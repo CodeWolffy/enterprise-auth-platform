@@ -1,8 +1,10 @@
 package com.enterprise.auth.platform.system.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.common.model.PageResult;
 import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.persistence.entity.SysConfigEntity;
 import com.enterprise.auth.platform.persistence.entity.SysDictEntity;
@@ -20,6 +22,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +32,9 @@ import org.springframework.util.StringUtils;
 
 @Service
 public class SystemManagementService {
+
+    private static final String SORT_ASC = "asc";
+    private static final String SORT_DESC = "desc";
 
     private final PersistenceProperties persistenceProperties;
     private final SysDictMapper sysDictMapper;
@@ -51,19 +59,28 @@ public class SystemManagementService {
         this.dataScopeService = dataScopeService;
     }
 
-    public List<DictView> dicts() {
+    public PageResult<DictView> dicts(String dictType, String keyword, int page, int size) {
+        return dicts(dictType, keyword, page, size, null, null);
+    }
+
+    public PageResult<DictView> dicts(String dictType, String keyword, int page, int size, String sortBy, String sortDirection) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
-        return dataScopeService.filterByCreator(
-                        tenantId,
-                        sysDictMapper.selectList(new LambdaQueryWrapper<SysDictEntity>()
-                                .eq(SysDictEntity::getTenantId, tenantId)
-                                .eq(SysDictEntity::getDeleted, 0)
-                                .orderByAsc(SysDictEntity::getId)),
-                        SysDictEntity::getCreatedBy)
-                .stream()
-                .map(item -> new DictView(item.getId(), item.getDictType(), item.getDictCode(), item.getDictValue(), item.getCreatedBy()))
-                .toList();
+        Optional<Set<String>> visibleCreators = dataScopeService.visibleUsernames(tenantId);
+        return pageQuery(
+                buildDictQuery(tenantId, dictType, keyword, visibleCreators),
+                buildDictQuery(tenantId, dictType, keyword, visibleCreators),
+                page,
+                size,
+                query -> sysDictMapper.selectCount(query),
+                query -> sysDictMapper.selectList(query).stream().map(this::toDictView).toList(),
+                resolveDictSort(sortBy),
+                resolveDirection(sortDirection, SORT_ASC)
+        );
+    }
+
+    public PageResult<DictView> dicts() {
+        return dicts(null, null, 1, 10, null, null);
     }
 
     @Transactional
@@ -78,7 +95,7 @@ public class SystemManagementService {
         entity.setDictValue(request.dictValue());
         sysDictMapper.insert(entity);
         auditService.record("DICT_CREATED", operator, tenantId, Map.of("dictId", entity.getId()));
-        return new DictView(entity.getId(), entity.getDictType(), entity.getDictCode(), entity.getDictValue(), entity.getCreatedBy());
+        return toDictView(entity);
     }
 
     @Transactional
@@ -91,7 +108,7 @@ public class SystemManagementService {
         entity.setDictValue(request.dictValue());
         sysDictMapper.updateById(entity);
         auditService.record("DICT_UPDATED", SecuritySupport.currentOperator(), tenantId, Map.of("dictId", id));
-        return new DictView(entity.getId(), entity.getDictType(), entity.getDictCode(), entity.getDictValue(), entity.getCreatedBy());
+        return toDictView(entity);
     }
 
     @Transactional
@@ -104,19 +121,28 @@ public class SystemManagementService {
         auditService.record("DICT_DELETED", operator, tenantId, Map.of("dictId", id));
     }
 
-    public List<ConfigView> configs() {
+    public PageResult<ConfigView> configs(String keyword, int page, int size) {
+        return configs(keyword, page, size, null, null);
+    }
+
+    public PageResult<ConfigView> configs(String keyword, int page, int size, String sortBy, String sortDirection) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
-        return dataScopeService.filterByCreator(
-                        tenantId,
-                        sysConfigMapper.selectList(new LambdaQueryWrapper<SysConfigEntity>()
-                                .eq(SysConfigEntity::getTenantId, tenantId)
-                                .eq(SysConfigEntity::getDeleted, 0)
-                                .orderByAsc(SysConfigEntity::getId)),
-                        SysConfigEntity::getCreatedBy)
-                .stream()
-                .map(item -> new ConfigView(item.getId(), item.getConfigKey(), item.getConfigName(), item.getConfigValue(), item.getCreatedBy()))
-                .toList();
+        Optional<Set<String>> visibleCreators = dataScopeService.visibleUsernames(tenantId);
+        return pageQuery(
+                buildConfigQuery(tenantId, keyword, visibleCreators),
+                buildConfigQuery(tenantId, keyword, visibleCreators),
+                page,
+                size,
+                query -> sysConfigMapper.selectCount(query),
+                query -> sysConfigMapper.selectList(query).stream().map(this::toConfigView).toList(),
+                resolveConfigSort(sortBy),
+                resolveDirection(sortDirection, SORT_ASC)
+        );
+    }
+
+    public PageResult<ConfigView> configs() {
+        return configs(null, 1, 10, null, null);
     }
 
     @Transactional
@@ -131,7 +157,7 @@ public class SystemManagementService {
         entity.setConfigValue(request.configValue());
         sysConfigMapper.insert(entity);
         auditService.record("CONFIG_CREATED", operator, tenantId, Map.of("configId", entity.getId()));
-        return new ConfigView(entity.getId(), entity.getConfigKey(), entity.getConfigName(), entity.getConfigValue(), entity.getCreatedBy());
+        return toConfigView(entity);
     }
 
     @Transactional
@@ -144,7 +170,7 @@ public class SystemManagementService {
         entity.setConfigValue(request.configValue());
         sysConfigMapper.updateById(entity);
         auditService.record("CONFIG_UPDATED", SecuritySupport.currentOperator(), tenantId, Map.of("configId", id));
-        return new ConfigView(entity.getId(), entity.getConfigKey(), entity.getConfigName(), entity.getConfigValue(), entity.getCreatedBy());
+        return toConfigView(entity);
     }
 
     @Transactional
@@ -157,26 +183,35 @@ public class SystemManagementService {
         auditService.record("CONFIG_DELETED", operator, tenantId, Map.of("configId", id));
     }
 
-    public List<NoticeView> notices() {
+    public PageResult<NoticeView> notices(Boolean published, String keyword, int page, int size) {
+        return notices(published, keyword, page, size, null, null);
+    }
+
+    public PageResult<NoticeView> notices(
+            Boolean published,
+            String keyword,
+            int page,
+            int size,
+            String sortBy,
+            String sortDirection
+    ) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
-        return dataScopeService.filterByCreator(
-                        tenantId,
-                        sysNoticeMapper.selectList(new LambdaQueryWrapper<SysNoticeEntity>()
-                                .eq(SysNoticeEntity::getTenantId, tenantId)
-                                .eq(SysNoticeEntity::getDeleted, 0)
-                                .orderByDesc(SysNoticeEntity::getId)),
-                        SysNoticeEntity::getCreatedBy)
-                .stream()
-                .map(item -> new NoticeView(
-                        item.getId(),
-                        item.getNoticeTitle(),
-                        item.getNoticeContent(),
-                        item.getPublished() != null && item.getPublished() == 1,
-                        item.getPublishTime(),
-                        item.getCreatedBy()
-                ))
-                .toList();
+        Optional<Set<String>> visibleCreators = dataScopeService.visibleUsernames(tenantId);
+        return pageQuery(
+                buildNoticeQuery(tenantId, published, keyword, visibleCreators),
+                buildNoticeQuery(tenantId, published, keyword, visibleCreators),
+                page,
+                size,
+                query -> sysNoticeMapper.selectCount(query),
+                query -> sysNoticeMapper.selectList(query).stream().map(this::toNoticeView).toList(),
+                resolveNoticeSort(sortBy),
+                resolveDirection(sortDirection, SORT_DESC)
+        );
+    }
+
+    public PageResult<NoticeView> notices() {
+        return notices(null, null, 1, 10, null, null);
     }
 
     @Transactional
@@ -192,7 +227,7 @@ public class SystemManagementService {
         entity.setPublishTime(request.publishTime());
         sysNoticeMapper.insert(entity);
         auditService.record("NOTICE_CREATED", operator, tenantId, Map.of("noticeId", entity.getId()));
-        return new NoticeView(entity.getId(), entity.getNoticeTitle(), entity.getNoticeContent(), entity.getPublished() == 1, entity.getPublishTime(), entity.getCreatedBy());
+        return toNoticeView(entity);
     }
 
     @Transactional
@@ -206,7 +241,7 @@ public class SystemManagementService {
         entity.setPublishTime(request.publishTime());
         sysNoticeMapper.updateById(entity);
         auditService.record("NOTICE_UPDATED", SecuritySupport.currentOperator(), tenantId, Map.of("noticeId", id));
-        return new NoticeView(entity.getId(), entity.getNoticeTitle(), entity.getNoticeContent(), entity.getPublished() == 1, entity.getPublishTime(), entity.getCreatedBy());
+        return toNoticeView(entity);
     }
 
     @Transactional
@@ -217,6 +252,123 @@ public class SystemManagementService {
         SysNoticeEntity entity = getNotice(id, tenantId);
         sysNoticeMapper.deleteById(entity.getId());
         auditService.record("NOTICE_DELETED", operator, tenantId, Map.of("noticeId", id));
+    }
+
+    private DictView toDictView(SysDictEntity entity) {
+        return new DictView(entity.getId(), entity.getDictType(), entity.getDictCode(), entity.getDictValue(), entity.getCreatedBy());
+    }
+
+    private ConfigView toConfigView(SysConfigEntity entity) {
+        return new ConfigView(entity.getId(), entity.getConfigKey(), entity.getConfigName(), entity.getConfigValue(), entity.getCreatedBy());
+    }
+
+    private NoticeView toNoticeView(SysNoticeEntity entity) {
+        return new NoticeView(
+                entity.getId(),
+                entity.getNoticeTitle(),
+                entity.getNoticeContent(),
+                entity.getPublished() != null && entity.getPublished() == 1,
+                entity.getPublishTime(),
+                entity.getCreatedBy()
+        );
+    }
+
+    private LambdaQueryWrapper<SysDictEntity> buildDictQuery(
+            String tenantId,
+            String dictType,
+            String keyword,
+            Optional<Set<String>> visibleCreators
+    ) {
+        LambdaQueryWrapper<SysDictEntity> query = new LambdaQueryWrapper<SysDictEntity>()
+                .eq(SysDictEntity::getTenantId, tenantId)
+                .eq(SysDictEntity::getDeleted, 0)
+                .like(StringUtils.hasText(dictType), SysDictEntity::getDictType, dictType)
+                .and(StringUtils.hasText(keyword), wrapper -> wrapper
+                        .like(SysDictEntity::getDictCode, keyword)
+                        .or()
+                        .like(SysDictEntity::getDictValue, keyword));
+        visibleCreators.ifPresent(usernames -> {
+            if (usernames.isEmpty()) {
+                query.apply("1 = 0");
+                return;
+            }
+            query.in(SysDictEntity::getCreatedBy, usernames);
+        });
+        return query;
+    }
+
+    private LambdaQueryWrapper<SysConfigEntity> buildConfigQuery(
+            String tenantId,
+            String keyword,
+            Optional<Set<String>> visibleCreators
+    ) {
+        LambdaQueryWrapper<SysConfigEntity> query = new LambdaQueryWrapper<SysConfigEntity>()
+                .eq(SysConfigEntity::getTenantId, tenantId)
+                .eq(SysConfigEntity::getDeleted, 0)
+                .and(StringUtils.hasText(keyword), wrapper -> wrapper
+                        .like(SysConfigEntity::getConfigKey, keyword)
+                        .or()
+                        .like(SysConfigEntity::getConfigName, keyword)
+                        .or()
+                        .like(SysConfigEntity::getConfigValue, keyword));
+        visibleCreators.ifPresent(usernames -> {
+            if (usernames.isEmpty()) {
+                query.apply("1 = 0");
+                return;
+            }
+            query.in(SysConfigEntity::getCreatedBy, usernames);
+        });
+        return query;
+    }
+
+    private LambdaQueryWrapper<SysNoticeEntity> buildNoticeQuery(
+            String tenantId,
+            Boolean published,
+            String keyword,
+            Optional<Set<String>> visibleCreators
+    ) {
+        LambdaQueryWrapper<SysNoticeEntity> query = new LambdaQueryWrapper<SysNoticeEntity>()
+                .eq(SysNoticeEntity::getTenantId, tenantId)
+                .eq(SysNoticeEntity::getDeleted, 0)
+                .eq(published != null, SysNoticeEntity::getPublished, Boolean.TRUE.equals(published) ? 1 : 0)
+                .and(StringUtils.hasText(keyword), wrapper -> wrapper
+                        .like(SysNoticeEntity::getNoticeTitle, keyword)
+                        .or()
+                        .like(SysNoticeEntity::getNoticeContent, keyword));
+        visibleCreators.ifPresent(usernames -> {
+            if (usernames.isEmpty()) {
+                query.apply("1 = 0");
+                return;
+            }
+            query.in(SysNoticeEntity::getCreatedBy, usernames);
+        });
+        return query;
+    }
+
+    private <E, V> PageResult<V> pageQuery(
+            LambdaQueryWrapper<E> countQuery,
+            LambdaQueryWrapper<E> listQuery,
+            int page,
+            int size,
+            Function<LambdaQueryWrapper<E>, Long> counter,
+            Function<LambdaQueryWrapper<E>, List<V>> recordsLoader,
+            SFunction<E, ?> orderField,
+            String direction
+    ) {
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.max(size, 1);
+        long total = counter.apply(countQuery);
+        if (total == 0) {
+            return PageResult.of(0, safePage, safeSize, List.of());
+        }
+        int offset = (safePage - 1) * safeSize;
+        if (SORT_ASC.equals(direction)) {
+            listQuery.orderByAsc(orderField);
+        } else {
+            listQuery.orderByDesc(orderField);
+        }
+        listQuery.last("limit " + offset + "," + safeSize);
+        return PageResult.of(total, safePage, safeSize, recordsLoader.apply(listQuery));
     }
 
     private SysDictEntity getDict(Long id, String tenantId) {
@@ -273,6 +425,42 @@ public class SystemManagementService {
     private String currentTenantId() {
         String tenantId = TenantContext.getTenantId();
         return StringUtils.hasText(tenantId) ? tenantId : "platform";
+    }
+
+    private SFunction<SysDictEntity, ?> resolveDictSort(String sortBy) {
+        if ("dictType".equalsIgnoreCase(sortBy)) {
+            return SysDictEntity::getDictType;
+        }
+        if ("dictCode".equalsIgnoreCase(sortBy)) {
+            return SysDictEntity::getDictCode;
+        }
+        return SysDictEntity::getCreatedAt;
+    }
+
+    private SFunction<SysConfigEntity, ?> resolveConfigSort(String sortBy) {
+        if ("configKey".equalsIgnoreCase(sortBy)) {
+            return SysConfigEntity::getConfigKey;
+        }
+        if ("configName".equalsIgnoreCase(sortBy)) {
+            return SysConfigEntity::getConfigName;
+        }
+        return SysConfigEntity::getCreatedAt;
+    }
+
+    private SFunction<SysNoticeEntity, ?> resolveNoticeSort(String sortBy) {
+        if ("createdAt".equalsIgnoreCase(sortBy)) {
+            return SysNoticeEntity::getCreatedAt;
+        }
+        if ("noticeTitle".equalsIgnoreCase(sortBy)) {
+            return SysNoticeEntity::getNoticeTitle;
+        }
+        return SysNoticeEntity::getPublishTime;
+    }
+
+    private String resolveDirection(String sortDirection, String defaultValue) {
+        return SORT_ASC.equalsIgnoreCase(sortDirection)
+                ? SORT_ASC
+                : SORT_DESC.equalsIgnoreCase(sortDirection) ? SORT_DESC : defaultValue;
     }
 
     @Schema(description = "字典项视图")

@@ -294,9 +294,9 @@ const tokenCommandExample = computed(() => {
 void load()
 
 async function load() {
-  const [clientList, dictList] = await Promise.all([queryClients(), queryDicts()])
+  const [clientList, dictPage] = await Promise.all([queryClients(), queryDicts({ page: 1, size: 200 })])
   clients.value = clientList
-  availableScopes.value = dictList.filter((item) => item.dictType === 'oauth_scope')
+  availableScopes.value = dictPage.records.filter((item) => item.dictType === 'oauth_scope')
 }
 
 function openCreate() {

@@ -130,7 +130,7 @@
         </el-row>
         <el-row :gutter="16">
           <el-col :span="12">
-            <el-form-item label="手机号">
+            <el-form-item label="手机号" prop="mobile">
               <el-input v-model="userForm.mobile" />
             </el-form-item>
           </el-col>
@@ -151,7 +151,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="部门 ID">
+            <el-form-item label="部门 ID" prop="deptId">
               <el-input-number v-model="userForm.deptId" :min="1" style="width: 100%" />
             </el-form-item>
           </el-col>
@@ -236,6 +236,13 @@ const userForm = reactive({
 
 const userRules = reactive<FormRules>({
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+  mobile: [
+    {
+      pattern: /^1\d{10}$/,
+      message: '请输入有效的 11 位手机号',
+      trigger: ['blur', 'change'],
+    },
+  ],
   email: [{ type: 'email', message: '请输入有效的邮箱地址', trigger: ['blur', 'change'] }],
   password: [
     {
@@ -247,6 +254,18 @@ const userRules = reactive<FormRules>({
         callback()
       },
       trigger: 'blur',
+    },
+  ],
+  deptId: [
+    {
+      validator: (_rule, value, callback) => {
+        if (value == null || value < 1) {
+          callback(new Error('请输入有效的部门 ID'))
+          return
+        }
+        callback()
+      },
+      trigger: 'change',
     },
   ],
 })

@@ -3,13 +3,13 @@
     <section class="dashboard-grid">
       <article class="stat-card">
         <span class="eyebrow">Configs</span>
-        <strong>{{ filteredConfigs.length }}</strong>
+        <strong>{{ total }}</strong>
         <span>当前筛选条件下的参数项总数</span>
       </article>
       <article class="stat-card">
         <span class="eyebrow">Operators</span>
         <strong>{{ operatorCount }}</strong>
-        <span>涉及的创建人数量</span>
+        <span>当前页涉及的创建人数</span>
       </article>
     </section>
 
@@ -22,35 +22,77 @@
         <el-button type="primary" @click="openConfig()">新增参数</el-button>
       </div>
 
-      <el-form :inline="true" class="toolbar-inline" @submit.prevent>
+      <el-form :inline="true" class="toolbar-inline" @submit.prevent="handleSearch">
         <el-form-item label="关键字">
           <el-input v-model="keyword" placeholder="搜索参数键、名称或值" clearable />
         </el-form-item>
+        <el-form-item label="排序字段">
+          <el-select v-model="sortBy" style="width: 160px">
+            <el-option label="创建时间" value="createdAt" />
+            <el-option label="参数键" value="configKey" />
+            <el-option label="参数名称" value="configName" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="排序方向">
+          <el-select v-model="sortDirection" style="width: 120px">
+            <el-option label="升序" value="asc" />
+            <el-option label="降序" value="desc" />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="handleSearch">搜索</el-button>
+          <el-button @click="resetSearch">重置</el-button>
+        </el-form-item>
       </el-form>
 
-      <el-table :data="filteredConfigs" stripe>
+      <el-table :data="configs" stripe>
         <el-table-column prop="configKey" label="参数键" min-width="180" />
         <el-table-column prop="configName" label="参数名称" min-width="180" />
         <el-table-column prop="configValue" label="参数值" min-width="220" show-overflow-tooltip />
         <el-table-column prop="createdBy" label="创建人" min-width="120" />
-        <el-table-column fixed="right" label="操作" width="160">
+        <el-table-column fixed="right" label="操作" width="220">
           <template #default="{ row }">
+            <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button link type="primary" @click="openConfig(row)">编辑</el-button>
             <el-button link type="danger" @click="removeConfig(row.id)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="pagination-wrap">
+        <el-pagination
+          v-model:current-page="page"
+          v-model:page-size="size"
+          :page-sizes="[10, 20, 50]"
+          layout="total, sizes, prev, pager, next"
+          :total="total"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
     </section>
 
+    <el-drawer v-model="detailVisible" title="参数详情" size="600px">
+      <template v-if="detailItem">
+        <el-descriptions :column="2" border>
+          <el-descriptions-item label="参数键">{{ detailItem.configKey }}</el-descriptions-item>
+          <el-descriptions-item label="参数名称">{{ detailItem.configName }}</el-descriptions-item>
+          <el-descriptions-item label="参数值" :span="2">{{ detailItem.configValue }}</el-descriptions-item>
+          <el-descriptions-item label="创建人">{{ detailItem.createdBy }}</el-descriptions-item>
+          <el-descriptions-item label="ID">{{ detailItem.id }}</el-descriptions-item>
+        </el-descriptions>
+      </template>
+    </el-drawer>
+
     <el-dialog v-model="visible" :title="editingId ? '编辑参数' : '新增参数'" width="560px">
-      <el-form label-position="top">
-        <el-form-item label="参数键">
+      <el-form ref="formRef" label-position="top" :model="form" :rules="rules">
+        <el-form-item label="参数键" prop="configKey">
           <el-input v-model="form.configKey" />
         </el-form-item>
-        <el-form-item label="参数名称">
+        <el-form-item label="参数名称" prop="configName">
           <el-input v-model="form.configName" />
         </el-form-item>
-        <el-form-item label="参数值">
+        <el-form-item label="参数值" prop="configValue">
           <el-input v-model="form.configValue" type="textarea" :rows="4" />
         </el-form-item>
       </el-form>
@@ -65,13 +107,22 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
 import { createConfig, deleteConfig, queryConfigs, updateConfig } from '@/api/system'
 import type { ConfigView } from '@/types/auth'
 
 const configs = ref<ConfigView[]>([])
 const visible = ref(false)
+const detailVisible = ref(false)
 const editingId = ref<number | null>(null)
+const detailItem = ref<ConfigView | null>(null)
 const keyword = ref('')
+const sortBy = ref<'createdAt' | 'configKey' | 'configName'>('createdAt')
+const sortDirection = ref<'asc' | 'desc'>('asc')
+const page = ref(1)
+const size = ref(10)
+const total = ref(0)
+const formRef = ref<FormInstance>()
 
 const form = reactive({
   configKey: '',
@@ -79,24 +130,54 @@ const form = reactive({
   configValue: '',
 })
 
-const filteredConfigs = computed(() =>
-  configs.value.filter((item) => {
-    const normalizedKeyword = keyword.value.trim().toLowerCase()
-    return (
-      !normalizedKeyword ||
-      [item.configKey, item.configName, item.configValue].some((value) =>
-        value.toLowerCase().includes(normalizedKeyword),
-      )
-    )
-  }),
-)
+const rules = reactive<FormRules>({
+  configKey: [{ required: true, message: '请输入参数键', trigger: 'blur' }],
+  configName: [{ required: true, message: '请输入参数名称', trigger: 'blur' }],
+  configValue: [{ required: true, message: '请输入参数值', trigger: 'blur' }],
+})
 
-const operatorCount = computed(() => new Set(filteredConfigs.value.map((item) => item.createdBy)).size)
+const operatorCount = computed(() => new Set(configs.value.map((item) => item.createdBy)).size)
 
 void load()
 
 async function load() {
-  configs.value = await queryConfigs()
+  const result = await queryConfigs({
+    keyword: keyword.value || undefined,
+    page: page.value,
+    size: size.value,
+    sortBy: sortBy.value,
+    sortDirection: sortDirection.value,
+  })
+  configs.value = result.records
+  total.value = result.total
+}
+
+function handleSearch() {
+  page.value = 1
+  void load()
+}
+
+function resetSearch() {
+  keyword.value = ''
+  sortBy.value = 'createdAt'
+  sortDirection.value = 'asc'
+  page.value = 1
+  void load()
+}
+
+function handleSizeChange(value: number) {
+  size.value = value
+  void load()
+}
+
+function handleCurrentChange(value: number) {
+  page.value = value
+  void load()
+}
+
+function openDetail(row: ConfigView) {
+  detailItem.value = row
+  detailVisible.value = true
 }
 
 function openConfig(row?: ConfigView) {
@@ -106,6 +187,10 @@ function openConfig(row?: ConfigView) {
 }
 
 async function submit() {
+  if (!formRef.value) {
+    return
+  }
+  await formRef.value.validate()
   if (editingId.value) {
     await updateConfig(editingId.value, form)
     ElMessage.success('参数已更新')
@@ -124,3 +209,11 @@ async function removeConfig(id: number) {
   await load()
 }
 </script>
+
+<style scoped lang="scss">
+.pagination-wrap {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+</style>

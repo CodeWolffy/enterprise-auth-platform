@@ -34,6 +34,8 @@ class SystemControllerTest {
     private static final String CHILD_DEPT_CODE = "SYSTEM_SCOPE_CHILD_UT";
     private static final String VISIBLE_DICT_CODE = "SYSTEM_VISIBLE_DICT_UT";
     private static final String HIDDEN_DICT_CODE = "SYSTEM_HIDDEN_DICT_UT";
+    private static final String ALPHA_DICT_CODE = "SYSTEM_ALPHA_DICT_UT";
+    private static final String OMEGA_DICT_CODE = "SYSTEM_OMEGA_DICT_UT";
 
     @Autowired
     private MockMvc mockMvc;
@@ -60,7 +62,14 @@ class SystemControllerTest {
         ensureUser(VISIBLE_USER, childDeptId);
         ensureUser(HIDDEN_USER, 3L);
 
-        jdbcTemplate.update("DELETE FROM sys_dict WHERE tenant_id = ? AND dict_code IN (?, ?)", "tenant-a", VISIBLE_DICT_CODE, HIDDEN_DICT_CODE);
+        jdbcTemplate.update(
+                "DELETE FROM sys_dict WHERE tenant_id = ? AND dict_code IN (?, ?, ?, ?)",
+                "tenant-a",
+                VISIBLE_DICT_CODE,
+                HIDDEN_DICT_CODE,
+                ALPHA_DICT_CODE,
+                OMEGA_DICT_CODE
+        );
         jdbcTemplate.update(
                 "INSERT INTO sys_dict(tenant_id, dict_type, dict_code, dict_value, created_by, updated_by, deleted, created_at, updated_at) VALUES(?,?,?,?,?,?,0,NOW(),NOW())",
                 "tenant-a", "system_scope", VISIBLE_DICT_CODE, "可见字典", VISIBLE_USER, VISIBLE_USER
@@ -68,6 +77,14 @@ class SystemControllerTest {
         jdbcTemplate.update(
                 "INSERT INTO sys_dict(tenant_id, dict_type, dict_code, dict_value, created_by, updated_by, deleted, created_at, updated_at) VALUES(?,?,?,?,?,?,0,NOW(),NOW())",
                 "tenant-a", "system_scope", HIDDEN_DICT_CODE, "隐藏字典", HIDDEN_USER, HIDDEN_USER
+        );
+        jdbcTemplate.update(
+                "INSERT INTO sys_dict(tenant_id, dict_type, dict_code, dict_value, created_by, updated_by, deleted, created_at, updated_at) VALUES(?,?,?,?,?,?,0,NOW(),NOW())",
+                "tenant-a", "system_scope", ALPHA_DICT_CODE, "排序字典 A", VISIBLE_USER, VISIBLE_USER
+        );
+        jdbcTemplate.update(
+                "INSERT INTO sys_dict(tenant_id, dict_type, dict_code, dict_value, created_by, updated_by, deleted, created_at, updated_at) VALUES(?,?,?,?,?,?,0,NOW(),NOW())",
+                "tenant-a", "system_scope", OMEGA_DICT_CODE, "排序字典 Z", VISIBLE_USER, VISIBLE_USER
         );
         hiddenDictId = jdbcTemplate.queryForObject(
                 "SELECT id FROM sys_dict WHERE tenant_id = ? AND dict_code = ?",
@@ -79,7 +96,14 @@ class SystemControllerTest {
 
     @AfterEach
     void tearDown() {
-        jdbcTemplate.update("DELETE FROM sys_dict WHERE tenant_id = ? AND dict_code IN (?, ?)", "tenant-a", VISIBLE_DICT_CODE, HIDDEN_DICT_CODE);
+        jdbcTemplate.update(
+                "DELETE FROM sys_dict WHERE tenant_id = ? AND dict_code IN (?, ?, ?, ?)",
+                "tenant-a",
+                VISIBLE_DICT_CODE,
+                HIDDEN_DICT_CODE,
+                ALPHA_DICT_CODE,
+                OMEGA_DICT_CODE
+        );
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username IN (?, ?, ?)", "tenant-a", SCOPE_USER, VISIBLE_USER, HIDDEN_USER);
         jdbcTemplate.update("DELETE FROM sys_dept WHERE tenant_id = ? AND dept_code = ?", "tenant-a", CHILD_DEPT_CODE);
     }
@@ -90,8 +114,21 @@ class SystemControllerTest {
                         .with(user(principal(Set.of("system:read"))))
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[?(@.dictCode=='" + VISIBLE_DICT_CODE + "')]").exists())
-                .andExpect(jsonPath("$.data[?(@.dictCode=='" + HIDDEN_DICT_CODE + "')]").doesNotExist());
+                .andExpect(jsonPath("$.data.records[?(@.dictCode=='" + VISIBLE_DICT_CODE + "')]").exists())
+                .andExpect(jsonPath("$.data.records[?(@.dictCode=='" + HIDDEN_DICT_CODE + "')]").doesNotExist());
+    }
+
+    @Test
+    void dictListShouldSupportSortByDictCode() throws Exception {
+        mockMvc.perform(get("/api/system/dicts")
+                        .with(user(principal(Set.of("system:read"))))
+                        .header("X-Tenant-Id", "tenant-a")
+                        .param("sortBy", "dictCode")
+                        .param("sortDirection", "asc")
+                        .param("page", "1")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].dictCode").value(ALPHA_DICT_CODE));
     }
 
     @Test

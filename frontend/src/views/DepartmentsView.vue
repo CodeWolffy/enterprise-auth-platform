@@ -32,9 +32,13 @@
         <el-button type="primary" @click="openDepartment()">新增部门</el-button>
       </div>
 
-      <el-form :inline="true" class="toolbar-inline" @submit.prevent>
+      <el-form :inline="true" class="toolbar-inline" @submit.prevent="handleSearch">
         <el-form-item label="关键字">
           <el-input v-model="keyword" placeholder="按部门名称或编码搜索" clearable />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="handleSearch">搜索</el-button>
+          <el-button @click="resetSearch">重置</el-button>
         </el-form-item>
       </el-form>
 
@@ -42,7 +46,7 @@
         <el-table-column prop="name" label="部门名称" min-width="180" />
         <el-table-column prop="code" label="部门编码" min-width="140" />
         <el-table-column prop="leaderUserId" label="负责人用户 ID" min-width="140" />
-        <el-table-column fixed="right" label="操作" width="240">
+        <el-table-column fixed="right" label="操作" width="280">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button link type="primary" @click="openDepartment(row)">编辑</el-button>
@@ -67,15 +71,15 @@
     </el-drawer>
 
     <el-dialog v-model="visible" :title="editingId ? '编辑部门' : '新增部门'" width="620px">
-      <el-form label-position="top">
+      <el-form ref="formRef" label-position="top" :model="form" :rules="deptRules">
         <el-row :gutter="16">
           <el-col :span="12">
-            <el-form-item label="部门名称">
+            <el-form-item label="部门名称" prop="deptName">
               <el-input v-model="form.deptName" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="部门编码">
+            <el-form-item label="部门编码" prop="deptCode">
               <el-input v-model="form.deptCode" />
             </el-form-item>
           </el-col>
@@ -95,7 +99,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="负责人用户 ID">
+            <el-form-item label="负责人用户 ID" prop="leaderUserId">
               <el-input-number v-model="form.leaderUserId" :min="1" style="width: 100%" />
             </el-form-item>
           </el-col>
@@ -112,6 +116,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
 import { createDepartment, deleteDepartment, queryDepartments, updateDepartment } from '@/api/platform'
 import type { DepartmentView } from '@/types/auth'
 
@@ -124,12 +129,37 @@ const editingId = ref<number | null>(null)
 const detailDepartment = ref<DepartmentView | null>(null)
 const loading = ref(false)
 const keyword = ref('')
+const formRef = ref<FormInstance>()
 
 const form = reactive({
   parentId: null as number | null,
   deptCode: '',
   deptName: '',
   leaderUserId: null as number | null,
+})
+
+const deptRules = reactive<FormRules>({
+  deptName: [{ required: true, message: '请输入部门名称', trigger: 'blur' }],
+  deptCode: [
+    { required: true, message: '请输入部门编码', trigger: 'blur' },
+    { pattern: /^[a-zA-Z0-9:_-]{2,64}$/, message: '部门编码仅支持字母、数字、:、_、-', trigger: 'blur' },
+  ],
+  leaderUserId: [
+    {
+      validator: (_rule, value, callback) => {
+        if (value == null) {
+          callback()
+          return
+        }
+        if (value < 1) {
+          callback(new Error('负责人用户 ID 必须大于 0'))
+          return
+        }
+        callback()
+      },
+      trigger: 'change',
+    },
+  ],
 })
 
 const departmentTree = computed<DepartmentTreeNode[]>(() => buildTree(departments.value))
@@ -156,6 +186,14 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+function handleSearch() {
+  return
+}
+
+function resetSearch() {
+  keyword.value = ''
 }
 
 function buildTree(source: DepartmentView[]) {
@@ -230,6 +268,10 @@ function openChildDepartment(row: DepartmentView) {
 }
 
 async function submit() {
+  if (!formRef.value) {
+    return
+  }
+  await formRef.value.validate()
   const payload = {
     parentId: form.parentId,
     deptCode: form.deptCode || null,

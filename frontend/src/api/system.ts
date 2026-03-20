@@ -1,13 +1,48 @@
 import { http } from './http'
 import type { ApiResponse, ConfigView, DictView, FeatureFlags, NoticeView } from '@/types/auth'
 
+export interface PageResult<T> {
+  total: number
+  page: number
+  size: number
+  records: T[]
+}
+
+export type SortDirection = 'asc' | 'desc'
+
+export interface DictQueryParams {
+  dictType?: string
+  keyword?: string
+  page?: number
+  size?: number
+  sortBy?: 'createdAt' | 'dictType' | 'dictCode'
+  sortDirection?: SortDirection
+}
+
+export interface ConfigQueryParams {
+  keyword?: string
+  page?: number
+  size?: number
+  sortBy?: 'createdAt' | 'configKey' | 'configName'
+  sortDirection?: SortDirection
+}
+
+export interface NoticeQueryParams {
+  keyword?: string
+  published?: boolean
+  page?: number
+  size?: number
+  sortBy?: 'publishTime' | 'createdAt' | 'noticeTitle'
+  sortDirection?: SortDirection
+}
+
 export async function queryFeatures() {
   const { data } = await http.get<ApiResponse<FeatureFlags>>('/api/system/features')
   return data.data
 }
 
-export async function queryDicts() {
-  const { data } = await http.get<ApiResponse<DictView[]>>('/api/system/dicts')
+export async function queryDicts(params?: DictQueryParams) {
+  const { data } = await http.get<ApiResponse<PageResult<DictView>>>('/api/system/dicts', { params })
   return data.data
 }
 
@@ -25,8 +60,8 @@ export async function deleteDict(id: number) {
   await http.delete(`/api/system/dicts/${id}`)
 }
 
-export async function queryConfigs() {
-  const { data } = await http.get<ApiResponse<ConfigView[]>>('/api/system/configs')
+export async function queryConfigs(params?: ConfigQueryParams) {
+  const { data } = await http.get<ApiResponse<PageResult<ConfigView>>>('/api/system/configs', { params })
   return data.data
 }
 
@@ -44,8 +79,8 @@ export async function deleteConfig(id: number) {
   await http.delete(`/api/system/configs/${id}`)
 }
 
-export async function queryNotices() {
-  const { data } = await http.get<ApiResponse<NoticeView[]>>('/api/system/notices')
+export async function queryNotices(params?: NoticeQueryParams) {
+  const { data } = await http.get<ApiResponse<PageResult<NoticeView>>>('/api/system/notices', { params })
   return data.data
 }
 

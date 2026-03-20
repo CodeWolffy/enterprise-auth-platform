@@ -3,8 +3,8 @@
     <section class="dashboard-grid">
       <article class="stat-card">
         <span class="eyebrow">Tenants</span>
-        <strong>{{ filteredTenants.length }}</strong>
-        <span>当前筛选条件下租户总数</span>
+        <strong>{{ pagedTenants.length }}</strong>
+        <span>当前页租户数量</span>
       </article>
       <article class="stat-card">
         <span class="eyebrow">Platform</span>
@@ -32,7 +32,7 @@
         <el-button type="primary" @click="openTenant()">新增租户</el-button>
       </div>
 
-      <el-form :inline="true" class="toolbar-inline" @submit.prevent>
+      <el-form :inline="true" class="toolbar-inline" @submit.prevent="handleSearch">
         <el-form-item label="关键字">
           <el-input v-model="keyword" placeholder="搜索租户编码或名称" clearable />
         </el-form-item>
@@ -50,9 +50,13 @@
             <el-option label="禁用" :value="0" />
           </el-select>
         </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="handleSearch">搜索</el-button>
+          <el-button @click="resetSearch">重置</el-button>
+        </el-form-item>
       </el-form>
 
-      <el-table v-loading="loading" :data="filteredTenants" stripe>
+      <el-table v-loading="loading" :data="pagedTenants" stripe>
         <el-table-column prop="tenantId" label="租户编码" min-width="140" />
         <el-table-column prop="name" label="租户名称" min-width="160" />
         <el-table-column label="租户级别" min-width="120">
@@ -86,6 +90,18 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="pagination-wrap">
+        <el-pagination
+          v-model:current-page="page"
+          v-model:page-size="size"
+          :page-sizes="[10, 20, 50]"
+          layout="total, sizes, prev, pager, next"
+          :total="filteredTenants.length"
+          @size-change="handlePageChange"
+          @current-change="handlePageChange"
+        />
+      </div>
     </section>
 
     <el-drawer v-model="detailVisible" title="租户详情" size="600px">
@@ -118,15 +134,15 @@
     </el-drawer>
 
     <el-dialog v-model="visible" :title="editingTenantId ? '编辑租户' : '新增租户'" width="660px">
-      <el-form label-position="top">
+      <el-form ref="formRef" label-position="top" :model="form" :rules="tenantRules">
         <el-row :gutter="16">
           <el-col :span="12">
-            <el-form-item label="租户编码">
+            <el-form-item label="租户编码" prop="tenantId">
               <el-input v-model="form.tenantId" :disabled="Boolean(editingTenantId)" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="租户名称">
+            <el-form-item label="租户名称" prop="tenantName">
               <el-input v-model="form.tenantName" />
             </el-form-item>
           </el-col>
@@ -138,7 +154,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="租户状态">
+            <el-form-item label="租户状态" prop="tenantStatus">
               <el-select v-model="form.tenantStatus" style="width: 100%">
                 <el-option label="启用" :value="1" />
                 <el-option label="禁用" :value="0" />
@@ -166,6 +182,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
 import { createTenant, deleteTenant, queryTenants, updateTenant } from '@/api/platform'
 import type { TenantView } from '@/types/auth'
 
@@ -178,6 +195,9 @@ const loading = ref(false)
 const keyword = ref('')
 const platformFilter = ref('')
 const statusFilter = ref<number | null>(null)
+const page = ref(1)
+const size = ref(10)
+const formRef = ref<FormInstance>()
 
 const form = reactive({
   tenantId: '',
@@ -185,6 +205,15 @@ const form = reactive({
   platformLevel: false,
   tenantStatus: 1,
   expireAt: '',
+})
+
+const tenantRules = reactive<FormRules>({
+  tenantId: [
+    { required: true, message: '请输入租户编码', trigger: 'blur' },
+    { pattern: /^[a-zA-Z0-9:_-]{2,64}$/, message: '租户编码仅支持字母、数字、:、_、-', trigger: 'blur' },
+  ],
+  tenantName: [{ required: true, message: '请输入租户名称', trigger: 'blur' }],
+  tenantStatus: [{ required: true, message: '请选择租户状态', trigger: 'change' }],
 })
 
 const filteredTenants = computed(() =>
@@ -200,6 +229,11 @@ const filteredTenants = computed(() =>
     return matchesKeyword && matchesPlatform && matchesStatus
   }),
 )
+
+const pagedTenants = computed(() => {
+  const start = (page.value - 1) * size.value
+  return filteredTenants.value.slice(start, start + size.value)
+})
 
 const platformTenantCount = computed(() => filteredTenants.value.filter((item) => item.platformLevel).length)
 const enabledTenantCount = computed(() => filteredTenants.value.filter((item) => item.tenantStatus === 1).length)
@@ -223,6 +257,21 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+function handleSearch() {
+  page.value = 1
+}
+
+function resetSearch() {
+  keyword.value = ''
+  platformFilter.value = ''
+  statusFilter.value = null
+  page.value = 1
+}
+
+function handlePageChange() {
+  return
 }
 
 function getExpireTagType(expireAt: string) {
@@ -261,6 +310,10 @@ function openDetail(row: TenantView) {
 }
 
 async function submit() {
+  if (!formRef.value) {
+    return
+  }
+  await formRef.value.validate()
   const payload = {
     tenantId: form.tenantId,
     tenantName: form.tenantName,
@@ -296,5 +349,11 @@ async function removeTenant(tenantId: string) {
 
 .detail-tip {
   margin-top: 20px;
+}
+
+.pagination-wrap {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
 }
 </style>

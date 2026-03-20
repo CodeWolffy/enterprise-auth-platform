@@ -111,16 +111,17 @@ const featureItems = computed(() => {
 void load()
 
 async function load() {
-  const [dicts, configs, notices, featureData] = await Promise.all([
-    queryDicts(),
-    queryConfigs(),
-    queryNotices(),
+  const [dicts, configs, notices, publishedNotices, featureData] = await Promise.all([
+    queryDicts({ page: 1, size: 1 }),
+    queryConfigs({ page: 1, size: 1 }),
+    queryNotices({ page: 1, size: 1 }),
+    queryNotices({ page: 1, size: 1, published: true }),
     queryFeatures(),
   ])
-  dictCount.value = dicts.length
-  configCount.value = configs.length
-  noticeCount.value = notices.length
-  publishedNoticeCount.value = notices.filter((item) => item.published).length
+  dictCount.value = dicts.total
+  configCount.value = configs.total
+  noticeCount.value = notices.total
+  publishedNoticeCount.value = publishedNotices.total
   features.value = featureData
 }
 

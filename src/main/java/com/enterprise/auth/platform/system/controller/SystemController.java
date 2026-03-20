@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.system.controller;
 
 import com.enterprise.auth.platform.common.api.ApiResponse;
+import com.enterprise.auth.platform.common.model.PageResult;
 import com.enterprise.auth.platform.config.FeatureToggleProperties;
 import com.enterprise.auth.platform.system.dto.ConfigCrudRequest;
 import com.enterprise.auth.platform.system.dto.DictCrudRequest;
@@ -11,7 +12,6 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "系统管理")
@@ -53,11 +54,18 @@ public class SystemController {
         return ApiResponse.ok(features);
     }
 
-    @Operation(summary = "查询字典列表")
+    @Operation(summary = "分页查询字典列表")
     @GetMapping("/dicts")
     @PreAuthorize("hasAuthority('system:read')")
-    public ApiResponse<List<SystemManagementService.DictView>> dicts() {
-        return ApiResponse.ok(systemManagementService.dicts());
+    public ApiResponse<PageResult<SystemManagementService.DictView>> dicts(
+            @Parameter(description = "字典类型") @RequestParam(required = false) String dictType,
+            @Parameter(description = "关键字，匹配字典编码或字典值") @RequestParam(required = false) String keyword,
+            @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "排序字段：createdAt、dictType、dictCode") @RequestParam(required = false) String sortBy,
+            @Parameter(description = "排序方向：asc 或 desc") @RequestParam(required = false) String sortDirection
+    ) {
+        return ApiResponse.ok(systemManagementService.dicts(dictType, keyword, page, size, sortBy, sortDirection));
     }
 
     @Operation(summary = "新增字典")
@@ -85,11 +93,17 @@ public class SystemController {
         return ApiResponse.ok();
     }
 
-    @Operation(summary = "查询参数列表")
+    @Operation(summary = "分页查询参数列表")
     @GetMapping("/configs")
     @PreAuthorize("hasAuthority('system:read')")
-    public ApiResponse<List<SystemManagementService.ConfigView>> configs() {
-        return ApiResponse.ok(systemManagementService.configs());
+    public ApiResponse<PageResult<SystemManagementService.ConfigView>> configs(
+            @Parameter(description = "关键字，匹配参数键、参数名称或参数值") @RequestParam(required = false) String keyword,
+            @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "排序字段：createdAt、configKey、configName") @RequestParam(required = false) String sortBy,
+            @Parameter(description = "排序方向：asc 或 desc") @RequestParam(required = false) String sortDirection
+    ) {
+        return ApiResponse.ok(systemManagementService.configs(keyword, page, size, sortBy, sortDirection));
     }
 
     @Operation(summary = "新增参数")
@@ -117,11 +131,18 @@ public class SystemController {
         return ApiResponse.ok();
     }
 
-    @Operation(summary = "查询公告列表")
+    @Operation(summary = "分页查询公告列表")
     @GetMapping("/notices")
     @PreAuthorize("hasAuthority('system:read')")
-    public ApiResponse<List<SystemManagementService.NoticeView>> notices() {
-        return ApiResponse.ok(systemManagementService.notices());
+    public ApiResponse<PageResult<SystemManagementService.NoticeView>> notices(
+            @Parameter(description = "是否已发布") @RequestParam(required = false) Boolean published,
+            @Parameter(description = "关键字，匹配标题或内容") @RequestParam(required = false) String keyword,
+            @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "排序字段：publishTime、createdAt、noticeTitle") @RequestParam(required = false) String sortBy,
+            @Parameter(description = "排序方向：asc 或 desc") @RequestParam(required = false) String sortDirection
+    ) {
+        return ApiResponse.ok(systemManagementService.notices(published, keyword, page, size, sortBy, sortDirection));
     }
 
     @Operation(summary = "新增公告")
