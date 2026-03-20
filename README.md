@@ -55,6 +55,7 @@
   - `keyword`
   - `platformLevel`
   - `tenantStatus`
+- 租户管理已支持租户状态历史与套餐变更轨迹查询
 - 角色权限分配已增强为资源树体验：
   - 展开 / 收起
   - 半选统计
@@ -64,6 +65,17 @@
   - 字典分类配置
   - 参数分类配置
   - 分类接口：`/api/system/categories`
+- 系统管理已提供分类配置管理入口：
+  - 字典分类配置维护
+  - 参数分类配置维护
+- 审计导出已支持异步导出任务：
+  - 创建异步导出任务
+  - 导出任务历史
+  - 导出文件下载
+- OAuth2 授权记录已增强审计联动：
+  - 最近授权时间
+  - 最近撤销时间
+  - 关联授权审计事件数
 - `system` 模块已支持服务端分页、服务端筛选、服务端排序：
   - 字典：`createdAt / dictType / dictCode`
   - 参数：`createdAt / configKey / configName`
@@ -95,7 +107,7 @@ mvn "-Dmaven.repo.local=.m2repo" test
 ```
 
 - 当前结果：
-  - `44` 个测试通过
+  - `46` 个测试通过
   - `4` 个测试因无 Docker 自动跳过
 
 - 前端构建通过：
@@ -287,10 +299,14 @@ mysql -h 127.0.0.1 -P 3306 -u root -p123456 < src/main/resources/database/enterp
 - `/api/permissions`
 - `/api/depts`
 - `/api/tenants`
+- `/api/tenants/{tenantId}/history`
 - `/api/audit/events`
 - `/api/audit/events/export`
+- `/api/audit/exports`
+- `/api/audit/exports/{taskId}/download`
 - `/api/system/features`
 - `/api/system/categories`
+- `/api/system/categories/{targetType}`
 - `/api/system/dicts`
 - `/api/system/configs`
 - `/api/system/notices`
@@ -360,14 +376,12 @@ mysql -h 127.0.0.1 -P 3306 -u root -p123456 < src/main/resources/database/enterp
   - 导入导出记录
   - 任务中心与报表任务
 - 系统管理仍缺更完整的产品能力：
-  - 分类配置管理页
   - 分类配置审计
   - 公告状态流转
   - 更完整的服务监控整合
 - 审计导出当前已增加时间范围上限与导出审计记录，但仍可继续增强：
-  - 异步导出
-  - 大文件导出任务化
-  - 导出历史列表
+  - 大文件导出任务分片与失败重试
+  - 导出结果保留策略
 - MinIO 还未接入真实业务
 - RocketMQ / Seata / XXL-Job / Loki 仍未接入真实业务链路
 - Redis / Redisson 虽已接入，但仍可继续统一成默认会话基础设施
@@ -386,17 +400,17 @@ mysql -h 127.0.0.1 -P 3306 -u root -p123456 < src/main/resources/database/enterp
   - 删除前引用校验提示
 - 部门管理后续建议继续升级为更完整的树形组织视图
 - 租户管理后续建议补：
-  - 租户状态历史
-  - 套餐变更轨迹
+  - 状态历史筛选与操作轨迹详情
+  - 套餐变更影响面说明
   - 更细的能力配置说明
 - 审计页面仍可继续增强：
-  - 导出历史
-  - 导出异步任务
+  - 导出结果保留与清理
+  - 异步导出进度与失败原因提示
   - 更细的时间跨度提示
 - 系统管理三页仍可继续增强：
   - 更多筛选项
   - 更强的详情展示
-  - 分类配置管理入口
+  - 分类配置引用分析
 - 前端菜单当前虽然已经动态化，但仍是“后端返回 code，前端本地映射页面元数据”的折中方案
 - 前端包体仍有继续优化空间：
   - `element-plus` 仍是最大包
@@ -415,8 +429,8 @@ mysql -h 127.0.0.1 -P 3306 -u root -p123456 < src/main/resources/database/enterp
 1. 完善前端业务页交互
 - 用户管理增加更多筛选、详情、重置密码、启停操作
 - 部门管理升级树形视图
-- 租户管理增加状态历史、套餐变更轨迹
-- 审计页面增加导出历史和异步导出体验
+- 租户管理增加状态历史筛选、套餐影响说明、能力说明
+- 审计页面增加导出结果保留和清理体验、失败原因展示
 
 2. 完善前端动态菜单
 - 当前保持 `menu.code + 本地路由元数据` 方案
@@ -438,6 +452,7 @@ mysql -h 127.0.0.1 -P 3306 -u root -p123456 < src/main/resources/database/enterp
 2. 完善授权记录
 - 记录谁在什么租户下给什么客户端授予了哪些 scope
 - 提供更细的查询接口和审计联动
+- 继续补客户端、授权记录、审计事件的三方联查与趋势视图
 
 3. 完善多租户授权页
 - 租户品牌色配置化
@@ -449,7 +464,7 @@ mysql -h 127.0.0.1 -P 3306 -u root -p123456 < src/main/resources/database/enterp
 1. 对未来组织类模块继续下沉数据权限
 2. 对报表和统计查询加入数据范围控制
 3. 对导入导出记录加入可见范围控制
-4. 对分类配置管理、任务记录等新增管理模块统一接入数据权限边界
+4. 对分类配置管理、导出任务记录等新增管理模块统一接入数据权限边界
 
 ### P4：继续启用预留组件
 

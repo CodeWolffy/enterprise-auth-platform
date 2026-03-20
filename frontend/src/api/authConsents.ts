@@ -3,10 +3,14 @@ import type { ApiResponse } from '@/types/auth'
 
 export interface ConsentView {
   registeredClientId: string
+  tenantId: string
   clientId: string
   clientName: string
   principalName: string
   authorities: string[]
+  lastGrantedAt?: string | null
+  lastRevokedAt?: string | null
+  auditEventCount: number
 }
 
 export interface PageResult<T> {

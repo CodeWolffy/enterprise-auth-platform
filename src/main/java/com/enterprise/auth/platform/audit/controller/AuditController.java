@@ -3,8 +3,10 @@ package com.enterprise.auth.platform.audit.controller;
 import com.enterprise.auth.platform.audit.model.AuditEvent;
 import com.enterprise.auth.platform.audit.model.AuditPage;
 import com.enterprise.auth.platform.audit.model.AuditQuery;
+import com.enterprise.auth.platform.audit.service.AuditExportTaskService;
 import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.common.api.ApiResponse;
+import com.enterprise.auth.platform.common.model.PageResult;
 import com.enterprise.auth.platform.security.SecuritySupport;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -19,6 +21,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,9 +33,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuditController {
 
     private final AuditService auditService;
+    private final AuditExportTaskService auditExportTaskService;
 
-    public AuditController(AuditService auditService) {
+    public AuditController(AuditService auditService, AuditExportTaskService auditExportTaskService) {
         this.auditService = auditService;
+        this.auditExportTaskService = auditExportTaskService;
     }
 
     @Operation(summary = "分页查询审计事件")
@@ -90,6 +96,44 @@ public class AuditController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=audit-events.csv")
                 .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
                 .body(csv.getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Operation(summary = "创建异步审计导出任务")
+    @PostMapping("/exports")
+    @PreAuthorize("hasAuthority('audit:read')")
+    public ApiResponse<AuditExportTaskService.ExportTaskView> createExportTask(
+            @RequestParam(required = false) String tenantId,
+            @RequestParam(required = false) String eventType,
+            @RequestParam(required = false) String operator,
+            @RequestParam(required = false) String requestId,
+            @RequestParam(required = false) String clientIp,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant occurredFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant occurredTo
+    ) {
+        return ApiResponse.ok(auditExportTaskService.create(buildQuery(tenantId, eventType, operator, requestId, clientIp, occurredFrom, occurredTo, 1, 2000)));
+    }
+
+    @Operation(summary = "分页查询审计导出任务")
+    @GetMapping("/exports")
+    @PreAuthorize("hasAuthority('audit:read')")
+    public ApiResponse<PageResult<AuditExportTaskService.ExportTaskView>> exportTasks(
+            @RequestParam(required = false) String tenantId,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return ApiResponse.ok(auditExportTaskService.page(tenantId, status, page, size));
+    }
+
+    @Operation(summary = "下载异步审计导出文件")
+    @GetMapping("/exports/{taskId}/download")
+    @PreAuthorize("hasAuthority('audit:read')")
+    public ResponseEntity<byte[]> downloadExportTask(@PathVariable Long taskId) {
+        AuditExportTaskService.DownloadFile file = auditExportTaskService.download(taskId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + file.fileName())
+                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .body(file.content());
     }
 
     private AuditQuery buildQuery(

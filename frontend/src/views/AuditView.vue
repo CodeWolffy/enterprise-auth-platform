@@ -31,6 +31,7 @@
         </div>
         <div class="panel-actions">
           <el-button @click="exportCurrentPage">导出当前页</el-button>
+          <el-button type="primary" plain @click="createAsyncExport">异步导出</el-button>
         </div>
       </div>
 
@@ -100,14 +101,38 @@
         />
       </div>
     </section>
+
+    <section class="dashboard-panel">
+      <div class="panel-head">
+        <div>
+          <span class="eyebrow">Export Tasks</span>
+          <h3>导出任务历史</h3>
+        </div>
+      </div>
+
+      <el-table :data="exportTasks.records" stripe>
+        <el-table-column prop="id" label="任务 ID" width="100" />
+        <el-table-column prop="status" label="状态" width="120" />
+        <el-table-column prop="operator" label="发起人" min-width="120" />
+        <el-table-column prop="recordCount" label="记录数" width="100" />
+        <el-table-column prop="requestedAt" label="发起时间" min-width="180" />
+        <el-table-column prop="completedAt" label="完成时间" min-width="180" />
+        <el-table-column prop="errorMessage" label="失败原因" min-width="180" />
+        <el-table-column fixed="right" label="操作" width="120">
+          <template #default="{ row }">
+            <el-button link type="primary" :disabled="row.status !== 'SUCCESS'" @click="downloadTask(row.id)">下载</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { exportAuditEvents, queryAuditEvents } from '@/api/platform'
-import type { AuditPage } from '@/types/auth'
+import { createAuditExportTask, downloadAuditExportTask, exportAuditEvents, queryAuditEvents, queryAuditExportTasks } from '@/api/platform'
+import type { AuditExportTask, AuditPage } from '@/types/auth'
 
 const query = reactive({
   tenantId: '',
@@ -125,6 +150,12 @@ const page = ref<AuditPage>({
   total: 0,
   page: 1,
   size: 20,
+  records: [],
+})
+const exportTasks = ref<{ total: number; page: number; size: number; records: AuditExportTask[] }>({
+  total: 0,
+  page: 1,
+  size: 10,
   records: [],
 })
 
@@ -152,15 +183,14 @@ function resetSearch() {
 
 async function load() {
   page.value = await queryAuditEvents({
-    tenantId: query.tenantId || undefined,
-    eventType: query.eventType || undefined,
-    operator: query.operator || undefined,
-    requestId: query.requestId || undefined,
-    clientIp: query.clientIp || undefined,
-    occurredFrom: dateRange.value?.[0] || undefined,
-    occurredTo: dateRange.value?.[1] || undefined,
+    ...currentQueryParams(),
     page: query.page,
     size: query.size,
+  })
+  exportTasks.value = await queryAuditExportTasks({
+    tenantId: query.tenantId || undefined,
+    page: 1,
+    size: 10,
   })
 }
 
@@ -180,15 +210,7 @@ async function exportCurrentPage() {
     ElMessage.warning('导出前请先选择开始和结束时间，且时间范围不能超过 31 天')
     return
   }
-  const blob = await exportAuditEvents({
-    tenantId: query.tenantId || undefined,
-    eventType: query.eventType || undefined,
-    operator: query.operator || undefined,
-    requestId: query.requestId || undefined,
-    clientIp: query.clientIp || undefined,
-    occurredFrom: dateRange.value?.[0] || undefined,
-    occurredTo: dateRange.value?.[1] || undefined,
-  })
+  const blob = await exportAuditEvents(currentQueryParams())
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
@@ -196,6 +218,42 @@ async function exportCurrentPage() {
   anchor.click()
   URL.revokeObjectURL(url)
   ElMessage.success('已导出审计记录')
+}
+
+async function createAsyncExport() {
+  if (!dateRange.value?.[0] || !dateRange.value?.[1]) {
+    ElMessage.warning('异步导出前请先选择开始和结束时间，且时间范围不能超过 31 天')
+    return
+  }
+  await createAuditExportTask(currentQueryParams())
+  ElMessage.success('导出任务已创建，请在下方历史列表查看状态')
+  exportTasks.value = await queryAuditExportTasks({
+    tenantId: query.tenantId || undefined,
+    page: 1,
+    size: 10,
+  })
+}
+
+async function downloadTask(taskId: number) {
+  const blob = await downloadAuditExportTask(taskId)
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `audit-export-task-${taskId}.csv`
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+function currentQueryParams() {
+  return {
+    tenantId: query.tenantId || undefined,
+    eventType: query.eventType || undefined,
+    operator: query.operator || undefined,
+    requestId: query.requestId || undefined,
+    clientIp: query.clientIp || undefined,
+    occurredFrom: dateRange.value?.[0] || undefined,
+    occurredTo: dateRange.value?.[1] || undefined,
+  }
 }
 </script>
 

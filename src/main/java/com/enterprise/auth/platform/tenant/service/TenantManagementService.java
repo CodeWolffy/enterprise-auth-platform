@@ -11,14 +11,18 @@ import com.enterprise.auth.platform.persistence.entity.SysRoleEntity;
 import com.enterprise.auth.platform.persistence.entity.SysTenantEntity;
 import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
 import com.enterprise.auth.platform.persistence.entity.SysConfigEntity;
+import com.enterprise.auth.platform.persistence.entity.SysTenantChangeLogEntity;
 import com.enterprise.auth.platform.persistence.mapper.SysConfigMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysDeptMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysRoleMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysTenantMapper;
+import com.enterprise.auth.platform.persistence.mapper.SysTenantChangeLogMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
 import com.enterprise.auth.platform.security.SecuritySupport;
 import com.enterprise.auth.platform.tenant.dto.CreateTenantRequest;
 import com.enterprise.auth.platform.tenant.dto.UpdateTenantRequest;
+import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import org.springframework.lang.Nullable;
@@ -35,6 +39,7 @@ public class TenantManagementService {
     private final SysRoleMapper sysRoleMapper;
     private final SysDeptMapper sysDeptMapper;
     private final SysConfigMapper sysConfigMapper;
+    private final SysTenantChangeLogMapper sysTenantChangeLogMapper;
     private final CatalogService catalogService;
     private final AuditService auditService;
 
@@ -45,6 +50,7 @@ public class TenantManagementService {
             @Nullable SysRoleMapper sysRoleMapper,
             @Nullable SysDeptMapper sysDeptMapper,
             @Nullable SysConfigMapper sysConfigMapper,
+            @Nullable SysTenantChangeLogMapper sysTenantChangeLogMapper,
             CatalogService catalogService,
             AuditService auditService
     ) {
@@ -54,6 +60,7 @@ public class TenantManagementService {
         this.sysRoleMapper = sysRoleMapper;
         this.sysDeptMapper = sysDeptMapper;
         this.sysConfigMapper = sysConfigMapper;
+        this.sysTenantChangeLogMapper = sysTenantChangeLogMapper;
         this.catalogService = catalogService;
         this.auditService = auditService;
     }
@@ -75,6 +82,11 @@ public class TenantManagementService {
         sysTenantMapper.insert(entity);
         saveTenantProfile(request.tenantId(), request.packageCode(), request.packageName(), request.userQuota(),
                 request.storageQuotaGb(), request.capabilityCodes(), request.lifecycleNote());
+        recordTenantChange(request.tenantId(), "CREATED", "tenant", null, request.tenantName(), "创建租户", operator);
+        recordTenantChange(request.tenantId(), "STATUS", "tenantStatus", null,
+                String.valueOf(entity.getTenantStatus()), "初始化租户状态", operator);
+        recordTenantChange(request.tenantId(), "PACKAGE", "packageCode", null,
+                request.packageCode(), "初始化租户套餐", operator);
 
         auditService.record("TENANT_CREATED", operator, request.tenantId(), Map.of("tenantId", request.tenantId()));
         return catalogService.tenant(request.tenantId());
@@ -84,6 +96,10 @@ public class TenantManagementService {
     public CatalogService.TenantView update(String tenantId, UpdateTenantRequest request) {
         requireDatabaseMode();
         SysTenantEntity entity = getTenant(tenantId);
+        String oldTenantName = entity.getTenantName();
+        Integer oldTenantStatus = entity.getTenantStatus();
+        java.time.LocalDateTime oldExpireAt = entity.getExpireAt();
+        Map<String, String> oldProfile = loadTenantProfileValues(List.of(tenantId)).getOrDefault(tenantId, Map.of());
         entity.setTenantName(request.tenantName());
         entity.setPlatformLevel(request.platformLevel() ? 1 : 0);
         if (request.tenantStatus() != null) {
@@ -94,7 +110,19 @@ public class TenantManagementService {
         saveTenantProfile(tenantId, request.packageCode(), request.packageName(), request.userQuota(),
                 request.storageQuotaGb(), request.capabilityCodes(), request.lifecycleNote());
 
-        auditService.record("TENANT_UPDATED", SecuritySupport.currentOperator(), tenantId, Map.of("tenantId", tenantId));
+        String operator = SecuritySupport.currentOperator();
+        recordIfChanged(tenantId, "PROFILE", "tenantName", oldTenantName, request.tenantName(), "更新租户名称", operator);
+        recordIfChanged(tenantId, "STATUS", "tenantStatus", toStringValue(oldTenantStatus), toStringValue(entity.getTenantStatus()), "更新租户状态", operator);
+        recordIfChanged(tenantId, "PROFILE", "expireAt", toStringValue(oldExpireAt), toStringValue(request.expireAt()), "更新到期时间", operator);
+        recordIfChanged(tenantId, "PACKAGE", "packageCode", oldProfile.get("tenant.package.code"), request.packageCode(), "更新租户套餐编码", operator);
+        recordIfChanged(tenantId, "PACKAGE", "packageName", oldProfile.get("tenant.package.name"), request.packageName(), "更新租户套餐名称", operator);
+        recordIfChanged(tenantId, "PACKAGE", "userQuota", oldProfile.get("tenant.quota.users"), toStringValue(request.userQuota()), "更新用户配额", operator);
+        recordIfChanged(tenantId, "PACKAGE", "storageQuotaGb", oldProfile.get("tenant.quota.storage_gb"), toStringValue(request.storageQuotaGb()), "更新存储配额", operator);
+        recordIfChanged(tenantId, "CAPABILITY", "capabilityCodes", oldProfile.get("tenant.capability.codes"),
+                request.capabilityCodes() == null ? null : String.join(",", request.capabilityCodes()), "更新租户能力范围", operator);
+        recordIfChanged(tenantId, "PROFILE", "lifecycleNote", oldProfile.get("tenant.lifecycle.note"), request.lifecycleNote(), "更新运营备注", operator);
+
+        auditService.record("TENANT_UPDATED", operator, tenantId, Map.of("tenantId", tenantId));
         return catalogService.tenant(tenantId);
     }
 
@@ -121,6 +149,7 @@ public class TenantManagementService {
                             "tenant.capability.codes",
                             "tenant.lifecycle.note"));
         }
+        recordTenantChange(tenantId, "DELETED", "tenant", entity.getTenantName(), null, "删除租户", operator);
         auditService.record("TENANT_DELETED", operator, tenantId, Map.of("tenantId", entity.getTenantId()));
     }
 
@@ -159,6 +188,50 @@ public class TenantManagementService {
         return PageResult.of(total, safePage, safeSize, records);
     }
 
+    public PageResult<TenantChangeView> history(
+            String tenantId,
+            String changeType,
+            String fieldKey,
+            String operator,
+            java.time.Instant occurredFrom,
+            java.time.Instant occurredTo,
+            int page,
+            int size
+    ) {
+        requireDatabaseMode();
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.max(size, 1);
+        LambdaQueryWrapper<SysTenantChangeLogEntity> query = new LambdaQueryWrapper<SysTenantChangeLogEntity>()
+                .eq(SysTenantChangeLogEntity::getTenantId, tenantId)
+                .eq(StringUtils.hasText(changeType), SysTenantChangeLogEntity::getChangeType, changeType)
+                .eq(StringUtils.hasText(fieldKey), SysTenantChangeLogEntity::getFieldKey, fieldKey)
+                .like(StringUtils.hasText(operator), SysTenantChangeLogEntity::getOperator, operator)
+                .ge(occurredFrom != null, SysTenantChangeLogEntity::getOccurredAt, occurredFrom == null ? null : java.time.LocalDateTime.ofInstant(occurredFrom, ZoneId.systemDefault()))
+                .le(occurredTo != null, SysTenantChangeLogEntity::getOccurredAt, occurredTo == null ? null : java.time.LocalDateTime.ofInstant(occurredTo, ZoneId.systemDefault()))
+                .orderByDesc(SysTenantChangeLogEntity::getOccurredAt)
+                .orderByDesc(SysTenantChangeLogEntity::getId);
+        long total = sysTenantChangeLogMapper.selectCount(query);
+        if (total == 0) {
+            return PageResult.of(0, safePage, safeSize, List.of());
+        }
+        int offset = (safePage - 1) * safeSize;
+        List<TenantChangeView> records = sysTenantChangeLogMapper.selectList(query.last("limit " + offset + "," + safeSize))
+                .stream()
+                .map(item -> new TenantChangeView(
+                        item.getId(),
+                        item.getTenantId(),
+                        item.getChangeType(),
+                        item.getFieldKey(),
+                        item.getOldValue(),
+                        item.getNewValue(),
+                        item.getSummary(),
+                        item.getOperator(),
+                        item.getOccurredAt() == null ? null : item.getOccurredAt().atZone(ZoneId.systemDefault()).toInstant()
+                ))
+                .toList();
+        return PageResult.of(total, safePage, safeSize, records);
+    }
+
     private boolean existsTenant(String tenantId) {
         return sysTenantMapper.selectCount(new LambdaQueryWrapper<SysTenantEntity>()
                 .eq(SysTenantEntity::getTenantId, tenantId)
@@ -182,7 +255,8 @@ public class TenantManagementService {
                 || sysUserMapper == null
                 || sysRoleMapper == null
                 || sysDeptMapper == null
-                || sysConfigMapper == null) {
+                || sysConfigMapper == null
+                || sysTenantChangeLogMapper == null) {
             throw new BusinessException("当前为默认内存模式，暂未启用数据库写入能力");
         }
     }
@@ -292,5 +366,46 @@ public class TenantManagementService {
                 .filter(StringUtils::hasText)
                 .distinct()
                 .toList();
+    }
+
+    private void recordIfChanged(String tenantId, String changeType, String fieldKey, String oldValue, String newValue, String summary, String operator) {
+        if (java.util.Objects.equals(trimToNull(oldValue), trimToNull(newValue))) {
+            return;
+        }
+        recordTenantChange(tenantId, changeType, fieldKey, oldValue, newValue, summary, operator);
+    }
+
+    private void recordTenantChange(String tenantId, String changeType, String fieldKey, String oldValue, String newValue, String summary, String operator) {
+        SysTenantChangeLogEntity entity = new SysTenantChangeLogEntity();
+        entity.setTenantId(tenantId);
+        entity.setChangeType(changeType);
+        entity.setFieldKey(fieldKey);
+        entity.setOldValue(trimToNull(oldValue));
+        entity.setNewValue(trimToNull(newValue));
+        entity.setSummary(summary);
+        entity.setOperator(operator);
+        sysTenantChangeLogMapper.insert(entity);
+    }
+
+    private String trimToNull(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private String toStringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    @Schema(description = "租户变更记录")
+    public record TenantChangeView(
+            @Schema(description = "记录 ID") Long id,
+            @Schema(description = "租户编码") String tenantId,
+            @Schema(description = "变更类型") String changeType,
+            @Schema(description = "字段键") String fieldKey,
+            @Schema(description = "旧值") String oldValue,
+            @Schema(description = "新值") String newValue,
+            @Schema(description = "变更摘要") String summary,
+            @Schema(description = "操作人") String operator,
+            @Schema(description = "变更时间") java.time.Instant occurredAt
+    ) {
     }
 }

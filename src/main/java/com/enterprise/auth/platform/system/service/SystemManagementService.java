@@ -15,6 +15,7 @@ import com.enterprise.auth.platform.persistence.mapper.SysNoticeMapper;
 import com.enterprise.auth.platform.security.DataScopeService;
 import com.enterprise.auth.platform.security.SecuritySupport;
 import com.enterprise.auth.platform.system.dto.ConfigCrudRequest;
+import com.enterprise.auth.platform.system.dto.CategoryConfigRequest;
 import com.enterprise.auth.platform.system.dto.DictCrudRequest;
 import com.enterprise.auth.platform.system.dto.NoticeCrudRequest;
 import com.enterprise.auth.platform.tenant.TenantContext;
@@ -192,6 +193,63 @@ public class SystemManagementService {
         );
     }
 
+    public List<CategoryOption> categoryOptions(String targetType) {
+        requireDatabaseMode();
+        return loadCategoryOptions(currentTenantId(), prefixForTargetType(targetType));
+    }
+
+    @Transactional
+    public CategoryOption createCategoryOption(String targetType, CategoryConfigRequest request) {
+        requireDatabaseMode();
+        String tenantId = currentTenantId();
+        String prefix = prefixForTargetType(targetType);
+        String configKey = prefix + request.code();
+        if (sysConfigMapper.selectCount(new LambdaQueryWrapper<SysConfigEntity>()
+                .eq(SysConfigEntity::getTenantId, tenantId)
+                .eq(SysConfigEntity::getConfigKey, configKey)
+                .eq(SysConfigEntity::getDeleted, 0)) > 0) {
+            throw new BusinessException("分类编码已存在");
+        }
+        SysConfigEntity entity = new SysConfigEntity();
+        entity.setTenantId(tenantId);
+        entity.setConfigKey(configKey);
+        entity.setConfigName(request.name());
+        entity.setConfigValue(normalizeMatchers(request.matchers()));
+        sysConfigMapper.insert(entity);
+        auditService.record("SYSTEM_CATEGORY_CREATED", SecuritySupport.currentOperator(), tenantId, Map.of(
+                "targetType", targetType,
+                "code", request.code()
+        ));
+        return new CategoryOption(request.code(), request.name(), splitMatchers(entity.getConfigValue()));
+    }
+
+    @Transactional
+    public CategoryOption updateCategoryOption(String targetType, String code, CategoryConfigRequest request) {
+        requireDatabaseMode();
+        String tenantId = currentTenantId();
+        SysConfigEntity entity = getCategoryConfig(tenantId, targetType, code);
+        entity.setConfigName(request.name());
+        entity.setConfigValue(normalizeMatchers(request.matchers()));
+        sysConfigMapper.updateById(entity);
+        auditService.record("SYSTEM_CATEGORY_UPDATED", SecuritySupport.currentOperator(), tenantId, Map.of(
+                "targetType", targetType,
+                "code", code
+        ));
+        return new CategoryOption(code, request.name(), splitMatchers(entity.getConfigValue()));
+    }
+
+    @Transactional
+    public void deleteCategoryOption(String targetType, String code) {
+        requireDatabaseMode();
+        String tenantId = currentTenantId();
+        SysConfigEntity entity = getCategoryConfig(tenantId, targetType, code);
+        sysConfigMapper.deleteById(entity.getId());
+        auditService.record("SYSTEM_CATEGORY_DELETED", SecuritySupport.currentOperator(), tenantId, Map.of(
+                "targetType", targetType,
+                "code", code
+        ));
+    }
+
     @Transactional
     public NoticeView createNotice(NoticeCrudRequest request) {
         requireDatabaseMode();
@@ -294,6 +352,8 @@ public class SystemManagementService {
         LambdaQueryWrapper<SysConfigEntity> query = new LambdaQueryWrapper<SysConfigEntity>()
                 .eq(SysConfigEntity::getTenantId, tenantId)
                 .eq(SysConfigEntity::getDeleted, 0)
+                .notLikeRight(SysConfigEntity::getConfigKey, DICT_CATEGORY_PREFIX)
+                .notLikeRight(SysConfigEntity::getConfigKey, CONFIG_CATEGORY_PREFIX)
                 .and(StringUtils.hasText(keyword), wrapper -> wrapper
                         .like(SysConfigEntity::getConfigKey, keyword)
                         .or()
@@ -539,11 +599,59 @@ public class SystemManagementService {
                 .map(config -> new CategoryOption(
                         config.getConfigKey().substring(prefix.length()),
                         StringUtils.hasText(config.getConfigName()) ? config.getConfigName() : config.getConfigKey(),
-                        java.util.Arrays.stream(config.getConfigValue().split(","))
-                                .map(String::trim)
-                                .filter(StringUtils::hasText)
-                                .toList()
+                        splitMatchers(config.getConfigValue())
                 ))
+                .toList();
+    }
+
+    private SysConfigEntity getCategoryConfig(String tenantId, String targetType, String code) {
+        SysConfigEntity entity = sysConfigMapper.selectOne(new LambdaQueryWrapper<SysConfigEntity>()
+                .eq(SysConfigEntity::getTenantId, tenantId)
+                .eq(SysConfigEntity::getConfigKey, prefixForTargetType(targetType) + code)
+                .eq(SysConfigEntity::getDeleted, 0)
+                .last("limit 1"));
+        if (entity == null) {
+            throw new BusinessException("分类配置不存在");
+        }
+        if (!dataScopeService.canAccessCreatedBy(tenantId, entity.getCreatedBy())) {
+            throw new BusinessException("无权访问该分类配置");
+        }
+        return entity;
+    }
+
+    private String prefixForTargetType(String targetType) {
+        if ("dict".equalsIgnoreCase(targetType)) {
+            return DICT_CATEGORY_PREFIX;
+        }
+        if ("config".equalsIgnoreCase(targetType)) {
+            return CONFIG_CATEGORY_PREFIX;
+        }
+        throw new BusinessException("仅支持 dict 或 config 分类配置");
+    }
+
+    private String normalizeMatchers(List<String> matchers) {
+        if (matchers == null || matchers.isEmpty()) {
+            throw new BusinessException("匹配规则不能为空");
+        }
+        String normalized = matchers.stream()
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .reduce((left, right) -> left + "," + right)
+                .orElse("");
+        if (!StringUtils.hasText(normalized)) {
+            throw new BusinessException("匹配规则不能为空");
+        }
+        return normalized;
+    }
+
+    private List<String> splitMatchers(String value) {
+        if (!StringUtils.hasText(value)) {
+            return List.of();
+        }
+        return java.util.Arrays.stream(value.split(","))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
                 .toList();
     }
 

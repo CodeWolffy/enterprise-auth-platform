@@ -19,6 +19,7 @@ const loading = ref(false)
 const consents = ref<ConsentView[]>([])
 
 const filteredClientLabel = computed(() => searchForm.value.clientId || '全部客户端')
+const auditedCount = computed(() => consents.value.reduce((sum, item) => sum + item.auditEventCount, 0))
 
 watch(
   () => route.query.clientId,
@@ -101,6 +102,11 @@ void load()
         <strong>{{ filteredClientLabel }}</strong>
         <span>正在查看的客户端范围</span>
       </article>
+      <article class="stat-card">
+        <span class="eyebrow">Audited</span>
+        <strong>{{ auditedCount }}</strong>
+        <span>当前页关联的授权审计事件数</span>
+      </article>
     </section>
 
     <section class="dashboard-panel">
@@ -151,6 +157,16 @@ void load()
             <el-tag v-for="scope in row.authorities" :key="scope" size="small" class="scope-tag">
               {{ scope }}
             </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="审计联动" min-width="260">
+          <template #default="{ row }">
+            <div class="client-cell">
+              <small>租户：{{ row.tenantId }}</small>
+              <small>最近授权：{{ row.lastGrantedAt || '-' }}</small>
+              <small>最近撤销：{{ row.lastRevokedAt || '-' }}</small>
+              <small>关联审计：{{ row.auditEventCount }}</small>
+            </div>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="120" fixed="right">

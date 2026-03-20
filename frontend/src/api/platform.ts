@@ -1,10 +1,12 @@
 import { http } from './http'
 import type {
   ApiResponse,
+  AuditExportTask,
   AuditPage,
   DepartmentView,
   PermissionView,
   RoleView,
+  TenantChangeView,
   TenantView,
   UserSummary,
 } from '@/types/auth'
@@ -38,6 +40,13 @@ export interface TenantPage {
   page: number
   size: number
   records: TenantView[]
+}
+
+export interface TenantHistoryPage {
+  total: number
+  page: number
+  size: number
+  records: TenantChangeView[]
 }
 
 export async function queryUsers(params?: UserQueryParams) {
@@ -155,6 +164,13 @@ export async function deleteTenant(tenantId: string) {
   await http.delete(`/api/tenants/${tenantId}`)
 }
 
+export async function queryTenantHistory(tenantId: string, page = 1, size = 10) {
+  const { data } = await http.get<ApiResponse<TenantHistoryPage>>(`/api/tenants/${tenantId}/history`, {
+    params: { page, size },
+  })
+  return data.data
+}
+
 export interface AuditQueryParams {
   tenantId?: string
   eventType?: string
@@ -175,6 +191,30 @@ export async function queryAuditEvents(params: AuditQueryParams) {
 export async function exportAuditEvents(params: Omit<AuditQueryParams, 'page' | 'size'>) {
   const response = await http.get('/api/audit/events/export', {
     params,
+    responseType: 'blob',
+  })
+  return response.data as Blob
+}
+
+export interface AuditExportTaskPage {
+  total: number
+  page: number
+  size: number
+  records: AuditExportTask[]
+}
+
+export async function createAuditExportTask(params: Omit<AuditQueryParams, 'page' | 'size'>) {
+  const { data } = await http.post<ApiResponse<AuditExportTask>>('/api/audit/exports', null, { params })
+  return data.data
+}
+
+export async function queryAuditExportTasks(params?: { tenantId?: string; status?: string; page?: number; size?: number }) {
+  const { data } = await http.get<ApiResponse<AuditExportTaskPage>>('/api/audit/exports', { params })
+  return data.data
+}
+
+export async function downloadAuditExportTask(taskId: number) {
+  const response = await http.get(`/api/audit/exports/${taskId}/download`, {
     responseType: 'blob',
   })
   return response.data as Blob

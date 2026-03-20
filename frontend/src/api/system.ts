@@ -49,6 +49,29 @@ export async function queryCategories() {
   return data.data
 }
 
+export async function queryCategoryOptions(targetType: 'dict' | 'config') {
+  const { data } = await http.get<ApiResponse<CategoryOption[]>>(`/api/system/categories/${targetType}`)
+  return data.data
+}
+
+export async function createCategoryOption(targetType: 'dict' | 'config', payload: { code: string; name: string; matchers: string[] }) {
+  const { data } = await http.post<ApiResponse<CategoryOption>>(`/api/system/categories/${targetType}`, payload)
+  return data.data
+}
+
+export async function updateCategoryOption(
+  targetType: 'dict' | 'config',
+  code: string,
+  payload: { code: string; name: string; matchers: string[] },
+) {
+  const { data } = await http.put<ApiResponse<CategoryOption>>(`/api/system/categories/${targetType}/${code}`, payload)
+  return data.data
+}
+
+export async function deleteCategoryOption(targetType: 'dict' | 'config', code: string) {
+  await http.delete(`/api/system/categories/${targetType}/${code}`)
+}
+
 export async function queryDicts(params?: DictQueryParams) {
   const { data } = await http.get<ApiResponse<PageResult<DictView>>>('/api/system/dicts', { params })
   return data.data

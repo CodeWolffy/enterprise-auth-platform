@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.config;
 
 import com.enterprise.auth.platform.auth.DatabaseRegisteredClientRepository;
+import com.enterprise.auth.platform.auth.service.AuditingAuthorizationConsentService;
 import com.enterprise.auth.platform.persistence.mapper.SysOauthClientMapper;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import com.enterprise.auth.platform.tenant.TenantFilter;
@@ -111,8 +112,14 @@ public class AuthorizationServerConfig {
     }
 
     @Bean
-    public OAuth2AuthorizationConsentService authorizationConsentService(JdbcTemplate jdbcTemplate, RegisteredClientRepository registeredClientRepository) {
-        return new JdbcOAuth2AuthorizationConsentService(jdbcTemplate, registeredClientRepository);
+    public OAuth2AuthorizationConsentService authorizationConsentService(
+            JdbcTemplate jdbcTemplate,
+            RegisteredClientRepository registeredClientRepository,
+            SysOauthClientMapper sysOauthClientMapper,
+            com.enterprise.auth.platform.audit.service.AuditService auditService
+    ) {
+        OAuth2AuthorizationConsentService delegate = new JdbcOAuth2AuthorizationConsentService(jdbcTemplate, registeredClientRepository);
+        return new AuditingAuthorizationConsentService(delegate, registeredClientRepository, sysOauthClientMapper, auditService);
     }
 
     @Bean

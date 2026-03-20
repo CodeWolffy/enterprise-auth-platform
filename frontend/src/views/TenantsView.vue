@@ -91,9 +91,10 @@
             <el-tag v-else type="info">无限期</el-tag>
           </template>
         </el-table-column>
-        <el-table-column fixed="right" label="操作" width="220">
+        <el-table-column fixed="right" label="操作" width="280">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
+            <el-button link type="primary" @click="openHistory(row)">变更历史</el-button>
             <el-button link type="primary" @click="openTenant(row)">编辑</el-button>
             <el-button link type="danger" @click="removeTenant(row.tenantId)">删除</el-button>
           </template>
@@ -151,6 +152,29 @@
           </el-tag>
         </div>
       </template>
+    </el-drawer>
+
+    <el-drawer v-model="historyVisible" title="租户变更历史" size="720px">
+      <el-table :data="historyRecords" stripe>
+        <el-table-column prop="changeType" label="类型" min-width="120" />
+        <el-table-column prop="fieldKey" label="字段" min-width="120" />
+        <el-table-column prop="summary" label="摘要" min-width="180" />
+        <el-table-column prop="oldValue" label="旧值" min-width="160" />
+        <el-table-column prop="newValue" label="新值" min-width="160" />
+        <el-table-column prop="operator" label="操作人" min-width="120" />
+        <el-table-column prop="occurredAt" label="时间" min-width="180" />
+      </el-table>
+      <div class="pagination-wrap">
+        <el-pagination
+          v-model:current-page="historyPage"
+          v-model:page-size="historySize"
+          :page-sizes="[10, 20, 50]"
+          layout="total, sizes, prev, pager, next"
+          :total="historyTotal"
+          @size-change="handleHistorySizeChange"
+          @current-change="handleHistoryPageChange"
+        />
+      </div>
     </el-drawer>
 
     <el-dialog v-model="visible" :title="editingTenantId ? '编辑租户' : '新增租户'" width="680px">
@@ -242,14 +266,20 @@
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import { createTenant, deleteTenant, queryTenants, updateTenant } from '@/api/platform'
-import type { TenantView } from '@/types/auth'
+import { createTenant, deleteTenant, queryTenantHistory, queryTenants, updateTenant } from '@/api/platform'
+import type { TenantChangeView, TenantView } from '@/types/auth'
 
 const tenants = ref<TenantView[]>([])
 const visible = ref(false)
 const detailVisible = ref(false)
+const historyVisible = ref(false)
 const editingTenantId = ref<string | null>(null)
 const detailTenant = ref<TenantView | null>(null)
+const historyTenantId = ref<string | null>(null)
+const historyRecords = ref<TenantChangeView[]>([])
+const historyPage = ref(1)
+const historySize = ref(10)
+const historyTotal = ref(0)
 const loading = ref(false)
 const keyword = ref('')
 const platformFilter = ref('')
@@ -389,6 +419,33 @@ function openTenant(row?: TenantView) {
 function openDetail(row: TenantView) {
   detailTenant.value = row
   detailVisible.value = true
+}
+
+async function openHistory(row: TenantView) {
+  historyTenantId.value = row.tenantId
+  historyPage.value = 1
+  historyVisible.value = true
+  await loadHistory()
+}
+
+async function loadHistory() {
+  if (!historyTenantId.value) {
+    return
+  }
+  const result = await queryTenantHistory(historyTenantId.value, historyPage.value, historySize.value)
+  historyRecords.value = result.records
+  historyTotal.value = result.total
+}
+
+async function handleHistoryPageChange(value: number) {
+  historyPage.value = value
+  await loadHistory()
+}
+
+async function handleHistorySizeChange(value: number) {
+  historySize.value = value
+  historyPage.value = 1
+  await loadHistory()
 }
 
 async function submit() {

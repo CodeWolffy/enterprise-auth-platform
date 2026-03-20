@@ -2,6 +2,7 @@ package com.enterprise.auth.platform.system;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -36,6 +37,7 @@ class SystemControllerTest {
     private static final String HIDDEN_DICT_CODE = "SYSTEM_HIDDEN_DICT_UT";
     private static final String ALPHA_DICT_CODE = "SYSTEM_ALPHA_DICT_UT";
     private static final String OMEGA_DICT_CODE = "SYSTEM_OMEGA_DICT_UT";
+    private static final String CATEGORY_CODE = "system-test-ut";
 
     @Autowired
     private MockMvc mockMvc;
@@ -92,6 +94,7 @@ class SystemControllerTest {
                 "tenant-a",
                 HIDDEN_DICT_CODE
         );
+        jdbcTemplate.update("DELETE FROM sys_config WHERE tenant_id = ? AND config_key = ?", "tenant-a", "system.category.dict." + CATEGORY_CODE);
     }
 
     @AfterEach
@@ -106,6 +109,7 @@ class SystemControllerTest {
         );
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username IN (?, ?, ?)", "tenant-a", SCOPE_USER, VISIBLE_USER, HIDDEN_USER);
         jdbcTemplate.update("DELETE FROM sys_dept WHERE tenant_id = ? AND dept_code = ?", "tenant-a", CHILD_DEPT_CODE);
+        jdbcTemplate.update("DELETE FROM sys_config WHERE tenant_id = ? AND config_key = ?", "tenant-a", "system.category.dict." + CATEGORY_CODE);
     }
 
     @Test
@@ -158,6 +162,30 @@ class SystemControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"))
                 .andExpect(jsonPath("$.message").value("无权访问该字典项"));
+    }
+
+    @Test
+    void shouldCreateCategoryOption() throws Exception {
+        mockMvc.perform(post("/api/system/categories/dict")
+                        .with(user(principal(Set.of("system:write"))))
+                        .header("X-Tenant-Id", "tenant-a")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "code": "system-test-ut",
+                                  "name": "系统测试分类",
+                                  "matchers": ["system_scope*", "system.test.*"]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.code").value(CATEGORY_CODE))
+                .andExpect(jsonPath("$.data.matchers[0]").value("system_scope*"));
+
+        mockMvc.perform(get("/api/system/categories/dict")
+                        .with(user(principal(Set.of("system:read"))))
+                        .header("X-Tenant-Id", "tenant-a"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.code=='" + CATEGORY_CODE + "')]").exists());
     }
 
     private UserAccount principal(Set<String> permissions) {

@@ -104,6 +104,12 @@ const DYNAMIC_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = {
     component: () => import('@/views/SystemNoticesView.vue'),
     meta: { title: '公告管理', hidden: true, requiresPermission: 'system:read' },
   },
+  'settings-categories': {
+    path: 'system/settings/categories',
+    name: 'settings-categories',
+    component: () => import('@/views/SystemCategoriesView.vue'),
+    meta: { title: '分类配置', hidden: true, requiresPermission: 'system:read' },
+  },
 }
 
 const dynamicRouteNames = new Set<string>()

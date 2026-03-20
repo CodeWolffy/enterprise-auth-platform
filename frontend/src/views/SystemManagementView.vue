@@ -58,6 +58,15 @@
           </div>
           <el-button type="primary" @click="goTo('settings-notices')">进入公告管理</el-button>
         </article>
+
+        <article class="setting-card">
+          <div>
+            <span class="eyebrow">Category</span>
+            <h4>分类配置</h4>
+            <p>维护字典分类与参数分类的匹配规则，统一系统管理分类体系。</p>
+          </div>
+          <el-button type="primary" @click="goTo('settings-categories')">进入分类配置</el-button>
+        </article>
       </div>
     </section>
 
@@ -125,7 +134,7 @@ async function load() {
   features.value = featureData
 }
 
-function goTo(name: 'settings-dicts' | 'settings-configs' | 'settings-notices') {
+function goTo(name: 'settings-dicts' | 'settings-configs' | 'settings-notices' | 'settings-categories') {
   void router.push({ name })
 }
 </script>

@@ -2,6 +2,7 @@ package com.enterprise.auth.platform.audit;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -38,6 +39,7 @@ class AuditControllerTest {
 
     @BeforeEach
     void setUp() {
+        jdbcTemplate.update("DELETE FROM sys_audit_export_task WHERE query_json LIKE ?", "%AUDIT_EXPORT_UT%");
         jdbcTemplate.update("DELETE FROM sys_audit_log WHERE event_type = ?", EVENT_TYPE);
         jdbcTemplate.update(
                 "INSERT INTO sys_audit_log(tenant_id, event_type, operator, payload_json, occurred_at, request_id, client_ip) VALUES(?,?,?,?,NOW(),?,?)",
@@ -51,6 +53,7 @@ class AuditControllerTest {
 
     @AfterEach
     void tearDown() {
+        jdbcTemplate.update("DELETE FROM sys_audit_export_task WHERE query_json LIKE ?", "%AUDIT_EXPORT_UT%");
         jdbcTemplate.update("DELETE FROM sys_audit_log WHERE event_type = ?", EVENT_TYPE);
     }
 
@@ -79,6 +82,27 @@ class AuditControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(REQUEST_ID_VISIBLE)))
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString(REQUEST_ID_HIDDEN))));
+    }
+
+    @Test
+    void shouldCreateAsyncExportTask() throws Exception {
+        mockMvc.perform(post("/api/audit/exports")
+                        .with(user(principal()))
+                        .header("X-Tenant-Id", "platform")
+                        .param("eventType", EVENT_TYPE)
+                        .param("clientIp", "10.10.10.10")
+                        .param("occurredFrom", java.time.Instant.now().minusSeconds(3600).toString())
+                        .param("occurredTo", java.time.Instant.now().plusSeconds(3600).toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").exists())
+                .andExpect(jsonPath("$.data.status").isNotEmpty());
+
+        mockMvc.perform(get("/api/audit/exports")
+                        .with(user(principal()))
+                        .header("X-Tenant-Id", "platform")
+                        .param("tenantId", "platform"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].id").exists());
     }
 
     private UserAccount principal() {

@@ -4,6 +4,7 @@ import com.enterprise.auth.platform.common.api.ApiResponse;
 import com.enterprise.auth.platform.common.model.PageResult;
 import com.enterprise.auth.platform.config.FeatureToggleProperties;
 import com.enterprise.auth.platform.system.dto.ConfigCrudRequest;
+import com.enterprise.auth.platform.system.dto.CategoryConfigRequest;
 import com.enterprise.auth.platform.system.dto.DictCrudRequest;
 import com.enterprise.auth.platform.system.dto.NoticeCrudRequest;
 import com.enterprise.auth.platform.system.service.SystemManagementService;
@@ -60,6 +61,47 @@ public class SystemController {
     @PreAuthorize("hasAuthority('system:read')")
     public ApiResponse<Map<String, List<SystemManagementService.CategoryOption>>> categories() {
         return ApiResponse.ok(systemManagementService.categories());
+    }
+
+    @Operation(summary = "查询指定类型的分类配置")
+    @GetMapping("/categories/{targetType}")
+    @PreAuthorize("hasAuthority('system:read')")
+    public ApiResponse<List<SystemManagementService.CategoryOption>> categoryOptions(
+            @Parameter(description = "分类目标类型：dict 或 config") @PathVariable String targetType
+    ) {
+        return ApiResponse.ok(systemManagementService.categoryOptions(targetType));
+    }
+
+    @Operation(summary = "新增分类配置")
+    @PostMapping("/categories/{targetType}")
+    @PreAuthorize("hasAuthority('system:write')")
+    public ApiResponse<SystemManagementService.CategoryOption> createCategoryOption(
+            @Parameter(description = "分类目标类型：dict 或 config") @PathVariable String targetType,
+            @Valid @RequestBody CategoryConfigRequest request
+    ) {
+        return ApiResponse.ok(systemManagementService.createCategoryOption(targetType, request));
+    }
+
+    @Operation(summary = "修改分类配置")
+    @PutMapping("/categories/{targetType}/{code}")
+    @PreAuthorize("hasAuthority('system:write')")
+    public ApiResponse<SystemManagementService.CategoryOption> updateCategoryOption(
+            @Parameter(description = "分类目标类型：dict 或 config") @PathVariable String targetType,
+            @Parameter(description = "分类编码") @PathVariable String code,
+            @Valid @RequestBody CategoryConfigRequest request
+    ) {
+        return ApiResponse.ok(systemManagementService.updateCategoryOption(targetType, code, request));
+    }
+
+    @Operation(summary = "删除分类配置")
+    @DeleteMapping("/categories/{targetType}/{code}")
+    @PreAuthorize("hasAuthority('system:write')")
+    public ApiResponse<Void> deleteCategoryOption(
+            @Parameter(description = "分类目标类型：dict 或 config") @PathVariable String targetType,
+            @Parameter(description = "分类编码") @PathVariable String code
+    ) {
+        systemManagementService.deleteCategoryOption(targetType, code);
+        return ApiResponse.ok();
     }
 
     @Operation(summary = "分页查询字典列表")

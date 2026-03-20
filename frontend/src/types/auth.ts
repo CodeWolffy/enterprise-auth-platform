@@ -110,6 +110,18 @@ export interface TenantView {
   lifecycleNote?: string | null
 }
 
+export interface TenantChangeView {
+  id: number
+  tenantId: string
+  changeType: string
+  fieldKey: string
+  oldValue?: string | null
+  newValue?: string | null
+  summary: string
+  operator: string
+  occurredAt?: string | null
+}
+
 export interface CategoryOption {
   code: string
   name: string
@@ -159,6 +171,18 @@ export interface AuditPage {
   page: number
   size: number
   records: AuditEvent[]
+}
+
+export interface AuditExportTask {
+  id: number
+  tenantId: string
+  operator: string
+  status: string
+  fileName: string
+  recordCount: number
+  requestedAt?: string | null
+  completedAt?: string | null
+  errorMessage?: string | null
 }
 
 export interface FeatureFlags {

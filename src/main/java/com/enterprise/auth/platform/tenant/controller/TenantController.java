@@ -11,8 +11,10 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -48,6 +50,37 @@ public class TenantController {
             @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") int size
     ) {
         return ApiResponse.ok(tenantManagementService.page(keyword, platformLevel, tenantStatus, page, size));
+    }
+
+    @Operation(summary = "查询租户变更历史")
+    @GetMapping("/{tenantId}/history")
+    @PreAuthorize("hasAuthority('tenant:read')")
+    public ApiResponse<PageResult<TenantManagementService.TenantChangeView>> history(
+            @Parameter(description = "租户编码") @PathVariable String tenantId,
+            @Parameter(description = "变更类型") @RequestParam(required = false) String changeType,
+            @Parameter(description = "字段键") @RequestParam(required = false) String fieldKey,
+            @Parameter(description = "操作人") @RequestParam(required = false) String operator,
+            @Parameter(description = "开始时间，ISO-8601 格式")
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            Instant occurredFrom,
+            @Parameter(description = "结束时间，ISO-8601 格式")
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            Instant occurredTo,
+            @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") int size
+    ) {
+        return ApiResponse.ok(tenantManagementService.history(
+                tenantId,
+                changeType,
+                fieldKey,
+                operator,
+                occurredFrom,
+                occurredTo,
+                page,
+                size
+        ));
     }
 
     @Operation(summary = "新增租户")
