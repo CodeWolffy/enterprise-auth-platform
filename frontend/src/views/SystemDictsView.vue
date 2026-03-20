@@ -26,6 +26,11 @@
         <el-form-item label="字典类型">
           <el-input v-model="typeKeyword" placeholder="输入字典类型" clearable />
         </el-form-item>
+        <el-form-item label="字典分类">
+          <el-select v-model="category" placeholder="全部分类" clearable style="width: 180px">
+            <el-option v-for="item in categoryOptions" :key="item.code" :label="item.name" :value="item.code" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="关键字">
           <el-input v-model="keyword" placeholder="搜索字典编码或字典值" clearable />
         </el-form-item>
@@ -49,6 +54,7 @@
       </el-form>
 
       <el-table :data="dicts" stripe>
+        <el-table-column prop="category" label="字典分类" min-width="120" />
         <el-table-column prop="dictType" label="字典类型" min-width="140" />
         <el-table-column prop="dictCode" label="字典编码" min-width="160" />
         <el-table-column prop="dictValue" label="字典值" min-width="180" />
@@ -79,6 +85,7 @@
       <template v-if="detailItem">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="字典类型">{{ detailItem.dictType }}</el-descriptions-item>
+          <el-descriptions-item label="字典分类">{{ detailItem.category }}</el-descriptions-item>
           <el-descriptions-item label="字典编码">{{ detailItem.dictCode }}</el-descriptions-item>
           <el-descriptions-item label="字典值" :span="2">{{ detailItem.dictValue }}</el-descriptions-item>
           <el-descriptions-item label="创建人">{{ detailItem.createdBy }}</el-descriptions-item>
@@ -111,8 +118,8 @@
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import { createDict, deleteDict, queryDicts, updateDict } from '@/api/system'
-import type { DictView } from '@/types/auth'
+import { createDict, deleteDict, queryCategories, queryDicts, updateDict } from '@/api/system'
+import type { CategoryOption, DictView } from '@/types/auth'
 
 const dicts = ref<DictView[]>([])
 const visible = ref(false)
@@ -121,12 +128,14 @@ const editingId = ref<number | null>(null)
 const detailItem = ref<DictView | null>(null)
 const keyword = ref('')
 const typeKeyword = ref('')
+const category = ref('')
 const sortBy = ref<'createdAt' | 'dictType' | 'dictCode'>('createdAt')
 const sortDirection = ref<'asc' | 'desc'>('asc')
 const page = ref(1)
 const size = ref(10)
 const total = ref(0)
 const formRef = ref<FormInstance>()
+const categoryOptions = ref<CategoryOption[]>([])
 
 const form = reactive({
   dictType: '',
@@ -143,10 +152,12 @@ const rules = reactive<FormRules>({
 const dictTypeCount = computed(() => new Set(dicts.value.map((item) => item.dictType)).size)
 
 void load()
+void loadCategories()
 
 async function load() {
   const result = await queryDicts({
     dictType: typeKeyword.value || undefined,
+    category: category.value || undefined,
     keyword: keyword.value || undefined,
     page: page.value,
     size: size.value,
@@ -157,6 +168,11 @@ async function load() {
   total.value = result.total
 }
 
+async function loadCategories() {
+  const result = await queryCategories()
+  categoryOptions.value = result.dict || []
+}
+
 function handleSearch() {
   page.value = 1
   void load()
@@ -165,6 +181,7 @@ function handleSearch() {
 function resetSearch() {
   keyword.value = ''
   typeKeyword.value = ''
+  category.value = ''
   sortBy.value = 'createdAt'
   sortDirection.value = 'asc'
   page.value = 1

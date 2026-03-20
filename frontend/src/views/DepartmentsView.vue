@@ -84,7 +84,11 @@
         </el-descriptions>
 
         <div class="detail-tip">
-          <el-alert title="部门树已接入数据权限过滤，当前列表只展示当前用户有权访问的组织范围。" type="info" :closable="false" />
+          <el-alert
+            title="部门树已接入数据权限过滤，当前列表只展示当前用户有权访问的组织范围。"
+            type="info"
+            :closable="false"
+          />
         </div>
       </template>
     </el-drawer>

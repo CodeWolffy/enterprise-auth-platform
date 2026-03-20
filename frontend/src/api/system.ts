@@ -1,5 +1,5 @@
 import { http } from './http'
-import type { ApiResponse, ConfigView, DictView, FeatureFlags, NoticeView } from '@/types/auth'
+import type { ApiResponse, CategoryOption, ConfigView, DictView, FeatureFlags, NoticeView } from '@/types/auth'
 
 export interface PageResult<T> {
   total: number
@@ -12,6 +12,7 @@ export type SortDirection = 'asc' | 'desc'
 
 export interface DictQueryParams {
   dictType?: string
+  category?: string
   keyword?: string
   page?: number
   size?: number
@@ -20,6 +21,7 @@ export interface DictQueryParams {
 }
 
 export interface ConfigQueryParams {
+  category?: string
   keyword?: string
   page?: number
   size?: number
@@ -30,6 +32,7 @@ export interface ConfigQueryParams {
 export interface NoticeQueryParams {
   keyword?: string
   published?: boolean
+  workflowStatus?: 'DRAFT' | 'SCHEDULED' | 'PUBLISHED'
   page?: number
   size?: number
   sortBy?: 'publishTime' | 'createdAt' | 'noticeTitle'
@@ -38,6 +41,11 @@ export interface NoticeQueryParams {
 
 export async function queryFeatures() {
   const { data } = await http.get<ApiResponse<FeatureFlags>>('/api/system/features')
+  return data.data
+}
+
+export async function queryCategories() {
+  const { data } = await http.get<ApiResponse<Record<string, CategoryOption[]>>>('/api/system/categories')
   return data.data
 }
 

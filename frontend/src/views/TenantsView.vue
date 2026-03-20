@@ -3,7 +3,7 @@
     <section class="dashboard-grid">
       <article class="stat-card">
         <span class="eyebrow">Tenants</span>
-        <strong>{{ filteredTenants.length }}</strong>
+        <strong>{{ total }}</strong>
         <span>当前筛选条件下的租户数</span>
       </article>
       <article class="stat-card">
@@ -56,7 +56,7 @@
         </el-form-item>
       </el-form>
 
-      <el-table v-loading="loading" :data="pagedTenants" stripe>
+      <el-table v-loading="loading" :data="tenants" stripe>
         <el-table-column prop="tenantId" label="租户编码" min-width="140" />
         <el-table-column prop="name" label="租户名称" min-width="160" />
         <el-table-column label="租户级别" min-width="120">
@@ -75,6 +75,12 @@
         </el-table-column>
         <el-table-column label="套餐" min-width="150">
           <template #default="{ row }">{{ getPackageLabel(row) }}</template>
+        </el-table-column>
+        <el-table-column label="用户配额" min-width="100">
+          <template #default="{ row }">{{ row.userQuota ?? '-' }}</template>
+        </el-table-column>
+        <el-table-column label="存储配额(GB)" min-width="120">
+          <template #default="{ row }">{{ row.storageQuotaGb ?? '-' }}</template>
         </el-table-column>
         <el-table-column label="到期提醒" min-width="220">
           <template #default="{ row }">
@@ -100,9 +106,9 @@
           v-model:page-size="size"
           :page-sizes="[10, 20, 50]"
           layout="total, sizes, prev, pager, next"
-          :total="filteredTenants.length"
-          @size-change="handlePageChange"
-          @current-change="handlePageChange"
+          :total="total"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
         />
       </div>
     </section>
@@ -119,11 +125,17 @@
             {{ detailTenant.tenantStatus === 1 ? '启用' : '禁用' }}
           </el-descriptions-item>
           <el-descriptions-item label="套餐">{{ getPackageLabel(detailTenant) }}</el-descriptions-item>
+          <el-descriptions-item label="套餐编码">{{ detailTenant.packageCode || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="用户配额">{{ detailTenant.userQuota ?? '未设置' }}</el-descriptions-item>
+          <el-descriptions-item label="存储配额(GB)">{{ detailTenant.storageQuotaGb ?? '未设置' }}</el-descriptions-item>
           <el-descriptions-item label="到期状态">
             {{ detailTenant.expireAt ? getExpireText(detailTenant.expireAt) : '无限期' }}
           </el-descriptions-item>
           <el-descriptions-item label="到期时间" :span="2">
             {{ detailTenant.expireAt || '未设置到期时间' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="运营备注" :span="2">
+            {{ detailTenant.lifecycleNote || '未填写' }}
           </el-descriptions-item>
         </el-descriptions>
 
@@ -132,6 +144,11 @@
             <strong>{{ capability.label }}</strong>
             <span>{{ capability.value }}</span>
           </article>
+        </div>
+        <div v-if="detailTenant.capabilityCodes?.length" class="capability-tags">
+          <el-tag v-for="code in detailTenant.capabilityCodes" :key="code" type="success" effect="plain">
+            {{ code }}
+          </el-tag>
         </div>
       </template>
     </el-drawer>
@@ -173,6 +190,45 @@
             style="width: 100%"
           />
         </el-form-item>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="套餐编码">
+              <el-input v-model="form.packageCode" placeholder="如 business-standard" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="套餐名称">
+              <el-input v-model="form.packageName" placeholder="如 标准版" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="用户配额">
+              <el-input-number v-model="form.userQuota" :min="0" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="存储配额(GB)">
+              <el-input-number v-model="form.storageQuotaGb" :min="0" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="启用能力">
+          <el-select v-model="form.capabilityCodes" multiple allow-create default-first-option style="width: 100%">
+            <el-option label="oauth" value="oauth" />
+            <el-option label="user" value="user" />
+            <el-option label="role" value="role" />
+            <el-option label="dept" value="dept" />
+            <el-option label="tenant" value="tenant" />
+            <el-option label="system" value="system" />
+            <el-option label="audit" value="audit" />
+            <el-option label="notice" value="notice" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="运营备注">
+          <el-input v-model="form.lifecycleNote" type="textarea" :rows="3" maxlength="200" show-word-limit />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="visible = false">取消</el-button>
@@ -200,6 +256,7 @@ const platformFilter = ref('')
 const statusFilter = ref<number | null>(null)
 const page = ref(1)
 const size = ref(10)
+const total = ref(0)
 const formRef = ref<FormInstance>()
 
 const form = reactive({
@@ -208,6 +265,12 @@ const form = reactive({
   platformLevel: false,
   tenantStatus: 1,
   expireAt: '',
+  packageCode: '',
+  packageName: '',
+  userQuota: undefined as number | undefined,
+  storageQuotaGb: undefined as number | undefined,
+  capabilityCodes: [] as string[],
+  lifecycleNote: '',
 })
 
 const tenantRules = reactive<FormRules>({
@@ -219,30 +282,11 @@ const tenantRules = reactive<FormRules>({
   tenantStatus: [{ required: true, message: '请选择租户状态', trigger: 'change' }],
 })
 
-const filteredTenants = computed(() =>
-  tenants.value.filter((tenant) => {
-    const normalizedKeyword = keyword.value.trim().toLowerCase()
-    const matchesKeyword =
-      !normalizedKeyword ||
-      [tenant.tenantId, tenant.name].some((value) => value.toLowerCase().includes(normalizedKeyword))
-    const matchesPlatform =
-      !platformFilter.value ||
-      (platformFilter.value === 'platform' ? tenant.platformLevel : !tenant.platformLevel)
-    const matchesStatus = statusFilter.value === null || tenant.tenantStatus === statusFilter.value
-    return matchesKeyword && matchesPlatform && matchesStatus
-  }),
-)
-
-const pagedTenants = computed(() => {
-  const start = (page.value - 1) * size.value
-  return filteredTenants.value.slice(start, start + size.value)
-})
-
-const platformTenantCount = computed(() => filteredTenants.value.filter((item) => item.platformLevel).length)
-const enabledTenantCount = computed(() => filteredTenants.value.filter((item) => item.tenantStatus === 1).length)
+const platformTenantCount = computed(() => tenants.value.filter((item) => item.platformLevel).length)
+const enabledTenantCount = computed(() => tenants.value.filter((item) => item.tenantStatus === 1).length)
 const expiringSoonCount = computed(
   () =>
-    filteredTenants.value.filter((item) => {
+    tenants.value.filter((item) => {
       if (!item.expireAt) {
         return false
       }
@@ -256,7 +300,15 @@ void load()
 async function load() {
   loading.value = true
   try {
-    tenants.value = await queryTenants()
+    const result = await queryTenants({
+      keyword: keyword.value || undefined,
+      platformLevel: platformFilter.value ? platformFilter.value === 'platform' : undefined,
+      tenantStatus: statusFilter.value ?? undefined,
+      page: page.value,
+      size: size.value,
+    })
+    tenants.value = result.records
+    total.value = result.total
   } finally {
     loading.value = false
   }
@@ -264,6 +316,7 @@ async function load() {
 
 function handleSearch() {
   page.value = 1
+  void load()
 }
 
 function resetSearch() {
@@ -271,10 +324,18 @@ function resetSearch() {
   platformFilter.value = ''
   statusFilter.value = null
   page.value = 1
+  void load()
 }
 
-function handlePageChange() {
-  return
+function handleSizeChange(value: number) {
+  size.value = value
+  page.value = 1
+  void load()
+}
+
+function handleCurrentChange(value: number) {
+  page.value = value
+  void load()
 }
 
 function getExpireTagType(expireAt: string) {
@@ -296,27 +357,14 @@ function getExpireText(expireAt: string) {
 }
 
 function getPackageLabel(tenant: TenantView) {
-  if (tenant.platformLevel) {
-    return '平台治理版'
-  }
-  if (!tenant.expireAt) {
-    return '长期标准版'
-  }
-  return tenant.tenantStatus === 1 ? '生产租户版' : '停用租户版'
+  return tenant.packageName || tenant.packageCode || (tenant.platformLevel ? '平台治理版' : '未配置套餐')
 }
 
 function getCapabilityList(tenant: TenantView) {
-  if (tenant.platformLevel) {
-    return [
-      { label: '能力范围', value: '全局治理、租户管理、认证中心' },
-      { label: '访问模式', value: '平台级全域访问' },
-      { label: '推荐用途', value: '平台运维与治理' },
-    ]
-  }
   return [
-    { label: '能力范围', value: tenant.tenantStatus === 1 ? '用户、角色、部门、审计、系统管理' : '只保留只读访问' },
+    { label: '能力范围', value: tenant.capabilityCodes?.length ? tenant.capabilityCodes.join('、') : '未配置能力集合' },
     { label: '套餐建议', value: getPackageLabel(tenant) },
-    { label: '运营提示', value: tenant.expireAt ? getExpireText(tenant.expireAt) : '建议补充套餐与配额信息' },
+    { label: '运营提示', value: tenant.lifecycleNote || (tenant.expireAt ? getExpireText(tenant.expireAt) : '建议补充套餐与配额信息') },
   ]
 }
 
@@ -328,6 +376,12 @@ function openTenant(row?: TenantView) {
     platformLevel: row?.platformLevel ?? false,
     tenantStatus: row?.tenantStatus ?? 1,
     expireAt: row?.expireAt ?? '',
+    packageCode: row?.packageCode ?? '',
+    packageName: row?.packageName ?? '',
+    userQuota: row?.userQuota ?? undefined,
+    storageQuotaGb: row?.storageQuotaGb ?? undefined,
+    capabilityCodes: [...(row?.capabilityCodes ?? [])],
+    lifecycleNote: row?.lifecycleNote ?? '',
   })
   visible.value = true
 }
@@ -348,6 +402,12 @@ async function submit() {
     platformLevel: form.platformLevel,
     tenantStatus: form.tenantStatus,
     expireAt: form.expireAt || null,
+    packageCode: form.packageCode || null,
+    packageName: form.packageName || null,
+    userQuota: form.userQuota ?? null,
+    storageQuotaGb: form.storageQuotaGb ?? null,
+    capabilityCodes: form.capabilityCodes,
+    lifecycleNote: form.lifecycleNote || null,
   }
   if (editingTenantId.value) {
     await updateTenant(editingTenantId.value, payload)
@@ -394,6 +454,13 @@ async function removeTenant(tenantId: string) {
 .pagination-wrap {
   display: flex;
   justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.capability-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-top: 16px;
 }
 </style>

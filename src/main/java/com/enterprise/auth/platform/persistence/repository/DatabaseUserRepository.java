@@ -8,6 +8,8 @@ import com.enterprise.auth.platform.persistence.entity.SysRoleEntity;
 import com.enterprise.auth.platform.persistence.entity.SysRolePermissionEntity;
 import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
 import com.enterprise.auth.platform.persistence.entity.SysUserRoleEntity;
+import com.enterprise.auth.platform.persistence.entity.SysConfigEntity;
+import com.enterprise.auth.platform.persistence.mapper.SysConfigMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysPermissionMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysRoleMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysRolePermissionMapper;
@@ -35,6 +37,7 @@ public class DatabaseUserRepository implements UserRepository {
     private final SysRoleMapper sysRoleMapper;
     private final SysRolePermissionMapper sysRolePermissionMapper;
     private final SysPermissionMapper sysPermissionMapper;
+    private final SysConfigMapper sysConfigMapper;
     private final InMemoryUserRepository fallbackRepository;
 
     public DatabaseUserRepository(
@@ -44,6 +47,7 @@ public class DatabaseUserRepository implements UserRepository {
             @Nullable SysRoleMapper sysRoleMapper,
             @Nullable SysRolePermissionMapper sysRolePermissionMapper,
             @Nullable SysPermissionMapper sysPermissionMapper,
+            @Nullable SysConfigMapper sysConfigMapper,
             InMemoryUserRepository fallbackRepository
     ) {
         this.persistenceProperties = persistenceProperties;
@@ -52,6 +56,7 @@ public class DatabaseUserRepository implements UserRepository {
         this.sysRoleMapper = sysRoleMapper;
         this.sysRolePermissionMapper = sysRolePermissionMapper;
         this.sysPermissionMapper = sysPermissionMapper;
+        this.sysConfigMapper = sysConfigMapper;
         this.fallbackRepository = fallbackRepository;
     }
 
@@ -123,7 +128,7 @@ public class DatabaseUserRepository implements UserRepository {
                 user.getEnabled() != null && user.getEnabled() == 1,
                 roleCodes,
                 roleData.permissionCodes(),
-                Set.of(),
+                roleData.customDeptIds(),
                 roleData.dataScopeType(),
                 user.getSessionVersion() == null ? 1 : user.getSessionVersion()
         );
@@ -148,7 +153,7 @@ public class DatabaseUserRepository implements UserRepository {
 
     private RoleData loadRoleData(String tenantId, Set<String> roleCodes) {
         if (roleCodes.isEmpty()) {
-            return new RoleData(Set.of(), DataScopeType.SELF);
+            return new RoleData(Set.of(), DataScopeType.SELF, Set.of());
         }
         List<SysRoleEntity> roles = sysRoleMapper.selectList(new LambdaQueryWrapper<SysRoleEntity>()
                 .eq(SysRoleEntity::getTenantId, tenantId)
@@ -159,13 +164,14 @@ public class DatabaseUserRepository implements UserRepository {
                 .map(this::parseScope)
                 .max(java.util.Comparator.comparingInt(this::scopeWeight))
                 .orElse(DataScopeType.SELF);
+        Set<Long> customDeptIds = loadCustomDeptIds(tenantId, roles);
 
         List<Long> roleIds = roles.stream().map(SysRoleEntity::getId).toList();
         List<SysRolePermissionEntity> rolePermissions = sysRolePermissionMapper.selectList(new LambdaQueryWrapper<SysRolePermissionEntity>()
                 .eq(SysRolePermissionEntity::getTenantId, tenantId)
                 .in(SysRolePermissionEntity::getRoleId, roleIds));
         if (rolePermissions.isEmpty()) {
-            return new RoleData(Set.of(), dataScopeType);
+            return new RoleData(Set.of(), dataScopeType, customDeptIds);
         }
         List<Long> permissionIds = rolePermissions.stream().map(SysRolePermissionEntity::getPermissionId).distinct().toList();
         Set<String> permissionCodes = sysPermissionMapper.selectList(new LambdaQueryWrapper<SysPermissionEntity>()
@@ -175,7 +181,7 @@ public class DatabaseUserRepository implements UserRepository {
                 .stream()
                 .map(SysPermissionEntity::getPermissionCode)
                 .collect(Collectors.toSet());
-        return new RoleData(permissionCodes, dataScopeType);
+        return new RoleData(permissionCodes, dataScopeType, customDeptIds);
     }
 
     private boolean databaseEnabled() {
@@ -184,7 +190,8 @@ public class DatabaseUserRepository implements UserRepository {
                 && sysUserRoleMapper != null
                 && sysRoleMapper != null
                 && sysRolePermissionMapper != null
-                && sysPermissionMapper != null;
+                && sysPermissionMapper != null
+                && sysConfigMapper != null;
     }
 
     private DataScopeType parseScope(String value) {
@@ -205,6 +212,34 @@ public class DatabaseUserRepository implements UserRepository {
         };
     }
 
-    private record RoleData(Set<String> permissionCodes, DataScopeType dataScopeType) {
+    private Set<Long> loadCustomDeptIds(String tenantId, List<SysRoleEntity> roles) {
+        List<String> roleCodes = roles.stream()
+                .filter(role -> parseScope(role.getDataScopeType()) == DataScopeType.CUSTOM)
+                .map(SysRoleEntity::getRoleCode)
+                .toList();
+        if (roleCodes.isEmpty()) {
+            return Set.of();
+        }
+        List<String> configKeys = roleCodes.stream().map(roleCode -> "role.custom_dept_ids." + roleCode).toList();
+        return sysConfigMapper.selectList(new LambdaQueryWrapper<SysConfigEntity>()
+                        .eq(SysConfigEntity::getTenantId, tenantId)
+                        .eq(SysConfigEntity::getDeleted, 0)
+                        .in(SysConfigEntity::getConfigKey, configKeys))
+                .stream()
+                .flatMap(config -> java.util.Arrays.stream(config.getConfigValue().split(",")))
+                .map(String::trim)
+                .filter(item -> !item.isEmpty())
+                .map(item -> {
+                    try {
+                        return Long.parseLong(item);
+                    } catch (NumberFormatException ignored) {
+                        return null;
+                    }
+                })
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+    }
+
+    private record RoleData(Set<String> permissionCodes, DataScopeType dataScopeType, Set<Long> customDeptIds) {
     }
 }

@@ -40,9 +40,17 @@ public class CaptchaService {
         String answer = String.valueOf((int) (Math.random() * 9000) + 1000);
         Instant expiresAt = Instant.now().plus(securityProperties.captchaTtl());
         if (redissonCaptchaEnabled()) {
-            redissonClient.getBucket(captchaKey(captchaId)).set(answer, securityProperties.captchaTtl());
+            try {
+                redissonClient.getBucket(captchaKey(captchaId)).set(answer, securityProperties.captchaTtl());
+            } catch (Exception ignored) {
+                captchas.put(captchaId, new CaptchaEntry(answer, expiresAt));
+            }
         } else if (redisCaptchaEnabled()) {
-            redisTemplate.opsForValue().set(captchaKey(captchaId), answer, securityProperties.captchaTtl());
+            try {
+                redisTemplate.opsForValue().set(captchaKey(captchaId), answer, securityProperties.captchaTtl());
+            } catch (Exception ignored) {
+                captchas.put(captchaId, new CaptchaEntry(answer, expiresAt));
+            }
         } else {
             captchas.put(captchaId, new CaptchaEntry(answer, expiresAt));
         }
@@ -55,16 +63,32 @@ public class CaptchaService {
         }
         String answer;
         if (redissonCaptchaEnabled()) {
-            RBucket<String> bucket = redissonClient.getBucket(captchaKey(captchaId));
-            answer = bucket.get();
-            bucket.delete();
-            if (!StringUtils.hasText(answer)) {
-                throw new BusinessException("验证码已过期");
+            try {
+                RBucket<String> bucket = redissonClient.getBucket(captchaKey(captchaId));
+                answer = bucket.get();
+                bucket.delete();
+                if (!StringUtils.hasText(answer)) {
+                    throw new BusinessException("验证码已过期");
+                }
+            } catch (Exception ignored) {
+                CaptchaEntry entry = captchas.remove(captchaId);
+                if (entry == null || Instant.now().isAfter(entry.expiresAt())) {
+                    throw new BusinessException("验证码已过期");
+                }
+                answer = entry.answer();
             }
         } else if (redisCaptchaEnabled()) {
-            answer = redisTemplate.opsForValue().getAndDelete(captchaKey(captchaId));
-            if (!StringUtils.hasText(answer)) {
-                throw new BusinessException("验证码已过期");
+            try {
+                answer = redisTemplate.opsForValue().getAndDelete(captchaKey(captchaId));
+                if (!StringUtils.hasText(answer)) {
+                    throw new BusinessException("验证码已过期");
+                }
+            } catch (Exception ignored) {
+                CaptchaEntry entry = captchas.remove(captchaId);
+                if (entry == null || Instant.now().isAfter(entry.expiresAt())) {
+                    throw new BusinessException("验证码已过期");
+                }
+                answer = entry.answer();
             }
         } else {
             CaptchaEntry entry = captchas.remove(captchaId);
@@ -96,4 +120,3 @@ public class CaptchaService {
     private record CaptchaEntry(String answer, Instant expiresAt) {
     }
 }
-

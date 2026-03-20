@@ -76,6 +76,7 @@ export interface RoleView {
   name: string
   description?: string | null
   dataScopeType: string
+  customDeptIds?: number[]
 }
 
 export interface PermissionView {
@@ -101,11 +102,24 @@ export interface TenantView {
   platformLevel: boolean
   tenantStatus: number
   expireAt?: string | null
+  packageCode?: string | null
+  packageName?: string | null
+  userQuota?: number | null
+  storageQuotaGb?: number | null
+  capabilityCodes?: string[]
+  lifecycleNote?: string | null
+}
+
+export interface CategoryOption {
+  code: string
+  name: string
+  matchers: string[]
 }
 
 export interface DictView {
   id: number
   dictType: string
+  category: string
   dictCode: string
   dictValue: string
   createdBy: string
@@ -114,6 +128,7 @@ export interface DictView {
 export interface ConfigView {
   id: number
   configKey: string
+  category: string
   configName: string
   configValue: string
   createdBy: string
@@ -125,6 +140,7 @@ export interface NoticeView {
   noticeContent: string
   published: boolean
   publishTime?: string | null
+  workflowStatus: string
   createdBy: string
 }
 

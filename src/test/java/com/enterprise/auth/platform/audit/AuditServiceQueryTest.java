@@ -62,6 +62,7 @@ class AuditServiceQueryTest {
                 "USER_UPDATED",
                 "alice",
                 null,
+                null,
                 from,
                 null,
                 1,
@@ -102,6 +103,7 @@ class AuditServiceQueryTest {
         var page = auditService.query(new AuditQuery(
                 "tenant-a",
                 "AUDIT_SCOPE_TEST",
+                null,
                 null,
                 null,
                 null,

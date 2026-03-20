@@ -29,13 +29,13 @@ class SystemManagementServiceTest {
                 new DictCrudRequest("demo", dictCode, "v")
         );
 
-        assertThat(systemManagementService.dicts().records())
+        assertThat(systemManagementService.dicts(null, null, null, 1, 50, "createdAt", "asc").records())
                 .extracting(SystemManagementService.DictView::dictCode)
                 .contains(dictCode);
 
         systemManagementService.deleteDict(created.id());
 
-        assertThat(systemManagementService.dicts().records())
+        assertThat(systemManagementService.dicts(null, null, null, 1, 50, "createdAt", "asc").records())
                 .extracting(SystemManagementService.DictView::dictCode)
                 .doesNotContain(dictCode);
     }

@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import org.redisson.api.RBucket;
 import org.redisson.api.RScoredSortedSet;
 import org.redisson.api.RedissonClient;
@@ -24,6 +25,7 @@ public class RedisSessionStore implements SessionStore {
     private final ObjectMapper objectMapper;
     private final SecurityRedisProperties redisProperties;
     private final RedissonClient redissonClient;
+    private final ConcurrentHashMap<String, UserSession> fallbackSessions = new ConcurrentHashMap<>();
 
     public RedisSessionStore(
             StringRedisTemplate redisTemplate,
@@ -43,27 +45,44 @@ public class RedisSessionStore implements SessionStore {
         String sessionKey = sessionKey(session.sessionId());
         Duration ttl = remainingTtl(session.expiresAt());
         if (redissonStorageEnabled()) {
-            RBucket<String> sessionBucket = redissonClient.getBucket(sessionKey);
-            sessionBucket.set(payload, ttl);
-            RScoredSortedSet<String> userSessions = redissonClient.getScoredSortedSet(userSessionsKey(session.userId()));
-            userSessions.add(session.issuedAt().toEpochMilli(), session.sessionId());
-            return;
+            try {
+                RBucket<String> sessionBucket = redissonClient.getBucket(sessionKey);
+                sessionBucket.set(payload, ttl);
+                RScoredSortedSet<String> userSessions = redissonClient.getScoredSortedSet(userSessionsKey(session.userId()));
+                userSessions.add(session.issuedAt().toEpochMilli(), session.sessionId());
+                return;
+            } catch (Exception ignored) {
+                fallbackSessions.put(session.sessionId(), session);
+                return;
+            }
         }
-        redisTemplate.opsForValue().set(sessionKey, payload, ttl);
-        redisTemplate.opsForZSet().add(userSessionsKey(session.userId()), session.sessionId(), session.issuedAt().toEpochMilli());
+        try {
+            redisTemplate.opsForValue().set(sessionKey, payload, ttl);
+            redisTemplate.opsForZSet().add(userSessionsKey(session.userId()), session.sessionId(), session.issuedAt().toEpochMilli());
+        } catch (Exception ignored) {
+            fallbackSessions.put(session.sessionId(), session);
+        }
     }
 
     @Override
     public Optional<UserSession> findBySessionId(String sessionId) {
         String payload;
         if (redissonStorageEnabled()) {
-            RBucket<String> bucket = redissonClient.getBucket(sessionKey(sessionId));
-            payload = bucket.get();
+            try {
+                RBucket<String> bucket = redissonClient.getBucket(sessionKey(sessionId));
+                payload = bucket.get();
+            } catch (Exception ignored) {
+                return Optional.ofNullable(fallbackSessions.get(sessionId));
+            }
         } else {
-            payload = redisTemplate.opsForValue().get(sessionKey(sessionId));
+            try {
+                payload = redisTemplate.opsForValue().get(sessionKey(sessionId));
+            } catch (Exception ignored) {
+                return Optional.ofNullable(fallbackSessions.get(sessionId));
+            }
         }
         if (payload == null) {
-            return Optional.empty();
+            return Optional.ofNullable(fallbackSessions.get(sessionId));
         }
         return Optional.of(readSession(payload));
     }
@@ -72,14 +91,30 @@ public class RedisSessionStore implements SessionStore {
     public List<UserSession> findByUserId(Long userId) {
         List<String> sessionIds;
         if (redissonStorageEnabled()) {
-            RScoredSortedSet<String> zset = redissonClient.getScoredSortedSet(userSessionsKey(userId));
-            sessionIds = new ArrayList<>(zset.valueRangeReversed(0, true, Double.MAX_VALUE, true));
-            if (sessionIds.size() > 200) {
-                sessionIds = sessionIds.subList(0, 200);
+            try {
+                RScoredSortedSet<String> zset = redissonClient.getScoredSortedSet(userSessionsKey(userId));
+                sessionIds = new ArrayList<>(zset.valueRangeReversed(0, true, Double.MAX_VALUE, true));
+                if (sessionIds.size() > 200) {
+                    sessionIds = sessionIds.subList(0, 200);
+                }
+            } catch (Exception ignored) {
+                return fallbackSessions.values().stream()
+                        .filter(session -> session.userId().equals(userId))
+                        .sorted((left, right) -> right.issuedAt().compareTo(left.issuedAt()))
+                        .limit(200)
+                        .toList();
             }
         } else {
-            var result = redisTemplate.opsForZSet().reverseRange(userSessionsKey(userId), 0, 200);
-            sessionIds = result == null ? List.of() : new ArrayList<>(result);
+            try {
+                var result = redisTemplate.opsForZSet().reverseRange(userSessionsKey(userId), 0, 200);
+                sessionIds = result == null ? List.of() : new ArrayList<>(result);
+            } catch (Exception ignored) {
+                return fallbackSessions.values().stream()
+                        .filter(session -> session.userId().equals(userId))
+                        .sorted((left, right) -> right.issuedAt().compareTo(left.issuedAt()))
+                        .limit(200)
+                        .toList();
+            }
         }
         if (sessionIds == null || sessionIds.isEmpty()) {
             return List.of();

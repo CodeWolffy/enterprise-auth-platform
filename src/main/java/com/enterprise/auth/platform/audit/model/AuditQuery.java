@@ -7,6 +7,7 @@ public record AuditQuery(
         String eventType,
         String operator,
         String requestId,
+        String clientIp,
         Instant occurredFrom,
         Instant occurredTo,
         int page,

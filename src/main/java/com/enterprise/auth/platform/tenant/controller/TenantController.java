@@ -2,6 +2,7 @@ package com.enterprise.auth.platform.tenant.controller;
 
 import com.enterprise.auth.platform.catalog.CatalogService;
 import com.enterprise.auth.platform.common.api.ApiResponse;
+import com.enterprise.auth.platform.common.model.PageResult;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import com.enterprise.auth.platform.tenant.dto.CreateTenantRequest;
 import com.enterprise.auth.platform.tenant.dto.UpdateTenantRequest;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "租户管理")
@@ -38,8 +40,14 @@ public class TenantController {
     @Operation(summary = "查询租户列表")
     @GetMapping
     @PreAuthorize("hasAuthority('tenant:read')")
-    public ApiResponse<List<CatalogService.TenantView>> list() {
-        return ApiResponse.ok(catalogService.tenants());
+    public ApiResponse<PageResult<CatalogService.TenantView>> list(
+            @Parameter(description = "关键字，匹配租户编码或名称") @RequestParam(required = false) String keyword,
+            @Parameter(description = "是否平台级租户") @RequestParam(required = false) Boolean platformLevel,
+            @Parameter(description = "租户状态，1 启用，0 禁用") @RequestParam(required = false) Integer tenantStatus,
+            @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") int size
+    ) {
+        return ApiResponse.ok(tenantManagementService.page(keyword, platformLevel, tenantStatus, page, size));
     }
 
     @Operation(summary = "新增租户")

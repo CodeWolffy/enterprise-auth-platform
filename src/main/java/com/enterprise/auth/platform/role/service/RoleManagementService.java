@@ -3,12 +3,17 @@ package com.enterprise.auth.platform.role.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.catalog.CatalogService;
+import com.enterprise.auth.platform.common.model.DataScopeType;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.config.PersistenceProperties;
+import com.enterprise.auth.platform.persistence.entity.SysConfigEntity;
+import com.enterprise.auth.platform.persistence.entity.SysDeptEntity;
 import com.enterprise.auth.platform.persistence.entity.SysPermissionEntity;
 import com.enterprise.auth.platform.persistence.entity.SysRoleEntity;
 import com.enterprise.auth.platform.persistence.entity.SysRolePermissionEntity;
 import com.enterprise.auth.platform.persistence.entity.SysUserRoleEntity;
+import com.enterprise.auth.platform.persistence.mapper.SysConfigMapper;
+import com.enterprise.auth.platform.persistence.mapper.SysDeptMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysPermissionMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysRoleMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysRolePermissionMapper;
@@ -34,6 +39,8 @@ public class RoleManagementService {
     private final SysUserRoleMapper sysUserRoleMapper;
     private final SysRolePermissionMapper sysRolePermissionMapper;
     private final SysPermissionMapper sysPermissionMapper;
+    private final SysDeptMapper sysDeptMapper;
+    private final SysConfigMapper sysConfigMapper;
     private final CatalogService catalogService;
     private final AuditService auditService;
 
@@ -43,6 +50,8 @@ public class RoleManagementService {
             @Nullable SysUserRoleMapper sysUserRoleMapper,
             @Nullable SysRolePermissionMapper sysRolePermissionMapper,
             @Nullable SysPermissionMapper sysPermissionMapper,
+            @Nullable SysDeptMapper sysDeptMapper,
+            @Nullable SysConfigMapper sysConfigMapper,
             CatalogService catalogService,
             AuditService auditService
     ) {
@@ -51,6 +60,8 @@ public class RoleManagementService {
         this.sysUserRoleMapper = sysUserRoleMapper;
         this.sysRolePermissionMapper = sysRolePermissionMapper;
         this.sysPermissionMapper = sysPermissionMapper;
+        this.sysDeptMapper = sysDeptMapper;
+        this.sysConfigMapper = sysConfigMapper;
         this.catalogService = catalogService;
         this.auditService = auditService;
     }
@@ -71,6 +82,7 @@ public class RoleManagementService {
         entity.setRoleDesc(request.roleDesc());
         entity.setDataScopeType(request.dataScopeType().name());
         sysRoleMapper.insert(entity);
+        saveCustomDeptIds(tenantId, entity.getRoleCode(), request.dataScopeType(), request.customDeptIds());
 
         auditService.record("ROLE_CREATED", operator, tenantId, Map.of("roleId", entity.getId(), "roleCode", entity.getRoleCode()));
         return catalogService.role(entity.getRoleCode());
@@ -85,6 +97,7 @@ public class RoleManagementService {
         entity.setRoleDesc(request.roleDesc());
         entity.setDataScopeType(request.dataScopeType().name());
         sysRoleMapper.updateById(entity);
+        saveCustomDeptIds(tenantId, entity.getRoleCode(), request.dataScopeType(), request.customDeptIds());
 
         auditService.record("ROLE_UPDATED", SecuritySupport.currentOperator(), tenantId, Map.of("roleId", entity.getId(), "roleCode", entity.getRoleCode()));
         return catalogService.role(entity.getRoleCode());
@@ -154,6 +167,7 @@ public class RoleManagementService {
         sysRolePermissionMapper.delete(new LambdaQueryWrapper<SysRolePermissionEntity>()
                 .eq(SysRolePermissionEntity::getTenantId, tenantId)
                 .eq(SysRolePermissionEntity::getRoleId, roleId));
+        deleteCustomDeptIds(tenantId, entity.getRoleCode());
         sysRoleMapper.deleteById(entity.getId());
         auditService.record("ROLE_DELETED", operator, tenantId, Map.of("roleId", roleId, "roleCode", entity.getRoleCode()));
     }
@@ -196,7 +210,9 @@ public class RoleManagementService {
                 || sysRoleMapper == null
                 || sysUserRoleMapper == null
                 || sysRolePermissionMapper == null
-                || sysPermissionMapper == null) {
+                || sysPermissionMapper == null
+                || sysDeptMapper == null
+                || sysConfigMapper == null) {
             throw new BusinessException("当前为默认内存模式，暂未启用数据库写入能力");
         }
     }
@@ -204,5 +220,57 @@ public class RoleManagementService {
     private String currentTenantId() {
         String tenantId = TenantContext.getTenantId();
         return StringUtils.hasText(tenantId) ? tenantId : "platform";
+    }
+
+    private void saveCustomDeptIds(String tenantId, String roleCode, DataScopeType scopeType, List<Long> customDeptIds) {
+        if (scopeType != DataScopeType.CUSTOM) {
+            deleteCustomDeptIds(tenantId, roleCode);
+            return;
+        }
+        List<Long> normalizedDeptIds = customDeptIds == null ? List.of() : customDeptIds.stream()
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        if (normalizedDeptIds.isEmpty()) {
+            throw new BusinessException("自定义数据范围至少选择一个部门");
+        }
+        long validCount = sysDeptMapper.selectCount(new LambdaQueryWrapper<SysDeptEntity>()
+                .eq(SysDeptEntity::getTenantId, tenantId)
+                .eq(SysDeptEntity::getDeleted, 0)
+                .in(SysDeptEntity::getId, normalizedDeptIds));
+        if (validCount != normalizedDeptIds.size()) {
+            throw new BusinessException("存在无效的自定义部门");
+        }
+
+        String configKey = roleCustomDeptConfigKey(roleCode);
+        String configValue = normalizedDeptIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+        SysConfigEntity entity = sysConfigMapper.selectOne(new LambdaQueryWrapper<SysConfigEntity>()
+                .eq(SysConfigEntity::getTenantId, tenantId)
+                .eq(SysConfigEntity::getConfigKey, configKey)
+                .eq(SysConfigEntity::getDeleted, 0)
+                .last("limit 1"));
+        if (entity == null) {
+            entity = new SysConfigEntity();
+            entity.setTenantId(tenantId);
+            entity.setConfigKey(configKey);
+            entity.setConfigName("角色自定义数据范围部门");
+            entity.setConfigValue(configValue);
+            sysConfigMapper.insert(entity);
+            return;
+        }
+        entity.setConfigName("角色自定义数据范围部门");
+        entity.setConfigValue(configValue);
+        sysConfigMapper.updateById(entity);
+    }
+
+    private void deleteCustomDeptIds(String tenantId, String roleCode) {
+        sysConfigMapper.delete(new LambdaQueryWrapper<SysConfigEntity>()
+                .eq(SysConfigEntity::getTenantId, tenantId)
+                .eq(SysConfigEntity::getConfigKey, roleCustomDeptConfigKey(roleCode))
+                .eq(SysConfigEntity::getDeleted, 0));
+    }
+
+    private String roleCustomDeptConfigKey(String roleCode) {
+        return "role.custom_dept_ids." + roleCode;
     }
 }

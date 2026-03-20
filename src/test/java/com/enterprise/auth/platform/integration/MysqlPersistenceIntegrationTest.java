@@ -142,13 +142,13 @@ class MysqlPersistenceIntegrationTest {
                 new DictCrudRequest("notify_level", dictCode, "普通通知")
         );
 
-        assertThat(systemManagementService.dicts().records())
+        assertThat(systemManagementService.dicts(null, null, null, 1, 50, "createdAt", "asc").records())
                 .extracting(SystemManagementService.DictView::dictCode)
                 .contains(dictCode);
 
         systemManagementService.deleteDict(created.id());
 
-        assertThat(systemManagementService.dicts().records())
+        assertThat(systemManagementService.dicts(null, null, null, 1, 50, "createdAt", "asc").records())
                 .extracting(SystemManagementService.DictView::dictCode)
                 .doesNotContain(dictCode);
     }

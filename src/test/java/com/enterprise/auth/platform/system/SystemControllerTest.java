@@ -132,6 +132,17 @@ class SystemControllerTest {
     }
 
     @Test
+    void dictListShouldSupportCategoryFilter() throws Exception {
+        mockMvc.perform(get("/api/system/dicts")
+                        .with(user(principal(Set.of("system:read"))))
+                        .header("X-Tenant-Id", "tenant-a")
+                        .param("category", "system"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[?(@.dictCode=='" + VISIBLE_DICT_CODE + "')]").exists())
+                .andExpect(jsonPath("$.data.records[0].category").value("system"));
+    }
+
+    @Test
     void updateHiddenDictShouldBeRejected() throws Exception {
         mockMvc.perform(put("/api/system/dicts/{id}", hiddenDictId)
                         .with(user(principal(Set.of("system:write"))))

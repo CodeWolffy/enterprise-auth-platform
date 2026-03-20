@@ -89,14 +89,26 @@
           <el-descriptions-item label="角色编码">{{ detailRole.code }}</el-descriptions-item>
           <el-descriptions-item label="角色名称">{{ detailRole.name }}</el-descriptions-item>
           <el-descriptions-item label="数据范围">{{ detailRole.dataScopeType }}</el-descriptions-item>
+          <el-descriptions-item label="自定义部门">{{ detailRole.customDeptIds?.length || 0 }}</el-descriptions-item>
           <el-descriptions-item label="已分配权限">{{ assignedPermissionCodes.length }}</el-descriptions-item>
           <el-descriptions-item label="角色描述" :span="2">{{ detailRole.description || '-' }}</el-descriptions-item>
         </el-descriptions>
 
+        <div v-if="detailRole.customDeptIds?.length" class="scope-tags">
+          <el-tag v-for="deptId in detailRole.customDeptIds" :key="deptId" type="warning" effect="plain">
+            部门 #{{ deptId }}
+          </el-tag>
+        </div>
+
         <div class="tree-panel">
-          <div class="tree-panel__head">
-            <strong>权限树</strong>
-            <span>{{ assignedPermissionCodes.length }} 个权限点</span>
+        <div class="tree-panel__head">
+          <strong>权限树</strong>
+          <span>{{ assignedPermissionCodes.length }} 个权限点</span>
+        </div>
+          <div class="resource-summary">
+            <el-tag v-for="item in detailResourceSummary" :key="item.resource" effect="plain">
+              {{ item.resource }} / {{ item.count }}
+            </el-tag>
           </div>
           <el-tree
             :data="detailPermissionTree"
@@ -135,6 +147,18 @@
             <el-option label="自定义范围" value="CUSTOM" />
           </el-select>
         </el-form-item>
+        <el-form-item v-if="roleForm.dataScopeType === 'CUSTOM'" label="自定义部门" prop="customDeptIds">
+          <el-tree-select
+            v-model="roleForm.customDeptIds"
+            :data="departmentTree"
+            multiple
+            show-checkbox
+            check-strictly
+            node-key="id"
+            :props="{ label: 'label', children: 'children' }"
+            style="width: 100%"
+          />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="roleVisible = false">取消</el-button>
@@ -145,6 +169,16 @@
     <el-dialog v-model="permissionVisible" title="分配角色权限" width="760px">
       <div class="assignment-toolbar">
         <el-input v-model="permissionKeyword" placeholder="筛选权限名称、编码、资源或动作" clearable />
+        <div class="assignment-toolbar__actions">
+          <el-button @click="expandAll">全部展开</el-button>
+          <el-button @click="collapseAll">全部折叠</el-button>
+          <span class="assignment-toolbar__meta">共 {{ permissions.length }} 个权限点</span>
+        </div>
+        <div class="resource-summary">
+          <el-tag v-for="item in selectedResourceSummary" :key="item.resource" effect="plain">
+            {{ item.resource }} / {{ item.count }}
+          </el-tag>
+        </div>
       </div>
       <el-tree
         ref="permissionTreeRef"
@@ -154,6 +188,7 @@
         default-expand-all
         :props="{ children: 'children', label: 'label' }"
         class="permission-tree"
+        @check="syncSelectedPermissionCodes"
       />
       <template #footer>
         <el-button @click="permissionVisible = false">取消</el-button>
@@ -171,12 +206,13 @@ import {
   assignRolePermissions,
   createRole,
   deleteRole,
+  queryDepartments,
   queryAssignedPermissions,
   queryPermissions,
   queryRoles,
   updateRole,
 } from '@/api/platform'
-import type { PermissionView, RoleView } from '@/types/auth'
+import type { DepartmentView, PermissionView, RoleView } from '@/types/auth'
 
 type PermissionTreeNode = {
   id: string
@@ -186,6 +222,7 @@ type PermissionTreeNode = {
 
 const roles = ref<RoleView[]>([])
 const permissions = ref<PermissionView[]>([])
+const departments = ref<DepartmentView[]>([])
 const permissionTreeRef = ref<InstanceType<typeof ElTree>>()
 const formRef = ref<FormInstance>()
 const roleVisible = ref(false)
@@ -199,6 +236,7 @@ const loading = ref(false)
 const keyword = ref('')
 const scopeFilter = ref('')
 const permissionKeyword = ref('')
+const selectedPermissionCodes = ref<string[]>([])
 const page = ref(1)
 const size = ref(10)
 
@@ -207,6 +245,7 @@ const roleForm = reactive({
   roleName: '',
   roleDesc: '',
   dataScopeType: 'ALL',
+  customDeptIds: [] as number[],
 })
 
 const roleRules = reactive<FormRules>({
@@ -216,6 +255,18 @@ const roleRules = reactive<FormRules>({
   ],
   roleName: [{ required: true, message: '请输入角色名称', trigger: 'blur' }],
   dataScopeType: [{ required: true, message: '请选择数据范围', trigger: 'change' }],
+  customDeptIds: [
+    {
+      validator: (_rule, value, callback) => {
+        if (roleForm.dataScopeType === 'CUSTOM' && (!Array.isArray(value) || value.length === 0)) {
+          callback(new Error('自定义范围至少选择一个部门'))
+          return
+        }
+        callback()
+      },
+      trigger: 'change',
+    },
+  ],
 })
 
 const permissionCountMap = computed<Record<number, number>>(() => {
@@ -232,7 +283,7 @@ const permissionCountMap = computed<Record<number, number>>(() => {
 function buildPermissionTree(source: PermissionView[]) {
   const resourceMap = new Map<string, PermissionTreeNode>()
   for (const permission of source) {
-    const resourceLabel = `${permission.resourceCode}`
+    const resourceLabel = permission.resourceCode
     const actionLabel = `${permission.actionCode} / ${permission.scopeCode}`
     let resourceNode = resourceMap.get(permission.resourceCode)
     if (!resourceNode) {
@@ -264,6 +315,7 @@ function buildPermissionTree(source: PermissionView[]) {
 
 const permissionTreeData = computed(() => buildPermissionTree(permissions.value))
 const detailPermissionTree = computed(() => buildPermissionTree(assignedPermissions.value))
+const departmentTree = computed(() => buildDepartmentTree(departments.value))
 
 const filteredPermissionTree = computed(() => {
   const normalizedKeyword = permissionKeyword.value.trim().toLowerCase()
@@ -290,20 +342,24 @@ const pagedRoles = computed(() => {
 })
 
 const assignedPermissionCodes = computed(() => assignedPermissions.value.map((item) => item.permissionCode))
+const detailResourceSummary = computed(() => summarizePermissions(assignedPermissions.value))
+const selectedResourceSummary = computed(() => summarizePermissions(permissions.value.filter((item) => selectedPermissionCodeSet.value.has(item.permissionCode))))
 const allScopeCount = computed(() => filteredRoles.value.filter((item) => item.dataScopeType === 'ALL').length)
 const deptScopeCount = computed(() =>
   filteredRoles.value.filter((item) => item.dataScopeType === 'DEPT_AND_CHILDREN' || item.dataScopeType === 'DEPT').length,
 )
 const customScopeCount = computed(() => filteredRoles.value.filter((item) => item.dataScopeType === 'CUSTOM').length)
+const selectedPermissionCodeSet = computed(() => new Set(selectedPermissionCodes.value))
 
 void load()
 
 async function load() {
   loading.value = true
   try {
-    const [roleList, permissionList] = await Promise.all([queryRoles(), queryPermissions()])
+    const [roleList, permissionList, departmentList] = await Promise.all([queryRoles(), queryPermissions(), queryDepartments()])
     roles.value = roleList
     permissions.value = permissionList
+    departments.value = departmentList
   } finally {
     loading.value = false
   }
@@ -330,6 +386,7 @@ function openRole(row?: RoleView) {
     roleName: row?.name ?? '',
     roleDesc: row?.description ?? '',
     dataScopeType: row?.dataScopeType ?? 'ALL',
+    customDeptIds: [...(row?.customDeptIds ?? [])],
   })
   roleVisible.value = true
 }
@@ -350,6 +407,7 @@ async function submitRole() {
     roleName: roleForm.roleName,
     roleDesc: roleForm.roleDesc || null,
     dataScopeType: roleForm.dataScopeType,
+    customDeptIds: roleForm.dataScopeType === 'CUSTOM' ? roleForm.customDeptIds : [],
   }
   if (editingRoleId.value) {
     await updateRole(editingRoleId.value, payload)
@@ -368,7 +426,9 @@ async function openPermissionAssignment(row: RoleView) {
   permissionVisible.value = true
   permissionKeyword.value = ''
   await nextTick()
-  permissionTreeRef.value?.setCheckedKeys(assigned.map((item) => item.permissionCode))
+  const checkedKeys = assigned.map((item) => item.permissionCode)
+  permissionTreeRef.value?.setCheckedKeys(checkedKeys)
+  selectedPermissionCodes.value = checkedKeys
 }
 
 async function submitPermissionAssignment() {
@@ -385,11 +445,33 @@ async function submitPermissionAssignment() {
   await load()
 }
 
+function expandAll() {
+  setTreeExpanded(true)
+}
+
+function collapseAll() {
+  setTreeExpanded(false)
+}
+
+function syncSelectedPermissionCodes() {
+  selectedPermissionCodes.value = ((permissionTreeRef.value?.getCheckedKeys(true) || []) as string[]).filter((item) => !item.startsWith('RES_') && !item.startsWith('ACT_'))
+}
+
 async function removeRole(id: number) {
   await ElMessageBox.confirm('删除角色后，原有关联授权将失效，是否继续？', '删除确认', { type: 'warning' })
   await deleteRole(id)
   ElMessage.success('角色已删除')
   await load()
+}
+
+function setTreeExpanded(expanded: boolean) {
+  const treeStore = (permissionTreeRef.value as unknown as { store?: { nodesMap?: Record<string, { expanded: boolean }> } })?.store
+  if (!treeStore?.nodesMap) {
+    return
+  }
+  Object.values(treeStore.nodesMap).forEach((node) => {
+    node.expanded = expanded
+  })
 }
 
 function filterTree(nodes: PermissionTreeNode[], keywordValue: string): PermissionTreeNode[] {
@@ -407,11 +489,58 @@ function filterTree(nodes: PermissionTreeNode[], keywordValue: string): Permissi
     })
     .filter((item): item is PermissionTreeNode => Boolean(item))
 }
+
+function summarizePermissions(source: PermissionView[]) {
+  const counter = new Map<string, number>()
+  source.forEach((item) => {
+    counter.set(item.resourceCode, (counter.get(item.resourceCode) || 0) + 1)
+  })
+  return Array.from(counter.entries()).map(([resource, count]) => ({ resource, count }))
+}
+
+function buildDepartmentTree(source: DepartmentView[]) {
+  const nodes = source.map((item) => ({
+    id: item.id,
+    label: item.name,
+    parentId: item.parentId ?? 0,
+    children: [] as Array<{ id: number; label: string; parentId: number; children: unknown[] }>,
+  }))
+  const map = new Map(nodes.map((item) => [item.id, item]))
+  const roots: typeof nodes = []
+  nodes.forEach((node) => {
+    const parent = node.parentId ? map.get(node.parentId) : null
+    if (parent) {
+      parent.children.push(node)
+      return
+    }
+    roots.push(node)
+  })
+  return roots
+}
 </script>
 
 <style scoped lang="scss">
 .assignment-toolbar {
+  display: grid;
+  gap: 12px;
   margin-bottom: 16px;
+}
+
+.assignment-toolbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.assignment-toolbar__meta {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.resource-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .permission-tree {
@@ -431,6 +560,13 @@ function filterTree(nodes: PermissionTreeNode[], keywordValue: string): Permissi
   justify-content: space-between;
   margin-bottom: 12px;
   color: #475569;
+}
+
+.scope-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
 }
 
 .pagination-wrap {

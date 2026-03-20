@@ -4,11 +4,14 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.catalog.CatalogService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.common.model.PageResult;
 import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.persistence.entity.SysDeptEntity;
 import com.enterprise.auth.platform.persistence.entity.SysRoleEntity;
 import com.enterprise.auth.platform.persistence.entity.SysTenantEntity;
 import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
+import com.enterprise.auth.platform.persistence.entity.SysConfigEntity;
+import com.enterprise.auth.platform.persistence.mapper.SysConfigMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysDeptMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysRoleMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysTenantMapper;
@@ -16,10 +19,12 @@ import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
 import com.enterprise.auth.platform.security.SecuritySupport;
 import com.enterprise.auth.platform.tenant.dto.CreateTenantRequest;
 import com.enterprise.auth.platform.tenant.dto.UpdateTenantRequest;
+import java.util.List;
 import java.util.Map;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 @Service
 public class TenantManagementService {
@@ -29,6 +34,7 @@ public class TenantManagementService {
     private final SysUserMapper sysUserMapper;
     private final SysRoleMapper sysRoleMapper;
     private final SysDeptMapper sysDeptMapper;
+    private final SysConfigMapper sysConfigMapper;
     private final CatalogService catalogService;
     private final AuditService auditService;
 
@@ -38,6 +44,7 @@ public class TenantManagementService {
             @Nullable SysUserMapper sysUserMapper,
             @Nullable SysRoleMapper sysRoleMapper,
             @Nullable SysDeptMapper sysDeptMapper,
+            @Nullable SysConfigMapper sysConfigMapper,
             CatalogService catalogService,
             AuditService auditService
     ) {
@@ -46,6 +53,7 @@ public class TenantManagementService {
         this.sysUserMapper = sysUserMapper;
         this.sysRoleMapper = sysRoleMapper;
         this.sysDeptMapper = sysDeptMapper;
+        this.sysConfigMapper = sysConfigMapper;
         this.catalogService = catalogService;
         this.auditService = auditService;
     }
@@ -65,6 +73,8 @@ public class TenantManagementService {
         entity.setTenantStatus(request.tenantStatus() == null ? 1 : request.tenantStatus());
         entity.setExpireAt(request.expireAt());
         sysTenantMapper.insert(entity);
+        saveTenantProfile(request.tenantId(), request.packageCode(), request.packageName(), request.userQuota(),
+                request.storageQuotaGb(), request.capabilityCodes(), request.lifecycleNote());
 
         auditService.record("TENANT_CREATED", operator, request.tenantId(), Map.of("tenantId", request.tenantId()));
         return catalogService.tenant(request.tenantId());
@@ -81,6 +91,8 @@ public class TenantManagementService {
         }
         entity.setExpireAt(request.expireAt());
         sysTenantMapper.updateById(entity);
+        saveTenantProfile(tenantId, request.packageCode(), request.packageName(), request.userQuota(),
+                request.storageQuotaGb(), request.capabilityCodes(), request.lifecycleNote());
 
         auditService.record("TENANT_UPDATED", SecuritySupport.currentOperator(), tenantId, Map.of("tenantId", tenantId));
         return catalogService.tenant(tenantId);
@@ -98,7 +110,53 @@ public class TenantManagementService {
         }
 
         sysTenantMapper.deleteById(entity.getId());
+        if (sysConfigMapper != null) {
+            sysConfigMapper.delete(new LambdaQueryWrapper<SysConfigEntity>()
+                    .eq(SysConfigEntity::getTenantId, tenantId)
+                    .in(SysConfigEntity::getConfigKey,
+                            "tenant.package.code",
+                            "tenant.package.name",
+                            "tenant.quota.users",
+                            "tenant.quota.storage_gb",
+                            "tenant.capability.codes",
+                            "tenant.lifecycle.note"));
+        }
         auditService.record("TENANT_DELETED", operator, tenantId, Map.of("tenantId", entity.getTenantId()));
+    }
+
+    public PageResult<CatalogService.TenantView> page(String keyword, Boolean platformLevel, Integer tenantStatus, int page, int size) {
+        requireDatabaseMode();
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.max(size, 1);
+        LambdaQueryWrapper<SysTenantEntity> query = new LambdaQueryWrapper<SysTenantEntity>()
+                .eq(SysTenantEntity::getDeleted, 0)
+                .eq(platformLevel != null, SysTenantEntity::getPlatformLevel, Boolean.TRUE.equals(platformLevel) ? 1 : 0)
+                .eq(tenantStatus != null, SysTenantEntity::getTenantStatus, tenantStatus)
+                .and(StringUtils.hasText(keyword), wrapper -> wrapper
+                        .like(SysTenantEntity::getTenantId, keyword)
+                        .or()
+                        .like(SysTenantEntity::getTenantName, keyword));
+        long total = sysTenantMapper.selectCount(query);
+        if (total == 0) {
+            return PageResult.of(0, safePage, safeSize, List.of());
+        }
+        int offset = (safePage - 1) * safeSize;
+        List<SysTenantEntity> entities = sysTenantMapper.selectList(new LambdaQueryWrapper<SysTenantEntity>()
+                .eq(SysTenantEntity::getDeleted, 0)
+                .eq(platformLevel != null, SysTenantEntity::getPlatformLevel, Boolean.TRUE.equals(platformLevel) ? 1 : 0)
+                .eq(tenantStatus != null, SysTenantEntity::getTenantStatus, tenantStatus)
+                .and(StringUtils.hasText(keyword), wrapper -> wrapper
+                        .like(SysTenantEntity::getTenantId, keyword)
+                        .or()
+                        .like(SysTenantEntity::getTenantName, keyword))
+                .orderByDesc(SysTenantEntity::getCreatedAt)
+                .orderByDesc(SysTenantEntity::getId)
+                .last("limit " + offset + "," + safeSize));
+        Map<String, Map<String, String>> profiles = loadTenantProfileValues(entities.stream().map(SysTenantEntity::getTenantId).toList());
+        List<CatalogService.TenantView> records = entities.stream()
+                .map(entity -> toTenantView(entity, profiles.getOrDefault(entity.getTenantId(), Map.of())))
+                .toList();
+        return PageResult.of(total, safePage, safeSize, records);
     }
 
     private boolean existsTenant(String tenantId) {
@@ -123,8 +181,116 @@ public class TenantManagementService {
                 || sysTenantMapper == null
                 || sysUserMapper == null
                 || sysRoleMapper == null
-                || sysDeptMapper == null) {
+                || sysDeptMapper == null
+                || sysConfigMapper == null) {
             throw new BusinessException("当前为默认内存模式，暂未启用数据库写入能力");
         }
+    }
+
+    private void saveTenantProfile(
+            String tenantId,
+            String packageCode,
+            String packageName,
+            Integer userQuota,
+            Integer storageQuotaGb,
+            java.util.List<String> capabilityCodes,
+            String lifecycleNote
+    ) {
+        upsertTenantConfig(tenantId, "tenant.package.code", "租户套餐编码", packageCode);
+        upsertTenantConfig(tenantId, "tenant.package.name", "租户套餐名称", packageName);
+        upsertTenantConfig(tenantId, "tenant.quota.users", "租户用户配额", userQuota == null ? null : String.valueOf(userQuota));
+        upsertTenantConfig(tenantId, "tenant.quota.storage_gb", "租户存储配额(GB)", storageQuotaGb == null ? null : String.valueOf(storageQuotaGb));
+        upsertTenantConfig(tenantId, "tenant.capability.codes", "租户能力编码集合",
+                capabilityCodes == null || capabilityCodes.isEmpty() ? null : String.join(",", capabilityCodes));
+        upsertTenantConfig(tenantId, "tenant.lifecycle.note", "租户运营备注", lifecycleNote);
+    }
+
+    private void upsertTenantConfig(String tenantId, String key, String name, String value) {
+        if (sysConfigMapper == null) {
+            return;
+        }
+        SysConfigEntity existing = sysConfigMapper.selectOne(new LambdaQueryWrapper<SysConfigEntity>()
+                .eq(SysConfigEntity::getTenantId, tenantId)
+                .eq(SysConfigEntity::getConfigKey, key)
+                .eq(SysConfigEntity::getDeleted, 0)
+                .last("limit 1"));
+        if (!org.springframework.util.StringUtils.hasText(value)) {
+            if (existing != null) {
+                sysConfigMapper.deleteById(existing.getId());
+            }
+            return;
+        }
+        if (existing == null) {
+            existing = new SysConfigEntity();
+            existing.setTenantId(tenantId);
+            existing.setConfigKey(key);
+            existing.setConfigName(name);
+            existing.setConfigValue(value);
+            sysConfigMapper.insert(existing);
+            return;
+        }
+        existing.setConfigName(name);
+        existing.setConfigValue(value);
+        sysConfigMapper.updateById(existing);
+    }
+
+    private Map<String, Map<String, String>> loadTenantProfileValues(List<String> tenantIds) {
+        if (tenantIds.isEmpty()) {
+            return Map.of();
+        }
+        List<SysConfigEntity> configs = sysConfigMapper.selectList(new LambdaQueryWrapper<SysConfigEntity>()
+                .in(SysConfigEntity::getTenantId, tenantIds)
+                .eq(SysConfigEntity::getDeleted, 0)
+                .in(SysConfigEntity::getConfigKey,
+                        "tenant.package.code",
+                        "tenant.package.name",
+                        "tenant.quota.users",
+                        "tenant.quota.storage_gb",
+                        "tenant.capability.codes",
+                        "tenant.lifecycle.note"));
+        Map<String, Map<String, String>> result = new java.util.LinkedHashMap<>();
+        for (SysConfigEntity config : configs) {
+            result.computeIfAbsent(config.getTenantId(), ignored -> new java.util.LinkedHashMap<>())
+                    .put(config.getConfigKey(), config.getConfigValue());
+        }
+        return result;
+    }
+
+    private CatalogService.TenantView toTenantView(SysTenantEntity tenant, Map<String, String> values) {
+        return new CatalogService.TenantView(
+                tenant.getTenantId(),
+                tenant.getTenantName(),
+                tenant.getPlatformLevel() != null && tenant.getPlatformLevel() == 1,
+                tenant.getTenantStatus(),
+                tenant.getExpireAt(),
+                values.get("tenant.package.code"),
+                values.get("tenant.package.name"),
+                parseInteger(values.get("tenant.quota.users")),
+                parseInteger(values.get("tenant.quota.storage_gb")),
+                parseCodes(values.get("tenant.capability.codes")),
+                values.get("tenant.lifecycle.note")
+        );
+    }
+
+    private Integer parseInteger(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private List<String> parseCodes(String value) {
+        if (!StringUtils.hasText(value)) {
+            return List.of();
+        }
+        return java.util.Arrays.stream(value.split(","))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .toList();
     }
 }

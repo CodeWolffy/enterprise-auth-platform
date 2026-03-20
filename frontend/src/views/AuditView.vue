@@ -47,6 +47,9 @@
         <el-form-item label="请求 ID">
           <el-input v-model="query.requestId" placeholder="按请求 ID 搜索" clearable />
         </el-form-item>
+        <el-form-item label="客户端 IP">
+          <el-input v-model="query.clientIp" placeholder="按客户端 IP 搜索" clearable />
+        </el-form-item>
         <el-form-item label="时间范围">
           <el-date-picker
             v-model="dateRange"
@@ -103,7 +106,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { queryAuditEvents } from '@/api/platform'
+import { exportAuditEvents, queryAuditEvents } from '@/api/platform'
 import type { AuditPage } from '@/types/auth'
 
 const query = reactive({
@@ -111,6 +114,7 @@ const query = reactive({
   eventType: '',
   operator: '',
   requestId: '',
+  clientIp: '',
   page: 1,
   size: 20,
 })
@@ -140,6 +144,7 @@ function resetSearch() {
   query.eventType = ''
   query.operator = ''
   query.requestId = ''
+  query.clientIp = ''
   dateRange.value = null
   query.page = 1
   void load()
@@ -151,6 +156,7 @@ async function load() {
     eventType: query.eventType || undefined,
     operator: query.operator || undefined,
     requestId: query.requestId || undefined,
+    clientIp: query.clientIp || undefined,
     occurredFrom: dateRange.value?.[0] || undefined,
     occurredTo: dateRange.value?.[1] || undefined,
     page: query.page,
@@ -169,35 +175,27 @@ async function handleSizeChange(nextSize: number) {
   await load()
 }
 
-function exportCurrentPage() {
-  const rows = page.value.records.map((item) => ({
-    type: item.type,
-    operator: item.operator,
-    tenantId: item.tenantId,
-    requestId: item.requestId,
-    clientIp: item.clientIp,
-    occurredAt: item.occurredAt,
-    details: JSON.stringify(item.details),
-  }))
-
-  const header = ['type', 'operator', 'tenantId', 'requestId', 'clientIp', 'occurredAt', 'details']
-  const csv = [
-    header.join(','),
-    ...rows.map((row) =>
-      header
-        .map((key) => `"${String(row[key as keyof typeof row] ?? '').replaceAll('"', '""')}"`)
-        .join(','),
-    ),
-  ].join('\n')
-
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+async function exportCurrentPage() {
+  if (!dateRange.value?.[0] || !dateRange.value?.[1]) {
+    ElMessage.warning('导出前请先选择开始和结束时间，且时间范围不能超过 31 天')
+    return
+  }
+  const blob = await exportAuditEvents({
+    tenantId: query.tenantId || undefined,
+    eventType: query.eventType || undefined,
+    operator: query.operator || undefined,
+    requestId: query.requestId || undefined,
+    clientIp: query.clientIp || undefined,
+    occurredFrom: dateRange.value?.[0] || undefined,
+    occurredTo: dateRange.value?.[1] || undefined,
+  })
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = `audit-page-${query.page}.csv`
+  anchor.download = `audit-export-${Date.now()}.csv`
   anchor.click()
   URL.revokeObjectURL(url)
-  ElMessage.success('已导出当前页审计记录')
+  ElMessage.success('已导出审计记录')
 }
 </script>
 

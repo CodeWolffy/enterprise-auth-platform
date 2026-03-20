@@ -38,6 +38,14 @@
             <el-option label="草稿" value="draft" />
           </el-select>
         </el-form-item>
+        <el-form-item label="工作流状态">
+          <el-select v-model="workflowStatus" placeholder="全部" clearable style="width: 160px">
+            <el-option label="全部" value="" />
+            <el-option label="草稿" value="DRAFT" />
+            <el-option label="待发布" value="SCHEDULED" />
+            <el-option label="已发布" value="PUBLISHED" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="排序字段">
           <el-select v-model="sortBy" style="width: 160px">
             <el-option label="发布时间" value="publishTime" />
@@ -65,6 +73,7 @@
             <el-tag :type="row.published ? 'success' : 'info'">{{ row.published ? '已发布' : '草稿' }}</el-tag>
           </template>
         </el-table-column>
+        <el-table-column prop="workflowStatus" label="工作流状态" min-width="120" />
         <el-table-column prop="publishTime" label="发布时间" min-width="180" />
         <el-table-column prop="createdBy" label="创建人" min-width="120" />
         <el-table-column fixed="right" label="操作" width="220">
@@ -96,6 +105,7 @@
           <el-descriptions-item label="发布状态">
             {{ detailItem.published ? '已发布' : '草稿' }}
           </el-descriptions-item>
+          <el-descriptions-item label="工作流状态">{{ detailItem.workflowStatus }}</el-descriptions-item>
           <el-descriptions-item label="发布时间">{{ detailItem.publishTime || '-' }}</el-descriptions-item>
           <el-descriptions-item label="创建人">{{ detailItem.createdBy }}</el-descriptions-item>
           <el-descriptions-item label="ID">{{ detailItem.id }}</el-descriptions-item>
@@ -141,6 +151,7 @@ const editingId = ref<number | null>(null)
 const detailItem = ref<NoticeView | null>(null)
 const keyword = ref('')
 const statusFilter = ref('')
+const workflowStatus = ref('')
 const sortBy = ref<'publishTime' | 'createdAt' | 'noticeTitle'>('publishTime')
 const sortDirection = ref<'asc' | 'desc'>('desc')
 const page = ref(1)
@@ -169,6 +180,7 @@ async function load() {
   const result = await queryNotices({
     keyword: keyword.value || undefined,
     published: statusFilter.value ? statusFilter.value === 'published' : undefined,
+    workflowStatus: workflowStatus.value || undefined,
     page: page.value,
     size: size.value,
     sortBy: sortBy.value,
@@ -186,6 +198,7 @@ function handleSearch() {
 function resetSearch() {
   keyword.value = ''
   statusFilter.value = ''
+  workflowStatus.value = ''
   sortBy.value = 'publishTime'
   sortDirection.value = 'desc'
   page.value = 1

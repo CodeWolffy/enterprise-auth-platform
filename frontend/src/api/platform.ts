@@ -25,6 +25,21 @@ export interface UserPage {
   records: UserSummary[]
 }
 
+export interface TenantQueryParams {
+  keyword?: string
+  platformLevel?: boolean
+  tenantStatus?: number
+  page?: number
+  size?: number
+}
+
+export interface TenantPage {
+  total: number
+  page: number
+  size: number
+  records: TenantView[]
+}
+
 export async function queryUsers(params?: UserQueryParams) {
   const { data } = await http.get<ApiResponse<UserPage>>('/api/users', { params })
   return data.data
@@ -121,8 +136,8 @@ export async function deleteDepartment(id: number) {
   await http.delete(`/api/depts/${id}`)
 }
 
-export async function queryTenants() {
-  const { data } = await http.get<ApiResponse<TenantView[]>>('/api/tenants')
+export async function queryTenants(params?: TenantQueryParams) {
+  const { data } = await http.get<ApiResponse<TenantPage>>('/api/tenants', { params })
   return data.data
 }
 
@@ -145,6 +160,7 @@ export interface AuditQueryParams {
   eventType?: string
   operator?: string
   requestId?: string
+  clientIp?: string
   occurredFrom?: string
   occurredTo?: string
   page?: number
@@ -154,4 +170,12 @@ export interface AuditQueryParams {
 export async function queryAuditEvents(params: AuditQueryParams) {
   const { data } = await http.get<ApiResponse<AuditPage>>('/api/audit/events', { params })
   return data.data
+}
+
+export async function exportAuditEvents(params: Omit<AuditQueryParams, 'page' | 'size'>) {
+  const response = await http.get('/api/audit/events/export', {
+    params,
+    responseType: 'blob',
+  })
+  return response.data as Blob
 }

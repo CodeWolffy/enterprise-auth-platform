@@ -23,6 +23,11 @@
       </div>
 
       <el-form :inline="true" class="toolbar-inline" @submit.prevent="handleSearch">
+        <el-form-item label="参数分类">
+          <el-select v-model="category" placeholder="全部分类" clearable style="width: 180px">
+            <el-option v-for="item in categoryOptions" :key="item.code" :label="item.name" :value="item.code" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="关键字">
           <el-input v-model="keyword" placeholder="搜索参数键、名称或值" clearable />
         </el-form-item>
@@ -46,6 +51,7 @@
       </el-form>
 
       <el-table :data="configs" stripe>
+        <el-table-column prop="category" label="参数分类" min-width="120" />
         <el-table-column prop="configKey" label="参数键" min-width="180" />
         <el-table-column prop="configName" label="参数名称" min-width="180" />
         <el-table-column prop="configValue" label="参数值" min-width="220" show-overflow-tooltip />
@@ -76,6 +82,7 @@
       <template v-if="detailItem">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="参数键">{{ detailItem.configKey }}</el-descriptions-item>
+          <el-descriptions-item label="参数分类">{{ detailItem.category }}</el-descriptions-item>
           <el-descriptions-item label="参数名称">{{ detailItem.configName }}</el-descriptions-item>
           <el-descriptions-item label="参数值" :span="2">{{ detailItem.configValue }}</el-descriptions-item>
           <el-descriptions-item label="创建人">{{ detailItem.createdBy }}</el-descriptions-item>
@@ -108,14 +115,15 @@
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import { createConfig, deleteConfig, queryConfigs, updateConfig } from '@/api/system'
-import type { ConfigView } from '@/types/auth'
+import { createConfig, deleteConfig, queryCategories, queryConfigs, updateConfig } from '@/api/system'
+import type { CategoryOption, ConfigView } from '@/types/auth'
 
 const configs = ref<ConfigView[]>([])
 const visible = ref(false)
 const detailVisible = ref(false)
 const editingId = ref<number | null>(null)
 const detailItem = ref<ConfigView | null>(null)
+const category = ref('')
 const keyword = ref('')
 const sortBy = ref<'createdAt' | 'configKey' | 'configName'>('createdAt')
 const sortDirection = ref<'asc' | 'desc'>('asc')
@@ -123,6 +131,7 @@ const page = ref(1)
 const size = ref(10)
 const total = ref(0)
 const formRef = ref<FormInstance>()
+const categoryOptions = ref<CategoryOption[]>([])
 
 const form = reactive({
   configKey: '',
@@ -139,10 +148,12 @@ const rules = reactive<FormRules>({
 const operatorCount = computed(() => new Set(configs.value.map((item) => item.createdBy)).size)
 
 void load()
+void loadCategories()
 
 async function load() {
   const result = await queryConfigs({
     keyword: keyword.value || undefined,
+    category: category.value || undefined,
     page: page.value,
     size: size.value,
     sortBy: sortBy.value,
@@ -152,6 +163,11 @@ async function load() {
   total.value = result.total
 }
 
+async function loadCategories() {
+  const result = await queryCategories()
+  categoryOptions.value = result.config || []
+}
+
 function handleSearch() {
   page.value = 1
   void load()
@@ -159,6 +175,7 @@ function handleSearch() {
 
 function resetSearch() {
   keyword.value = ''
+  category.value = ''
   sortBy.value = 'createdAt'
   sortDirection.value = 'asc'
   page.value = 1

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.audit.model.AuditEvent;
 import com.enterprise.auth.platform.audit.model.AuditPage;
 import com.enterprise.auth.platform.audit.model.AuditQuery;
+import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.RequestContext;
 import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.persistence.entity.SysAuditLogEntity;
@@ -78,7 +79,7 @@ public class AuditService {
     }
 
     public List<AuditEvent> list() {
-        return query(new AuditQuery(null, null, null, null, null, null, 1, 100)).records();
+        return query(new AuditQuery(null, null, null, null, null, null, null, 1, 100)).records();
     }
 
     public AuditPage query(AuditQuery query) {
@@ -86,6 +87,35 @@ public class AuditService {
             return queryInMemory(query);
         }
         return queryInDatabase(query);
+    }
+
+    public List<AuditEvent> export(AuditQuery query) {
+        validateExportQuery(query);
+        AuditQuery exportQuery = new AuditQuery(
+                query.tenantId(),
+                query.eventType(),
+                query.operator(),
+                query.requestId(),
+                query.clientIp(),
+                query.occurredFrom(),
+                query.occurredTo(),
+                1,
+                2000
+        );
+        return query(exportQuery).records();
+    }
+
+    public void validateExportQuery(AuditQuery query) {
+        if (query.occurredFrom() == null || query.occurredTo() == null) {
+            throw new BusinessException("导出审计记录必须指定开始和结束时间");
+        }
+        if (query.occurredTo().isBefore(query.occurredFrom())) {
+            throw new BusinessException("审计导出结束时间不能早于开始时间");
+        }
+        long days = java.time.Duration.between(query.occurredFrom(), query.occurredTo()).toDays();
+        if (days > 31) {
+            throw new BusinessException("审计导出时间范围不能超过 31 天");
+        }
     }
 
     private AuditPage queryInDatabase(AuditQuery query) {
@@ -101,6 +131,9 @@ public class AuditService {
         }
         if (StringUtils.hasText(query.requestId())) {
             wrapper.eq(SysAuditLogEntity::getRequestId, query.requestId());
+        }
+        if (StringUtils.hasText(query.clientIp())) {
+            wrapper.eq(SysAuditLogEntity::getClientIp, query.clientIp());
         }
         dataScopeService.visibleUsernames(queryTenantId(query)).ifPresent(visibleUsers -> {
             if (visibleUsers.isEmpty()) {
@@ -142,6 +175,9 @@ public class AuditService {
         }
         if (StringUtils.hasText(query.requestId())) {
             stream = stream.filter(item -> query.requestId().equals(item.requestId()));
+        }
+        if (StringUtils.hasText(query.clientIp())) {
+            stream = stream.filter(item -> query.clientIp().equals(item.clientIp()));
         }
         var visibleUsernames = dataScopeService.visibleUsernames(queryTenantId(query));
         if (visibleUsernames.isPresent()) {

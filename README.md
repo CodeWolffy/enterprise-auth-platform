@@ -4,7 +4,7 @@
 
 后端基于 `Spring Boot 3.2 + Spring Security + Spring Authorization Server + MyBatis-Plus + MySQL 8.0 + Redis/Redisson`，前端基于 `Vue 3 + TypeScript + Vite + Element Plus + Pinia + Vue Router + Axios + Sass + ECharts`。
 
-目前系统已经具备认证中心、OAuth2 客户端管理、RBAC、数据权限、多租户、审计、系统管理，以及前端管理台基础能力。
+目前系统已经具备认证中心、OAuth2 客户端管理、RBAC、数据权限、多租户、安全审计、系统管理，以及前端管理台基础能力。
 
 ## 当前进度
 
@@ -22,7 +22,7 @@
 - MySQL 已作为当前唯一真实数据源
 - Redis / Redisson 已接入
 - Spring Authorization Server 已接入并可运行
-- 标准 OAuth2 / OIDC 端点已可用：
+- 标准 OAuth2 / OIDC 端点可用：
   - `/.well-known/openid-configuration`
   - `/oauth2/authorize`
   - `/oauth2/token`
@@ -49,8 +49,21 @@
   - 字典、参数、公告的查询与目标校验
   - 强制会话下线
 - 已支持多租户上下文透传与 MyBatis-Plus 多租户拦截
-- 已支持审计日志落库、分页、筛选
+- 已支持审计日志落库、分页、筛选、客户端 IP 过滤、服务端导出
 - 已完成用户、角色、权限、部门、租户、字典、参数、公告基础 CRUD
+- 租户管理已支持服务端分页与服务端筛选：
+  - `keyword`
+  - `platformLevel`
+  - `tenantStatus`
+- 角色权限分配已增强为资源树体验：
+  - 展开 / 收起
+  - 半选统计
+  - 资源级摘要
+  - 自定义数据范围与部门联动
+- 系统管理分类已升级为可配置分类体系：
+  - 字典分类配置
+  - 参数分类配置
+  - 分类接口：`/api/system/categories`
 - `system` 模块已支持服务端分页、服务端筛选、服务端排序：
   - 字典：`createdAt / dictType / dictCode`
   - 参数：`createdAt / configKey / configName`
@@ -82,7 +95,7 @@ mvn "-Dmaven.repo.local=.m2repo" test
 ```
 
 - 当前结果：
-  - `40` 个测试通过
+  - `44` 个测试通过
   - `4` 个测试因无 Docker 自动跳过
 
 - 前端构建通过：
@@ -127,10 +140,9 @@ npm run lint
 - ESLint + Prettier
 
 说明：
-
 - 原规划中的 TypeScript 为 `5.3.x`
 - 当前实际采用 `5.4.5`
-- 当前 Vite 已升级到 `8.x`，用于解决 Sass legacy JS API 弃用警告
+- 当前 Vite 已升级到 `8.x`，用于消除 Sass legacy JS API 弃用警告
 
 ## 仓库结构
 
@@ -151,7 +163,6 @@ enterprise-auth-platform/
 ### 后端启动
 
 默认配置文件：
-
 - [application.yml](/e:/Myproject/enterprise-auth-platform/src/main/resources/application.yml)
 
 直接运行：
@@ -168,13 +179,11 @@ java -jar target/enterprise-auth-platform-0.0.1-SNAPSHOT.jar
 ```
 
 默认端口：
-
 - `8080`
 
 ### 前端启动
 
 前端目录：
-
 - [frontend](/e:/Myproject/enterprise-auth-platform/frontend)
 
 开发启动：
@@ -186,11 +195,9 @@ npm run dev
 ```
 
 默认端口：
-
 - `5173`
 
 默认联调后端地址：
-
 - `http://127.0.0.1:8080`
 
 ## 数据库初始化
@@ -210,7 +217,6 @@ JDBC 当前已包含：
 - `createDatabaseIfNotExist=true`
 
 因此：
-
 - 如果 MySQL 账号有建库权限，通常不需要手动创建数据库
 - 如果没有建库权限，请先手工创建空库，再执行初始化脚本
 
@@ -221,13 +227,11 @@ mysql -h 127.0.0.1 -P 3306 -u root -p123456 < src/main/resources/database/enterp
 ```
 
 索引升级脚本：
-
 - [upgrade_20260320_system_indexes.sql](/e:/Myproject/enterprise-auth-platform/src/main/resources/database/upgrade_20260320_system_indexes.sql)
 
 说明：
-
 - 该脚本用于补充 `sys_dict / sys_config / sys_notice` 的分页筛选与排序索引
-- 你当前已经手动执行完成，无需重复写入 README 的执行步骤
+- 当前环境已执行完成
 
 ## 认证与授权
 
@@ -244,7 +248,6 @@ mysql -h 127.0.0.1 -P 3306 -u root -p123456 < src/main/resources/database/enterp
 ### 标准 OAuth2 / OIDC
 
 当前系统已提供最小可运行的 Spring Authorization Server：
-
 - `/.well-known/openid-configuration`
 - `/oauth2/authorize`
 - `/oauth2/token`
@@ -276,7 +279,7 @@ mysql -h 127.0.0.1 -P 3306 -u root -p123456 < src/main/resources/database/enterp
 - `/oauth2/authorize`
 - `/oauth2/token`
 - `/api/oauth-clients`
-- `/api/oauth-consents`
+- `/api/auth/consents`
 - `/api/users`
 - `/api/users/{userId}/roles`
 - `/api/roles`
@@ -285,7 +288,9 @@ mysql -h 127.0.0.1 -P 3306 -u root -p123456 < src/main/resources/database/enterp
 - `/api/depts`
 - `/api/tenants`
 - `/api/audit/events`
+- `/api/audit/events/export`
 - `/api/system/features`
+- `/api/system/categories`
 - `/api/system/dicts`
 - `/api/system/configs`
 - `/api/system/notices`
@@ -302,6 +307,7 @@ mysql -h 127.0.0.1 -P 3306 -u root -p123456 < src/main/resources/database/enterp
 - 部门新增、修改、删除
 - 指定部门负责人
 - 审计分页查询
+- 审计导出目标校验
 - 字典列表与目标校验
 - 参数列表与目标校验
 - 公告列表与目标校验
@@ -354,18 +360,21 @@ mysql -h 127.0.0.1 -P 3306 -u root -p123456 < src/main/resources/database/enterp
   - 导入导出记录
   - 任务中心与报表任务
 - 系统管理仍缺更完整的产品能力：
-  - 字典分组
-  - 参数分类
+  - 分类配置管理页
+  - 分类配置审计
   - 公告状态流转
   - 更完整的服务监控整合
+- 审计导出当前已增加时间范围上限与导出审计记录，但仍可继续增强：
+  - 异步导出
+  - 大文件导出任务化
+  - 导出历史列表
 - MinIO 还未接入真实业务
 - RocketMQ / Seata / XXL-Job / Loki 仍未接入真实业务链路
 - Redis / Redisson 虽已接入，但仍可继续统一成默认会话基础设施
-- 仍有少量历史文件需要继续清理中文乱码，尤其是：
-  - 个别旧页面
-  - 个别配置注释
-  - 少量历史测试文本
-- [application.yml](/e:/Myproject/enterprise-auth-platform/src/main/resources/application.yml) 中仍可见个别中文配置值乱码，例如前端公共客户端名称，建议后续统一清理
+- 后端目录服务菜单模型当前暂不硬改：
+  - 前端已使用 `menu.code + 本地路由元数据` 兜底标题与路由映射
+  - 后续需要统一收口为稳定菜单模型：`code / path / component / order / hidden / parentCode`
+  - 该改造应与菜单层级、排序、隐藏页、按钮权限模型一起处理
 
 ### 前端
 
@@ -375,22 +384,20 @@ mysql -h 127.0.0.1 -P 3306 -u root -p123456 < src/main/resources/database/enterp
   - 更细的筛选条件
   - 更严格的表单校验
   - 删除前引用校验提示
-- 角色权限分配当前仍是基础多选方式，后续建议升级为资源树 / 权限树
-- 部门管理后续建议升级为真正的树形结构视图
+- 部门管理后续建议继续升级为更完整的树形组织视图
 - 租户管理后续建议补：
-  - 套餐信息
-  - 到期提醒
-  - 状态历史
-  - 可用能力清单
+  - 租户状态历史
+  - 套餐变更轨迹
+  - 更细的能力配置说明
 - 审计页面仍可继续增强：
-  - 时间范围筛选
-  - 多条件组合筛选
-  - 导出
+  - 导出历史
+  - 导出异步任务
+  - 更细的时间跨度提示
 - 系统管理三页仍可继续增强：
   - 更多筛选项
   - 更强的详情展示
-  - 分类视图
-- 前端菜单当前仍以静态路由为主，后续可继续下沉为基于 `/api/auth/me` 返回菜单快照的动态路由生成
+  - 分类配置管理入口
+- 前端菜单当前虽然已经动态化，但仍是“后端返回 code，前端本地映射页面元数据”的折中方案
 - 前端包体仍有继续优化空间：
   - `element-plus` 仍是最大包
   - `charts` chunk 仍较大
@@ -399,7 +406,7 @@ mysql -h 127.0.0.1 -P 3306 -u root -p123456 < src/main/resources/database/enterp
 
 - README 后续新增模块后仍需同步
 - 数据库初始化脚本中的中文注释仍建议后续统一再清理一轮
-- `application.yml` 中若继续新增中文配置项，建议统一以 UTF-8 正常文本维护，避免再混入历史乱码
+- `application.yml` 后续若继续新增中文配置项，建议始终按 UTF-8 正常文本维护
 
 ## 下一步建议
 
@@ -407,14 +414,13 @@ mysql -h 127.0.0.1 -P 3306 -u root -p123456 < src/main/resources/database/enterp
 
 1. 完善前端业务页交互
 - 用户管理增加更多筛选、详情、重置密码、启停操作
-- 角色管理升级权限树
 - 部门管理升级树形视图
-- 租户管理增加套餐、到期、能力视图
-- 审计页面增加时间范围和组合筛选
+- 租户管理增加状态历史、套餐变更轨迹
+- 审计页面增加导出历史和异步导出体验
 
 2. 完善前端动态菜单
-- 基于 `/api/auth/me` 返回的菜单快照生成路由与菜单
-- 按权限隐藏不可访问页面
+- 当前保持 `menu.code + 本地路由元数据` 方案
+- 后续再统一收口到后端稳定菜单模型
 
 3. 完善前端异常体验
 - 表单级校验
@@ -443,6 +449,7 @@ mysql -h 127.0.0.1 -P 3306 -u root -p123456 < src/main/resources/database/enterp
 1. 对未来组织类模块继续下沉数据权限
 2. 对报表和统计查询加入数据范围控制
 3. 对导入导出记录加入可见范围控制
+4. 对分类配置管理、任务记录等新增管理模块统一接入数据权限边界
 
 ### P4：继续启用预留组件
 
