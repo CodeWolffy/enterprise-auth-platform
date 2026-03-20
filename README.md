@@ -1,6 +1,6 @@
 # 企业级权限管理平台
 
-当前仓库为首期后端实现，采用 Spring Boot 3.2 + Java 17 + MyBatis-Plus + MySQL 8.0，按模块化单体方式落地。系统已经具备基础认证、授权、租户、审计和系统管理能力，并保留后续微服务组件的 Maven 引入能力。
+当前仓库为首期后端实现，采用 Spring Boot 3.2、Java 17、MyBatis-Plus、MySQL 8.0，按模块化单体方式建设。系统已具备基础认证、授权、多租户、审计与系统管理能力，数据库已经作为默认且唯一的数据来源。
 
 ## 技术基线
 
@@ -14,10 +14,9 @@
 - Redis / Redisson
 - Knife4j OpenAPI 3
 
-## 当前启动方式
+## 启动方式
 
 默认配置文件：
-
 - [application.yml](/e:/Myproject/enterprise-auth-platform/src/main/resources/application.yml)
 
 直接启动：
@@ -34,22 +33,19 @@ java -jar target/enterprise-auth-platform-0.0.1-SNAPSHOT.jar
 ```
 
 默认端口：
-
 - `8080`
 
 ## 数据库初始化
 
-当前项目以单一 SQL 初始化脚本为准：
-
+当前项目以单一初始化脚本为准：
 - [enterprise_auth_platform.sql](/e:/Myproject/enterprise-auth-platform/src/main/resources/database/enterprise_auth_platform.sql)
 
 默认数据库连接：
-
 - 地址：`jdbc:mysql://127.0.0.1:3306/enterprise_auth_platform`
 - 用户名：`root`
 - 密码：`123456`
 
-当前 JDBC 连接串已包含 `createDatabaseIfNotExist=true`。如果当前 MySQL 账号有建库权限，一般不需要手工创建数据库；如果没有建库权限，请先手工创建空库，再执行初始化脚本。
+当前 JDBC 连接串已包含 `createDatabaseIfNotExist=true`。如果当前 MySQL 账号具备建库权限，通常不需要手动创建数据库；如果没有建库权限，请先手工创建空库，再执行初始化脚本。
 
 初始化示例：
 
@@ -65,13 +61,14 @@ SELECT COUNT(*) AS tenant_cnt FROM sys_tenant;
 SELECT COUNT(*) AS user_cnt FROM sys_user;
 SELECT COUNT(*) AS role_cnt FROM sys_role;
 SELECT COUNT(*) AS perm_cnt FROM sys_permission;
+SELECT COUNT(*) AS oauth_client_cnt FROM sys_oauth_client;
 ```
 
 ## 认证基线
 
-当前系统同时提供两套认证方式：
+当前系统同时提供两套认证方式。
 
-### 1. 现有管理端认证接口
+### 1. 管理端现有认证接口
 
 - `GET /api/auth/captcha`
 - `POST /api/auth/login`
@@ -81,7 +78,7 @@ SELECT COUNT(*) AS perm_cnt FROM sys_permission;
 - `GET /api/auth/sessions`
 - `POST /api/auth/sessions/{sessionId}/offline`
 
-这套接口仍然保留，适合当前管理端直连模式。
+这套接口仍然保留，适合当前管理端直接接入。
 
 ### 2. Spring Authorization Server 标准认证链路
 
@@ -91,19 +88,21 @@ SELECT COUNT(*) AS perm_cnt FROM sys_permission;
 - `/oauth2/authorize`
 - `/oauth2/token`
 - `/oauth2/jwks`
+- `/login`
 
-默认注册客户端见 [application.yml](/e:/Myproject/enterprise-auth-platform/src/main/resources/application.yml) 中 `app.authorization-server.clients` 配置。当前默认提供一个管理端客户端：
+当前 OAuth2 客户端统一从数据库表 `sys_oauth_client` 读取，不再从 `application.yml` 回退读取。初始化脚本已经内置默认客户端：
 
-- `client-id`：`eap-web`
-- `client-secret`：`eap-web-secret`
-- grant types：`authorization_code`、`refresh_token`、`client_credentials`
+- `client_id`：`eap-web`
+- `client_secret`：`eap-web-secret`
+- `grant_types`：`authorization_code,refresh_token,client_credentials`
+- `scopes`：`openid,profile,api.read,api.write`
 
 说明：
 
-- 标准认证链路当前主打“最小可运行版本”
-- 标准授权码流程使用 Spring Security 默认登录页
-- 当前默认登录租户为平台租户 `platform`
-- 多租户登录细化仍以自定义 `/api/auth/login` 链路最完整
+- 标准认证链路当前为最小可运行版本
+- 已支持数据库客户端注册信息读取
+- 已提供中文登录页，并支持通过 `tenantId` 进入租户登录流程
+- 当前 OAuth2 浏览器授权流程仍以平台租户场景为主，多租户授权页仍可继续细化
 
 ## Redis / Redisson 开关
 
@@ -143,8 +142,9 @@ mvn "-Dmaven.repo.local=.m2repo" test
 说明：
 
 - 业务测试默认直接走真实数据库
+- OAuth2 客户端测试默认直接读取并维护 `sys_oauth_client`
 - 部分 Testcontainers 相关测试在无 Docker 环境下会自动跳过
-- 当前错误响应已经统一为 `code + success + data + message`
+- 当前错误响应已统一为 `code + success + data + message`
 
 ## 已完成范围
 
@@ -170,7 +170,7 @@ mvn "-Dmaven.repo.local=.m2repo" test
 
 ## 数据权限边界
 
-当前第二轮数据权限下沉边界如下：
+当前第二轮数据权限下沉边界如下。
 
 ### 已按组织级数据权限控制
 
@@ -193,11 +193,11 @@ mvn "-Dmaven.repo.local=.m2repo" test
 - 参数管理
 - 公告管理
 
-这样划分的原因是：
+当前这样划分的原因：
 
 - 用户、部门、审计直接与组织可见范围相关，必须纳入数据权限
 - 角色、权限、字典、参数、公告当前属于租户级主数据，首期不再额外叠加部门级数据权限
-- 租户管理本身是平台级能力，不适合再套组织级范围
+- 租户管理本身属于平台级能力，不适合再套组织级范围
 
 ### 下一轮适合继续下沉的模块
 
@@ -220,15 +220,14 @@ mvn "-Dmaven.repo.local=.m2repo" test
 
 ## 当前未完成范围
 
-- Spring Authorization Server 仍是最小可运行版本，尚未做客户端持久化、同意页、自定义登录页、多租户授权页
-- 标准 OAuth2 链路当前优先覆盖平台租户场景，多租户浏览器授权流程还未细化
-- 数据权限仍未覆盖全部未来模块，只完成了首期核心业务链路
+- Spring Authorization Server 仍是最小可运行版本，尚未补齐同意页、客户端管理界面、更细粒度多租户授权页
+- 数据权限尚未覆盖所有未来模块，只完成了首期核心业务链路
 - 前端管理台尚未纳入当前仓库
-- MinIO、消息队列、分布式事务、任务调度、日志采集仍未启用实际业务链路
+- MinIO、消息队列、分布式事务、任务调度、日志采集尚未启用实际业务链路
 
 ## 后续建议顺序
 
-1. 继续完善 Spring Authorization Server 的多租户登录体验和客户端持久化
+1. 继续完善 Spring Authorization Server 的多租户授权体验和客户端管理能力
 2. 为角色、权限、系统管理模块补更完整的接口文档和示例
 3. 启动前端管理台联调
 4. 根据业务需要启用 Redis、Gateway、Nacos、MQ 等预留组件

@@ -40,46 +40,25 @@ knife4j:
 app:
   authorization-server:
     issuer: http://127.0.0.1:8080
-    clients:
-      - client-id: eap-web
-        client-secret: eap-web-secret
-        client-name: 企业权限平台管理端
-        redirect-uris:
-          - http://127.0.0.1:8080/swagger-ui/oauth2-redirect.html
-        scopes:
-          - openid
-          - profile
-          - api.read
-          - api.write
-        grant-types:
-          - authorization_code
-          - refresh_token
-          - client_credentials
   security:
     jwt-secret: "change-me-to-a-32-char-secret-key-for-prod"
     access-token-ttl: 30m
     refresh-token-ttl: 7d
     captcha-ttl: 5m
     expose-captcha-answer: true
-
     redis:
       session-enabled: false
       captcha-enabled: false
       redisson-enabled: false
       key-prefix: "eap:auth:"
-
   tenant:
     header-name: X-Tenant-Id
     platform-tenant-id: platform
     mybatis-tenant-enabled: true
     mybatis-ignore-tables:
       - flyway_schema_history
-
-
   persistence:
     database-enabled: true
-
-
   features:
     gateway-enabled: false
     nacos-enabled: false
@@ -91,4 +70,3 @@ app:
 logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger - %msg%n"
-

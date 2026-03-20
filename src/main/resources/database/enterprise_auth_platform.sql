@@ -357,4 +357,34 @@ CREATE TABLE `sys_user_role`  (
 INSERT INTO `sys_user_role` VALUES (1, 'platform', 1, 1, '2026-03-20 00:09:53', NULL, NULL, '2026-03-20 00:09:55');
 INSERT INTO `sys_user_role` VALUES (2, 'tenant-a', 2, 2, '2026-03-20 00:09:53', NULL, NULL, '2026-03-20 00:09:55');
 
+-- ----------------------------
+-- Table structure for sys_oauth_client
+-- ----------------------------
+DROP TABLE IF EXISTS `sys_oauth_client`;
+CREATE TABLE `sys_oauth_client`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `tenant_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '所属租户标识',
+  `client_id` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'OAuth2 客户端 ID',
+  `client_secret` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'OAuth2 客户端密钥',
+  `client_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '客户端名称',
+  `redirect_uris` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '重定向地址列表，逗号分隔',
+  `scopes` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '作用域列表，逗号分隔',
+  `grant_types` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '授权类型列表，逗号分隔',
+  `require_pkce` tinyint NOT NULL DEFAULT 0 COMMENT '是否要求 PKCE',
+  `require_consent` tinyint NOT NULL DEFAULT 0 COMMENT '是否要求授权确认页',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '创建人',
+  `updated_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '更新人',
+  `deleted` tinyint NOT NULL DEFAULT 0 COMMENT '逻辑删除标记，0 未删除，1 已删除',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_sys_oauth_client_tenant_client_id`(`tenant_id` ASC, `client_id` ASC) USING BTREE,
+  INDEX `idx_sys_oauth_client_deleted`(`tenant_id` ASC, `deleted` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 2 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = 'OAuth2 客户端配置表' ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Records of sys_oauth_client
+-- ----------------------------
+INSERT INTO `sys_oauth_client` VALUES (1, 'platform', 'eap-web', '$2a$10$babwhNwwnHRe.kleYGFsdeaIE0O544FkZ7VpQAJQIvx1QOBcx3yL.', '企业权限平台管理端', 'http://127.0.0.1:8080/swagger-ui/oauth2-redirect.html', 'openid,profile,api.read,api.write', 'authorization_code,refresh_token,client_credentials', 0, 0, NOW(), NOW(), 'system', 'system', 0);
+
 SET FOREIGN_KEY_CHECKS = 1;

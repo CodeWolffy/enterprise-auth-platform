@@ -16,6 +16,7 @@ public class TenantFilter extends OncePerRequestFilter {
 
     private static final String REQUEST_ID_HEADER = "X-Request-Id";
     private static final String FORWARDED_FOR_HEADER = "X-Forwarded-For";
+    private static final String TENANT_ID_PARAM = "tenantId";
 
     private final TenantProperties tenantProperties;
 
@@ -30,6 +31,9 @@ public class TenantFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
         String tenantId = request.getHeader(tenantProperties.headerName());
+        if (!StringUtils.hasText(tenantId)) {
+            tenantId = request.getParameter(TENANT_ID_PARAM);
+        }
         String requestId = request.getHeader(REQUEST_ID_HEADER);
         if (!StringUtils.hasText(requestId)) {
             requestId = UUID.randomUUID().toString();
