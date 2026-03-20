@@ -1,0 +1,11 @@
+/target/
+/.idea/
+/.m2repo
+/.DS_Store
+/.vscode/
+/*.iml
+/.mvn/wrapper/maven-wrapper.jar
+/.mvn/wrapper/maven-wrapper.properties
+/.flattened-pom.xml
+Thumbs.db
+
