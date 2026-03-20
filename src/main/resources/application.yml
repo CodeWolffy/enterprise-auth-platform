@@ -40,6 +40,20 @@ knife4j:
 app:
   authorization-server:
     issuer: http://127.0.0.1:8080
+  frontend:
+    allowed-origins:
+      - http://127.0.0.1:5173
+      - http://localhost:5173
+    public-client-id: eap-frontend-spa
+    public-client-name: 前端管理台
+    redirect-uris:
+      - http://127.0.0.1:5173/auth/callback
+      - http://localhost:5173/auth/callback
+    scopes:
+      - openid
+      - profile
+      - api.read
+      - api.write
   security:
     jwt-secret: "change-me-to-a-32-char-secret-key-for-prod"
     access-token-ttl: 30m

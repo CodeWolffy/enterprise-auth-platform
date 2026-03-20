@@ -71,7 +71,7 @@ public class SystemController {
     @PutMapping("/dicts/{id}")
     @PreAuthorize("hasAuthority('system:write')")
     public ApiResponse<SystemManagementService.DictView> updateDict(
-            @Parameter(description = "字典ID") @PathVariable Long id,
+            @Parameter(description = "字典 ID") @PathVariable Long id,
             @Valid @RequestBody DictCrudRequest request
     ) {
         return ApiResponse.ok(systemManagementService.updateDict(id, request));
@@ -80,7 +80,7 @@ public class SystemController {
     @Operation(summary = "删除字典")
     @DeleteMapping("/dicts/{id}")
     @PreAuthorize("hasAuthority('system:write')")
-    public ApiResponse<Void> deleteDict(@Parameter(description = "字典ID") @PathVariable Long id) {
+    public ApiResponse<Void> deleteDict(@Parameter(description = "字典 ID") @PathVariable Long id) {
         systemManagementService.deleteDict(id);
         return ApiResponse.ok();
     }
@@ -103,7 +103,7 @@ public class SystemController {
     @PutMapping("/configs/{id}")
     @PreAuthorize("hasAuthority('system:write')")
     public ApiResponse<SystemManagementService.ConfigView> updateConfig(
-            @Parameter(description = "参数ID") @PathVariable Long id,
+            @Parameter(description = "参数 ID") @PathVariable Long id,
             @Valid @RequestBody ConfigCrudRequest request
     ) {
         return ApiResponse.ok(systemManagementService.updateConfig(id, request));
@@ -112,7 +112,7 @@ public class SystemController {
     @Operation(summary = "删除参数")
     @DeleteMapping("/configs/{id}")
     @PreAuthorize("hasAuthority('system:write')")
-    public ApiResponse<Void> deleteConfig(@Parameter(description = "参数ID") @PathVariable Long id) {
+    public ApiResponse<Void> deleteConfig(@Parameter(description = "参数 ID") @PathVariable Long id) {
         systemManagementService.deleteConfig(id);
         return ApiResponse.ok();
     }
@@ -135,7 +135,7 @@ public class SystemController {
     @PutMapping("/notices/{id}")
     @PreAuthorize("hasAuthority('system:write')")
     public ApiResponse<SystemManagementService.NoticeView> updateNotice(
-            @Parameter(description = "公告ID") @PathVariable Long id,
+            @Parameter(description = "公告 ID") @PathVariable Long id,
             @Valid @RequestBody NoticeCrudRequest request
     ) {
         return ApiResponse.ok(systemManagementService.updateNotice(id, request));
@@ -144,7 +144,7 @@ public class SystemController {
     @Operation(summary = "删除公告")
     @DeleteMapping("/notices/{id}")
     @PreAuthorize("hasAuthority('system:write')")
-    public ApiResponse<Void> deleteNotice(@Parameter(description = "公告ID") @PathVariable Long id) {
+    public ApiResponse<Void> deleteNotice(@Parameter(description = "公告 ID") @PathVariable Long id) {
         systemManagementService.deleteNotice(id);
         return ApiResponse.ok();
     }

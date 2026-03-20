@@ -19,6 +19,7 @@ import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 @Service
 public class DataScopeService {
@@ -73,6 +74,20 @@ public class DataScopeService {
         }
         return departments.stream()
                 .filter(dept -> dept.getId() != null && context.deptIds().contains(dept.getId()))
+                .toList();
+    }
+
+    public <T> List<T> filterByCreator(String tenantId, List<T> items, java.util.function.Function<T, String> creatorExtractor) {
+        Optional<Set<String>> visibleUsernames = visibleUsernames(tenantId);
+        if (visibleUsernames.isEmpty()) {
+            return items;
+        }
+        Set<String> usernames = visibleUsernames.get();
+        if (usernames.isEmpty()) {
+            return List.of();
+        }
+        return items.stream()
+                .filter(item -> usernames.contains(creatorExtractor.apply(item)))
                 .toList();
     }
 
@@ -136,6 +151,15 @@ public class DataScopeService {
         }
         return visibleDeptIds(tenantId)
                 .map(deptIds -> deptIds.contains(deptId))
+                .orElse(true);
+    }
+
+    public boolean canAccessCreatedBy(String tenantId, String createdBy) {
+        if (!StringUtils.hasText(createdBy)) {
+            return false;
+        }
+        return visibleUsernames(tenantId)
+                .map(usernames -> usernames.contains(createdBy))
                 .orElse(true);
     }
 

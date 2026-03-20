@@ -54,7 +54,9 @@ public class AuthorizationServerConfig {
     ) throws Exception {
         OAuth2AuthorizationServerConfigurer authorizationServerConfigurer = new OAuth2AuthorizationServerConfigurer();
         http.securityMatcher(authorizationServerConfigurer.getEndpointsMatcher())
-                .with(authorizationServerConfigurer, authorizationServer -> authorizationServer.oidc(Customizer.withDefaults()))
+                .with(authorizationServerConfigurer, authorizationServer -> authorizationServer
+                        .authorizationEndpoint(endpoint -> endpoint.consentPage("/oauth2/consent"))
+                        .oidc(Customizer.withDefaults()))
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
                 .csrf(csrf -> csrf.ignoringRequestMatchers(authorizationServerConfigurer.getEndpointsMatcher()))
                 .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login")))
@@ -68,10 +70,12 @@ public class AuthorizationServerConfig {
             HttpSecurity http,
             TenantFilter tenantFilter
     ) throws Exception {
-        http.securityMatcher("/login")
+        http.securityMatcher("/login", "/oauth2/consent")
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
-                .authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
+                .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers("/login").permitAll()
+                        .anyRequest().authenticated())
                 .formLogin(form -> form.loginPage("/login").permitAll())
                 .addFilterBefore(tenantFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();

@@ -27,14 +27,15 @@ import org.springframework.util.StringUtils;
 public class CatalogService {
 
     private static final List<MenuRule> MENU_RULES = List.of(
-            new MenuRule(new MenuItem("dashboard", "工作台", "/dashboard", "DashboardView"), Set.of("auth:read")),
-            new MenuRule(new MenuItem("user", "用户管理", "/system/users", "UserView"), Set.of("user:read")),
-            new MenuRule(new MenuItem("role", "角色管理", "/system/roles", "RoleView"), Set.of("role:read")),
-            new MenuRule(new MenuItem("permission", "权限管理", "/system/permissions", "PermissionView"), Set.of("permission:read")),
-            new MenuRule(new MenuItem("dept", "部门管理", "/system/depts", "DeptView"), Set.of("dept:read")),
-            new MenuRule(new MenuItem("tenant", "租户管理", "/system/tenants", "TenantView"), Set.of("tenant:read")),
+            new MenuRule(new MenuItem("dashboard", "运行总览", "/dashboard", "DashboardView"), Set.of("auth:read")),
+            new MenuRule(new MenuItem("oauth-clients", "OAuth2 客户端", "/oauth-clients", "OAuthClientsView"), Set.of("auth:read")),
+            new MenuRule(new MenuItem("users", "用户管理", "/system/users", "UsersView"), Set.of("user:read")),
+            new MenuRule(new MenuItem("roles", "角色管理", "/system/roles", "RolesView"), Set.of("role:read")),
+            new MenuRule(new MenuItem("permissions", "权限管理", "/system/permissions", "PermissionsView"), Set.of("permission:read")),
+            new MenuRule(new MenuItem("depts", "部门管理", "/system/depts", "DepartmentsView"), Set.of("dept:read")),
+            new MenuRule(new MenuItem("tenants", "租户管理", "/system/tenants", "TenantsView"), Set.of("tenant:read")),
             new MenuRule(new MenuItem("audit", "安全审计", "/system/audit", "AuditView"), Set.of("audit:read")),
-            new MenuRule(new MenuItem("system", "系统管理", "/system/settings", "SystemView"), Set.of("system:read"))
+            new MenuRule(new MenuItem("settings", "系统管理", "/system/settings", "SystemManagementView"), Set.of("system:read"))
     );
 
     private final PersistenceProperties persistenceProperties;
@@ -115,8 +116,8 @@ public class CatalogService {
             return List.of(new DepartmentView(1000L, "OPS", "平台运营中心", null, null));
         }
         return List.of(
-                new DepartmentView(1001L, "FIN", "租户A-财务部", null, null),
-                new DepartmentView(1002L, "RD", "租户A-研发部", null, null)
+                new DepartmentView(1001L, "FIN", "租户 A 财务部", null, null),
+                new DepartmentView(1002L, "RD", "租户 A 研发部", null, null)
         );
     }
 
@@ -137,7 +138,7 @@ public class CatalogService {
         }
         return List.of(
                 new TenantView("platform", "平台租户", true, 1, null),
-                new TenantView("tenant-a", "租户A", false, 1, null)
+                new TenantView("tenant-a", "租户 A", false, 1, null)
         );
     }
 
@@ -226,7 +227,7 @@ public class CatalogService {
 
     @Schema(description = "角色目录项")
     public record RoleView(
-            @Schema(description = "角色ID") Long id,
+            @Schema(description = "角色 ID") Long id,
             @Schema(description = "角色编码") String code,
             @Schema(description = "角色名称") String name,
             @Schema(description = "角色描述") String description,
@@ -236,11 +237,11 @@ public class CatalogService {
 
     @Schema(description = "部门目录项")
     public record DepartmentView(
-            @Schema(description = "部门ID") Long id,
+            @Schema(description = "部门 ID") Long id,
             @Schema(description = "部门编码") String code,
             @Schema(description = "部门名称") String name,
-            @Schema(description = "父部门ID") Long parentId,
-            @Schema(description = "负责人用户ID") Long leaderUserId
+            @Schema(description = "父部门 ID") Long parentId,
+            @Schema(description = "负责人用户 ID") Long leaderUserId
     ) {
     }
 
@@ -256,7 +257,7 @@ public class CatalogService {
 
     @Schema(description = "权限目录项")
     public record PermissionView(
-            @Schema(description = "权限ID") Long id,
+            @Schema(description = "权限 ID") Long id,
             @Schema(description = "资源编码") String resourceCode,
             @Schema(description = "动作编码") String actionCode,
             @Schema(description = "作用域编码") String scopeCode,

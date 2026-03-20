@@ -16,6 +16,7 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
+import org.springframework.util.StringUtils;
 
 public class DatabaseRegisteredClientRepository implements RegisteredClientRepository {
 
@@ -37,9 +38,7 @@ public class DatabaseRegisteredClientRepository implements RegisteredClientRepos
     @Override
     public void save(RegisteredClient registeredClient) {
         requireDatabase();
-        SysOauthClientEntity existing = sysOauthClientMapper.selectOne(new LambdaQueryWrapper<SysOauthClientEntity>()
-                .eq(SysOauthClientEntity::getClientId, registeredClient.getClientId())
-                .last("limit 1"));
+        SysOauthClientEntity existing = sysOauthClientMapper.selectIncludingDeleted("platform", registeredClient.getClientId());
         SysOauthClientEntity entity = existing == null ? new SysOauthClientEntity() : existing;
         entity.setTenantId("platform");
         entity.setClientId(registeredClient.getClientId());
@@ -53,6 +52,7 @@ public class DatabaseRegisteredClientRepository implements RegisteredClientRepos
                 .orElse(""));
         entity.setRequirePkce(registeredClient.getClientSettings().isRequireProofKey() ? 1 : 0);
         entity.setRequireConsent(registeredClient.getClientSettings().isRequireAuthorizationConsent() ? 1 : 0);
+        entity.setDeleted(0);
         if (existing == null) {
             sysOauthClientMapper.insert(entity);
             return;
@@ -130,9 +130,6 @@ public class DatabaseRegisteredClientRepository implements RegisteredClientRepos
                         entity.getId() == null ? UUID.randomUUID().toString() : entity.getId().toString())
                 .clientId(entity.getClientId())
                 .clientName(entity.getClientName())
-                .clientSecret(entity.getClientSecret())
-                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
-                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
                 .tokenSettings(TokenSettings.builder()
                         .accessTokenTimeToLive(securityProperties.accessTokenTtl())
                         .refreshTokenTimeToLive(securityProperties.refreshTokenTtl())
@@ -142,6 +139,13 @@ public class DatabaseRegisteredClientRepository implements RegisteredClientRepos
                         .requireProofKey(entity.getRequirePkce() != null && entity.getRequirePkce() == 1)
                         .requireAuthorizationConsent(entity.getRequireConsent() != null && entity.getRequireConsent() == 1)
                         .build());
+        if (StringUtils.hasText(entity.getClientSecret())) {
+            builder.clientSecret(entity.getClientSecret())
+                    .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                    .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST);
+        } else {
+            builder.clientAuthenticationMethod(ClientAuthenticationMethod.NONE);
+        }
         split(entity.getRedirectUris()).forEach(builder::redirectUri);
         split(entity.getScopes()).forEach(builder::scope);
         split(entity.getGrantTypes()).stream().map(this::grantType).forEach(builder::authorizationGrantType);
@@ -149,12 +153,12 @@ public class DatabaseRegisteredClientRepository implements RegisteredClientRepos
     }
 
     private List<String> split(String value) {
-        if (value == null || value.isBlank()) {
+        if (!StringUtils.hasText(value)) {
             return List.of();
         }
         return List.of(value.split(",")).stream()
                 .map(String::trim)
-                .filter(s -> !s.isEmpty())
+                .filter(StringUtils::hasText)
                 .toList();
     }
 
