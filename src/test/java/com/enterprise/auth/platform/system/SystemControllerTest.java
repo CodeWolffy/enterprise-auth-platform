@@ -186,6 +186,15 @@ class SystemControllerTest {
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[?(@.code=='" + CATEGORY_CODE + "')]").exists());
+
+        mockMvc.perform(get("/api/system/categories/dict/{code}/analysis", CATEGORY_CODE)
+                        .with(user(principal(Set.of("system:read"))))
+                        .header("X-Tenant-Id", "tenant-a"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.code").value(CATEGORY_CODE))
+                .andExpect(jsonPath("$.data.referenceCount").isNumber())
+                .andExpect(jsonPath("$.data.sampleReferences").isArray())
+                .andExpect(jsonPath("$.data.recentAudits").isArray());
     }
 
     private UserAccount principal(Set<String> permissions) {

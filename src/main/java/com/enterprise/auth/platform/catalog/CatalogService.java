@@ -137,6 +137,7 @@ public class CatalogService {
                     .eq(SysTenantEntity::getDeleted, 0)
                     .orderByAsc(SysTenantEntity::getId));
             Map<String, TenantProfile> profiles = loadTenantProfiles(tenants.stream().map(SysTenantEntity::getTenantId).toList());
+            Map<String, String> capabilityDocs = loadCapabilityDocs("platform");
             return tenants.stream()
                     .map(tenant -> {
                         TenantProfile profile = profiles.getOrDefault(tenant.getTenantId(), TenantProfile.empty());
@@ -151,6 +152,7 @@ public class CatalogService {
                                 profile.userQuota(),
                                 profile.storageQuotaGb(),
                                 profile.capabilityCodes(),
+                                mapCapabilityDocs(profile.capabilityCodes(), capabilityDocs),
                                 profile.lifecycleNote()
                         );
                     })
@@ -158,9 +160,13 @@ public class CatalogService {
         }
         return List.of(
                 new TenantView("platform", "平台租户", true, 1, null, "platform-governance", "平台治理版", 9999, 1024,
-                        List.of("oauth", "audit", "system", "tenant"), "负责全局治理与租户运维"),
+                        List.of("oauth", "audit", "system", "tenant"),
+                        Map.of("oauth", "统一认证中心与开放授权能力", "audit", "全局审计检索与导出能力", "system", "平台级系统配置与分类管理", "tenant", "租户治理与套餐运维"),
+                        "负责全局治理与租户运维"),
                 new TenantView("tenant-a", "租户 A", false, 1, null, "business-standard", "标准版", 200, 200,
-                        List.of("user", "role", "audit", "notice"), "默认标准业务租户")
+                        List.of("user", "role", "audit", "notice"),
+                        Map.of("user", "用户与身份目录管理", "role", "角色与授权范围管理", "audit", "安全审计检索能力", "notice", "租户公告发布能力"),
+                        "默认标准业务租户")
         );
     }
 
@@ -271,6 +277,35 @@ public class CatalogService {
         return result;
     }
 
+    private Map<String, String> loadCapabilityDocs(String tenantId) {
+        if (sysConfigMapper == null) {
+            return Map.of();
+        }
+        String prefix = "tenant.capability.doc.";
+        return sysConfigMapper.selectList(new LambdaQueryWrapper<SysConfigEntity>()
+                        .eq(SysConfigEntity::getTenantId, tenantId)
+                        .eq(SysConfigEntity::getDeleted, 0)
+                        .likeRight(SysConfigEntity::getConfigKey, prefix))
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        item -> item.getConfigKey().substring(prefix.length()),
+                        SysConfigEntity::getConfigValue,
+                        (left, right) -> right,
+                        LinkedHashMap::new
+                ));
+    }
+
+    private Map<String, String> mapCapabilityDocs(List<String> codes, Map<String, String> docs) {
+        if (codes == null || codes.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, String> result = new LinkedHashMap<>();
+        for (String code : codes) {
+            result.put(code, docs.getOrDefault(code, code + " 能力已启用，可在租户侧使用对应模块。"));
+        }
+        return result;
+    }
+
     private Map<String, List<Long>> loadRoleCustomDeptIds(String tenantId) {
         if (sysConfigMapper == null) {
             return Map.of();
@@ -321,6 +356,7 @@ public class CatalogService {
             @Schema(description = "用户配额") Integer userQuota,
             @Schema(description = "存储配额(GB)") Integer storageQuotaGb,
             @Schema(description = "能力编码集合") List<String> capabilityCodes,
+            @Schema(description = "能力说明映射") Map<String, String> capabilityDescriptions,
             @Schema(description = "运营备注") String lifecycleNote
     ) {
     }

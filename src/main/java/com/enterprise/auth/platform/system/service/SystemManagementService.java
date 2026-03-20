@@ -9,6 +9,8 @@ import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.persistence.entity.SysConfigEntity;
 import com.enterprise.auth.platform.persistence.entity.SysDictEntity;
 import com.enterprise.auth.platform.persistence.entity.SysNoticeEntity;
+import com.enterprise.auth.platform.persistence.entity.SysAuditLogEntity;
+import com.enterprise.auth.platform.persistence.mapper.SysAuditLogMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysConfigMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysDictMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysNoticeMapper;
@@ -43,6 +45,7 @@ public class SystemManagementService {
     private final SysDictMapper sysDictMapper;
     private final SysConfigMapper sysConfigMapper;
     private final SysNoticeMapper sysNoticeMapper;
+    private final SysAuditLogMapper sysAuditLogMapper;
     private final AuditService auditService;
     private final DataScopeService dataScopeService;
 
@@ -51,6 +54,7 @@ public class SystemManagementService {
             @Nullable SysDictMapper sysDictMapper,
             @Nullable SysConfigMapper sysConfigMapper,
             @Nullable SysNoticeMapper sysNoticeMapper,
+            @Nullable SysAuditLogMapper sysAuditLogMapper,
             AuditService auditService,
             DataScopeService dataScopeService
     ) {
@@ -58,6 +62,7 @@ public class SystemManagementService {
         this.sysDictMapper = sysDictMapper;
         this.sysConfigMapper = sysConfigMapper;
         this.sysNoticeMapper = sysNoticeMapper;
+        this.sysAuditLogMapper = sysAuditLogMapper;
         this.auditService = auditService;
         this.dataScopeService = dataScopeService;
     }
@@ -196,6 +201,31 @@ public class SystemManagementService {
     public List<CategoryOption> categoryOptions(String targetType) {
         requireDatabaseMode();
         return loadCategoryOptions(currentTenantId(), prefixForTargetType(targetType));
+    }
+
+    public CategoryAnalysis analyzeCategoryOption(String targetType, String code) {
+        requireDatabaseMode();
+        String tenantId = currentTenantId();
+        SysConfigEntity entity = getCategoryConfig(tenantId, targetType, code);
+        List<String> matchers = splitMatchers(entity.getConfigValue());
+        int referenceCount = "dict".equalsIgnoreCase(targetType)
+                ? countMatchingDicts(tenantId, matchers)
+                : countMatchingConfigs(tenantId, matchers);
+        List<String> sampleReferences = "dict".equalsIgnoreCase(targetType)
+                ? sampleMatchingDicts(tenantId, matchers)
+                : sampleMatchingConfigs(tenantId, matchers);
+        List<CategoryAuditView> recentAudits = loadCategoryAudits(tenantId, targetType, code);
+        List<CategoryTrendPoint> trend = buildCategoryTrend(recentAudits);
+        return new CategoryAnalysis(
+                code,
+                entity.getConfigName(),
+                targetType.toLowerCase(),
+                matchers,
+                referenceCount,
+                sampleReferences,
+                recentAudits,
+                trend
+        );
     }
 
     @Transactional
@@ -468,9 +498,110 @@ public class SystemManagementService {
     }
 
     private void requireDatabaseMode() {
-        if (!persistenceProperties.databaseEnabled() || sysDictMapper == null || sysConfigMapper == null || sysNoticeMapper == null) {
+        if (!persistenceProperties.databaseEnabled() || sysDictMapper == null || sysConfigMapper == null || sysNoticeMapper == null || sysAuditLogMapper == null) {
             throw new BusinessException("当前未启用数据库系统管理能力");
         }
+    }
+
+    private int countMatchingDicts(String tenantId, List<String> matchers) {
+        return sysDictMapper.selectList(new LambdaQueryWrapper<SysDictEntity>()
+                        .eq(SysDictEntity::getTenantId, tenantId)
+                        .eq(SysDictEntity::getDeleted, 0))
+                .stream()
+                .map(SysDictEntity::getDictType)
+                .filter(raw -> matchesAny(matchers, raw))
+                .toList()
+                .size();
+    }
+
+    private int countMatchingConfigs(String tenantId, List<String> matchers) {
+        return sysConfigMapper.selectList(new LambdaQueryWrapper<SysConfigEntity>()
+                        .eq(SysConfigEntity::getTenantId, tenantId)
+                        .eq(SysConfigEntity::getDeleted, 0)
+                        .notLikeRight(SysConfigEntity::getConfigKey, DICT_CATEGORY_PREFIX)
+                        .notLikeRight(SysConfigEntity::getConfigKey, CONFIG_CATEGORY_PREFIX))
+                .stream()
+                .map(SysConfigEntity::getConfigKey)
+                .filter(raw -> matchesAny(matchers, raw))
+                .toList()
+                .size();
+    }
+
+    private List<String> sampleMatchingDicts(String tenantId, List<String> matchers) {
+        return sysDictMapper.selectList(new LambdaQueryWrapper<SysDictEntity>()
+                        .eq(SysDictEntity::getTenantId, tenantId)
+                        .eq(SysDictEntity::getDeleted, 0)
+                        .orderByAsc(SysDictEntity::getDictType)
+                        .orderByAsc(SysDictEntity::getDictCode))
+                .stream()
+                .filter(item -> matchesAny(matchers, item.getDictType()))
+                .map(item -> item.getDictType() + " / " + item.getDictCode())
+                .distinct()
+                .limit(5)
+                .toList();
+    }
+
+    private List<String> sampleMatchingConfigs(String tenantId, List<String> matchers) {
+        return sysConfigMapper.selectList(new LambdaQueryWrapper<SysConfigEntity>()
+                        .eq(SysConfigEntity::getTenantId, tenantId)
+                        .eq(SysConfigEntity::getDeleted, 0)
+                        .notLikeRight(SysConfigEntity::getConfigKey, DICT_CATEGORY_PREFIX)
+                        .notLikeRight(SysConfigEntity::getConfigKey, CONFIG_CATEGORY_PREFIX)
+                        .orderByAsc(SysConfigEntity::getConfigKey))
+                .stream()
+                .filter(item -> matchesAny(matchers, item.getConfigKey()))
+                .map(SysConfigEntity::getConfigKey)
+                .distinct()
+                .limit(5)
+                .toList();
+    }
+
+    private boolean matchesAny(List<String> matchers, String rawKey) {
+        return matchers.stream().anyMatch(matcher -> {
+            if (!StringUtils.hasText(matcher) || !StringUtils.hasText(rawKey)) {
+                return false;
+            }
+            if (matcher.endsWith("*")) {
+                return rawKey.startsWith(matcher.substring(0, matcher.length() - 1));
+            }
+            return rawKey.equals(matcher);
+        });
+    }
+
+    private List<CategoryAuditView> loadCategoryAudits(String tenantId, String targetType, String code) {
+        List<String> eventTypes = List.of("SYSTEM_CATEGORY_CREATED", "SYSTEM_CATEGORY_UPDATED", "SYSTEM_CATEGORY_DELETED");
+        return sysAuditLogMapper.selectList(new LambdaQueryWrapper<SysAuditLogEntity>()
+                        .eq(SysAuditLogEntity::getTenantId, tenantId)
+                        .in(SysAuditLogEntity::getEventType, eventTypes)
+                        .like(SysAuditLogEntity::getPayloadJson, "\"" + "targetType" + "\":\"" + targetType + "\"")
+                        .like(SysAuditLogEntity::getPayloadJson, "\"" + "code" + "\":\"" + code + "\"")
+                        .orderByDesc(SysAuditLogEntity::getOccurredAt)
+                        .last("limit 10"))
+                .stream()
+                .map(item -> new CategoryAuditView(
+                        item.getEventType(),
+                        item.getOperator(),
+                        item.getOccurredAt(),
+                        item.getPayloadJson()
+                ))
+                .toList();
+    }
+
+    private List<CategoryTrendPoint> buildCategoryTrend(List<CategoryAuditView> audits) {
+        java.time.LocalDate today = java.time.LocalDate.now();
+        Map<java.time.LocalDate, Long> counts = audits.stream()
+                .filter(item -> item.occurredAt() != null)
+                .collect(java.util.stream.Collectors.groupingBy(
+                        item -> item.occurredAt().toLocalDate(),
+                        LinkedHashMap::new,
+                        java.util.stream.Collectors.counting()
+                ));
+        List<CategoryTrendPoint> trend = new java.util.ArrayList<>();
+        for (int i = 6; i >= 0; i--) {
+            java.time.LocalDate day = today.minusDays(i);
+            trend.add(new CategoryTrendPoint(day.toString(), counts.getOrDefault(day, 0L).intValue()));
+        }
+        return trend;
     }
 
     private String currentTenantId() {
@@ -713,6 +844,35 @@ public class SystemManagementService {
             }
             return false;
         }
+    }
+
+    @Schema(description = "分类配置分析")
+    public record CategoryAnalysis(
+            @Schema(description = "分类编码") String code,
+            @Schema(description = "分类名称") String name,
+            @Schema(description = "目标类型") String targetType,
+            @Schema(description = "匹配规则") List<String> matchers,
+            @Schema(description = "引用数量") Integer referenceCount,
+            @Schema(description = "引用样例") List<String> sampleReferences,
+            @Schema(description = "最近审计记录") List<CategoryAuditView> recentAudits,
+            @Schema(description = "七日趋势") List<CategoryTrendPoint> trend
+    ) {
+    }
+
+    @Schema(description = "分类配置审计记录")
+    public record CategoryAuditView(
+            @Schema(description = "事件类型") String eventType,
+            @Schema(description = "操作人") String operator,
+            @Schema(description = "发生时间") LocalDateTime occurredAt,
+            @Schema(description = "审计负载") String payloadJson
+    ) {
+    }
+
+    @Schema(description = "分类配置趋势点")
+    public record CategoryTrendPoint(
+            @Schema(description = "日期") String date,
+            @Schema(description = "次数") Integer count
+    ) {
     }
 
     private static final class StreamUtil {

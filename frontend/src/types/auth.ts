@@ -107,6 +107,7 @@ export interface TenantView {
   userQuota?: number | null
   storageQuotaGb?: number | null
   capabilityCodes?: string[]
+  capabilityDescriptions?: Record<string, string>
   lifecycleNote?: string | null
 }
 
@@ -118,6 +119,7 @@ export interface TenantChangeView {
   oldValue?: string | null
   newValue?: string | null
   summary: string
+  impactSummary?: string | null
   operator: string
   occurredAt?: string | null
 }
@@ -126,6 +128,24 @@ export interface CategoryOption {
   code: string
   name: string
   matchers: string[]
+}
+
+export interface CategoryAuditView {
+  eventType: string
+  operator: string
+  occurredAt?: string | null
+  payloadJson: string
+}
+
+export interface CategoryAnalysis {
+  code: string
+  name: string
+  targetType: string
+  matchers: string[]
+  referenceCount: number
+  sampleReferences: string[]
+  recentAudits: CategoryAuditView[]
+  trend: { date: string; count: number }[]
 }
 
 export interface DictView {
@@ -180,9 +200,18 @@ export interface AuditExportTask {
   status: string
   fileName: string
   recordCount: number
+  progressPercent: number
+  progressStage: string
+  retentionExpired: boolean
+  expiresAt?: string | null
   requestedAt?: string | null
   completedAt?: string | null
   errorMessage?: string | null
+}
+
+export interface AuditExportPolicy {
+  retentionDays: number
+  maxTasks: number
 }
 
 export interface FeatureFlags {

@@ -182,8 +182,9 @@ public class TenantManagementService {
                 .orderByDesc(SysTenantEntity::getId)
                 .last("limit " + offset + "," + safeSize));
         Map<String, Map<String, String>> profiles = loadTenantProfileValues(entities.stream().map(SysTenantEntity::getTenantId).toList());
+        Map<String, String> capabilityDocs = loadCapabilityDocs();
         List<CatalogService.TenantView> records = entities.stream()
-                .map(entity -> toTenantView(entity, profiles.getOrDefault(entity.getTenantId(), Map.of())))
+                .map(entity -> toTenantView(entity, profiles.getOrDefault(entity.getTenantId(), Map.of()), capabilityDocs))
                 .toList();
         return PageResult.of(total, safePage, safeSize, records);
     }
@@ -225,6 +226,7 @@ public class TenantManagementService {
                         item.getOldValue(),
                         item.getNewValue(),
                         item.getSummary(),
+                        buildImpactSummary(item),
                         item.getOperator(),
                         item.getOccurredAt() == null ? null : item.getOccurredAt().atZone(ZoneId.systemDefault()).toInstant()
                 ))
@@ -330,7 +332,8 @@ public class TenantManagementService {
         return result;
     }
 
-    private CatalogService.TenantView toTenantView(SysTenantEntity tenant, Map<String, String> values) {
+    private CatalogService.TenantView toTenantView(SysTenantEntity tenant, Map<String, String> values, Map<String, String> capabilityDocs) {
+        List<String> capabilityCodes = parseCodes(values.get("tenant.capability.codes"));
         return new CatalogService.TenantView(
                 tenant.getTenantId(),
                 tenant.getTenantName(),
@@ -341,9 +344,47 @@ public class TenantManagementService {
                 values.get("tenant.package.name"),
                 parseInteger(values.get("tenant.quota.users")),
                 parseInteger(values.get("tenant.quota.storage_gb")),
-                parseCodes(values.get("tenant.capability.codes")),
+                capabilityCodes,
+                capabilityCodes.stream().collect(java.util.stream.Collectors.toMap(
+                        java.util.function.Function.identity(),
+                        code -> capabilityDocs.getOrDefault(code, defaultCapabilityDescription(code)),
+                        (left, right) -> right,
+                        java.util.LinkedHashMap::new
+                )),
                 values.get("tenant.lifecycle.note")
         );
+    }
+
+    private Map<String, String> loadCapabilityDocs() {
+        if (sysConfigMapper == null) {
+            return Map.of();
+        }
+        String prefix = "tenant.capability.doc.";
+        return sysConfigMapper.selectList(new LambdaQueryWrapper<SysConfigEntity>()
+                        .eq(SysConfigEntity::getTenantId, "platform")
+                        .eq(SysConfigEntity::getDeleted, 0)
+                        .likeRight(SysConfigEntity::getConfigKey, prefix))
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        item -> item.getConfigKey().substring(prefix.length()),
+                        SysConfigEntity::getConfigValue,
+                        (left, right) -> right,
+                        java.util.LinkedHashMap::new
+                ));
+    }
+
+    private String defaultCapabilityDescription(String code) {
+        return switch (code) {
+            case "oauth" -> "统一认证、授权码登录与开放接入能力";
+            case "user" -> "用户目录、启停、角色分配与组织可见范围管理";
+            case "role" -> "角色模型、权限树与数据范围授权";
+            case "dept" -> "组织树、负责人和部门层级治理";
+            case "tenant" -> "租户套餐、能力配置与生命周期治理";
+            case "system" -> "字典、参数、公告与分类配置管理";
+            case "audit" -> "审计查询、导出与授权记录联动";
+            case "notice" -> "公告发布与租户通知能力";
+            default -> code + " 能力已启用，可在租户侧继续扩展说明。";
+        };
     }
 
     private Integer parseInteger(String value) {
@@ -395,6 +436,29 @@ public class TenantManagementService {
         return value == null ? null : String.valueOf(value);
     }
 
+    private String buildImpactSummary(SysTenantChangeLogEntity entity) {
+        String fieldKey = entity.getFieldKey();
+        if ("packageCode".equals(fieldKey) || "packageName".equals(fieldKey)) {
+            return "套餐变更会影响当前租户的默认能力集、配额说明和运营策略展示。";
+        }
+        if ("userQuota".equals(fieldKey)) {
+            return "用户配额变更会影响新增用户容量和租户运营阈值。";
+        }
+        if ("storageQuotaGb".equals(fieldKey)) {
+            return "存储配额变更会影响文件容量规划与对象存储成本预估。";
+        }
+        if ("capabilityCodes".equals(fieldKey)) {
+            return "能力范围变更会影响当前租户可见模块与功能开关。";
+        }
+        if ("tenantStatus".equals(fieldKey)) {
+            return "租户状态变更会直接影响登录、访问和管理操作可用性。";
+        }
+        if ("expireAt".equals(fieldKey)) {
+            return "到期时间变更会影响续费提醒、停用策略和运营排期。";
+        }
+        return null;
+    }
+
     @Schema(description = "租户变更记录")
     public record TenantChangeView(
             @Schema(description = "记录 ID") Long id,
@@ -404,6 +468,7 @@ public class TenantManagementService {
             @Schema(description = "旧值") String oldValue,
             @Schema(description = "新值") String newValue,
             @Schema(description = "变更摘要") String summary,
+            @Schema(description = "影响说明") String impactSummary,
             @Schema(description = "操作人") String operator,
             @Schema(description = "变更时间") java.time.Instant occurredAt
     ) {

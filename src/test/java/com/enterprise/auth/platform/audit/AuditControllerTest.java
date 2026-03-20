@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.audit;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -95,7 +96,9 @@ class AuditControllerTest {
                         .param("occurredTo", java.time.Instant.now().plusSeconds(3600).toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").exists())
-                .andExpect(jsonPath("$.data.status").isNotEmpty());
+                .andExpect(jsonPath("$.data.status").isNotEmpty())
+                .andExpect(jsonPath("$.data.progressPercent").isNumber())
+                .andExpect(jsonPath("$.data.progressStage").isNotEmpty());
 
         mockMvc.perform(get("/api/audit/exports")
                         .with(user(principal()))
@@ -103,6 +106,39 @@ class AuditControllerTest {
                         .param("tenantId", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.records[0].id").exists());
+    }
+
+    @Test
+    void shouldDeleteAndCleanupExportTasks() throws Exception {
+        jdbcTemplate.update(
+                "INSERT INTO sys_audit_export_task(tenant_id, operator, status, file_name, query_json, record_count, requested_at, completed_at) VALUES(?,?,?,?,?,?,NOW(),DATE_SUB(NOW(), INTERVAL 2 DAY))",
+                "platform", "admin", "SUCCESS", "audit-cleanup-ut.csv", "{\"eventType\":\"AUDIT_EXPORT_UT\"}", 1
+        );
+        Long taskId = jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_audit_export_task WHERE file_name = ?",
+                Long.class,
+                "audit-cleanup-ut.csv"
+        );
+
+        mockMvc.perform(delete("/api/audit/exports/{taskId}", taskId)
+                        .with(user(principal()))
+                        .header("X-Tenant-Id", "platform"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").doesNotExist());
+
+        jdbcTemplate.update(
+                "INSERT INTO sys_audit_export_task(tenant_id, operator, status, file_name, query_json, record_count, requested_at, completed_at) VALUES(?,?,?,?,?,?,NOW(),DATE_SUB(NOW(), INTERVAL 5 DAY))",
+                "platform", "admin", "FAILED", "audit-cleanup-batch-ut.csv", "{\"eventType\":\"AUDIT_EXPORT_UT\"}", 0
+        );
+
+        mockMvc.perform(delete("/api/audit/exports")
+                        .with(user(principal()))
+                        .header("X-Tenant-Id", "platform")
+                        .param("tenantId", "platform")
+                        .param("status", "FAILED")
+                        .param("completedBefore", java.time.Instant.now().minusSeconds(24 * 3600).toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(1));
     }
 
     private UserAccount principal() {

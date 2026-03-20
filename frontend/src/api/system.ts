@@ -1,5 +1,5 @@
 import { http } from './http'
-import type { ApiResponse, CategoryOption, ConfigView, DictView, FeatureFlags, NoticeView } from '@/types/auth'
+import type { ApiResponse, CategoryAnalysis, CategoryOption, ConfigView, DictView, FeatureFlags, NoticeView } from '@/types/auth'
 
 export interface PageResult<T> {
   total: number
@@ -51,6 +51,11 @@ export async function queryCategories() {
 
 export async function queryCategoryOptions(targetType: 'dict' | 'config') {
   const { data } = await http.get<ApiResponse<CategoryOption[]>>(`/api/system/categories/${targetType}`)
+  return data.data
+}
+
+export async function queryCategoryAnalysis(targetType: 'dict' | 'config', code: string) {
+  const { data } = await http.get<ApiResponse<CategoryAnalysis>>(`/api/system/categories/${targetType}/${code}/analysis`)
   return data.data
 }
 

@@ -72,6 +72,16 @@ public class SystemController {
         return ApiResponse.ok(systemManagementService.categoryOptions(targetType));
     }
 
+    @Operation(summary = "查询分类配置分析")
+    @GetMapping("/categories/{targetType}/{code}/analysis")
+    @PreAuthorize("hasAuthority('system:read')")
+    public ApiResponse<SystemManagementService.CategoryAnalysis> categoryAnalysis(
+            @Parameter(description = "分类目标类型：dict 或 config") @PathVariable String targetType,
+            @Parameter(description = "分类编码") @PathVariable String code
+    ) {
+        return ApiResponse.ok(systemManagementService.analyzeCategoryOption(targetType, code));
+    }
+
     @Operation(summary = "新增分类配置")
     @PostMapping("/categories/{targetType}")
     @PreAuthorize("hasAuthority('system:write')")

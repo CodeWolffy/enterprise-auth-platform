@@ -26,6 +26,7 @@
         </el-table-column>
         <el-table-column fixed="right" label="操作" width="160">
           <template #default="{ row }">
+            <el-button link type="primary" @click="openAnalysis(row)">分析</el-button>
             <el-button link type="primary" @click="openDialog(row)">编辑</el-button>
             <el-button link type="danger" @click="removeRow(row)">删除</el-button>
           </template>
@@ -55,6 +56,47 @@
         <el-button type="primary" @click="submit">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-drawer v-model="analysisVisible" title="分类引用分析" size="720px">
+      <template v-if="analysis">
+        <el-descriptions :column="2" border>
+          <el-descriptions-item label="分类编码">{{ analysis.code }}</el-descriptions-item>
+          <el-descriptions-item label="分类名称">{{ analysis.name }}</el-descriptions-item>
+          <el-descriptions-item label="目标类型">{{ analysis.targetType }}</el-descriptions-item>
+          <el-descriptions-item label="引用数量">{{ analysis.referenceCount }}</el-descriptions-item>
+          <el-descriptions-item label="匹配规则" :span="2">
+            <el-tag v-for="matcher in analysis.matchers" :key="matcher" class="scope-tag" size="small">
+              {{ matcher }}
+            </el-tag>
+          </el-descriptions-item>
+        </el-descriptions>
+
+        <section class="analysis-section">
+          <h4>引用样例</h4>
+          <el-empty v-if="!analysis.sampleReferences.length" description="暂无引用样例" />
+          <el-timeline v-else>
+            <el-timeline-item v-for="item in analysis.sampleReferences" :key="item">
+              {{ item }}
+            </el-timeline-item>
+          </el-timeline>
+        </section>
+
+        <section class="analysis-section">
+          <h4>最近审计记录</h4>
+          <el-empty v-if="!analysis.recentAudits.length" description="暂无分类变更审计" />
+          <el-table v-else :data="analysis.recentAudits" stripe>
+            <el-table-column prop="eventType" label="事件类型" min-width="180" />
+            <el-table-column prop="operator" label="操作人" min-width="120" />
+            <el-table-column prop="occurredAt" label="发生时间" min-width="180" />
+            <el-table-column label="审计负载" min-width="260">
+              <template #default="{ row }">
+                <pre class="payload-pre">{{ row.payloadJson }}</pre>
+              </template>
+            </el-table-column>
+          </el-table>
+        </section>
+      </template>
+    </el-drawer>
   </div>
 </template>
 
@@ -62,15 +104,17 @@
 import { reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import { createCategoryOption, deleteCategoryOption, queryCategoryOptions, updateCategoryOption } from '@/api/system'
-import type { CategoryOption } from '@/types/auth'
+import { createCategoryOption, deleteCategoryOption, queryCategoryAnalysis, queryCategoryOptions, updateCategoryOption } from '@/api/system'
+import type { CategoryAnalysis, CategoryOption } from '@/types/auth'
 
 const activeTab = ref<'dict' | 'config'>('dict')
 const loading = ref(false)
 const rows = ref<CategoryOption[]>([])
 const visible = ref(false)
+const analysisVisible = ref(false)
 const editingCode = ref<string | null>(null)
 const formRef = ref<FormInstance>()
+const analysis = ref<CategoryAnalysis | null>(null)
 
 const form = reactive({
   code: '',
@@ -141,11 +185,26 @@ async function removeRow(row: CategoryOption) {
   ElMessage.success('分类已删除')
   await load()
 }
+
+async function openAnalysis(row: CategoryOption) {
+  analysis.value = await queryCategoryAnalysis(activeTab.value, row.code)
+  analysisVisible.value = true
+}
 </script>
 
 <style scoped lang="scss">
 .scope-tag {
   margin-right: 6px;
   margin-bottom: 6px;
+}
+
+.analysis-section {
+  margin-top: 20px;
+}
+
+.payload-pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 </style>

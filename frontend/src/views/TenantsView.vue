@@ -146,21 +146,63 @@
             <span>{{ capability.value }}</span>
           </article>
         </div>
-        <div v-if="detailTenant.capabilityCodes?.length" class="capability-tags">
-          <el-tag v-for="code in detailTenant.capabilityCodes" :key="code" type="success" effect="plain">
-            {{ code }}
-          </el-tag>
+        <div v-if="detailTenant.capabilityCodes?.length" class="capability-docs">
+          <article v-for="code in detailTenant.capabilityCodes" :key="code" class="capability-doc-card">
+            <div class="capability-doc-head">
+              <el-tag type="success" effect="plain">{{ code }}</el-tag>
+            </div>
+            <p>{{ detailTenant.capabilityDescriptions?.[code] || `${code} 能力已启用，可继续补充说明。` }}</p>
+          </article>
         </div>
       </template>
     </el-drawer>
 
     <el-drawer v-model="historyVisible" title="租户变更历史" size="720px">
+      <el-form :inline="true" class="toolbar-inline history-toolbar" @submit.prevent="loadHistory">
+        <el-form-item label="类型">
+          <el-select v-model="historyQuery.changeType" placeholder="全部" clearable style="width: 160px">
+            <el-option label="全部" value="" />
+            <el-option label="创建" value="CREATED" />
+            <el-option label="状态" value="STATUS" />
+            <el-option label="套餐" value="PACKAGE" />
+            <el-option label="能力" value="CAPABILITY" />
+            <el-option label="资料" value="PROFILE" />
+            <el-option label="删除" value="DELETED" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="字段">
+          <el-input v-model="historyQuery.fieldKey" placeholder="按字段键搜索" clearable />
+        </el-form-item>
+        <el-form-item label="操作人">
+          <el-input v-model="historyQuery.operator" placeholder="按操作人搜索" clearable />
+        </el-form-item>
+        <el-form-item label="时间范围">
+          <el-date-picker
+            v-model="historyDateRange"
+            type="datetimerange"
+            range-separator="至"
+            start-placeholder="开始时间"
+            end-placeholder="结束时间"
+            value-format="YYYY-MM-DDTHH:mm:ss"
+            clearable
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="applyHistorySearch">筛选</el-button>
+          <el-button @click="resetHistorySearch">重置</el-button>
+        </el-form-item>
+      </el-form>
       <el-table :data="historyRecords" stripe>
         <el-table-column prop="changeType" label="类型" min-width="120" />
         <el-table-column prop="fieldKey" label="字段" min-width="120" />
         <el-table-column prop="summary" label="摘要" min-width="180" />
         <el-table-column prop="oldValue" label="旧值" min-width="160" />
         <el-table-column prop="newValue" label="新值" min-width="160" />
+        <el-table-column label="影响说明" min-width="240">
+          <template #default="{ row }">
+            <span>{{ row.impactSummary || '该变更主要影响租户基础资料展示。' }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="operator" label="操作人" min-width="120" />
         <el-table-column prop="occurredAt" label="时间" min-width="180" />
       </el-table>
@@ -280,6 +322,12 @@ const historyRecords = ref<TenantChangeView[]>([])
 const historyPage = ref(1)
 const historySize = ref(10)
 const historyTotal = ref(0)
+const historyQuery = reactive({
+  changeType: '',
+  fieldKey: '',
+  operator: '',
+})
+const historyDateRange = ref<[string, string] | null>(null)
 const loading = ref(false)
 const keyword = ref('')
 const platformFilter = ref('')
@@ -432,9 +480,31 @@ async function loadHistory() {
   if (!historyTenantId.value) {
     return
   }
-  const result = await queryTenantHistory(historyTenantId.value, historyPage.value, historySize.value)
+  const result = await queryTenantHistory(historyTenantId.value, {
+    changeType: historyQuery.changeType || undefined,
+    fieldKey: historyQuery.fieldKey || undefined,
+    operator: historyQuery.operator || undefined,
+    occurredFrom: historyDateRange.value?.[0] || undefined,
+    occurredTo: historyDateRange.value?.[1] || undefined,
+    page: historyPage.value,
+    size: historySize.value,
+  })
   historyRecords.value = result.records
   historyTotal.value = result.total
+}
+
+async function applyHistorySearch() {
+  historyPage.value = 1
+  await loadHistory()
+}
+
+async function resetHistorySearch() {
+  historyQuery.changeType = ''
+  historyQuery.fieldKey = ''
+  historyQuery.operator = ''
+  historyDateRange.value = null
+  historyPage.value = 1
+  await loadHistory()
 }
 
 async function handleHistoryPageChange(value: number) {
@@ -514,10 +584,31 @@ async function removeTenant(tenantId: string) {
   margin-top: 16px;
 }
 
-.capability-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.history-toolbar {
+  margin-bottom: 16px;
+}
+
+.capability-docs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
   margin-top: 16px;
+}
+
+.capability-doc-card {
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(241, 245, 249, 0.9);
+  color: #475569;
+}
+
+.capability-doc-card p {
+  margin: 10px 0 0;
+  line-height: 1.6;
+}
+
+.capability-doc-head {
+  display: flex;
+  justify-content: flex-start;
 }
 </style>

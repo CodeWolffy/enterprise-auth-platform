@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.audit.controller;
 
+import com.enterprise.auth.platform.audit.dto.AuditExportPolicyRequest;
 import com.enterprise.auth.platform.audit.model.AuditEvent;
 import com.enterprise.auth.platform.audit.model.AuditPage;
 import com.enterprise.auth.platform.audit.model.AuditQuery;
@@ -20,9 +21,12 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -119,10 +123,30 @@ public class AuditController {
     public ApiResponse<PageResult<AuditExportTaskService.ExportTaskView>> exportTasks(
             @RequestParam(required = false) String tenantId,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String operator,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        return ApiResponse.ok(auditExportTaskService.page(tenantId, status, page, size));
+        return ApiResponse.ok(auditExportTaskService.page(tenantId, status, operator, page, size));
+    }
+
+    @Operation(summary = "查询审计导出保留策略")
+    @GetMapping("/exports/policy")
+    @PreAuthorize("hasAuthority('audit:read')")
+    public ApiResponse<AuditExportTaskService.ExportPolicy> exportPolicy(
+            @RequestParam(required = false) String tenantId
+    ) {
+        return ApiResponse.ok(auditExportTaskService.policy(tenantId));
+    }
+
+    @Operation(summary = "更新审计导出保留策略")
+    @PutMapping("/exports/policy")
+    @PreAuthorize("hasAuthority('audit:write')")
+    public ApiResponse<AuditExportTaskService.ExportPolicy> updateExportPolicy(
+            @RequestParam(required = false) String tenantId,
+            @RequestBody @jakarta.validation.Valid AuditExportPolicyRequest request
+    ) {
+        return ApiResponse.ok(auditExportTaskService.updatePolicy(tenantId, request));
     }
 
     @Operation(summary = "下载异步审计导出文件")
@@ -134,6 +158,25 @@ public class AuditController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + file.fileName())
                 .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
                 .body(file.content());
+    }
+
+    @Operation(summary = "删除异步审计导出任务")
+    @DeleteMapping("/exports/{taskId}")
+    @PreAuthorize("hasAuthority('audit:read')")
+    public ApiResponse<Void> deleteExportTask(@PathVariable Long taskId) {
+        auditExportTaskService.deleteTask(taskId);
+        return ApiResponse.ok();
+    }
+
+    @Operation(summary = "清理异步审计导出任务")
+    @DeleteMapping("/exports")
+    @PreAuthorize("hasAuthority('audit:read')")
+    public ApiResponse<Integer> cleanupExportTasks(
+            @RequestParam(required = false) String tenantId,
+            @RequestParam(required = false) String status,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant completedBefore
+    ) {
+        return ApiResponse.ok(auditExportTaskService.cleanup(tenantId, status, completedBefore));
     }
 
     private AuditQuery buildQuery(

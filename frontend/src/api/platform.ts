@@ -1,6 +1,7 @@
 import { http } from './http'
 import type {
   ApiResponse,
+  AuditExportPolicy,
   AuditExportTask,
   AuditPage,
   DepartmentView,
@@ -47,6 +48,16 @@ export interface TenantHistoryPage {
   page: number
   size: number
   records: TenantChangeView[]
+}
+
+export interface TenantHistoryQueryParams {
+  changeType?: string
+  fieldKey?: string
+  operator?: string
+  occurredFrom?: string
+  occurredTo?: string
+  page?: number
+  size?: number
 }
 
 export async function queryUsers(params?: UserQueryParams) {
@@ -164,9 +175,9 @@ export async function deleteTenant(tenantId: string) {
   await http.delete(`/api/tenants/${tenantId}`)
 }
 
-export async function queryTenantHistory(tenantId: string, page = 1, size = 10) {
+export async function queryTenantHistory(tenantId: string, params?: TenantHistoryQueryParams) {
   const { data } = await http.get<ApiResponse<TenantHistoryPage>>(`/api/tenants/${tenantId}/history`, {
-    params: { page, size },
+    params,
   })
   return data.data
 }
@@ -208,7 +219,13 @@ export async function createAuditExportTask(params: Omit<AuditQueryParams, 'page
   return data.data
 }
 
-export async function queryAuditExportTasks(params?: { tenantId?: string; status?: string; page?: number; size?: number }) {
+export async function queryAuditExportTasks(params?: {
+  tenantId?: string
+  status?: string
+  operator?: string
+  page?: number
+  size?: number
+}) {
   const { data } = await http.get<ApiResponse<AuditExportTaskPage>>('/api/audit/exports', { params })
   return data.data
 }
@@ -218,4 +235,27 @@ export async function downloadAuditExportTask(taskId: number) {
     responseType: 'blob',
   })
   return response.data as Blob
+}
+
+export async function deleteAuditExportTask(taskId: number) {
+  await http.delete(`/api/audit/exports/${taskId}`)
+}
+
+export async function cleanupAuditExportTasks(params: { tenantId?: string; status?: string; completedBefore: string }) {
+  const { data } = await http.delete<ApiResponse<number>>('/api/audit/exports', { params })
+  return data.data
+}
+
+export async function queryAuditExportPolicy(tenantId?: string) {
+  const { data } = await http.get<ApiResponse<AuditExportPolicy>>('/api/audit/exports/policy', {
+    params: { tenantId },
+  })
+  return data.data
+}
+
+export async function updateAuditExportPolicy(payload: AuditExportPolicy, tenantId?: string) {
+  const { data } = await http.put<ApiResponse<AuditExportPolicy>>('/api/audit/exports/policy', payload, {
+    params: { tenantId },
+  })
+  return data.data
 }

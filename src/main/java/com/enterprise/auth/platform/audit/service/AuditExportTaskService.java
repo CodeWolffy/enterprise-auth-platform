@@ -1,11 +1,14 @@
 package com.enterprise.auth.platform.audit.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.enterprise.auth.platform.audit.dto.AuditExportPolicyRequest;
 import com.enterprise.auth.platform.audit.model.AuditEvent;
 import com.enterprise.auth.platform.audit.model.AuditQuery;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.model.PageResult;
+import com.enterprise.auth.platform.persistence.entity.SysConfigEntity;
 import com.enterprise.auth.platform.persistence.entity.SysAuditExportTaskEntity;
+import com.enterprise.auth.platform.persistence.mapper.SysConfigMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysAuditExportTaskMapper;
 import com.enterprise.auth.platform.security.SecuritySupport;
 import com.enterprise.auth.platform.tenant.TenantContext;
@@ -26,17 +29,20 @@ import org.springframework.util.StringUtils;
 public class AuditExportTaskService {
 
     private final SysAuditExportTaskMapper sysAuditExportTaskMapper;
+    private final SysConfigMapper sysConfigMapper;
     private final AuditService auditService;
     private final ObjectMapper objectMapper;
     private final java.util.concurrent.Executor auditExportExecutor;
 
     public AuditExportTaskService(
             SysAuditExportTaskMapper sysAuditExportTaskMapper,
+            SysConfigMapper sysConfigMapper,
             AuditService auditService,
             ObjectMapper objectMapper,
             @org.springframework.beans.factory.annotation.Qualifier("auditExportExecutor") java.util.concurrent.Executor auditExportExecutor
     ) {
         this.sysAuditExportTaskMapper = sysAuditExportTaskMapper;
+        this.sysConfigMapper = sysConfigMapper;
         this.auditService = auditService;
         this.objectMapper = objectMapper;
         this.auditExportExecutor = auditExportExecutor;
@@ -72,6 +78,7 @@ public class AuditExportTaskService {
     }
 
     public PageResult<ExportTaskView> page(String tenantId, String status, String operator, int page, int size) {
+        ExportPolicy policy = policy(resolveTenantId(new AuditQuery(tenantId, null, null, null, null, null, null, 1, 1)));
         int safePage = Math.max(page, 1);
         int safeSize = Math.max(size, 1);
         LambdaQueryWrapper<SysAuditExportTaskEntity> query = new LambdaQueryWrapper<SysAuditExportTaskEntity>()
@@ -87,7 +94,7 @@ public class AuditExportTaskService {
         int offset = (safePage - 1) * safeSize;
         List<ExportTaskView> records = sysAuditExportTaskMapper.selectList(query.last("limit " + offset + "," + safeSize))
                 .stream()
-                .map(this::toView)
+                .map(item -> toView(item, policy))
                 .toList();
         return PageResult.of(total, safePage, safeSize, records);
     }
@@ -135,8 +142,33 @@ public class AuditExportTaskService {
         return affected;
     }
 
+    public ExportPolicy policy(String tenantId) {
+        String resolvedTenantId = StringUtils.hasText(tenantId) ? tenantId : "platform";
+        return new ExportPolicy(
+                parsePositiveInt(loadConfigValue(resolvedTenantId, "audit.export.retention.days"), 7),
+                parsePositiveInt(loadConfigValue(resolvedTenantId, "audit.export.retention.max_tasks"), 100)
+        );
+    }
+
+    @Transactional
+    public ExportPolicy updatePolicy(String tenantId, AuditExportPolicyRequest request) {
+        String resolvedTenantId = StringUtils.hasText(tenantId) ? tenantId : "platform";
+        upsertConfig(resolvedTenantId, "audit.export.retention.days", "审计导出保留天数", String.valueOf(request.retentionDays()));
+        upsertConfig(resolvedTenantId, "audit.export.retention.max_tasks", "审计导出最大任务数", String.valueOf(request.maxTasks()));
+        auditService.record("AUDIT_EXPORT_POLICY_UPDATED", SecuritySupport.currentOperator(), resolvedTenantId, Map.of(
+                "retentionDays", request.retentionDays(),
+                "maxTasks", request.maxTasks()
+        ));
+        return policy(resolvedTenantId);
+    }
+
     public void processTask(Long taskId, AuditQuery query) {
-        SysAuditExportTaskEntity entity = getTask(taskId);
+        SysAuditExportTaskEntity entity;
+        try {
+            entity = getTask(taskId);
+        } catch (BusinessException ex) {
+            return;
+        }
         try {
             entity.setStatus("RUNNING");
             sysAuditExportTaskMapper.updateById(entity);
@@ -210,7 +242,24 @@ public class AuditExportTaskService {
         builder.append('"').append(normalized).append('"');
     }
 
-    private ExportTaskView toView(SysAuditExportTaskEntity entity) {
+    private ExportTaskView toView(SysAuditExportTaskEntity entity, ExportPolicy policy) {
+        int progressPercent = switch (entity.getStatus()) {
+            case "PENDING" -> 10;
+            case "RUNNING" -> 60;
+            case "SUCCESS", "FAILED" -> 100;
+            default -> 0;
+        };
+        String progressStage = switch (entity.getStatus()) {
+            case "PENDING" -> "等待执行";
+            case "RUNNING" -> "正在生成文件";
+            case "SUCCESS" -> "文件已生成";
+            case "FAILED" -> "执行失败";
+            default -> "未知状态";
+        };
+        Instant expiresAt = entity.getCompletedAt() == null
+                ? null
+                : entity.getCompletedAt().plusDays(policy.retentionDays()).atZone(ZoneId.systemDefault()).toInstant();
+        boolean retentionExpired = expiresAt != null && expiresAt.isBefore(Instant.now());
         return new ExportTaskView(
                 entity.getId(),
                 entity.getTenantId(),
@@ -218,10 +267,54 @@ public class AuditExportTaskService {
                 entity.getStatus(),
                 entity.getFileName(),
                 entity.getRecordCount(),
+                progressPercent,
+                progressStage,
+                retentionExpired,
+                expiresAt,
                 entity.getRequestedAt() == null ? null : entity.getRequestedAt().atZone(ZoneId.systemDefault()).toInstant(),
                 entity.getCompletedAt() == null ? null : entity.getCompletedAt().atZone(ZoneId.systemDefault()).toInstant(),
                 entity.getErrorMessage()
         );
+    }
+
+    private String loadConfigValue(String tenantId, String key) {
+        SysConfigEntity entity = sysConfigMapper.selectOne(new LambdaQueryWrapper<SysConfigEntity>()
+                .eq(SysConfigEntity::getTenantId, tenantId)
+                .eq(SysConfigEntity::getConfigKey, key)
+                .eq(SysConfigEntity::getDeleted, 0)
+                .last("limit 1"));
+        return entity == null ? null : entity.getConfigValue();
+    }
+
+    private void upsertConfig(String tenantId, String key, String name, String value) {
+        SysConfigEntity entity = sysConfigMapper.selectOne(new LambdaQueryWrapper<SysConfigEntity>()
+                .eq(SysConfigEntity::getTenantId, tenantId)
+                .eq(SysConfigEntity::getConfigKey, key)
+                .eq(SysConfigEntity::getDeleted, 0)
+                .last("limit 1"));
+        if (entity == null) {
+            entity = new SysConfigEntity();
+            entity.setTenantId(tenantId);
+            entity.setConfigKey(key);
+            entity.setConfigName(name);
+            entity.setConfigValue(value);
+            sysConfigMapper.insert(entity);
+            return;
+        }
+        entity.setConfigName(name);
+        entity.setConfigValue(value);
+        sysConfigMapper.updateById(entity);
+    }
+
+    private int parsePositiveInt(String value, int defaultValue) {
+        if (!StringUtils.hasText(value)) {
+            return defaultValue;
+        }
+        try {
+            return Math.max(Integer.parseInt(value), 1);
+        } catch (NumberFormatException ex) {
+            return defaultValue;
+        }
     }
 
     @Schema(description = "审计导出任务视图")
@@ -232,6 +325,10 @@ public class AuditExportTaskService {
             @Schema(description = "任务状态") String status,
             @Schema(description = "文件名") String fileName,
             @Schema(description = "导出记录数") Integer recordCount,
+            @Schema(description = "进度百分比") Integer progressPercent,
+            @Schema(description = "进度阶段") String progressStage,
+            @Schema(description = "是否已超过保留期") Boolean retentionExpired,
+            @Schema(description = "预计过期时间") Instant expiresAt,
             @Schema(description = "发起时间") Instant requestedAt,
             @Schema(description = "完成时间") Instant completedAt,
             @Schema(description = "失败原因") String errorMessage
@@ -239,5 +336,12 @@ public class AuditExportTaskService {
     }
 
     public record DownloadFile(String fileName, byte[] content) {
+    }
+
+    @Schema(description = "审计导出保留策略")
+    public record ExportPolicy(
+            @Schema(description = "导出结果保留天数") Integer retentionDays,
+            @Schema(description = "单租户最多保留任务数") Integer maxTasks
+    ) {
     }
 }
