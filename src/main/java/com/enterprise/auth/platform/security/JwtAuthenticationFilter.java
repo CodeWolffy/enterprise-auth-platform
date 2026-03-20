@@ -110,7 +110,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return Optional.empty();
             }
             return Optional.of(userAccountJwtConverter.convert(jwt));
-        } catch (JwtException ex) {
+        } catch (RuntimeException ex) {
             return Optional.empty();
         }
     }

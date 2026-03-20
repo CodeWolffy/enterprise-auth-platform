@@ -26,8 +26,8 @@ public class UserAccountJwtConverter {
     }
 
     public UserAccount toUserAccount(Jwt jwt) {
-        Long userId = jwt.getClaim("uid");
-        Integer sessionVersion = jwt.getClaim("ver");
+        Long userId = claimLong(jwt, "uid");
+        Integer sessionVersion = claimInt(jwt, "ver");
         String tenantId = jwt.getClaimAsString("tenant");
         String username = jwt.getSubject();
         Set<String> roles = new HashSet<>(claimStrings(jwt, "roles"));
@@ -50,8 +50,8 @@ public class UserAccountJwtConverter {
     }
 
     public TokenClaims toClaims(Jwt jwt) {
-        Long userId = jwt.getClaim("uid");
-        Integer sessionVersion = jwt.getClaim("ver");
+        Long userId = claimLong(jwt, "uid");
+        Integer sessionVersion = claimInt(jwt, "ver");
         return new TokenClaims(
                 jwt.getId(),
                 jwt.getClaimAsString("sid"),
@@ -78,5 +78,15 @@ public class UserAccountJwtConverter {
                 .map(Number.class::cast)
                 .map(Number::longValue)
                 .toList();
+    }
+
+    private Long claimLong(Jwt jwt, String claimName) {
+        Number value = jwt.getClaim(claimName);
+        return value == null ? null : value.longValue();
+    }
+
+    private Integer claimInt(Jwt jwt, String claimName) {
+        Number value = jwt.getClaim(claimName);
+        return value == null ? null : value.intValue();
     }
 }

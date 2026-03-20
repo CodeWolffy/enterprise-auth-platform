@@ -143,6 +143,14 @@ const form = reactive({
   dictValue: '',
 })
 
+function toDictPayload() {
+  return {
+    dictType: form.dictType.trim(),
+    dictCode: form.dictCode.trim(),
+    dictValue: form.dictValue.trim(),
+  }
+}
+
 const rules = reactive<FormRules>({
   dictType: [{ required: true, message: '请输入字典类型', trigger: 'blur' }],
   dictCode: [{ required: true, message: '请输入字典编码', trigger: 'blur' }],
@@ -205,7 +213,11 @@ function openDetail(row: DictView) {
 
 function openDict(row?: DictView) {
   editingId.value = row?.id ?? null
-  Object.assign(form, row ?? { dictType: '', dictCode: '', dictValue: '' })
+  Object.assign(form, {
+    dictType: row?.dictType ?? '',
+    dictCode: row?.dictCode ?? '',
+    dictValue: row?.dictValue ?? '',
+  })
   visible.value = true
 }
 
@@ -213,16 +225,21 @@ async function submit() {
   if (!formRef.value) {
     return
   }
-  await formRef.value.validate()
-  if (editingId.value) {
-    await updateDict(editingId.value, form)
-    ElMessage.success('字典项已更新')
-  } else {
-    await createDict(form)
-    ElMessage.success('字典项已创建')
+  try {
+    await formRef.value.validate()
+    const payload = toDictPayload()
+    if (editingId.value !== null) {
+      await updateDict(editingId.value, payload)
+      ElMessage.success('字典项已更新')
+    } else {
+      await createDict(payload)
+      ElMessage.success('字典项已创建')
+    }
+    visible.value = false
+    await load()
+  } catch {
+    // Error toast is handled by HTTP interceptor; keep submit from bubbling unhandled rejections.
   }
-  visible.value = false
-  await load()
 }
 
 async function removeDict(id: number) {

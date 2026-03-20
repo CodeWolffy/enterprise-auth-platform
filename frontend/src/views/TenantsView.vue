@@ -17,9 +17,9 @@
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="statusFilter" clearable style="width: 140px">
-            <el-option label="全部" :value="null" />
-            <el-option label="启用" :value="1" />
-            <el-option label="禁用" :value="0" />
+            <el-option label="全部" value="" />
+            <el-option label="启用" value="1" />
+            <el-option label="禁用" value="0" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -191,7 +191,7 @@ const historyQuery = reactive({ changeType: '', fieldKey: '', operator: '' })
 const historyDateRange = ref<[string, string] | null>(null)
 const keyword = ref('')
 const platformFilter = ref('')
-const statusFilter = ref<number | null>(null)
+const statusFilter = ref('')
 const page = ref(1)
 const size = ref(10)
 const total = ref(0)
@@ -204,9 +204,9 @@ const overrideSummaryText = computed(() => { const parts = []; if (overrideChang
 void bootstrap()
 async function bootstrap() { await Promise.all([load(), loadCatalog()]) }
 async function loadCatalog() { const [packages, capabilities] = await Promise.all([queryTenantPackages(), queryTenantCapabilities()]); packageOptions.value = packages; capabilityOptions.value = capabilities }
-async function load() { loading.value = true; try { const result = await queryTenants({ keyword: keyword.value || undefined, platformLevel: platformFilter.value ? platformFilter.value === 'platform' : undefined, tenantStatus: statusFilter.value ?? undefined, page: page.value, size: size.value }); tenants.value = result.records; total.value = result.total } finally { loading.value = false } }
+async function load() { loading.value = true; try { const result = await queryTenants({ keyword: keyword.value || undefined, platformLevel: platformFilter.value ? platformFilter.value === 'platform' : undefined, tenantStatus: statusFilter.value === '' ? undefined : Number(statusFilter.value), page: page.value, size: size.value }); tenants.value = result.records; total.value = result.total } finally { loading.value = false } }
 function handleSearch() { page.value = 1; void load() }
-function resetSearch() { keyword.value = ''; platformFilter.value = ''; statusFilter.value = null; page.value = 1; void load() }
+function resetSearch() { keyword.value = ''; platformFilter.value = ''; statusFilter.value = ''; page.value = 1; void load() }
 function handleSizeChange(value: number) { size.value = value; page.value = 1; void load() }
 function handleCurrentChange(value: number) { page.value = value; void load() }
 function openTenant(row?: TenantView) { editingTenantId.value = row?.tenantId ?? null; Object.assign(form, { tenantId: row?.tenantId ?? '', tenantName: row?.name ?? '', platformLevel: row?.platformLevel ?? false, tenantStatus: row?.tenantStatus ?? 1, expireAt: row?.expireAt ?? '', packageCode: row?.packageCode ?? '', packageName: row?.packageName ?? '', userQuota: row?.userQuota ?? undefined, storageQuotaGb: row?.storageQuotaGb ?? undefined, capabilityCodes: [...(row?.capabilityCodes ?? [])], lifecycleNote: row?.lifecycleNote ?? '' }); visible.value = true }

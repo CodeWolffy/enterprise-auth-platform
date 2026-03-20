@@ -126,6 +126,22 @@ const DYNAMIC_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = {
 
 const dynamicRouteNames = new Set<string>()
 
+function normalizeMenuPath(path: string | undefined) {
+  if (!path) {
+    return ''
+  }
+  return path.replace(/^\/+/, '')
+}
+
+function resolveRouteByMenu(menu: { code: string; path: string }) {
+  const byCode = DYNAMIC_ROUTE_DEFINITIONS[menu.code]
+  if (byCode) {
+    return byCode
+  }
+  const normalizedPath = normalizeMenuPath(menu.path)
+  return Object.values(DYNAMIC_ROUTE_DEFINITIONS).find((route) => normalizeMenuPath(String(route.path)) === normalizedPath)
+}
+
 const router = createRouter({
   history: createWebHistory(),
   routes: [...PUBLIC_ROUTES, SHELL_ROUTE],
@@ -147,9 +163,13 @@ function registerDynamicRoutes(snapshot: PermissionSnapshot | null) {
   }
 
   const menuCodes = new Set(snapshot.menus.map((item) => item.code))
+  const menuPaths = new Set(snapshot.menus.map((item) => normalizeMenuPath(item.path)))
   for (const menu of snapshot.menus) {
-    const route = DYNAMIC_ROUTE_DEFINITIONS[menu.code]
+    const route = resolveRouteByMenu(menu)
     if (!route) {
+      continue
+    }
+    if (router.hasRoute(String(route.name))) {
       continue
     }
     router.addRoute('console-shell', route)
@@ -157,11 +177,14 @@ function registerDynamicRoutes(snapshot: PermissionSnapshot | null) {
   }
 
   for (const [code, route] of Object.entries(DYNAMIC_ROUTE_DEFINITIONS)) {
-    if (menuCodes.has(code)) {
+    if (menuCodes.has(code) || menuPaths.has(normalizeMenuPath(String(route.path)))) {
       continue
     }
     const requiredPermission = route.meta?.requiresPermission as string | undefined
     if (requiredPermission && snapshot.permissions.includes(requiredPermission)) {
+      if (router.hasRoute(String(route.name))) {
+        continue
+      }
       router.addRoute('console-shell', route)
       dynamicRouteNames.add(String(route.name))
     }

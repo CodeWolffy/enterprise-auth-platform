@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.user.model;
 
 import com.enterprise.auth.platform.common.model.DataScopeType;
+import java.util.HashSet;
 import java.util.Collection;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -20,6 +21,12 @@ public record UserAccount(
         DataScopeType dataScopeType,
         int sessionVersion
 ) implements UserDetails {
+
+    public UserAccount {
+        roles = roles == null ? new HashSet<>() : new HashSet<>(roles);
+        permissions = permissions == null ? new HashSet<>() : new HashSet<>(permissions);
+        customDeptIds = customDeptIds == null ? new HashSet<>() : new HashSet<>(customDeptIds);
+    }
 
     @Override
     public String getPassword() {

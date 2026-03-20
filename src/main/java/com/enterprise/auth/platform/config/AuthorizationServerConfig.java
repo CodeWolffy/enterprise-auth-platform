@@ -1,12 +1,16 @@
 package com.enterprise.auth.platform.config;
 
+import com.enterprise.auth.platform.user.model.UserAccount;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.databind.Module;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.enterprise.auth.platform.auth.DatabaseRegisteredClientRepository;
 import com.enterprise.auth.platform.auth.service.AuditingAuthorizationConsentService;
 import com.enterprise.auth.platform.persistence.mapper.SysOauthClientMapper;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import com.enterprise.auth.platform.tenant.TenantFilter;
 import com.enterprise.auth.platform.tenant.TenantProperties;
-import com.enterprise.auth.platform.user.model.UserAccount;
 import com.enterprise.auth.platform.user.repository.UserRepository;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
@@ -17,6 +21,8 @@ import java.security.KeyPairGenerator;
 import java.security.Principal;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,6 +33,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.jackson2.SecurityJackson2Modules;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
@@ -36,6 +43,7 @@ import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
+import org.springframework.security.oauth2.server.authorization.jackson2.OAuth2AuthorizationServerJackson2Module;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
@@ -58,6 +66,7 @@ public class AuthorizationServerConfig {
                 .with(authorizationServerConfigurer, authorizationServer -> authorizationServer
                         .authorizationEndpoint(endpoint -> endpoint.consentPage("/oauth2/consent"))
                         .oidc(Customizer.withDefaults()))
+            .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
                 .csrf(csrf -> csrf.ignoringRequestMatchers(authorizationServerConfigurer.getEndpointsMatcher()))
                 .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login")))
@@ -108,7 +117,61 @@ public class AuthorizationServerConfig {
 
     @Bean
     public OAuth2AuthorizationService authorizationService(JdbcTemplate jdbcTemplate, RegisteredClientRepository registeredClientRepository) {
-        return new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
+        JdbcOAuth2AuthorizationService authorizationService = new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
+        ObjectMapper authorizationObjectMapper = authorizationObjectMapper();
+
+        JdbcOAuth2AuthorizationService.OAuth2AuthorizationRowMapper authorizationRowMapper =
+                new JdbcOAuth2AuthorizationService.OAuth2AuthorizationRowMapper(registeredClientRepository);
+        authorizationRowMapper.setObjectMapper(authorizationObjectMapper);
+        authorizationService.setAuthorizationRowMapper(authorizationRowMapper);
+
+        JdbcOAuth2AuthorizationService.OAuth2AuthorizationParametersMapper authorizationParametersMapper =
+                new JdbcOAuth2AuthorizationService.OAuth2AuthorizationParametersMapper();
+        authorizationParametersMapper.setObjectMapper(authorizationObjectMapper);
+        authorizationService.setAuthorizationParametersMapper(authorizationParametersMapper);
+
+        return authorizationService;
+    }
+
+    private ObjectMapper authorizationObjectMapper() {
+        ClassLoader classLoader = AuthorizationServerConfig.class.getClassLoader();
+        List<Module> securityModules = SecurityJackson2Modules.getModules(classLoader);
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModules(securityModules);
+        objectMapper.registerModule(new OAuth2AuthorizationServerJackson2Module());
+        objectMapper.addMixIn(UserAccount.class, UserAccountMixin.class);
+        allowLegacyImmutableCollections(objectMapper);
+        return objectMapper;
+    }
+
+    private void allowLegacyImmutableCollections(ObjectMapper objectMapper) {
+        // Compatibility for previously serialized rows that captured JDK immutable collection impl classes.
+        String[] legacySetImplNames = {
+                "java.util.ImmutableCollections$SetN",
+                "java.util.ImmutableCollections$Set12"
+        };
+        for (String className : legacySetImplNames) {
+            try {
+                Class<?> implClass = Class.forName(className);
+                objectMapper.addMixIn(implClass, TrustedSetMixin.class);
+            } catch (ClassNotFoundException ignored) {
+                // Different JDK may not expose all immutable implementation variants.
+            }
+        }
+    }
+
+        @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS)
+        @JsonIgnoreProperties(value = {
+            "authorities",
+            "accountNonExpired",
+            "accountNonLocked",
+            "credentialsNonExpired"
+        }, ignoreUnknown = true)
+    private abstract static class UserAccountMixin {
+    }
+
+    @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS)
+    private abstract static class TrustedSetMixin {
     }
 
     @Bean

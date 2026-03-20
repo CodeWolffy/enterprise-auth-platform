@@ -19,6 +19,7 @@ import com.enterprise.auth.platform.user.model.UserAccount;
 import com.enterprise.auth.platform.user.repository.InMemoryUserRepository;
 import com.enterprise.auth.platform.user.repository.UserRepository;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -139,7 +140,7 @@ public class DatabaseUserRepository implements UserRepository {
                 .eq(SysUserRoleEntity::getTenantId, tenantId)
                 .eq(SysUserRoleEntity::getUserId, userId));
         if (links.isEmpty()) {
-            return Set.of();
+            return new HashSet<>();
         }
         List<Long> roleIds = links.stream().map(SysUserRoleEntity::getRoleId).distinct().toList();
         return sysRoleMapper.selectList(new LambdaQueryWrapper<SysRoleEntity>()
@@ -153,7 +154,7 @@ public class DatabaseUserRepository implements UserRepository {
 
     private RoleData loadRoleData(String tenantId, Set<String> roleCodes) {
         if (roleCodes.isEmpty()) {
-            return new RoleData(Set.of(), DataScopeType.SELF, Set.of());
+            return new RoleData(new HashSet<>(), DataScopeType.SELF, new HashSet<>());
         }
         List<SysRoleEntity> roles = sysRoleMapper.selectList(new LambdaQueryWrapper<SysRoleEntity>()
                 .eq(SysRoleEntity::getTenantId, tenantId)
@@ -171,7 +172,7 @@ public class DatabaseUserRepository implements UserRepository {
                 .eq(SysRolePermissionEntity::getTenantId, tenantId)
                 .in(SysRolePermissionEntity::getRoleId, roleIds));
         if (rolePermissions.isEmpty()) {
-            return new RoleData(Set.of(), dataScopeType, customDeptIds);
+            return new RoleData(new HashSet<>(), dataScopeType, customDeptIds);
         }
         List<Long> permissionIds = rolePermissions.stream().map(SysRolePermissionEntity::getPermissionId).distinct().toList();
         Set<String> permissionCodes = sysPermissionMapper.selectList(new LambdaQueryWrapper<SysPermissionEntity>()
@@ -218,7 +219,7 @@ public class DatabaseUserRepository implements UserRepository {
                 .map(SysRoleEntity::getRoleCode)
                 .toList();
         if (roleCodes.isEmpty()) {
-            return Set.of();
+            return new HashSet<>();
         }
         List<String> configKeys = roleCodes.stream().map(roleCode -> "role.custom_dept_ids." + roleCode).toList();
         return sysConfigMapper.selectList(new LambdaQueryWrapper<SysConfigEntity>()
