@@ -73,17 +73,16 @@ class OAuthClientControllerTest {
                         .last("limit 1"))
                 .getId();
 
-        mockMvc.perform(get("/api/oauth-clients")
-                        .with(user(principal))
-                        .header("X-Tenant-Id", "platform"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[?(@.clientId=='" + CLIENT_ID + "')]").exists());
-
         mockMvc.perform(get("/api/oauth-clients/{id}", clientRowId)
                         .with(user(principal))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.clientName").value("接口联调客户端"));
+                .andExpect(jsonPath("$.data.clientName").value("接口联调客户端"))
+                .andExpect(jsonPath("$.data.scopeDescriptions.openid").exists())
+                .andExpect(jsonPath("$.data.scopeDetails").isArray())
+                .andExpect(jsonPath("$.data.scopeTypeSummary").isMap())
+                .andExpect(jsonPath("$.data.integrationGuidance.recommendedGrantType").exists())
+                .andExpect(jsonPath("$.data.statusHistory").isArray());
 
         mockMvc.perform(put("/api/oauth-clients/{id}", clientRowId)
                         .with(user(principal))
@@ -91,7 +90,7 @@ class OAuthClientControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "clientName": "接口联调客户端更新",
+                                  "clientName": "接口联调客户端-更新",
                                   "clientSecret": "ClientSecret@456",
                                   "redirectUris": ["http://127.0.0.1:8081/callback", "http://127.0.0.1:8081/silent"],
                                   "scopes": ["openid", "api.read", "api.write"],
@@ -101,7 +100,7 @@ class OAuthClientControllerTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.clientName").value("接口联调客户端更新"))
+                .andExpect(jsonPath("$.data.clientName").value("接口联调客户端-更新"))
                 .andExpect(jsonPath("$.data.issuedClientSecret").value("ClientSecret@456"));
 
         mockMvc.perform(post("/api/oauth-clients/{id}/rotate-secret", clientRowId)

@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -62,9 +63,11 @@ public class AuditController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
             Instant occurredTo,
             @Parameter(description = "页码，从 1 开始") @RequestParam(defaultValue = "1") int page,
-            @Parameter(description = "每页条数") @RequestParam(defaultValue = "20") int size
+            @Parameter(description = "每页数量") @RequestParam(defaultValue = "20") int size
     ) {
-        return ApiResponse.ok(auditService.query(buildQuery(tenantId, eventType, operator, requestId, clientIp, occurredFrom, occurredTo, page, size)));
+        return ApiResponse.ok(auditService.query(buildQuery(
+                tenantId, eventType, operator, requestId, clientIp, occurredFrom, occurredTo, page, size
+        )));
     }
 
     @Operation(summary = "导出审计事件")
@@ -85,7 +88,7 @@ public class AuditController {
                 "AUDIT_EXPORTED",
                 SecuritySupport.currentOperator(),
                 StringUtils.hasText(tenantId) ? tenantId : "platform",
-                java.util.Map.of(
+                Map.of(
                         "eventType", eventType == null ? "" : eventType,
                         "operator", operator == null ? "" : operator,
                         "clientIp", clientIp == null ? "" : clientIp,
@@ -114,7 +117,9 @@ public class AuditController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant occurredFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant occurredTo
     ) {
-        return ApiResponse.ok(auditExportTaskService.create(buildQuery(tenantId, eventType, operator, requestId, clientIp, occurredFrom, occurredTo, 1, 2000)));
+        return ApiResponse.ok(auditExportTaskService.create(buildQuery(
+                tenantId, eventType, operator, requestId, clientIp, occurredFrom, occurredTo, 1, 2000
+        )));
     }
 
     @Operation(summary = "分页查询审计导出任务")
@@ -160,12 +165,37 @@ public class AuditController {
                 .body(file.content());
     }
 
+    @Operation(summary = "归档单条异步审计导出任务")
+    @PostMapping("/exports/{taskId}/archive")
+    @PreAuthorize("hasAuthority('audit:read')")
+    public ApiResponse<AuditExportTaskService.ExportTaskView> archiveExportTask(@PathVariable Long taskId) {
+        return ApiResponse.ok(auditExportTaskService.archive(taskId));
+    }
+
+    @Operation(summary = "批量归档异步审计导出任务")
+    @PostMapping("/exports/archive")
+    @PreAuthorize("hasAuthority('audit:read')")
+    public ApiResponse<Integer> archiveExportTasks(
+            @RequestParam(required = false) String tenantId,
+            @RequestParam(required = false) String status,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant completedBefore
+    ) {
+        return ApiResponse.ok(auditExportTaskService.archiveCompleted(tenantId, status, completedBefore));
+    }
+
     @Operation(summary = "删除异步审计导出任务")
     @DeleteMapping("/exports/{taskId}")
     @PreAuthorize("hasAuthority('audit:read')")
     public ApiResponse<Void> deleteExportTask(@PathVariable Long taskId) {
         auditExportTaskService.deleteTask(taskId);
         return ApiResponse.ok();
+    }
+
+    @Operation(summary = "重试异步审计导出任务")
+    @PostMapping("/exports/{taskId}/retry")
+    @PreAuthorize("hasAuthority('audit:read')")
+    public ApiResponse<AuditExportTaskService.ExportTaskView> retryExportTask(@PathVariable Long taskId) {
+        return ApiResponse.ok(auditExportTaskService.retry(taskId));
     }
 
     @Operation(summary = "清理异步审计导出任务")

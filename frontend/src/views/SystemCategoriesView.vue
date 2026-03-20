@@ -72,6 +72,11 @@
         </el-descriptions>
 
         <section class="analysis-section">
+          <h4>七日影响趋势</h4>
+          <div ref="trendChartRef" class="trend-chart"></div>
+        </section>
+
+        <section class="analysis-section">
           <h4>引用样例</h4>
           <el-empty v-if="!analysis.sampleReferences.length" description="暂无引用样例" />
           <el-timeline v-else>
@@ -101,11 +106,17 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { nextTick, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { createCategoryOption, deleteCategoryOption, queryCategoryAnalysis, queryCategoryOptions, updateCategoryOption } from '@/api/system'
 import type { CategoryAnalysis, CategoryOption } from '@/types/auth'
+import { BarChart } from 'echarts/charts'
+import { GridComponent, TooltipComponent } from 'echarts/components'
+import { getInstanceByDom, init, use } from 'echarts/core'
+import { CanvasRenderer } from 'echarts/renderers'
+
+use([BarChart, GridComponent, TooltipComponent, CanvasRenderer])
 
 const activeTab = ref<'dict' | 'config'>('dict')
 const loading = ref(false)
@@ -115,6 +126,7 @@ const analysisVisible = ref(false)
 const editingCode = ref<string | null>(null)
 const formRef = ref<FormInstance>()
 const analysis = ref<CategoryAnalysis | null>(null)
+const trendChartRef = ref<HTMLElement | null>(null)
 
 const form = reactive({
   code: '',
@@ -189,6 +201,39 @@ async function removeRow(row: CategoryOption) {
 async function openAnalysis(row: CategoryOption) {
   analysis.value = await queryCategoryAnalysis(activeTab.value, row.code)
   analysisVisible.value = true
+  await nextTick()
+  renderTrendChart()
+}
+
+function renderTrendChart() {
+  if (!trendChartRef.value || !analysis.value) {
+    return
+  }
+  const existing = getInstanceByDom(trendChartRef.value)
+  const chart = existing ?? init(trendChartRef.value)
+  chart.setOption({
+    tooltip: { trigger: 'axis' },
+    grid: { left: 24, right: 16, top: 24, bottom: 24, containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: analysis.value.trend.map((item) => item.date.slice(5)),
+      axisTick: { alignWithLabel: true },
+    },
+    yAxis: {
+      type: 'value',
+      minInterval: 1,
+    },
+    series: [
+      {
+        type: 'bar',
+        data: analysis.value.trend.map((item) => item.count),
+        itemStyle: {
+          color: '#2563eb',
+          borderRadius: [6, 6, 0, 0],
+        },
+      },
+    ],
+  })
 }
 </script>
 
@@ -206,5 +251,10 @@ async function openAnalysis(row: CategoryOption) {
   margin: 0;
   white-space: pre-wrap;
   word-break: break-all;
+}
+
+.trend-chart {
+  width: 100%;
+  height: 260px;
 }
 </style>

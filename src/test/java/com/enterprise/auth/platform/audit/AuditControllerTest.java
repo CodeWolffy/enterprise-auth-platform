@@ -4,6 +4,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -141,6 +142,87 @@ class AuditControllerTest {
                 .andExpect(jsonPath("$.data").value(1));
     }
 
+    @Test
+    void shouldArchiveSingleAndBatchExportTasks() throws Exception {
+        jdbcTemplate.update(
+                "INSERT INTO sys_audit_export_task(tenant_id, operator, status, file_name, query_json, record_count, file_content, requested_at, completed_at) VALUES(?,?,?,?,?,?,?,NOW(),DATE_SUB(NOW(), INTERVAL 2 DAY))",
+                "platform", "admin", "SUCCESS", "audit-archive-single-ut.csv", "{\"eventType\":\"AUDIT_EXPORT_UT\"}", 1, "csv".getBytes()
+        );
+        Long singleTaskId = jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_audit_export_task WHERE file_name = ?",
+                Long.class,
+                "audit-archive-single-ut.csv"
+        );
+
+        mockMvc.perform(post("/api/audit/exports/{taskId}/archive", singleTaskId)
+                        .with(user(principal()))
+                        .header("X-Tenant-Id", "platform"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("ARCHIVED"))
+                .andExpect(jsonPath("$.data.archived").value(true))
+                .andExpect(jsonPath("$.data.archivable").value(false));
+
+        jdbcTemplate.update(
+                "INSERT INTO sys_audit_export_task(tenant_id, operator, status, file_name, query_json, record_count, file_content, requested_at, completed_at) VALUES(?,?,?,?,?,?,?,NOW(),DATE_SUB(NOW(), INTERVAL 5 DAY))",
+                "platform", "admin", "SUCCESS", "audit-archive-batch-ut.csv", "{\"eventType\":\"AUDIT_EXPORT_UT\"}", 1, "csv".getBytes()
+        );
+
+        mockMvc.perform(post("/api/audit/exports/archive")
+                        .with(user(principal()))
+                        .header("X-Tenant-Id", "platform")
+                        .param("tenantId", "platform")
+                        .param("status", "SUCCESS")
+                        .param("completedBefore", java.time.Instant.now().minusSeconds(24 * 3600).toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)));
+    }
+
+    @Test
+    void shouldRetryExportTask() throws Exception {
+        jdbcTemplate.update(
+                "INSERT INTO sys_audit_export_task(tenant_id, operator, status, file_name, query_json, record_count, requested_at, completed_at, error_message) VALUES(?,?,?,?,?,?,NOW(),NOW(),?)",
+                "platform", "admin", "FAILED", "audit-retry-ut.csv",
+                "{\"tenantId\":\"platform\",\"eventType\":\"AUDIT_EXPORT_UT\",\"clientIp\":\"10.10.10.10\",\"occurredFrom\":\"2026-03-20T00:00:00Z\",\"occurredTo\":\"2026-03-21T00:00:00Z\"}",
+                0, "mock failed"
+        );
+        Long taskId = jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_audit_export_task WHERE file_name = ?",
+                Long.class,
+                "audit-retry-ut.csv"
+        );
+
+        mockMvc.perform(post("/api/audit/exports/{taskId}/retry", taskId)
+                        .with(user(principal()))
+                        .header("X-Tenant-Id", "platform"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").isNumber())
+                .andExpect(jsonPath("$.data.status").isNotEmpty());
+    }
+
+    @Test
+    void shouldQueryAndUpdateExportPolicy() throws Exception {
+        mockMvc.perform(get("/api/audit/exports/policy")
+                        .with(user(principalWithWrite()))
+                        .header("X-Tenant-Id", "platform"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.retentionDays").isNumber())
+                .andExpect(jsonPath("$.data.maxTasks").isNumber());
+
+        mockMvc.perform(put("/api/audit/exports/policy")
+                        .with(user(principalWithWrite()))
+                        .header("X-Tenant-Id", "platform")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "retentionDays": 9,
+                                  "maxTasks": 120
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.retentionDays").value(9))
+                .andExpect(jsonPath("$.data.maxTasks").value(120));
+    }
+
     private UserAccount principal() {
         return new UserAccount(
                 1L,
@@ -150,6 +232,21 @@ class AuditControllerTest {
                 true,
                 Set.of(),
                 Set.of("audit:read"),
+                Set.of(),
+                DataScopeType.ALL,
+                1
+        );
+    }
+
+    private UserAccount principalWithWrite() {
+        return new UserAccount(
+                1L,
+                "platform",
+                "admin",
+                passwordEncoder.encode("AuditController@123"),
+                true,
+                Set.of(),
+                Set.of("audit:read", "audit:write"),
                 Set.of(),
                 DataScopeType.ALL,
                 1

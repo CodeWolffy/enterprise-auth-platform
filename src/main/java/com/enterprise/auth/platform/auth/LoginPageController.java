@@ -3,10 +3,10 @@ package com.enterprise.auth.platform.auth;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.web.HtmlTemplateRenderer;
 import com.enterprise.auth.platform.persistence.entity.SysConfigEntity;
-import com.enterprise.auth.platform.persistence.entity.SysDictEntity;
+import com.enterprise.auth.platform.persistence.entity.SysOauthScopeEntity;
 import com.enterprise.auth.platform.persistence.entity.SysTenantEntity;
 import com.enterprise.auth.platform.persistence.mapper.SysConfigMapper;
-import com.enterprise.auth.platform.persistence.mapper.SysDictMapper;
+import com.enterprise.auth.platform.persistence.mapper.SysOauthScopeMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysTenantMapper;
 import com.enterprise.auth.platform.tenant.TenantProperties;
 import jakarta.servlet.http.HttpServletRequest;
@@ -39,7 +39,7 @@ public class LoginPageController {
 
     private final SysTenantMapper sysTenantMapper;
     private final SysConfigMapper sysConfigMapper;
-    private final SysDictMapper sysDictMapper;
+    private final SysOauthScopeMapper sysOauthScopeMapper;
     private final TenantProperties tenantProperties;
     private final RegisteredClientRepository registeredClientRepository;
     private final HtmlTemplateRenderer htmlTemplateRenderer;
@@ -47,14 +47,14 @@ public class LoginPageController {
     public LoginPageController(
             @Nullable SysTenantMapper sysTenantMapper,
             @Nullable SysConfigMapper sysConfigMapper,
-            @Nullable SysDictMapper sysDictMapper,
+            @Nullable SysOauthScopeMapper sysOauthScopeMapper,
             TenantProperties tenantProperties,
             RegisteredClientRepository registeredClientRepository,
             HtmlTemplateRenderer htmlTemplateRenderer
     ) {
         this.sysTenantMapper = sysTenantMapper;
         this.sysConfigMapper = sysConfigMapper;
-        this.sysDictMapper = sysDictMapper;
+        this.sysOauthScopeMapper = sysOauthScopeMapper;
         this.tenantProperties = tenantProperties;
         this.registeredClientRepository = registeredClientRepository;
         this.htmlTemplateRenderer = htmlTemplateRenderer;
@@ -184,14 +184,15 @@ public class LoginPageController {
 
     private Map<String, String> resolveScopeDescriptions(String tenantId) {
         Map<String, String> descriptions = new LinkedHashMap<>(DEFAULT_SCOPE_DESCRIPTIONS);
-        if (sysDictMapper == null) {
+        if (sysOauthScopeMapper == null) {
             return descriptions;
         }
-        sysDictMapper.selectList(new LambdaQueryWrapper<SysDictEntity>()
-                        .eq(SysDictEntity::getDictType, "oauth_scope")
-                        .in(SysDictEntity::getTenantId, Arrays.asList("platform", tenantId))
-                        .eq(SysDictEntity::getDeleted, 0))
-                .forEach(item -> descriptions.put(normalizeScope(item.getDictCode()), item.getDictValue()));
+        sysOauthScopeMapper.selectList(new LambdaQueryWrapper<SysOauthScopeEntity>()
+                        .in(SysOauthScopeEntity::getTenantId, Arrays.asList("platform", tenantId))
+                        .eq(SysOauthScopeEntity::getDeleted, 0)
+                        .eq(SysOauthScopeEntity::getEnabled, 1)
+                        .eq(SysOauthScopeEntity::getVisibleInConsent, 1))
+                .forEach(item -> descriptions.put(normalizeScope(item.getScopeCode()), item.getScopeDesc()));
         return descriptions;
     }
 

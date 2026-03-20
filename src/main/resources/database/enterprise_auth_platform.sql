@@ -11,7 +11,7 @@
  Target Server Version : 80043 (8.0.43)
  File Encoding         : 65001
 
- Date: 20/03/2026 20:32:03
+ Date: 20/03/2026 22:26:36
 */
 
 SET NAMES utf8mb4;
@@ -94,6 +94,29 @@ CREATE TABLE `oauth2_authorization_consent`  (
 -- ----------------------------
 
 -- ----------------------------
+-- Table structure for sys_audit_export_policy
+-- ----------------------------
+DROP TABLE IF EXISTS `sys_audit_export_policy`;
+CREATE TABLE `sys_audit_export_policy`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `tenant_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '所属租户',
+  `retention_days` int NOT NULL DEFAULT 7 COMMENT '保留天数',
+  `max_tasks` int NOT NULL DEFAULT 100 COMMENT '最大任务数',
+  `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '创建人',
+  `updated_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '更新人',
+  `deleted` tinyint NOT NULL DEFAULT 0 COMMENT '逻辑删除标记',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_sys_audit_export_policy_tenant`(`tenant_id` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 2 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '审计导出保留策略表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of sys_audit_export_policy
+-- ----------------------------
+INSERT INTO `sys_audit_export_policy` VALUES (1, 'platform', 7, 100, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+
+-- ----------------------------
 -- Table structure for sys_audit_export_task
 -- ----------------------------
 DROP TABLE IF EXISTS `sys_audit_export_task`;
@@ -139,6 +162,34 @@ CREATE TABLE `sys_audit_log`  (
 -- ----------------------------
 -- Records of sys_audit_log
 -- ----------------------------
+
+-- ----------------------------
+-- Table structure for sys_category_rule
+-- ----------------------------
+DROP TABLE IF EXISTS `sys_category_rule`;
+CREATE TABLE `sys_category_rule`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `tenant_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '所属租户',
+  `target_type` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '目标类型 dict/config',
+  `category_code` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '分类编码',
+  `category_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '分类名称',
+  `matchers` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '匹配规则集合',
+  `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '创建人',
+  `updated_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '更新人',
+  `deleted` tinyint NOT NULL DEFAULT 0 COMMENT '逻辑删除标记',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_sys_category_rule_tenant_target_code`(`tenant_id` ASC, `target_type` ASC, `category_code` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 5 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '系统分类规则表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of sys_category_rule
+-- ----------------------------
+INSERT INTO `sys_category_rule` VALUES (1, 'platform', 'dict', 'oauth', 'OAuth 字典', 'oauth.*,scope.*', 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_category_rule` VALUES (2, 'platform', 'dict', 'user', '用户域字典', 'user.*,dept.*,role.*', 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_category_rule` VALUES (3, 'platform', 'config', 'auth', '认证参数', 'auth.*,oauth.*', 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_category_rule` VALUES (4, 'platform', 'config', 'platform', '平台参数', 'tenant.*,system.*,feature.*', 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
 
 -- ----------------------------
 -- Table structure for sys_config
@@ -296,6 +347,59 @@ INSERT INTO `sys_oauth_client` VALUES (1, 'platform', 'eap-web', '$2a$10$0O7R3sv
 INSERT INTO `sys_oauth_client` VALUES (2, 'platform', 'eap-frontend-spa', '', '前端管理台', 'http://127.0.0.1:5173/auth/callback,http://localhost:5173/auth/callback', 'openid,profile,api.read,api.write', 'authorization_code,refresh_token', 1, 1, 1, '2026-03-20 14:21:09', '2026-03-20 14:21:09', 'system', 'system', 0);
 
 -- ----------------------------
+-- Table structure for sys_oauth_client_history
+-- ----------------------------
+DROP TABLE IF EXISTS `sys_oauth_client_history`;
+CREATE TABLE `sys_oauth_client_history`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `tenant_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '所属租户',
+  `client_id` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '客户端编号',
+  `event_type` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '事件类型',
+  `summary` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '事件摘要',
+  `payload_json` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '事件负载',
+  `operator` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '操作人',
+  `occurred_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '发生时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_sys_oauth_client_history_tenant_client_time`(`tenant_id` ASC, `client_id` ASC, `occurred_at` DESC) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = 'OAuth2 客户端状态历史表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of sys_oauth_client_history
+-- ----------------------------
+
+-- ----------------------------
+-- Table structure for sys_oauth_scope
+-- ----------------------------
+DROP TABLE IF EXISTS `sys_oauth_scope`;
+CREATE TABLE `sys_oauth_scope`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `tenant_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '所属租户',
+  `scope_code` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '作用域编码',
+  `scope_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '作用域名称',
+  `scope_desc` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '作用域说明',
+  `scope_type` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '作用域类型',
+  `default_selected` tinyint NOT NULL DEFAULT 0 COMMENT '默认是否选中',
+  `visible_in_consent` tinyint NOT NULL DEFAULT 1 COMMENT '是否在同意页展示',
+  `sort_order` int NOT NULL DEFAULT 0 COMMENT '排序值',
+  `enabled` tinyint NOT NULL DEFAULT 1 COMMENT '是否启用',
+  `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '创建人',
+  `updated_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '更新人',
+  `deleted` tinyint NOT NULL DEFAULT 0 COMMENT '逻辑删除标记',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_sys_oauth_scope_tenant_code`(`tenant_id` ASC, `scope_code` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 5 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = 'OAuth2 作用域定义表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of sys_oauth_scope
+-- ----------------------------
+INSERT INTO `sys_oauth_scope` VALUES (1, 'platform', 'openid', 'OpenID', '读取用户基础身份信息，用于建立统一登录会话。', 'IDENTITY', 1, 1, 10, 1, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_oauth_scope` VALUES (2, 'platform', 'profile', '用户资料', '读取用户资料信息，用于展示昵称、头像等基础资料。', 'PROFILE', 1, 1, 20, 1, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_oauth_scope` VALUES (3, 'platform', 'api.read', '接口读取', '接口读取：允许读取平台接口与管理数据。', 'API', 1, 1, 30, 1, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_oauth_scope` VALUES (4, 'platform', 'api.write', '接口写入', '接口写入：允许创建、修改或删除平台业务数据。', 'API', 0, 1, 40, 1, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+
+-- ----------------------------
 -- Table structure for sys_permission
 -- ----------------------------
 DROP TABLE IF EXISTS `sys_permission`;
@@ -372,6 +476,27 @@ INSERT INTO `sys_role` VALUES (1, 'platform', 'ADMIN', '平台管理员', 'ALL',
 INSERT INTO `sys_role` VALUES (2, 'tenant-a', 'AUDITOR', '审计员', 'DEPT', '2026-03-20 00:09:53', NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
 
 -- ----------------------------
+-- Table structure for sys_role_dept_scope
+-- ----------------------------
+DROP TABLE IF EXISTS `sys_role_dept_scope`;
+CREATE TABLE `sys_role_dept_scope`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `tenant_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '所属租户',
+  `role_id` bigint NOT NULL COMMENT '角色ID',
+  `dept_id` bigint NOT NULL COMMENT '部门ID',
+  `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '创建人',
+  `updated_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '更新人',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_sys_role_dept_scope_tenant_role_dept`(`tenant_id` ASC, `role_id` ASC, `dept_id` ASC) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '角色自定义部门范围表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of sys_role_dept_scope
+-- ----------------------------
+
+-- ----------------------------
 -- Table structure for sys_role_permission
 -- ----------------------------
 DROP TABLE IF EXISTS `sys_role_permission`;
@@ -426,6 +551,8 @@ CREATE TABLE `sys_tenant`  (
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `tenant_status` tinyint NOT NULL DEFAULT 1 COMMENT '租户状态：1 启用，0 禁用',
   `expire_at` datetime NULL DEFAULT NULL COMMENT '租户到期时间',
+  `package_code` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '套餐编码',
+  `lifecycle_note` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '运营备注',
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '创建人',
   `updated_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '更新人',
@@ -439,8 +566,63 @@ CREATE TABLE `sys_tenant`  (
 -- ----------------------------
 -- Records of sys_tenant
 -- ----------------------------
-INSERT INTO `sys_tenant` VALUES (1, 'platform', '平台租户', 1, '2026-03-20 00:09:53', 1, NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
-INSERT INTO `sys_tenant` VALUES (2, 'tenant-a', '租户A', 0, '2026-03-20 00:09:53', 1, NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
+INSERT INTO `sys_tenant` VALUES (1, 'platform', '平台租户', 1, '2026-03-20 00:09:53', 1, NULL, 'platform-governance', '负责全局治理与租户运维', '2026-03-20 22:26:06', NULL, NULL, 0);
+INSERT INTO `sys_tenant` VALUES (2, 'tenant-a', '租户A', 0, '2026-03-20 00:09:53', 1, NULL, 'business-standard', '默认标准业务租户', '2026-03-20 22:26:06', NULL, NULL, 0);
+
+-- ----------------------------
+-- Table structure for sys_tenant_capability
+-- ----------------------------
+DROP TABLE IF EXISTS `sys_tenant_capability`;
+CREATE TABLE `sys_tenant_capability`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `tenant_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '所属租户，当前固定为 platform',
+  `capability_code` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '能力编码',
+  `capability_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '能力名称',
+  `capability_desc` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '能力说明',
+  `sort_order` int NOT NULL DEFAULT 0 COMMENT '排序值',
+  `enabled` tinyint NOT NULL DEFAULT 1 COMMENT '是否启用',
+  `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '创建人',
+  `updated_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '更新人',
+  `deleted` tinyint NOT NULL DEFAULT 0 COMMENT '逻辑删除标记',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_sys_tenant_capability_tenant_code`(`tenant_id` ASC, `capability_code` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 9 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户能力定义表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of sys_tenant_capability
+-- ----------------------------
+INSERT INTO `sys_tenant_capability` VALUES (1, 'platform', 'oauth', '统一认证', '统一认证、授权码登录与开放接入能力', 10, 1, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_tenant_capability` VALUES (2, 'platform', 'user', '用户管理', '用户目录、启停、角色分配与组织可见范围管理', 20, 1, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_tenant_capability` VALUES (3, 'platform', 'role', '角色授权', '角色模型、权限树与数据范围授权', 30, 1, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_tenant_capability` VALUES (4, 'platform', 'dept', '组织管理', '组织树、负责人和部门层级治理', 40, 1, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_tenant_capability` VALUES (5, 'platform', 'tenant', '租户治理', '租户套餐、能力配置与生命周期治理', 50, 1, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_tenant_capability` VALUES (6, 'platform', 'system', '系统管理', '字典、参数、公告与分类配置管理', 60, 1, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_tenant_capability` VALUES (7, 'platform', 'audit', '安全审计', '审计查询、导出与授权记录联动', 70, 1, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_tenant_capability` VALUES (8, 'platform', 'notice', '通知公告', '公告发布与租户通知能力', 80, 1, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+
+-- ----------------------------
+-- Table structure for sys_tenant_capability_override
+-- ----------------------------
+DROP TABLE IF EXISTS `sys_tenant_capability_override`;
+CREATE TABLE `sys_tenant_capability_override`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `tenant_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '租户编码',
+  `capability_code` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '能力编码',
+  `enabled` tinyint NOT NULL DEFAULT 1 COMMENT '覆盖后是否启用',
+  `capability_desc_override` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '能力说明覆盖',
+  `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '创建人',
+  `updated_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '更新人',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_sys_tenant_capability_override`(`tenant_id` ASC, `capability_code` ASC) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户能力覆盖表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of sys_tenant_capability_override
+-- ----------------------------
 
 -- ----------------------------
 -- Table structure for sys_tenant_change_log
@@ -463,6 +645,63 @@ CREATE TABLE `sys_tenant_change_log`  (
 -- ----------------------------
 -- Records of sys_tenant_change_log
 -- ----------------------------
+
+-- ----------------------------
+-- Table structure for sys_tenant_package
+-- ----------------------------
+DROP TABLE IF EXISTS `sys_tenant_package`;
+CREATE TABLE `sys_tenant_package`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `tenant_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '所属租户，当前固定为 platform',
+  `package_code` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '套餐编码',
+  `package_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '套餐名称',
+  `user_quota` int NULL DEFAULT NULL COMMENT '用户配额',
+  `storage_quota_gb` int NULL DEFAULT NULL COMMENT '存储配额GB',
+  `package_desc` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '套餐说明',
+  `enabled` tinyint NOT NULL DEFAULT 1 COMMENT '是否启用',
+  `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '创建人',
+  `updated_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '更新人',
+  `deleted` tinyint NOT NULL DEFAULT 0 COMMENT '逻辑删除标记',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_sys_tenant_package_tenant_code`(`tenant_id` ASC, `package_code` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户套餐定义表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of sys_tenant_package
+-- ----------------------------
+INSERT INTO `sys_tenant_package` VALUES (1, 'platform', 'platform-governance', '平台治理版', 9999, 1024, '负责全局治理与租户运维', 1, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_tenant_package` VALUES (2, 'platform', 'business-standard', '标准版', 200, 200, '适用于常规业务租户', 1, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+
+-- ----------------------------
+-- Table structure for sys_tenant_package_capability
+-- ----------------------------
+DROP TABLE IF EXISTS `sys_tenant_package_capability`;
+CREATE TABLE `sys_tenant_package_capability`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `tenant_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '所属租户，当前固定为 platform',
+  `package_code` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '套餐编码',
+  `capability_code` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '能力编码',
+  `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '创建人',
+  `updated_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '更新人',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_sys_tenant_package_capability`(`tenant_id` ASC, `package_code` ASC, `capability_code` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 9 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户套餐能力关联表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of sys_tenant_package_capability
+-- ----------------------------
+INSERT INTO `sys_tenant_package_capability` VALUES (1, 'platform', 'platform-governance', 'oauth', 'system', 'system', '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_tenant_package_capability` VALUES (2, 'platform', 'platform-governance', 'audit', 'system', 'system', '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_tenant_package_capability` VALUES (3, 'platform', 'platform-governance', 'system', 'system', 'system', '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_tenant_package_capability` VALUES (4, 'platform', 'platform-governance', 'tenant', 'system', 'system', '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_tenant_package_capability` VALUES (5, 'platform', 'business-standard', 'user', 'system', 'system', '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_tenant_package_capability` VALUES (6, 'platform', 'business-standard', 'role', 'system', 'system', '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_tenant_package_capability` VALUES (7, 'platform', 'business-standard', 'audit', 'system', 'system', '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_tenant_package_capability` VALUES (8, 'platform', 'business-standard', 'notice', 'system', 'system', '2026-03-20 22:26:06', '2026-03-20 22:26:06');
 
 -- ----------------------------
 -- Table structure for sys_user

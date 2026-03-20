@@ -5,21 +5,28 @@ import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.model.DataScopeType;
 import com.enterprise.auth.platform.common.model.MenuItem;
 import com.enterprise.auth.platform.config.PersistenceProperties;
-import com.enterprise.auth.platform.persistence.entity.SysConfigEntity;
 import com.enterprise.auth.platform.persistence.entity.SysDeptEntity;
 import com.enterprise.auth.platform.persistence.entity.SysPermissionEntity;
+import com.enterprise.auth.platform.persistence.entity.SysRoleDeptScopeEntity;
 import com.enterprise.auth.platform.persistence.entity.SysRoleEntity;
+import com.enterprise.auth.platform.persistence.entity.SysTenantCapabilityEntity;
+import com.enterprise.auth.platform.persistence.entity.SysTenantCapabilityOverrideEntity;
 import com.enterprise.auth.platform.persistence.entity.SysTenantEntity;
-import com.enterprise.auth.platform.persistence.mapper.SysConfigMapper;
+import com.enterprise.auth.platform.persistence.entity.SysTenantPackageCapabilityEntity;
+import com.enterprise.auth.platform.persistence.entity.SysTenantPackageEntity;
 import com.enterprise.auth.platform.persistence.mapper.SysDeptMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysPermissionMapper;
+import com.enterprise.auth.platform.persistence.mapper.SysRoleDeptScopeMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysRoleMapper;
+import com.enterprise.auth.platform.persistence.mapper.SysTenantCapabilityMapper;
+import com.enterprise.auth.platform.persistence.mapper.SysTenantCapabilityOverrideMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysTenantMapper;
+import com.enterprise.auth.platform.persistence.mapper.SysTenantPackageCapabilityMapper;
+import com.enterprise.auth.platform.persistence.mapper.SysTenantPackageMapper;
 import com.enterprise.auth.platform.security.DataScopeService;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,7 +55,11 @@ public class CatalogService {
     private final SysDeptMapper sysDeptMapper;
     private final SysTenantMapper sysTenantMapper;
     private final SysPermissionMapper sysPermissionMapper;
-    private final SysConfigMapper sysConfigMapper;
+    private final SysRoleDeptScopeMapper sysRoleDeptScopeMapper;
+    private final SysTenantPackageMapper sysTenantPackageMapper;
+    private final SysTenantCapabilityMapper sysTenantCapabilityMapper;
+    private final SysTenantPackageCapabilityMapper sysTenantPackageCapabilityMapper;
+    private final SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper;
     private final DataScopeService dataScopeService;
 
     public CatalogService(
@@ -57,7 +68,11 @@ public class CatalogService {
             @Nullable SysDeptMapper sysDeptMapper,
             @Nullable SysTenantMapper sysTenantMapper,
             @Nullable SysPermissionMapper sysPermissionMapper,
-            @Nullable SysConfigMapper sysConfigMapper,
+            @Nullable SysRoleDeptScopeMapper sysRoleDeptScopeMapper,
+            @Nullable SysTenantPackageMapper sysTenantPackageMapper,
+            @Nullable SysTenantCapabilityMapper sysTenantCapabilityMapper,
+            @Nullable SysTenantPackageCapabilityMapper sysTenantPackageCapabilityMapper,
+            @Nullable SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper,
             DataScopeService dataScopeService
     ) {
         this.persistenceProperties = persistenceProperties;
@@ -65,7 +80,11 @@ public class CatalogService {
         this.sysDeptMapper = sysDeptMapper;
         this.sysTenantMapper = sysTenantMapper;
         this.sysPermissionMapper = sysPermissionMapper;
-        this.sysConfigMapper = sysConfigMapper;
+        this.sysRoleDeptScopeMapper = sysRoleDeptScopeMapper;
+        this.sysTenantPackageMapper = sysTenantPackageMapper;
+        this.sysTenantCapabilityMapper = sysTenantCapabilityMapper;
+        this.sysTenantPackageCapabilityMapper = sysTenantPackageCapabilityMapper;
+        this.sysTenantCapabilityOverrideMapper = sysTenantCapabilityOverrideMapper;
         this.dataScopeService = dataScopeService;
     }
 
@@ -136,8 +155,7 @@ public class CatalogService {
             List<SysTenantEntity> tenants = sysTenantMapper.selectList(new LambdaQueryWrapper<SysTenantEntity>()
                     .eq(SysTenantEntity::getDeleted, 0)
                     .orderByAsc(SysTenantEntity::getId));
-            Map<String, TenantProfile> profiles = loadTenantProfiles(tenants.stream().map(SysTenantEntity::getTenantId).toList());
-            Map<String, String> capabilityDocs = loadCapabilityDocs("platform");
+            Map<String, TenantProfile> profiles = loadTenantProfiles(tenants);
             return tenants.stream()
                     .map(tenant -> {
                         TenantProfile profile = profiles.getOrDefault(tenant.getTenantId(), TenantProfile.empty());
@@ -152,7 +170,7 @@ public class CatalogService {
                                 profile.userQuota(),
                                 profile.storageQuotaGb(),
                                 profile.capabilityCodes(),
-                                mapCapabilityDocs(profile.capabilityCodes(), capabilityDocs),
+                                profile.capabilityDescriptions(),
                                 profile.lifecycleNote()
                         );
                     })
@@ -253,74 +271,122 @@ public class CatalogService {
         }
     }
 
-    private Map<String, TenantProfile> loadTenantProfiles(List<String> tenantIds) {
-        if (sysConfigMapper == null || tenantIds.isEmpty()) {
+    private Map<String, TenantProfile> loadTenantProfiles(List<SysTenantEntity> tenants) {
+        if (tenants.isEmpty()
+                || sysTenantPackageMapper == null
+                || sysTenantCapabilityMapper == null
+                || sysTenantPackageCapabilityMapper == null
+                || sysTenantCapabilityOverrideMapper == null) {
             return Map.of();
         }
-        List<SysConfigEntity> configs = sysConfigMapper.selectList(new LambdaQueryWrapper<SysConfigEntity>()
-                .in(SysConfigEntity::getTenantId, tenantIds)
-                .eq(SysConfigEntity::getDeleted, 0)
-                .in(SysConfigEntity::getConfigKey,
-                        "tenant.package.code",
-                        "tenant.package.name",
-                        "tenant.quota.users",
-                        "tenant.quota.storage_gb",
-                        "tenant.capability.codes",
-                        "tenant.lifecycle.note"));
-        Map<String, Map<String, String>> grouped = new LinkedHashMap<>();
-        for (SysConfigEntity config : configs) {
-            grouped.computeIfAbsent(config.getTenantId(), ignored -> new LinkedHashMap<>())
-                    .put(config.getConfigKey(), config.getConfigValue());
-        }
+        List<String> tenantIds = tenants.stream().map(SysTenantEntity::getTenantId).toList();
+        List<String> packageCodes = tenants.stream()
+                .map(SysTenantEntity::getPackageCode)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .toList();
+        Map<String, SysTenantPackageEntity> packages = packageCodes.isEmpty() ? Map.of() : sysTenantPackageMapper.selectList(
+                new LambdaQueryWrapper<SysTenantPackageEntity>()
+                        .eq(SysTenantPackageEntity::getTenantId, "platform")
+                        .eq(SysTenantPackageEntity::getDeleted, 0)
+                        .in(SysTenantPackageEntity::getPackageCode, packageCodes)
+        ).stream().collect(java.util.stream.Collectors.toMap(
+                SysTenantPackageEntity::getPackageCode,
+                java.util.function.Function.identity(),
+                (left, right) -> right,
+                LinkedHashMap::new
+        ));
+        Map<String, SysTenantCapabilityEntity> capabilities = sysTenantCapabilityMapper.selectList(
+                new LambdaQueryWrapper<SysTenantCapabilityEntity>()
+                        .eq(SysTenantCapabilityEntity::getTenantId, "platform")
+                        .eq(SysTenantCapabilityEntity::getDeleted, 0)
+                        .eq(SysTenantCapabilityEntity::getEnabled, 1)
+                        .orderByAsc(SysTenantCapabilityEntity::getSortOrder)
+                        .orderByAsc(SysTenantCapabilityEntity::getId)
+        ).stream().collect(java.util.stream.Collectors.toMap(
+                SysTenantCapabilityEntity::getCapabilityCode,
+                java.util.function.Function.identity(),
+                (left, right) -> right,
+                LinkedHashMap::new
+        ));
+        Map<String, List<String>> packageCapabilities = packageCodes.isEmpty() ? Map.of() : sysTenantPackageCapabilityMapper.selectList(
+                new LambdaQueryWrapper<SysTenantPackageCapabilityEntity>()
+                        .eq(SysTenantPackageCapabilityEntity::getTenantId, "platform")
+                        .in(SysTenantPackageCapabilityEntity::getPackageCode, packageCodes)
+        ).stream().collect(java.util.stream.Collectors.groupingBy(
+                SysTenantPackageCapabilityEntity::getPackageCode,
+                LinkedHashMap::new,
+                java.util.stream.Collectors.mapping(SysTenantPackageCapabilityEntity::getCapabilityCode, java.util.stream.Collectors.toList())
+        ));
+        Map<String, List<SysTenantCapabilityOverrideEntity>> overrides = sysTenantCapabilityOverrideMapper.selectList(
+                new LambdaQueryWrapper<SysTenantCapabilityOverrideEntity>()
+                        .in(SysTenantCapabilityOverrideEntity::getTenantId, tenantIds)
+        ).stream().collect(java.util.stream.Collectors.groupingBy(
+                SysTenantCapabilityOverrideEntity::getTenantId,
+                LinkedHashMap::new,
+                java.util.stream.Collectors.toList()
+        ));
         Map<String, TenantProfile> result = new LinkedHashMap<>();
-        grouped.forEach((tenantId, values) -> result.put(tenantId, TenantProfile.from(values)));
-        return result;
-    }
-
-    private Map<String, String> loadCapabilityDocs(String tenantId) {
-        if (sysConfigMapper == null) {
-            return Map.of();
-        }
-        String prefix = "tenant.capability.doc.";
-        return sysConfigMapper.selectList(new LambdaQueryWrapper<SysConfigEntity>()
-                        .eq(SysConfigEntity::getTenantId, tenantId)
-                        .eq(SysConfigEntity::getDeleted, 0)
-                        .likeRight(SysConfigEntity::getConfigKey, prefix))
-                .stream()
-                .collect(java.util.stream.Collectors.toMap(
-                        item -> item.getConfigKey().substring(prefix.length()),
-                        SysConfigEntity::getConfigValue,
-                        (left, right) -> right,
-                        LinkedHashMap::new
-                ));
-    }
-
-    private Map<String, String> mapCapabilityDocs(List<String> codes, Map<String, String> docs) {
-        if (codes == null || codes.isEmpty()) {
-            return Map.of();
-        }
-        Map<String, String> result = new LinkedHashMap<>();
-        for (String code : codes) {
-            result.put(code, docs.getOrDefault(code, code + " 能力已启用，可在租户侧使用对应模块。"));
+        for (SysTenantEntity tenant : tenants) {
+            SysTenantPackageEntity pkg = packages.get(tenant.getPackageCode());
+            List<String> capabilityCodes = new java.util.ArrayList<>(packageCapabilities.getOrDefault(tenant.getPackageCode(), List.of()));
+            Map<String, String> descriptions = capabilityCodes.stream().collect(java.util.stream.Collectors.toMap(
+                    java.util.function.Function.identity(),
+                    code -> capabilityDescription(capabilities.get(code)),
+                    (left, right) -> right,
+                    LinkedHashMap::new
+            ));
+            for (SysTenantCapabilityOverrideEntity override : overrides.getOrDefault(tenant.getTenantId(), List.of())) {
+                if (override.getEnabled() != null && override.getEnabled() == 1) {
+                    if (!capabilityCodes.contains(override.getCapabilityCode())) {
+                        capabilityCodes.add(override.getCapabilityCode());
+                    }
+                    descriptions.put(override.getCapabilityCode(), StringUtils.hasText(override.getCapabilityDescOverride())
+                            ? override.getCapabilityDescOverride()
+                            : capabilityDescription(capabilities.get(override.getCapabilityCode())));
+                } else {
+                    capabilityCodes.remove(override.getCapabilityCode());
+                    descriptions.remove(override.getCapabilityCode());
+                }
+            }
+            result.put(tenant.getTenantId(), new TenantProfile(
+                    tenant.getPackageCode(),
+                    pkg == null ? null : pkg.getPackageName(),
+                    pkg == null ? null : pkg.getUserQuota(),
+                    pkg == null ? null : pkg.getStorageQuotaGb(),
+                    capabilityCodes,
+                    descriptions,
+                    tenant.getLifecycleNote()
+            ));
         }
         return result;
     }
 
     private Map<String, List<Long>> loadRoleCustomDeptIds(String tenantId) {
-        if (sysConfigMapper == null) {
+        if (sysRoleDeptScopeMapper == null) {
             return Map.of();
         }
-        String prefix = "role.custom_dept_ids.";
-        List<SysConfigEntity> configs = sysConfigMapper.selectList(new LambdaQueryWrapper<SysConfigEntity>()
-                .eq(SysConfigEntity::getTenantId, tenantId)
-                .eq(SysConfigEntity::getDeleted, 0)
-                .likeRight(SysConfigEntity::getConfigKey, prefix));
-        Map<String, List<Long>> result = new LinkedHashMap<>();
-        for (SysConfigEntity config : configs) {
-            String roleCode = config.getConfigKey().substring(prefix.length());
-            result.put(roleCode, parseDeptIds(config.getConfigValue()));
+        Map<Long, String> roleCodeById = sysRoleMapper.selectList(new LambdaQueryWrapper<SysRoleEntity>()
+                        .eq(SysRoleEntity::getTenantId, tenantId)
+                        .eq(SysRoleEntity::getDeleted, 0))
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(SysRoleEntity::getId, SysRoleEntity::getRoleCode));
+        return sysRoleDeptScopeMapper.selectList(new LambdaQueryWrapper<SysRoleDeptScopeEntity>()
+                        .eq(SysRoleDeptScopeEntity::getTenantId, tenantId))
+                .stream()
+                .filter(item -> roleCodeById.containsKey(item.getRoleId()))
+                .collect(java.util.stream.Collectors.groupingBy(
+                        item -> roleCodeById.get(item.getRoleId()),
+                        LinkedHashMap::new,
+                        java.util.stream.Collectors.mapping(SysRoleDeptScopeEntity::getDeptId, java.util.stream.Collectors.toList())
+                ));
+    }
+
+    private String capabilityDescription(SysTenantCapabilityEntity capability) {
+        if (capability == null || !StringUtils.hasText(capability.getCapabilityDesc())) {
+            return "该能力已启用，可在租户侧使用对应模块。";
         }
-        return result;
+        return capability.getCapabilityDesc();
     }
 
     @Schema(description = "角色目录项")
@@ -381,62 +447,11 @@ public class CatalogService {
             Integer userQuota,
             Integer storageQuotaGb,
             List<String> capabilityCodes,
+            Map<String, String> capabilityDescriptions,
             String lifecycleNote
     ) {
         static TenantProfile empty() {
-            return new TenantProfile(null, null, null, null, List.of(), null);
+            return new TenantProfile(null, null, null, null, List.of(), Map.of(), null);
         }
-
-        static TenantProfile from(Map<String, String> values) {
-            return new TenantProfile(
-                    values.get("tenant.package.code"),
-                    values.get("tenant.package.name"),
-                    parseInt(values.get("tenant.quota.users")),
-                    parseInt(values.get("tenant.quota.storage_gb")),
-                    parseCapabilities(values.get("tenant.capability.codes")),
-                    values.get("tenant.lifecycle.note")
-            );
-        }
-
-        private static Integer parseInt(String value) {
-            if (!StringUtils.hasText(value)) {
-                return null;
-            }
-            try {
-                return Integer.parseInt(value);
-            } catch (NumberFormatException ignored) {
-                return null;
-            }
-        }
-
-        private static List<String> parseCapabilities(String value) {
-            if (!StringUtils.hasText(value)) {
-                return List.of();
-            }
-            return Arrays.stream(value.split(","))
-                    .map(String::trim)
-                    .filter(StringUtils::hasText)
-                    .distinct()
-                    .toList();
-        }
-    }
-
-    private static List<Long> parseDeptIds(String value) {
-        if (!StringUtils.hasText(value)) {
-            return List.of();
-        }
-        return Arrays.stream(value.split(","))
-                .map(String::trim)
-                .filter(StringUtils::hasText)
-                .map(item -> {
-                    try {
-                        return Long.parseLong(item);
-                    } catch (NumberFormatException ignored) {
-                        return null;
-                    }
-                })
-                .filter(java.util.Objects::nonNull)
-                .distinct()
-                .toList();
     }
 }

@@ -1,25 +1,21 @@
 package com.enterprise.auth.platform.persistence.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.LocalDateTime;
 
-@TableName("sys_tenant")
-public class SysTenantEntity {
+@TableName("sys_audit_export_policy")
+public class SysAuditExportPolicyEntity {
 
     @TableId(type = IdType.AUTO)
     private Long id;
     private String tenantId;
-    private String tenantName;
-    private Integer platformLevel;
-    private Integer tenantStatus;
-    private LocalDateTime expireAt;
-    private String packageCode;
-    private String lifecycleNote;
+    private Integer retentionDays;
+    private Integer maxTasks;
     @TableField(fill = FieldFill.INSERT)
     private String createdBy;
     @TableField(fill = FieldFill.INSERT_UPDATE)
@@ -35,18 +31,10 @@ public class SysTenantEntity {
     public void setId(Long id) { this.id = id; }
     public String getTenantId() { return tenantId; }
     public void setTenantId(String tenantId) { this.tenantId = tenantId; }
-    public String getTenantName() { return tenantName; }
-    public void setTenantName(String tenantName) { this.tenantName = tenantName; }
-    public Integer getPlatformLevel() { return platformLevel; }
-    public void setPlatformLevel(Integer platformLevel) { this.platformLevel = platformLevel; }
-    public Integer getTenantStatus() { return tenantStatus; }
-    public void setTenantStatus(Integer tenantStatus) { this.tenantStatus = tenantStatus; }
-    public LocalDateTime getExpireAt() { return expireAt; }
-    public void setExpireAt(LocalDateTime expireAt) { this.expireAt = expireAt; }
-    public String getPackageCode() { return packageCode; }
-    public void setPackageCode(String packageCode) { this.packageCode = packageCode; }
-    public String getLifecycleNote() { return lifecycleNote; }
-    public void setLifecycleNote(String lifecycleNote) { this.lifecycleNote = lifecycleNote; }
+    public Integer getRetentionDays() { return retentionDays; }
+    public void setRetentionDays(Integer retentionDays) { this.retentionDays = retentionDays; }
+    public Integer getMaxTasks() { return maxTasks; }
+    public void setMaxTasks(Integer maxTasks) { this.maxTasks = maxTasks; }
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
     public String getUpdatedBy() { return updatedBy; }

@@ -38,6 +38,12 @@ const DYNAMIC_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = {
     component: () => import('@/views/OAuthClientsView.vue'),
     meta: { title: 'OAuth2 客户端' },
   },
+  'oauth-scopes': {
+    path: 'oauth-scopes',
+    name: 'oauth-scopes',
+    component: () => import('@/views/OAuthScopesView.vue'),
+    meta: { title: 'OAuth2 作用域', hidden: true, requiresPermission: 'auth:read' },
+  },
   users: {
     path: 'system/users',
     name: 'users',
@@ -110,16 +116,19 @@ const DYNAMIC_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = {
     component: () => import('@/views/SystemCategoriesView.vue'),
     meta: { title: '分类配置', hidden: true, requiresPermission: 'system:read' },
   },
+  'tenant-catalog': {
+    path: 'system/settings/tenant-catalog',
+    name: 'tenant-catalog',
+    component: () => import('@/views/TenantCatalogView.vue'),
+    meta: { title: '租户套餐与能力', hidden: true, requiresPermission: 'tenant:read' },
+  },
 }
 
 const dynamicRouteNames = new Set<string>()
 
 const router = createRouter({
   history: createWebHistory(),
-  routes: [
-    ...PUBLIC_ROUTES,
-    SHELL_ROUTE,
-  ],
+  routes: [...PUBLIC_ROUTES, SHELL_ROUTE],
 })
 
 function clearDynamicRoutes() {
@@ -177,10 +186,13 @@ function isAllowedRoute(snapshot: PermissionSnapshot | null, path: string) {
   if (allowedPaths.has(path)) {
     return true
   }
-  if (snapshot.permissions.includes('auth:read') && path === '/system/consents') {
+  if (snapshot.permissions.includes('auth:read') && ['/system/consents', '/oauth-scopes'].includes(path)) {
     return true
   }
   if (snapshot.permissions.includes('system:read') && path.startsWith('/system/settings/')) {
+    return true
+  }
+  if (snapshot.permissions.includes('tenant:read') && path === '/system/settings/tenant-catalog') {
     return true
   }
   return false

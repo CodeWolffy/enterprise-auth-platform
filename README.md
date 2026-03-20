@@ -1,201 +1,171 @@
 # 企业级权限管理平台
 
-当前仓库已经进入“数据库真实运行 + 前后端联调 + 认证中心产品化”的阶段。
+当前仓库已经进入“真实数据库运行 + Spring Authorization Server 认证中心 + 前后端联调 + 领域表拆分”的阶段。
 
-后端基于 `Spring Boot 3.2 + Spring Security + Spring Authorization Server + MyBatis-Plus + MySQL 8.0 + Redis/Redisson`，前端基于 `Vue 3 + TypeScript + Vite + Element Plus + Pinia + Vue Router + Axios + Sass + ECharts`。
+后端基于：
+- Spring Boot 3.2
+- Spring Security
+- Spring Authorization Server
+- MyBatis-Plus
+- MySQL 8.0
+- Redis / Redisson
 
-目前系统已经具备认证中心、OAuth2 客户端管理、RBAC、数据权限、多租户、安全审计、系统管理，以及前端管理台基础能力。
+前端位于 [frontend](./frontend)，技术栈为：
+- Vue 3
+- TypeScript
+- Vite
+- Element Plus
+- Pinia
+- Vue Router
+- Axios
+- Sass
+- ECharts
 
-## 当前进度
+## 当前完成范围
 
-### 已完成
-
-- 后端采用模块化单体结构：
-  - `auth`
-  - `user`
-  - `role`
-  - `permission`
-  - `dept`
-  - `tenant`
-  - `audit`
-  - `system`
-- MySQL 已作为当前唯一真实数据源
-- Redis / Redisson 已接入
-- Spring Authorization Server 已接入并可运行
-- 标准 OAuth2 / OIDC 端点可用：
+### 后端
+- 模块化单体结构已落地：`auth / user / role / permission / dept / tenant / audit / system`
+- MySQL 作为真实主数据源，Redis / Redisson 已接入
+- Spring Authorization Server 可运行：
   - `/.well-known/openid-configuration`
   - `/oauth2/authorize`
   - `/oauth2/token`
   - `/oauth2/jwks`
   - `/login`
   - `/oauth2/consent`
-- OAuth2 客户端已改为数据库驱动，数据来源表：
-  - `sys_oauth_client`
-- 已支持中文登录页、中文同意页、多租户登录页
-- 已支持 OAuth2 客户端管理能力：
-  - 客户端列表
-  - 客户端详情
-  - 新增 / 编辑 / 删除
-  - 启用 / 禁用
+- OAuth2 客户端数据库化管理：
+  - 列表、详情、创建、修改、启停、删除
   - 密钥轮换
-  - 接入说明展示
   - 授权记录联动
-- 已支持自定义 JWT 会话、刷新令牌、在线会话、强制下线
-- 已支持 RBAC + 数据权限模型
-- 数据权限已下沉到首期核心链路：
-  - 用户查询与写入
-  - 部门查询与写入
-  - 审计查询
-  - 字典、参数、公告的查询与目标校验
-  - 强制会话下线
-- 已支持多租户上下文透传与 MyBatis-Plus 多租户拦截
-- 已支持审计日志落库、分页、筛选、客户端 IP 过滤、服务端导出
-- 已完成用户、角色、权限、部门、租户、字典、参数、公告基础 CRUD
-- 租户管理已支持服务端分页与服务端筛选：
-  - `keyword`
-  - `platformLevel`
-  - `tenantStatus`
-- 租户管理已支持租户状态历史与套餐变更轨迹查询
-  - 变更类型筛选
-  - 字段筛选
-  - 操作人筛选
-  - 时间范围筛选
+  - 作用域说明、作用域类型统计、接入建议
+  - 客户端状态历史
+- OAuth2 作用域独立管理
+- RBAC + 数据权限已覆盖首期核心链路
+- 多租户上下文透传 + MyBatis-Plus 多租户拦截
+- 审计日志落库、筛选、同步导出、异步导出
+- 审计异步导出任务支持：
+  - 进度展示
+  - 失败重试
+  - 结果归档
+  - 批量归档
+  - 批量清理
+  - 保留策略配置
+- 租户管理支持：
+  - 服务端分页 / 筛选
+  - 变更历史分页
+  - 变更历史摘要
+  - 近期轨迹时间线
   - 套餐变更影响说明
-- 角色权限分配已增强为资源树体验：
-  - 展开 / 收起
-  - 半选统计
-  - 资源级摘要
-  - 自定义数据范围与部门联动
-- 系统管理分类已升级为可配置分类体系：
-  - 字典分类配置
-  - 参数分类配置
-  - 分类接口：`/api/system/categories`
-- 系统管理已提供分类配置管理入口：
-  - 字典分类配置维护
-  - 参数分类配置维护
-  - 分类引用分析
-  - 最近分类变更审计查看
-- 审计导出已支持异步导出任务：
-  - 创建异步导出任务
-  - 导出任务历史
-  - 任务状态 / 发起人筛选
-  - 任务进度阶段展示
-  - 导出文件下载
-  - 单条任务删除
-  - 按完成时间批量清理
-- OAuth2 授权记录已增强审计联动：
-  - 最近授权时间
-  - 最近撤销时间
-  - 关联授权审计事件数
-- `system` 模块已支持服务端分页、服务端筛选、服务端排序：
-  - 字典：`createdAt / dictType / dictCode`
-  - 参数：`createdAt / configKey / configName`
-  - 公告：`publishTime / createdAt / noticeTitle`
-- 前端管理台已创建在 `frontend/`
-- 前端已联调页面：
-  - 登录页
-  - OAuth2 回调页
-  - 控制台总览
-  - OAuth2 客户端管理
-  - 授权记录
-  - 用户管理
-  - 角色管理
-  - 权限管理
-  - 部门管理
-  - 租户管理
-  - 审计管理
-  - 系统管理工作台
+  - 套餐 / 能力展示
+  - 租户能力覆盖管理
+- 用户、角色、权限、部门、租户、字典、参数、公告基础 CRUD
+- 系统分类规则已拆为独立领域模型
+
+### 前端
+- 控制台骨架已落地
+- OAuth2 登录、授权记录、客户端管理已联调
+- 用户、角色、权限、部门、租户、审计页面已联调
+- 系统管理已拆分为独立页面：
   - 字典管理
   - 参数管理
   - 公告管理
+  - 分类规则管理
+- 新增领域页面已联调：
+  - OAuth2 作用域管理
+  - 租户套餐与能力管理
+- 租户页已接入：
+  - 服务端分页
+  - 历史摘要
+  - 轨迹时间线
+  - 能力覆盖
+- 审计页已接入：
+  - 异步导出任务进度
+  - 保留策略
+  - 单条归档
+  - 批量归档
+  - 失败重试
+- 客户端详情页已接入：
+  - 作用域详情
+  - 类型统计
+  - 接入建议
+  - 状态历史
 
-### 当前验证结果
+## 新增领域表
 
-- 后端测试通过：
+以下领域数据已从旧的通用配置 / 字典 / 审计复用方式中拆出，改为独立领域表：
 
-```bash
-mvn "-Dmaven.repo.local=.m2repo" test
-```
+- `sys_oauth_scope`
+- `sys_oauth_client_history`
+- `sys_tenant_package`
+- `sys_tenant_capability`
+- `sys_tenant_package_capability`
+- `sys_tenant_capability_override`
+- `sys_category_rule`
+- `sys_audit_export_policy`
+- `sys_role_dept_scope`
 
-- 当前结果：
-  - `48` 个测试通过
-  - `4` 个测试因无 Docker 自动跳过
+同时 `sys_tenant` 已补充：
+- `package_code`
+- `lifecycle_note`
 
-- 前端构建通过：
+## 主要接口
 
-```bash
-cd frontend
-npm run build
-```
+### OAuth2 作用域管理
+- `GET /api/oauth-scopes`
+- `POST /api/oauth-scopes`
+- `PUT /api/oauth-scopes/{id}`
+- `DELETE /api/oauth-scopes/{id}`
 
-- 前端 lint 通过：
+### OAuth2 客户端管理
+- `GET /api/oauth-clients`
+- `GET /api/oauth-clients/{id}`
+- `POST /api/oauth-clients`
+- `PUT /api/oauth-clients/{id}`
+- `PUT /api/oauth-clients/{id}/status`
+- `POST /api/oauth-clients/{id}/rotate-secret`
+- `DELETE /api/oauth-clients/{id}`
 
-```bash
-cd frontend
-npm run lint
-```
+### 租户套餐与能力管理
+- `GET /api/tenant-catalog/packages`
+- `POST /api/tenant-catalog/packages`
+- `PUT /api/tenant-catalog/packages/{id}`
+- `DELETE /api/tenant-catalog/packages/{id}`
+- `GET /api/tenant-catalog/capabilities`
+- `POST /api/tenant-catalog/capabilities`
+- `PUT /api/tenant-catalog/capabilities/{id}`
+- `DELETE /api/tenant-catalog/capabilities/{id}`
 
-## 技术栈
+### 租户能力覆盖与历史
+- `GET /api/tenants/{tenantId}/history`
+- `GET /api/tenants/{tenantId}/history/summary`
+- `GET /api/tenants/{tenantId}/capability-overrides`
+- `PUT /api/tenants/{tenantId}/capability-overrides`
 
-### 后端
-
-- Java 17
-- Maven 3.9.x
-- Spring Boot 3.2.x
-- Spring Security 6.x
-- Spring Authorization Server 1.2.x
-- MyBatis-Plus 3.5.5
-- MySQL 8.0
-- Redis / Redisson
-- Knife4j OpenAPI 3
-
-### 前端
-
-- Vue 3.4.x
-- TypeScript 5.4.5
-- Element Plus 2.4.x
-- Pinia 2.1.x
-- Vue Router 4.2.x
-- Axios 1.6.x
-- Vite 8.0.x
-- Sass
-- ECharts 5.4.x
-- ESLint + Prettier
-
-说明：
-- 原规划中的 TypeScript 为 `5.3.x`
-- 当前实际采用 `5.4.5`
-- 当前 Vite 已升级到 `8.x`，用于消除 Sass legacy JS API 弃用警告
-
-## 仓库结构
-
-```text
-enterprise-auth-platform/
-├─ src/main/java/com/enterprise/auth/platform
-├─ src/main/resources
-│  ├─ application.yml
-│  ├─ database/enterprise_auth_platform.sql
-│  ├─ database/upgrade_20260320_system_indexes.sql
-│  └─ templates/
-├─ src/test/java/com/enterprise/auth/platform
-└─ frontend/
-```
+### 审计导出
+- `GET /api/audit/events`
+- `GET /api/audit/events/export`
+- `POST /api/audit/exports`
+- `GET /api/audit/exports`
+- `POST /api/audit/exports/{taskId}/retry`
+- `POST /api/audit/exports/{taskId}/archive`
+- `POST /api/audit/exports/archive`
+- `DELETE /api/audit/exports/{taskId}`
+- `DELETE /api/audit/exports`
+- `GET /api/audit/exports/policy`
+- `PUT /api/audit/exports/policy`
 
 ## 启动方式
 
-### 后端启动
+### 后端
+配置文件：
+- [application.yml](./src/main/resources/application.yml)
 
-默认配置文件：
-- [application.yml](/e:/Myproject/enterprise-auth-platform/src/main/resources/application.yml)
-
-直接运行：
-
+启动命令：
 ```bash
 mvn spring-boot:run
 ```
 
-或打包后运行：
-
+或：
 ```bash
 mvn clean package
 java -jar target/enterprise-auth-platform-0.0.1-SNAPSHOT.jar
@@ -204,13 +174,11 @@ java -jar target/enterprise-auth-platform-0.0.1-SNAPSHOT.jar
 默认端口：
 - `8080`
 
-### 前端启动
+### 前端
+目录：
+- [frontend](./frontend)
 
-前端目录：
-- [frontend](/e:/Myproject/enterprise-auth-platform/frontend)
-
-开发启动：
-
+启动命令：
 ```bash
 cd frontend
 npm install
@@ -220,307 +188,92 @@ npm run dev
 默认端口：
 - `5173`
 
-默认联调后端地址：
-- `http://127.0.0.1:8080`
-
 ## 数据库初始化
 
-当前以单一初始化脚本为准：
+主初始化脚本：
+- [enterprise_auth_platform.sql](./src/main/resources/database/enterprise_auth_platform.sql)
 
-- [enterprise_auth_platform.sql](/e:/Myproject/enterprise-auth-platform/src/main/resources/database/enterprise_auth_platform.sql)
+领域表升级脚本：
+- [upgrade_20260320_domain_tables.sql](./src/main/resources/database/upgrade_20260320_domain_tables.sql)
 
-默认数据库连接配置：
+系统索引升级脚本：
+- [upgrade_20260320_system_indexes.sql](./src/main/resources/database/upgrade_20260320_system_indexes.sql)
 
-- 地址：`jdbc:mysql://127.0.0.1:3306/enterprise_auth_platform`
+当前环境说明：
+- 领域表升级脚本已执行
+- 系统索引升级脚本已执行
+
+默认数据库连接：
+- `jdbc:mysql://127.0.0.1:3306/enterprise_auth_platform`
 - 用户名：`root`
 - 密码：`123456`
 
-JDBC 当前已包含：
-
-- `createDatabaseIfNotExist=true`
-
-因此：
-- 如果 MySQL 账号有建库权限，通常不需要手动创建数据库
-- 如果没有建库权限，请先手工创建空库，再执行初始化脚本
-
-初始化示例：
-
-```bash
-mysql -h 127.0.0.1 -P 3306 -u root -p123456 < src/main/resources/database/enterprise_auth_platform.sql
-```
-
-索引升级脚本：
-- [upgrade_20260320_system_indexes.sql](/e:/Myproject/enterprise-auth-platform/src/main/resources/database/upgrade_20260320_system_indexes.sql)
-
-说明：
-- 该脚本用于补充 `sys_dict / sys_config / sys_notice` 的分页筛选与排序索引
-- 当前环境已执行完成
-
-## 认证与授权
-
-### 管理认证接口
-
-- `GET /api/auth/captcha`
-- `POST /api/auth/login`
-- `POST /api/auth/refresh`
-- `POST /api/auth/logout`
-- `GET /api/auth/me`
-- `GET /api/auth/sessions`
-- `POST /api/auth/sessions/{sessionId}/offline`
-
-### 标准 OAuth2 / OIDC
-
-当前系统已提供最小可运行的 Spring Authorization Server：
-- `/.well-known/openid-configuration`
-- `/oauth2/authorize`
-- `/oauth2/token`
-- `/oauth2/jwks`
-- `/login`
-- `/oauth2/consent`
-
-### OAuth2 客户端
-
-客户端统一从数据库表读取：
-
-- `sys_oauth_client`
-
-当前已使用的客户端包括：
-
-- `eap-web`
-  - 用于后端管理端 / 测试链路
-  - 支持 `authorization_code / refresh_token / client_credentials`
-- `eap-frontend-spa`
-  - 用于前端控制台
-  - 公共客户端
-  - 使用 `Authorization Code + PKCE`
-
-## 前端当前联调范围
-
-当前前端已直接联调以下后端接口：
-
-- `/api/auth/me`
-- `/oauth2/authorize`
-- `/oauth2/token`
-- `/api/oauth-clients`
-- `/api/auth/consents`
-- `/api/users`
-- `/api/users/{userId}/roles`
-- `/api/roles`
-- `/api/roles/{roleId}/permissions`
-- `/api/permissions`
-- `/api/depts`
-- `/api/tenants`
-- `/api/tenants/{tenantId}/history`
-- `/api/audit/events`
-- `/api/audit/events/export`
-- `/api/audit/exports`
-- `/api/audit/exports/{taskId}`
-- `/api/audit/exports/{taskId}/download`
-- `/api/system/features`
-- `/api/system/categories`
-- `/api/system/categories/{targetType}`
-- `/api/system/dicts`
-- `/api/system/configs`
-- `/api/system/notices`
-
-## 数据权限当前边界
-
-### 已下沉到组织级数据权限
-
-- 用户列表
-- 用户详情目标校验
-- 用户新增、修改、删除
-- 用户分配角色
-- 部门列表
-- 部门新增、修改、删除
-- 指定部门负责人
-- 审计分页查询
-- 审计导出目标校验
-- 字典列表与目标校验
-- 参数列表与目标校验
-- 公告列表与目标校验
-- 强制会话下线
-
-### 当前保持租户级控制
-
-- 角色管理
-- 权限管理
-- 租户管理
-- OAuth2 客户端管理
-
-### 原因
-
-- 用户、部门、审计、系统管理中的部分对象与组织可见范围直接相关，必须走数据权限
-- 角色、权限、OAuth2 客户端当前仍被视为租户级主数据，不按部门范围切分
-- 租户管理属于平台级能力，不适合再套组织级数据权限
-
-## 预留组件状态
-
-以下组件当前保留 Maven 引入和功能开关，但不进入默认主链路：
-
-- Gateway
-- Nacos Discovery
-- Nacos Config
-- RocketMQ
-- Seata
-- XXL-Job
-- Loki
-
-对应开关位于 [application.yml](/e:/Myproject/enterprise-auth-platform/src/main/resources/application.yml) 的 `app.features.*`。
-
-## 当前仍待完善
-
-### 后端
-
-- Spring Authorization Server 已可用，但仍有产品化空间：
-  - scope 中文描述配置化持久化
-  - 更完整的客户端接入说明与第三方接入指引
-  - 更细的多租户品牌配置能力
-  - 授权记录与审计日志的更深联动
-- OAuth2 客户端管理仍可继续增强：
-  - 客户端使用说明回显优化
-  - 客户端接入示例模板化
-  - 客户端状态历史
-  - 客户端授权记录联动增强
-- 数据权限还未覆盖未来所有模块，后续还要继续下沉到：
-  - 岗位 / 职务 / 组织扩展模块
-  - 报表与统计查询
-  - 导入导出记录
-  - 任务中心与报表任务
-- 系统管理仍缺更完整的产品能力：
-  - 公告状态流转
-  - 更完整的服务监控整合
-- 审计导出当前已增加时间范围上限与导出审计记录，但仍可继续增强：
-  - 大文件导出任务分片与失败重试
-  - 导出结果保留策略
-- MinIO 还未接入真实业务
-- RocketMQ / Seata / XXL-Job / Loki 仍未接入真实业务链路
-- Redis / Redisson 虽已接入，但仍可继续统一成默认会话基础设施
-- 后端目录服务菜单模型当前暂不硬改：
-  - 前端已使用 `menu.code + 本地路由元数据` 兜底标题与路由映射
-  - 后续需要统一收口为稳定菜单模型：`code / path / component / order / hidden / parentCode`
-  - 该改造应与菜单层级、排序、隐藏页、按钮权限模型一起处理
-
-### 前端
-
-- 页面已经具备首版产品形态，但仍不是最终交付版本
-- 用户、角色、权限、部门、租户页面仍可继续增强：
-  - 更完整的详情页或详情抽屉
-  - 更细的筛选条件
-  - 更严格的表单校验
-  - 删除前引用校验提示
-- 部门管理后续建议继续升级为更完整的树形组织视图
-- 租户管理后续建议补：
-  - 操作轨迹详情摘要
-  - 更细的能力配置说明
-- 审计页面仍可继续增强：
-  - 导出结果保留与清理
-  - 更细的时间跨度提示
-- 系统管理三页仍可继续增强：
-  - 更多筛选项
-  - 更强的详情展示
-  - 分类配置影响面趋势图
-- 前端菜单当前虽然已经动态化，但仍是“后端返回 code，前端本地映射页面元数据”的折中方案
-- 前端包体仍有继续优化空间：
-  - `element-plus` 仍是最大包
-  - `charts` chunk 仍较大
-
-### 文档与配置
-
-- README 后续新增模块后仍需同步
-- 数据库初始化脚本中的中文注释仍建议后续统一再清理一轮
-- `application.yml` 后续若继续新增中文配置项，建议始终按 UTF-8 正常文本维护
-
-## 下一步建议
-
-### P1：继续做成可交付管理台
-
-1. 完善前端业务页交互
-- 用户管理增加更多筛选、详情、重置密码、启停操作
-- 部门管理升级树形视图
-- 租户管理增加状态历史筛选、套餐影响说明、能力说明
-- 审计页面增加导出结果保留和清理体验、进度展示
-
-2. 完善前端动态菜单
-- 当前保持 `menu.code + 本地路由元数据` 方案
-- 后续再统一收口到后端稳定菜单模型
-
-3. 完善前端异常体验
-- 表单级校验
-- 更细的错误提示
-- 加载态、空状态、无权限状态
-
-### P2：继续深挖认证中心
-
-1. 完善 OAuth2 客户端能力
-- 客户端使用说明模板化
-- 客户端接入示例模板化
-- 客户端状态历史
-- scope 描述配置化
-
-2. 完善授权记录
-- 记录谁在什么租户下给什么客户端授予了哪些 scope
-- 提供更细的查询接口和审计联动
-- 继续补客户端、授权记录、审计事件的三方联查与趋势视图
-
-3. 完善多租户授权页
-- 租户品牌色配置化
-- 租户 Logo / 文案配置化
-- 客户端说明 / 风险提示配置化
-
-### P3：继续扩大数据权限覆盖
-
-1. 对未来组织类模块继续下沉数据权限
-2. 对报表和统计查询加入数据范围控制
-3. 对导入导出记录加入可见范围控制
-4. 对分类配置管理、导出任务记录等新增管理模块统一接入数据权限边界
-
-### P4：继续启用预留组件
-
-1. Redis / Redisson 进一步统一为默认会话基础设施
-2. MinIO 接入实际文件上传
-3. XXL-Job 接入任务调度
-4. RocketMQ 接入异步审计或事件发布
-5. Gateway / Nacos 做最小启用验证
-
-## 常用命令
+## 测试与构建
 
 后端测试：
-
 ```bash
 mvn "-Dmaven.repo.local=.m2repo" test
 ```
 
-后端启动：
-
-```bash
-mvn spring-boot:run
-```
-
-前端安装依赖：
-
-```bash
-cd frontend
-npm install
-```
-
-前端开发启动：
-
-```bash
-cd frontend
-npm run dev
-```
-
-前端构建：
-
-```bash
-cd frontend
-npm run build
-```
+当前结果：
+- `55` 个测试通过
+- `4` 个测试因无 Docker 自动跳过
 
 前端检查：
-
 ```bash
 cd frontend
 npm run lint
+npm run build
 ```
+
+## 当前数据库设计边界
+
+以下领域数据已经明确不再继续硬塞进旧表：
+- OAuth2 作用域说明
+- OAuth2 客户端状态历史
+- 租户套餐
+- 租户能力
+- 套餐与能力关系
+- 租户能力覆盖
+- 系统分类规则
+- 审计导出保留策略
+- 角色自定义部门范围
+
+以下内容当前仍保留在原表中，且仍然合理：
+- 普通系统参数：`sys_config`
+- 普通字典项：`sys_dict`
+- 通用审计事件：`sys_audit_log`
+- OAuth2 客户端主表：`sys_oauth_client`
+- SAS 标准授权表：
+  - `oauth2_authorization`
+  - `oauth2_authorization_consent`
+
+## 当前仍待完善
+
+### 前端
+- 租户编辑页中“套餐选择 + 能力覆盖”联动还可以继续细化
+- OAuth2 作用域管理、套餐 / 能力管理还可以补更完整的详情抽屉和引用提示
+- 审计导出任务还可以补更细的归档结果说明和到期处理提示
+
+### 后端
+- 租户套餐 / 能力变更还可以补更细的时间线摘要
+- OAuth2 作用域与客户端详情联动还可以继续增强到更细的授权引导
+- 审计异步导出还可以继续补归档后的二次治理策略
+- 系统分类规则还可以继续补引用分析和审计联动深化
+
+### 菜单模型
+
+当前前端仍使用 `menu.code + 本地路由元数据` 兜底动态菜单标题与页面映射。  
+这是当前有意保留的策略，后续需要单独收口：
+
+- 后端菜单模型统一为稳定的 `code / path / component / order / hidden / parentCode`
+- 前端改为完全由后端菜单模型驱动
+- 菜单层级、排序、隐藏页、按钮权限一起整理
+
+## 下一步建议
+
+1. 租户套餐 / 能力变更的历史轨迹继续深化到更完整的时间线视图
+2. OAuth2 作用域说明与客户端详情联动继续增强到更细的授权引导
+3. 审计异步导出任务的归档结果、到期处理和保留策略继续产品化
+4. 系统分类规则的引用分析、趋势视图和审计联动继续增强
+5. 后续再单独收口菜单模型，不在当前阶段硬改目录服务

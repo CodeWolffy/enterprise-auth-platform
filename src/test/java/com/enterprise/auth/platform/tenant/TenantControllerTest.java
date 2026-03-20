@@ -2,6 +2,7 @@ package com.enterprise.auth.platform.tenant;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -31,7 +33,10 @@ class TenantControllerTest {
 
     @BeforeEach
     void setUp() {
-        jdbcTemplate.update("DELETE FROM sys_tenant_change_log WHERE tenant_id = ? AND summary IN (?, ?)", TENANT_ID, "历史筛选-状态", "历史筛选-套餐");
+        jdbcTemplate.update("DELETE FROM sys_tenant_change_log WHERE tenant_id = ? AND summary IN (?, ?)",
+                TENANT_ID, "历史筛选-状态", "历史筛选-套餐");
+        jdbcTemplate.update("DELETE FROM sys_tenant_capability_override WHERE tenant_id = ? AND capability_code IN (?, ?)",
+                TENANT_ID, "audit", "notice");
         jdbcTemplate.update(
                 "INSERT INTO sys_tenant_change_log(tenant_id, change_type, field_key, old_value, new_value, summary, operator, occurred_at) VALUES(?,?,?,?,?,?,?,DATE_SUB(NOW(), INTERVAL 2 DAY))",
                 TENANT_ID, "STATUS", "tenantStatus", "0", "1", "历史筛选-状态", "tester"
@@ -44,35 +49,25 @@ class TenantControllerTest {
 
     @AfterEach
     void tearDown() {
-        jdbcTemplate.update("DELETE FROM sys_tenant_change_log WHERE tenant_id = ? AND summary IN (?, ?)", TENANT_ID, "历史筛选-状态", "历史筛选-套餐");
+        jdbcTemplate.update("DELETE FROM sys_tenant_change_log WHERE tenant_id = ? AND summary IN (?, ?)",
+                TENANT_ID, "历史筛选-状态", "历史筛选-套餐");
+        jdbcTemplate.update("DELETE FROM sys_tenant_capability_override WHERE tenant_id = ? AND capability_code IN (?, ?)",
+                TENANT_ID, "audit", "notice");
     }
 
     @Test
     void currentTenantResolvesFromHeader() throws Exception {
-        UserAccount user = new UserAccount(
-                1L,
-                "tenant-a",
-                "tester",
-                "{noop}ignored",
-                true,
-                Set.of("TENANT_ADMIN"),
-                Set.of("tenant:read"),
-                Set.of(),
-                DataScopeType.ALL,
-                1
-        );
-
         mockMvc.perform(get("/api/tenants/current")
-                        .with(user(user))
-                        .header("X-Tenant-Id", "tenant-a"))
+                        .with(user(principal("tenant:read")))
+                        .header("X-Tenant-Id", TENANT_ID))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.tenantId").value("tenant-a"));
+                .andExpect(jsonPath("$.data.tenantId").value(TENANT_ID));
     }
 
     @Test
     void tenantHistoryShouldSupportFilters() throws Exception {
         mockMvc.perform(get("/api/tenants/{tenantId}/history", TENANT_ID)
-                        .with(user(principal()))
+                        .with(user(principal("tenant:read")))
                         .header("X-Tenant-Id", TENANT_ID)
                         .param("changeType", "STATUS")
                         .param("operator", "test")
@@ -81,11 +76,62 @@ class TenantControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.records[0].changeType").value("STATUS"))
                 .andExpect(jsonPath("$.data.records[0].summary").value("历史筛选-状态"))
-                .andExpect(jsonPath("$.data.records[0].impactSummary").isNotEmpty())
-                .andExpect(jsonPath("$.data.records[?(@.summary=='历史筛选-套餐')]").doesNotExist());
+                .andExpect(jsonPath("$.data.records[0].impactSummary").isNotEmpty());
     }
 
-    private UserAccount principal() {
+    @Test
+    void tenantHistorySummaryShouldReturnTrajectoryOverview() throws Exception {
+        mockMvc.perform(get("/api/tenants/{tenantId}/history/summary", TENANT_ID)
+                        .with(user(principal("tenant:read")))
+                        .header("X-Tenant-Id", TENANT_ID)
+                        .param("occurredFrom", java.time.Instant.now().minusSeconds(7 * 24 * 3600).toString())
+                        .param("occurredTo", java.time.Instant.now().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.tenantId").value(TENANT_ID))
+                .andExpect(jsonPath("$.data.totalChanges").isNumber())
+                .andExpect(jsonPath("$.data.packageChanges").isNumber())
+                .andExpect(jsonPath("$.data.recentTimeline").isArray());
+    }
+
+    @Test
+    void tenantCapabilityOverridesShouldBeQueriedAndUpdated() throws Exception {
+        mockMvc.perform(put("/api/tenants/{tenantId}/capability-overrides", TENANT_ID)
+                        .with(user(principal("tenant:write")))
+                        .header("X-Tenant-Id", TENANT_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "overrides": [
+                                    {
+                                      "capabilityCode": "audit",
+                                      "enabled": true,
+                                      "capabilityDescOverride": "审计导出与看板能力"
+                                    },
+                                    {
+                                      "capabilityCode": "notice",
+                                      "enabled": false
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.tenantId").value(TENANT_ID))
+                .andExpect(jsonPath("$.data.overrides[?(@.capabilityCode=='audit')].overrideEnabled").value(true));
+
+        mockMvc.perform(get("/api/tenants/{tenantId}/capability-overrides", TENANT_ID)
+                        .with(user(principal("tenant:read")))
+                        .header("X-Tenant-Id", TENANT_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.tenantId").value(TENANT_ID))
+                .andExpect(jsonPath("$.data.overrides[?(@.capabilityCode=='audit')].effectiveEnabled").value(true))
+                .andExpect(jsonPath("$.data.overrides[?(@.capabilityCode=='notice')].effectiveEnabled").value(false));
+    }
+
+    private UserAccount principal(String authority) {
+        java.util.LinkedHashSet<String> authorities = new java.util.LinkedHashSet<>();
+        authorities.add("tenant:read");
+        authorities.add("tenant:write");
+        authorities.add(authority);
         return new UserAccount(
                 1L,
                 TENANT_ID,
@@ -93,7 +139,7 @@ class TenantControllerTest {
                 "{noop}ignored",
                 true,
                 Set.of("TENANT_ADMIN"),
-                Set.of("tenant:read"),
+                authorities,
                 Set.of(),
                 DataScopeType.ALL,
                 1

@@ -94,7 +94,7 @@ class SystemControllerTest {
                 "tenant-a",
                 HIDDEN_DICT_CODE
         );
-        jdbcTemplate.update("DELETE FROM sys_config WHERE tenant_id = ? AND config_key = ?", "tenant-a", "system.category.dict." + CATEGORY_CODE);
+        jdbcTemplate.update("DELETE FROM sys_category_rule WHERE tenant_id = ? AND target_type = ? AND category_code = ?", "tenant-a", "dict", CATEGORY_CODE);
     }
 
     @AfterEach
@@ -109,7 +109,7 @@ class SystemControllerTest {
         );
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username IN (?, ?, ?)", "tenant-a", SCOPE_USER, VISIBLE_USER, HIDDEN_USER);
         jdbcTemplate.update("DELETE FROM sys_dept WHERE tenant_id = ? AND dept_code = ?", "tenant-a", CHILD_DEPT_CODE);
-        jdbcTemplate.update("DELETE FROM sys_config WHERE tenant_id = ? AND config_key = ?", "tenant-a", "system.category.dict." + CATEGORY_CODE);
+        jdbcTemplate.update("DELETE FROM sys_category_rule WHERE tenant_id = ? AND target_type = ? AND category_code = ?", "tenant-a", "dict", CATEGORY_CODE);
     }
 
     @Test
@@ -194,7 +194,8 @@ class SystemControllerTest {
                 .andExpect(jsonPath("$.data.code").value(CATEGORY_CODE))
                 .andExpect(jsonPath("$.data.referenceCount").isNumber())
                 .andExpect(jsonPath("$.data.sampleReferences").isArray())
-                .andExpect(jsonPath("$.data.recentAudits").isArray());
+                .andExpect(jsonPath("$.data.recentAudits").isArray())
+                .andExpect(jsonPath("$.data.trend").isArray());
     }
 
     private UserAccount principal(Set<String> permissions) {

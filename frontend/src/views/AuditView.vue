@@ -4,12 +4,12 @@
       <article class="stat-card">
         <span class="eyebrow">Records</span>
         <strong>{{ page.total }}</strong>
-        <span>当前条件下的审计记录总数</span>
+        <span>当前筛选条件下的审计记录总数</span>
       </article>
       <article class="stat-card">
         <span class="eyebrow">Events</span>
         <strong>{{ eventTypeCount }}</strong>
-        <span>当前页覆盖的事件类型数</span>
+        <span>当前页覆盖的事件类型数量</span>
       </article>
       <article class="stat-card">
         <span class="eyebrow">Operators</span>
@@ -19,7 +19,7 @@
       <article class="stat-card">
         <span class="eyebrow">Requests</span>
         <strong>{{ requestCount }}</strong>
-        <span>当前页涉及的请求数</span>
+        <span>当前页涉及的请求数量</span>
       </article>
     </section>
 
@@ -30,7 +30,7 @@
           <h3>安全审计</h3>
         </div>
         <div class="panel-actions">
-          <el-button @click="exportCurrentPage">导出当前页</el-button>
+          <el-button @click="exportCurrentPage">导出当前查询</el-button>
           <el-button type="primary" plain @click="createAsyncExport">异步导出</el-button>
         </div>
       </div>
@@ -69,7 +69,7 @@
       </el-form>
 
       <el-table :data="page.records" stripe>
-        <el-table-column prop="type" label="事件类型" min-width="160" />
+        <el-table-column prop="type" label="事件类型" min-width="180" />
         <el-table-column prop="operator" label="操作人" min-width="120" />
         <el-table-column prop="tenantId" label="租户" min-width="120" />
         <el-table-column prop="requestId" label="请求 ID" min-width="180" />
@@ -103,14 +103,17 @@
     </section>
 
     <section class="dashboard-panel">
-        <div class="panel-head">
-          <div>
-            <span class="eyebrow">Export Tasks</span>
-            <h3>导出任务历史</h3>
-            <p class="muted-line">当前保留策略：完成后保留 {{ exportPolicy.retentionDays }} 天，单租户最多保留 {{ exportPolicy.maxTasks }} 条任务。</p>
-          </div>
-          <div class="panel-actions">
-            <el-button @click="cleanupExportTasks">清理历史</el-button>
+      <div class="panel-head">
+        <div>
+          <span class="eyebrow">Export Tasks</span>
+          <h3>导出任务历史</h3>
+          <p class="muted-line">
+            当前保留策略：完成后保留 {{ exportPolicy.retentionDays }} 天，单租户最多保留 {{ exportPolicy.maxTasks }} 条任务。
+          </p>
+        </div>
+        <div class="panel-actions">
+          <el-button @click="archiveExportTasksByFilter">批量归档</el-button>
+          <el-button @click="cleanupExportTasks">批量清理</el-button>
         </div>
       </div>
 
@@ -125,6 +128,7 @@
             <el-option label="执行中" value="RUNNING" />
             <el-option label="成功" value="SUCCESS" />
             <el-option label="失败" value="FAILED" />
+            <el-option label="已归档" value="ARCHIVED" />
           </el-select>
         </el-form-item>
         <el-form-item label="发起人">
@@ -135,14 +139,14 @@
             v-model="cleanupCompletedBefore"
             type="datetime"
             value-format="YYYY-MM-DDTHH:mm:ss"
-            placeholder="用于批量清理"
+            placeholder="用于归档或清理"
             clearable
           />
         </el-form-item>
         <el-form-item label="保留天数">
           <el-input-number v-model="exportPolicy.retentionDays" :min="1" :max="365" />
         </el-form-item>
-        <el-form-item label="最多保留任务数">
+        <el-form-item label="最大任务数">
           <el-input-number v-model="exportPolicy.maxTasks" :min="1" :max="5000" />
         </el-form-item>
         <el-form-item>
@@ -154,8 +158,8 @@
 
       <el-table :data="exportTasks.records" stripe>
         <el-table-column prop="id" label="任务 ID" width="100" />
-        <el-table-column prop="status" label="状态" width="120" />
-        <el-table-column label="进度" min-width="220">
+        <el-table-column prop="status" label="状态" width="100" />
+        <el-table-column label="进度" min-width="240">
           <template #default="{ row }">
             <div class="progress-cell">
               <el-progress :percentage="row.progressPercent" :status="row.status === 'FAILED' ? 'exception' : undefined" />
@@ -165,17 +169,26 @@
         </el-table-column>
         <el-table-column prop="operator" label="发起人" min-width="120" />
         <el-table-column prop="recordCount" label="记录数" width="100" />
-        <el-table-column label="保留期" min-width="180">
+        <el-table-column label="保留策略" min-width="320">
           <template #default="{ row }">
-            <span>{{ row.expiresAt ? `保留至 ${row.expiresAt.replace('T', ' ')}` : '执行中不计保留期' }}</span>
+            <div class="retention-cell">
+              <span>{{ row.retentionSummary || defaultRetentionSummary(row) }}</span>
+              <div class="retention-tags">
+                <el-tag v-if="row.archived" type="info" effect="plain">已归档</el-tag>
+                <el-tag v-if="row.retentionExpired" type="danger" effect="plain">已过保留期</el-tag>
+                <el-tag v-else-if="row.archivable" type="warning" effect="plain">建议归档</el-tag>
+              </div>
+            </div>
           </template>
         </el-table-column>
         <el-table-column prop="requestedAt" label="发起时间" min-width="180" />
         <el-table-column prop="completedAt" label="完成时间" min-width="180" />
         <el-table-column prop="errorMessage" label="失败原因" min-width="180" />
-        <el-table-column fixed="right" label="操作" width="180">
+        <el-table-column fixed="right" label="操作" width="280">
           <template #default="{ row }">
             <el-button link type="primary" :disabled="row.status !== 'SUCCESS'" @click="downloadTask(row.id)">下载</el-button>
+            <el-button link type="warning" :disabled="!row.archivable" @click="archiveTask(row.id)">归档</el-button>
+            <el-button link type="warning" :disabled="row.status !== 'FAILED'" @click="retryTask(row.id)">重试</el-button>
             <el-button link type="danger" @click="removeTask(row.id)">删除</el-button>
           </template>
         </el-table-column>
@@ -202,6 +215,8 @@
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
+  archiveAuditExportTask,
+  archiveAuditExportTasks,
   cleanupAuditExportTasks,
   createAuditExportTask,
   deleteAuditExportTask,
@@ -210,6 +225,7 @@ import {
   queryAuditEvents,
   queryAuditExportPolicy,
   queryAuditExportTasks,
+  retryAuditExportTask,
   updateAuditExportPolicy,
 } from '@/api/platform'
 import type { AuditExportPolicy, AuditExportTask, AuditPage } from '@/types/auth'
@@ -232,12 +248,14 @@ const page = ref<AuditPage>({
   size: 20,
   records: [],
 })
+
 const exportTasks = ref<{ total: number; page: number; size: number; records: AuditExportTask[] }>({
   total: 0,
   page: 1,
   size: 10,
   records: [],
 })
+
 const exportQuery = reactive({
   tenantId: '',
   status: '',
@@ -245,7 +263,9 @@ const exportQuery = reactive({
   page: 1,
   size: 10,
 })
+
 const cleanupCompletedBefore = ref<string | null>(null)
+
 const exportPolicy = reactive<AuditExportPolicy>({
   retentionDays: 7,
   maxTasks: 100,
@@ -307,7 +327,7 @@ async function handleExportSizeChange(nextSize: number) {
 
 async function exportCurrentPage() {
   if (!dateRange.value?.[0] || !dateRange.value?.[1]) {
-    ElMessage.warning('导出前请先选择开始和结束时间，且时间范围不能超过 31 天')
+    ElMessage.warning('导出前请先选择开始和结束时间，且时间范围不能超过 31 天。')
     return
   }
   const blob = await exportAuditEvents(currentQueryParams())
@@ -322,11 +342,11 @@ async function exportCurrentPage() {
 
 async function createAsyncExport() {
   if (!dateRange.value?.[0] || !dateRange.value?.[1]) {
-    ElMessage.warning('异步导出前请先选择开始和结束时间，且时间范围不能超过 31 天')
+    ElMessage.warning('异步导出前请先选择开始和结束时间，且时间范围不能超过 31 天。')
     return
   }
   await createAuditExportTask(currentQueryParams())
-  ElMessage.success('导出任务已创建，请在下方历史列表查看状态')
+  ElMessage.success('导出任务已创建，请在下方历史列表查看状态。')
   exportQuery.page = 1
   await loadExportTasks()
 }
@@ -372,9 +392,40 @@ async function removeTask(taskId: number) {
   await loadExportTasks()
 }
 
+async function retryTask(taskId: number) {
+  await retryAuditExportTask(taskId)
+  ElMessage.success('已重新创建导出任务')
+  exportQuery.page = 1
+  await loadExportTasks()
+}
+
+async function archiveTask(taskId: number) {
+  await archiveAuditExportTask(taskId)
+  ElMessage.success('导出任务已归档，文件内容已转为仅保留元数据')
+  await loadExportTasks()
+}
+
+async function archiveExportTasksByFilter() {
+  if (!cleanupCompletedBefore.value) {
+    ElMessage.warning('请先选择完成时间上限，再执行批量归档。')
+    return
+  }
+  await ElMessageBox.confirm('批量归档会移除导出文件内容，仅保留任务元数据与审计轨迹，是否继续？', '归档确认', {
+    type: 'warning',
+  })
+  const affected = await archiveAuditExportTasks({
+    tenantId: exportQuery.tenantId || undefined,
+    status: exportQuery.status || undefined,
+    completedBefore: cleanupCompletedBefore.value,
+  })
+  ElMessage.success(`已归档 ${affected} 条导出任务`)
+  exportQuery.page = 1
+  await loadExportTasks()
+}
+
 async function cleanupExportTasks() {
   if (!cleanupCompletedBefore.value) {
-    ElMessage.warning('请先选择完成时间上限，再执行批量清理')
+    ElMessage.warning('请先选择完成时间上限，再执行批量清理。')
     return
   }
   await ElMessageBox.confirm('批量清理会删除满足条件的导出任务历史，是否继续？', '清理确认', { type: 'warning' })
@@ -403,6 +454,19 @@ function currentQueryParams() {
     occurredFrom: dateRange.value?.[0] || undefined,
     occurredTo: dateRange.value?.[1] || undefined,
   }
+}
+
+function defaultRetentionSummary(task: AuditExportTask) {
+  if (task.archived) {
+    return '导出结果已归档，仅保留元数据与审计轨迹。'
+  }
+  if (task.status === 'SUCCESS' && task.expiresAt) {
+    return `导出文件保留至 ${task.expiresAt.replace('T', ' ')}。`
+  }
+  if (task.status === 'FAILED') {
+    return '任务执行失败，可调整筛选条件后重新发起导出。'
+  }
+  return '任务完成后将按当前保留策略保留。'
 }
 </script>
 
@@ -433,6 +497,17 @@ function currentQueryParams() {
 .progress-text {
   font-size: 12px;
   color: #64748b;
+}
+
+.retention-cell {
+  display: grid;
+  gap: 8px;
+}
+
+.retention-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .muted-line {

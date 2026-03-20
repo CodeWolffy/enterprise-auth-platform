@@ -8,23 +8,31 @@ import com.enterprise.auth.platform.common.model.PageResult;
 import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.persistence.entity.SysDeptEntity;
 import com.enterprise.auth.platform.persistence.entity.SysRoleEntity;
+import com.enterprise.auth.platform.persistence.entity.SysTenantCapabilityEntity;
+import com.enterprise.auth.platform.persistence.entity.SysTenantCapabilityOverrideEntity;
 import com.enterprise.auth.platform.persistence.entity.SysTenantEntity;
 import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
-import com.enterprise.auth.platform.persistence.entity.SysConfigEntity;
+import com.enterprise.auth.platform.persistence.entity.SysTenantPackageCapabilityEntity;
+import com.enterprise.auth.platform.persistence.entity.SysTenantPackageEntity;
 import com.enterprise.auth.platform.persistence.entity.SysTenantChangeLogEntity;
-import com.enterprise.auth.platform.persistence.mapper.SysConfigMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysDeptMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysRoleMapper;
+import com.enterprise.auth.platform.persistence.mapper.SysTenantCapabilityMapper;
+import com.enterprise.auth.platform.persistence.mapper.SysTenantCapabilityOverrideMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysTenantMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysTenantChangeLogMapper;
+import com.enterprise.auth.platform.persistence.mapper.SysTenantPackageCapabilityMapper;
+import com.enterprise.auth.platform.persistence.mapper.SysTenantPackageMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
 import com.enterprise.auth.platform.security.SecuritySupport;
 import com.enterprise.auth.platform.tenant.dto.CreateTenantRequest;
+import com.enterprise.auth.platform.tenant.dto.UpdateTenantCapabilityOverridesRequest;
 import com.enterprise.auth.platform.tenant.dto.UpdateTenantRequest;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,7 +46,10 @@ public class TenantManagementService {
     private final SysUserMapper sysUserMapper;
     private final SysRoleMapper sysRoleMapper;
     private final SysDeptMapper sysDeptMapper;
-    private final SysConfigMapper sysConfigMapper;
+    private final SysTenantPackageMapper sysTenantPackageMapper;
+    private final SysTenantCapabilityMapper sysTenantCapabilityMapper;
+    private final SysTenantPackageCapabilityMapper sysTenantPackageCapabilityMapper;
+    private final SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper;
     private final SysTenantChangeLogMapper sysTenantChangeLogMapper;
     private final CatalogService catalogService;
     private final AuditService auditService;
@@ -49,7 +60,10 @@ public class TenantManagementService {
             @Nullable SysUserMapper sysUserMapper,
             @Nullable SysRoleMapper sysRoleMapper,
             @Nullable SysDeptMapper sysDeptMapper,
-            @Nullable SysConfigMapper sysConfigMapper,
+            @Nullable SysTenantPackageMapper sysTenantPackageMapper,
+            @Nullable SysTenantCapabilityMapper sysTenantCapabilityMapper,
+            @Nullable SysTenantPackageCapabilityMapper sysTenantPackageCapabilityMapper,
+            @Nullable SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper,
             @Nullable SysTenantChangeLogMapper sysTenantChangeLogMapper,
             CatalogService catalogService,
             AuditService auditService
@@ -59,7 +73,10 @@ public class TenantManagementService {
         this.sysUserMapper = sysUserMapper;
         this.sysRoleMapper = sysRoleMapper;
         this.sysDeptMapper = sysDeptMapper;
-        this.sysConfigMapper = sysConfigMapper;
+        this.sysTenantPackageMapper = sysTenantPackageMapper;
+        this.sysTenantCapabilityMapper = sysTenantCapabilityMapper;
+        this.sysTenantPackageCapabilityMapper = sysTenantPackageCapabilityMapper;
+        this.sysTenantCapabilityOverrideMapper = sysTenantCapabilityOverrideMapper;
         this.sysTenantChangeLogMapper = sysTenantChangeLogMapper;
         this.catalogService = catalogService;
         this.auditService = auditService;
@@ -79,14 +96,17 @@ public class TenantManagementService {
         entity.setPlatformLevel(request.platformLevel() ? 1 : 0);
         entity.setTenantStatus(request.tenantStatus() == null ? 1 : request.tenantStatus());
         entity.setExpireAt(request.expireAt());
+        entity.setPackageCode(request.packageCode());
+        entity.setLifecycleNote(request.lifecycleNote());
         sysTenantMapper.insert(entity);
         saveTenantProfile(request.tenantId(), request.packageCode(), request.packageName(), request.userQuota(),
-                request.storageQuotaGb(), request.capabilityCodes(), request.lifecycleNote());
+                request.storageQuotaGb(), request.capabilityCodes());
         recordTenantChange(request.tenantId(), "CREATED", "tenant", null, request.tenantName(), "创建租户", operator);
         recordTenantChange(request.tenantId(), "STATUS", "tenantStatus", null,
                 String.valueOf(entity.getTenantStatus()), "初始化租户状态", operator);
         recordTenantChange(request.tenantId(), "PACKAGE", "packageCode", null,
                 request.packageCode(), "初始化租户套餐", operator);
+        recordTenantChange(request.tenantId(), "PROFILE", "lifecycleNote", null, request.lifecycleNote(), "初始化运营备注", operator);
 
         auditService.record("TENANT_CREATED", operator, request.tenantId(), Map.of("tenantId", request.tenantId()));
         return catalogService.tenant(request.tenantId());
@@ -99,28 +119,30 @@ public class TenantManagementService {
         String oldTenantName = entity.getTenantName();
         Integer oldTenantStatus = entity.getTenantStatus();
         java.time.LocalDateTime oldExpireAt = entity.getExpireAt();
-        Map<String, String> oldProfile = loadTenantProfileValues(List.of(tenantId)).getOrDefault(tenantId, Map.of());
+        TenantProfile oldProfile = loadTenantProfiles(List.of(entity)).getOrDefault(tenantId, TenantProfile.empty());
         entity.setTenantName(request.tenantName());
         entity.setPlatformLevel(request.platformLevel() ? 1 : 0);
         if (request.tenantStatus() != null) {
             entity.setTenantStatus(request.tenantStatus());
         }
         entity.setExpireAt(request.expireAt());
+        entity.setPackageCode(request.packageCode());
+        entity.setLifecycleNote(request.lifecycleNote());
         sysTenantMapper.updateById(entity);
         saveTenantProfile(tenantId, request.packageCode(), request.packageName(), request.userQuota(),
-                request.storageQuotaGb(), request.capabilityCodes(), request.lifecycleNote());
+                request.storageQuotaGb(), request.capabilityCodes());
 
         String operator = SecuritySupport.currentOperator();
         recordIfChanged(tenantId, "PROFILE", "tenantName", oldTenantName, request.tenantName(), "更新租户名称", operator);
         recordIfChanged(tenantId, "STATUS", "tenantStatus", toStringValue(oldTenantStatus), toStringValue(entity.getTenantStatus()), "更新租户状态", operator);
         recordIfChanged(tenantId, "PROFILE", "expireAt", toStringValue(oldExpireAt), toStringValue(request.expireAt()), "更新到期时间", operator);
-        recordIfChanged(tenantId, "PACKAGE", "packageCode", oldProfile.get("tenant.package.code"), request.packageCode(), "更新租户套餐编码", operator);
-        recordIfChanged(tenantId, "PACKAGE", "packageName", oldProfile.get("tenant.package.name"), request.packageName(), "更新租户套餐名称", operator);
-        recordIfChanged(tenantId, "PACKAGE", "userQuota", oldProfile.get("tenant.quota.users"), toStringValue(request.userQuota()), "更新用户配额", operator);
-        recordIfChanged(tenantId, "PACKAGE", "storageQuotaGb", oldProfile.get("tenant.quota.storage_gb"), toStringValue(request.storageQuotaGb()), "更新存储配额", operator);
-        recordIfChanged(tenantId, "CAPABILITY", "capabilityCodes", oldProfile.get("tenant.capability.codes"),
+        recordIfChanged(tenantId, "PACKAGE", "packageCode", oldProfile.packageCode(), request.packageCode(), "更新租户套餐编码", operator);
+        recordIfChanged(tenantId, "PACKAGE", "packageName", oldProfile.packageName(), request.packageName(), "更新租户套餐名称", operator);
+        recordIfChanged(tenantId, "PACKAGE", "userQuota", toStringValue(oldProfile.userQuota()), toStringValue(request.userQuota()), "更新用户配额", operator);
+        recordIfChanged(tenantId, "PACKAGE", "storageQuotaGb", toStringValue(oldProfile.storageQuotaGb()), toStringValue(request.storageQuotaGb()), "更新存储配额", operator);
+        recordIfChanged(tenantId, "CAPABILITY", "capabilityCodes", oldProfile.capabilityCodes().isEmpty() ? null : String.join(",", oldProfile.capabilityCodes()),
                 request.capabilityCodes() == null ? null : String.join(",", request.capabilityCodes()), "更新租户能力范围", operator);
-        recordIfChanged(tenantId, "PROFILE", "lifecycleNote", oldProfile.get("tenant.lifecycle.note"), request.lifecycleNote(), "更新运营备注", operator);
+        recordIfChanged(tenantId, "PROFILE", "lifecycleNote", oldProfile.lifecycleNote(), request.lifecycleNote(), "更新运营备注", operator);
 
         auditService.record("TENANT_UPDATED", operator, tenantId, Map.of("tenantId", tenantId));
         return catalogService.tenant(tenantId);
@@ -138,17 +160,8 @@ public class TenantManagementService {
         }
 
         sysTenantMapper.deleteById(entity.getId());
-        if (sysConfigMapper != null) {
-            sysConfigMapper.delete(new LambdaQueryWrapper<SysConfigEntity>()
-                    .eq(SysConfigEntity::getTenantId, tenantId)
-                    .in(SysConfigEntity::getConfigKey,
-                            "tenant.package.code",
-                            "tenant.package.name",
-                            "tenant.quota.users",
-                            "tenant.quota.storage_gb",
-                            "tenant.capability.codes",
-                            "tenant.lifecycle.note"));
-        }
+        sysTenantCapabilityOverrideMapper.delete(new LambdaQueryWrapper<SysTenantCapabilityOverrideEntity>()
+                .eq(SysTenantCapabilityOverrideEntity::getTenantId, tenantId));
         recordTenantChange(tenantId, "DELETED", "tenant", entity.getTenantName(), null, "删除租户", operator);
         auditService.record("TENANT_DELETED", operator, tenantId, Map.of("tenantId", entity.getTenantId()));
     }
@@ -181,10 +194,9 @@ public class TenantManagementService {
                 .orderByDesc(SysTenantEntity::getCreatedAt)
                 .orderByDesc(SysTenantEntity::getId)
                 .last("limit " + offset + "," + safeSize));
-        Map<String, Map<String, String>> profiles = loadTenantProfileValues(entities.stream().map(SysTenantEntity::getTenantId).toList());
-        Map<String, String> capabilityDocs = loadCapabilityDocs();
+        Map<String, TenantProfile> profiles = loadTenantProfiles(entities);
         List<CatalogService.TenantView> records = entities.stream()
-                .map(entity -> toTenantView(entity, profiles.getOrDefault(entity.getTenantId(), Map.of()), capabilityDocs))
+                .map(entity -> toTenantView(entity, profiles.getOrDefault(entity.getTenantId(), TenantProfile.empty())))
                 .toList();
         return PageResult.of(total, safePage, safeSize, records);
     }
@@ -202,14 +214,9 @@ public class TenantManagementService {
         requireDatabaseMode();
         int safePage = Math.max(page, 1);
         int safeSize = Math.max(size, 1);
-        LambdaQueryWrapper<SysTenantChangeLogEntity> query = new LambdaQueryWrapper<SysTenantChangeLogEntity>()
-                .eq(SysTenantChangeLogEntity::getTenantId, tenantId)
-                .eq(StringUtils.hasText(changeType), SysTenantChangeLogEntity::getChangeType, changeType)
-                .eq(StringUtils.hasText(fieldKey), SysTenantChangeLogEntity::getFieldKey, fieldKey)
-                .like(StringUtils.hasText(operator), SysTenantChangeLogEntity::getOperator, operator)
-                .ge(occurredFrom != null, SysTenantChangeLogEntity::getOccurredAt, occurredFrom == null ? null : java.time.LocalDateTime.ofInstant(occurredFrom, ZoneId.systemDefault()))
-                .le(occurredTo != null, SysTenantChangeLogEntity::getOccurredAt, occurredTo == null ? null : java.time.LocalDateTime.ofInstant(occurredTo, ZoneId.systemDefault()))
-                .orderByDesc(SysTenantChangeLogEntity::getOccurredAt)
+        LambdaQueryWrapper<SysTenantChangeLogEntity> query = buildHistoryQuery(
+                tenantId, changeType, fieldKey, operator, occurredFrom, occurredTo
+        ).orderByDesc(SysTenantChangeLogEntity::getOccurredAt)
                 .orderByDesc(SysTenantChangeLogEntity::getId);
         long total = sysTenantChangeLogMapper.selectCount(query);
         if (total == 0) {
@@ -232,6 +239,88 @@ public class TenantManagementService {
                 ))
                 .toList();
         return PageResult.of(total, safePage, safeSize, records);
+    }
+
+    public TenantHistorySummaryView historySummary(
+            String tenantId,
+            String changeType,
+            String fieldKey,
+            String operator,
+            java.time.Instant occurredFrom,
+            java.time.Instant occurredTo
+    ) {
+        requireDatabaseMode();
+        List<SysTenantChangeLogEntity> records = sysTenantChangeLogMapper.selectList(
+                buildHistoryQuery(tenantId, changeType, fieldKey, operator, occurredFrom, occurredTo)
+                        .orderByDesc(SysTenantChangeLogEntity::getOccurredAt)
+                        .orderByDesc(SysTenantChangeLogEntity::getId)
+        );
+        long packageChanges = records.stream().filter(item -> "PACKAGE".equals(item.getChangeType())).count();
+        long capabilityChanges = records.stream().filter(item -> "CAPABILITY".equals(item.getChangeType())).count();
+        long statusChanges = records.stream().filter(item -> "STATUS".equals(item.getChangeType())).count();
+        long profileChanges = records.stream().filter(item -> "PROFILE".equals(item.getChangeType())).count();
+        List<TenantChangeView> recentTimeline = records.stream()
+                .limit(8)
+                .map(item -> new TenantChangeView(
+                        item.getId(),
+                        item.getTenantId(),
+                        item.getChangeType(),
+                        item.getFieldKey(),
+                        item.getOldValue(),
+                        item.getNewValue(),
+                        item.getSummary(),
+                        buildImpactSummary(item),
+                        item.getOperator(),
+                        item.getOccurredAt() == null ? null : item.getOccurredAt().atZone(ZoneId.systemDefault()).toInstant()
+                ))
+                .toList();
+        Map<String, Long> affectedFieldCounts = records.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        item -> item.getFieldKey() == null ? "unknown" : item.getFieldKey(),
+                        java.util.LinkedHashMap::new,
+                        java.util.stream.Collectors.counting()
+                ));
+        return new TenantHistorySummaryView(
+                tenantId,
+                records.size(),
+                packageChanges,
+                capabilityChanges,
+                statusChanges,
+                profileChanges,
+                affectedFieldCounts,
+                recentTimeline
+        );
+    }
+
+    public TenantCapabilityOverrideView capabilityOverrides(String tenantId) {
+        requireDatabaseMode();
+        SysTenantEntity tenant = getTenant(tenantId);
+        Map<String, TenantProfile> profiles = loadTenantProfiles(List.of(tenant));
+        TenantProfile profile = profiles.getOrDefault(tenantId, TenantProfile.empty());
+        return buildCapabilityOverrideView(tenant, profile);
+    }
+
+    @Transactional
+    public TenantCapabilityOverrideView updateCapabilityOverrides(
+            String tenantId,
+            UpdateTenantCapabilityOverridesRequest request
+    ) {
+        requireDatabaseMode();
+        SysTenantEntity tenant = getTenant(tenantId);
+        TenantCapabilityOverrideView before = capabilityOverrides(tenantId);
+        saveTenantCapabilityOverridesFromRequest(tenantId, tenant.getPackageCode(), request == null ? List.of() : request.overrides());
+        String operator = SecuritySupport.currentOperator();
+        recordIfChanged(
+                tenantId,
+                "CAPABILITY",
+                "capabilityOverrides",
+                summarizeOverrides(before.overrides()),
+                summarizeOverrides(capabilityOverrides(tenantId).overrides()),
+                "更新租户能力覆盖",
+                operator
+        );
+        auditService.record("TENANT_CAPABILITY_OVERRIDES_UPDATED", operator, tenantId, Map.of("tenantId", tenantId));
+        return capabilityOverrides(tenantId);
     }
 
     private boolean existsTenant(String tenantId) {
@@ -257,10 +346,32 @@ public class TenantManagementService {
                 || sysUserMapper == null
                 || sysRoleMapper == null
                 || sysDeptMapper == null
-                || sysConfigMapper == null
+                || sysTenantPackageMapper == null
+                || sysTenantCapabilityMapper == null
+                || sysTenantPackageCapabilityMapper == null
+                || sysTenantCapabilityOverrideMapper == null
                 || sysTenantChangeLogMapper == null) {
             throw new BusinessException("当前为默认内存模式，暂未启用数据库写入能力");
         }
+    }
+
+    private LambdaQueryWrapper<SysTenantChangeLogEntity> buildHistoryQuery(
+            String tenantId,
+            String changeType,
+            String fieldKey,
+            String operator,
+            java.time.Instant occurredFrom,
+            java.time.Instant occurredTo
+    ) {
+        return new LambdaQueryWrapper<SysTenantChangeLogEntity>()
+                .eq(SysTenantChangeLogEntity::getTenantId, tenantId)
+                .eq(StringUtils.hasText(changeType), SysTenantChangeLogEntity::getChangeType, changeType)
+                .eq(StringUtils.hasText(fieldKey), SysTenantChangeLogEntity::getFieldKey, fieldKey)
+                .like(StringUtils.hasText(operator), SysTenantChangeLogEntity::getOperator, operator)
+                .ge(occurredFrom != null, SysTenantChangeLogEntity::getOccurredAt,
+                        occurredFrom == null ? null : java.time.LocalDateTime.ofInstant(occurredFrom, ZoneId.systemDefault()))
+                .le(occurredTo != null, SysTenantChangeLogEntity::getOccurredAt,
+                        occurredTo == null ? null : java.time.LocalDateTime.ofInstant(occurredTo, ZoneId.systemDefault()));
     }
 
     private void saveTenantProfile(
@@ -269,108 +380,372 @@ public class TenantManagementService {
             String packageName,
             Integer userQuota,
             Integer storageQuotaGb,
-            java.util.List<String> capabilityCodes,
-            String lifecycleNote
+            java.util.List<String> capabilityCodes
     ) {
-        upsertTenantConfig(tenantId, "tenant.package.code", "租户套餐编码", packageCode);
-        upsertTenantConfig(tenantId, "tenant.package.name", "租户套餐名称", packageName);
-        upsertTenantConfig(tenantId, "tenant.quota.users", "租户用户配额", userQuota == null ? null : String.valueOf(userQuota));
-        upsertTenantConfig(tenantId, "tenant.quota.storage_gb", "租户存储配额(GB)", storageQuotaGb == null ? null : String.valueOf(storageQuotaGb));
-        upsertTenantConfig(tenantId, "tenant.capability.codes", "租户能力编码集合",
-                capabilityCodes == null || capabilityCodes.isEmpty() ? null : String.join(",", capabilityCodes));
-        upsertTenantConfig(tenantId, "tenant.lifecycle.note", "租户运营备注", lifecycleNote);
+        if (StringUtils.hasText(packageCode)) {
+            upsertPackageDefinition(packageCode, packageName, userQuota, storageQuotaGb, capabilityCodes);
+        }
+        saveTenantCapabilityOverrides(tenantId, packageCode, capabilityCodes);
     }
 
-    private void upsertTenantConfig(String tenantId, String key, String name, String value) {
-        if (sysConfigMapper == null) {
-            return;
-        }
-        SysConfigEntity existing = sysConfigMapper.selectOne(new LambdaQueryWrapper<SysConfigEntity>()
-                .eq(SysConfigEntity::getTenantId, tenantId)
-                .eq(SysConfigEntity::getConfigKey, key)
-                .eq(SysConfigEntity::getDeleted, 0)
-                .last("limit 1"));
-        if (!org.springframework.util.StringUtils.hasText(value)) {
-            if (existing != null) {
-                sysConfigMapper.deleteById(existing.getId());
-            }
-            return;
-        }
-        if (existing == null) {
-            existing = new SysConfigEntity();
-            existing.setTenantId(tenantId);
-            existing.setConfigKey(key);
-            existing.setConfigName(name);
-            existing.setConfigValue(value);
-            sysConfigMapper.insert(existing);
-            return;
-        }
-        existing.setConfigName(name);
-        existing.setConfigValue(value);
-        sysConfigMapper.updateById(existing);
-    }
-
-    private Map<String, Map<String, String>> loadTenantProfileValues(List<String> tenantIds) {
-        if (tenantIds.isEmpty()) {
+    private Map<String, TenantProfile> loadTenantProfiles(List<SysTenantEntity> tenants) {
+        if (tenants.isEmpty()) {
             return Map.of();
         }
-        List<SysConfigEntity> configs = sysConfigMapper.selectList(new LambdaQueryWrapper<SysConfigEntity>()
-                .in(SysConfigEntity::getTenantId, tenantIds)
-                .eq(SysConfigEntity::getDeleted, 0)
-                .in(SysConfigEntity::getConfigKey,
-                        "tenant.package.code",
-                        "tenant.package.name",
-                        "tenant.quota.users",
-                        "tenant.quota.storage_gb",
-                        "tenant.capability.codes",
-                        "tenant.lifecycle.note"));
-        Map<String, Map<String, String>> result = new java.util.LinkedHashMap<>();
-        for (SysConfigEntity config : configs) {
-            result.computeIfAbsent(config.getTenantId(), ignored -> new java.util.LinkedHashMap<>())
-                    .put(config.getConfigKey(), config.getConfigValue());
+        List<String> packageCodes = tenants.stream()
+                .map(SysTenantEntity::getPackageCode)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .toList();
+        Map<String, SysTenantPackageEntity> packages = withPlatformTenant(() -> packageCodes.isEmpty() ? Map.<String, SysTenantPackageEntity>of() : sysTenantPackageMapper.selectList(
+                new LambdaQueryWrapper<SysTenantPackageEntity>()
+                        .eq(SysTenantPackageEntity::getTenantId, "platform")
+                        .eq(SysTenantPackageEntity::getDeleted, 0)
+                        .in(SysTenantPackageEntity::getPackageCode, packageCodes)
+        ).stream().collect(java.util.stream.Collectors.toMap(
+                SysTenantPackageEntity::getPackageCode,
+                java.util.function.Function.identity(),
+                (left, right) -> right,
+                java.util.LinkedHashMap::new
+        )));
+        Map<String, SysTenantCapabilityEntity> capabilities = withPlatformTenant(() -> sysTenantCapabilityMapper.selectList(
+                new LambdaQueryWrapper<SysTenantCapabilityEntity>()
+                        .eq(SysTenantCapabilityEntity::getTenantId, "platform")
+                        .eq(SysTenantCapabilityEntity::getDeleted, 0)
+                        .eq(SysTenantCapabilityEntity::getEnabled, 1)
+                        .orderByAsc(SysTenantCapabilityEntity::getSortOrder)
+                        .orderByAsc(SysTenantCapabilityEntity::getId)
+        ).stream().collect(java.util.stream.Collectors.toMap(
+                SysTenantCapabilityEntity::getCapabilityCode,
+                java.util.function.Function.identity(),
+                (left, right) -> right,
+                java.util.LinkedHashMap::new
+        )));
+        Map<String, List<String>> packageCapabilities = withPlatformTenant(() -> packageCodes.isEmpty() ? Map.<String, List<String>>of() : sysTenantPackageCapabilityMapper.selectList(
+                new LambdaQueryWrapper<SysTenantPackageCapabilityEntity>()
+                        .eq(SysTenantPackageCapabilityEntity::getTenantId, "platform")
+                        .in(SysTenantPackageCapabilityEntity::getPackageCode, packageCodes)
+        ).stream().collect(java.util.stream.Collectors.groupingBy(
+                SysTenantPackageCapabilityEntity::getPackageCode,
+                java.util.LinkedHashMap::new,
+                java.util.stream.Collectors.mapping(SysTenantPackageCapabilityEntity::getCapabilityCode, java.util.stream.Collectors.toList())
+        )));
+        Map<String, List<SysTenantCapabilityOverrideEntity>> overrides = sysTenantCapabilityOverrideMapper.selectList(
+                new LambdaQueryWrapper<SysTenantCapabilityOverrideEntity>()
+                        .in(SysTenantCapabilityOverrideEntity::getTenantId, tenants.stream().map(SysTenantEntity::getTenantId).toList())
+        ).stream().collect(java.util.stream.Collectors.groupingBy(
+                SysTenantCapabilityOverrideEntity::getTenantId,
+                java.util.LinkedHashMap::new,
+                java.util.stream.Collectors.toList()
+        ));
+        Map<String, TenantProfile> result = new java.util.LinkedHashMap<>();
+        for (SysTenantEntity tenant : tenants) {
+            SysTenantPackageEntity pkg = packages.get(tenant.getPackageCode());
+            List<String> capabilityCodes = new java.util.ArrayList<>(packageCapabilities.getOrDefault(tenant.getPackageCode(), List.of()));
+            Map<String, String> descriptions = new java.util.LinkedHashMap<>();
+            for (String code : capabilityCodes) {
+                descriptions.put(code, capabilityDescription(capabilities.get(code)));
+            }
+            for (SysTenantCapabilityOverrideEntity override : overrides.getOrDefault(tenant.getTenantId(), List.of())) {
+                if (override.getEnabled() != null && override.getEnabled() == 1) {
+                    if (!capabilityCodes.contains(override.getCapabilityCode())) {
+                        capabilityCodes.add(override.getCapabilityCode());
+                    }
+                    descriptions.put(override.getCapabilityCode(),
+                            StringUtils.hasText(override.getCapabilityDescOverride())
+                                    ? override.getCapabilityDescOverride()
+                                    : capabilityDescription(capabilities.get(override.getCapabilityCode())));
+                } else {
+                    capabilityCodes.remove(override.getCapabilityCode());
+                    descriptions.remove(override.getCapabilityCode());
+                }
+            }
+            result.put(tenant.getTenantId(), new TenantProfile(
+                    tenant.getPackageCode(),
+                    pkg == null ? null : pkg.getPackageName(),
+                    pkg == null ? null : pkg.getUserQuota(),
+                    pkg == null ? null : pkg.getStorageQuotaGb(),
+                    capabilityCodes,
+                    descriptions,
+                    tenant.getLifecycleNote()
+            ));
         }
         return result;
     }
 
-    private CatalogService.TenantView toTenantView(SysTenantEntity tenant, Map<String, String> values, Map<String, String> capabilityDocs) {
-        List<String> capabilityCodes = parseCodes(values.get("tenant.capability.codes"));
+    private CatalogService.TenantView toTenantView(SysTenantEntity tenant, TenantProfile profile) {
         return new CatalogService.TenantView(
                 tenant.getTenantId(),
                 tenant.getTenantName(),
                 tenant.getPlatformLevel() != null && tenant.getPlatformLevel() == 1,
                 tenant.getTenantStatus(),
                 tenant.getExpireAt(),
-                values.get("tenant.package.code"),
-                values.get("tenant.package.name"),
-                parseInteger(values.get("tenant.quota.users")),
-                parseInteger(values.get("tenant.quota.storage_gb")),
-                capabilityCodes,
-                capabilityCodes.stream().collect(java.util.stream.Collectors.toMap(
-                        java.util.function.Function.identity(),
-                        code -> capabilityDocs.getOrDefault(code, defaultCapabilityDescription(code)),
-                        (left, right) -> right,
-                        java.util.LinkedHashMap::new
-                )),
-                values.get("tenant.lifecycle.note")
+                profile.packageCode(),
+                profile.packageName(),
+                profile.userQuota(),
+                profile.storageQuotaGb(),
+                profile.capabilityCodes(),
+                profile.capabilityDescriptions(),
+                profile.lifecycleNote()
         );
     }
 
-    private Map<String, String> loadCapabilityDocs() {
-        if (sysConfigMapper == null) {
-            return Map.of();
-        }
-        String prefix = "tenant.capability.doc.";
-        return sysConfigMapper.selectList(new LambdaQueryWrapper<SysConfigEntity>()
-                        .eq(SysConfigEntity::getTenantId, "platform")
-                        .eq(SysConfigEntity::getDeleted, 0)
-                        .likeRight(SysConfigEntity::getConfigKey, prefix))
+    private TenantCapabilityOverrideView buildCapabilityOverrideView(SysTenantEntity tenant, TenantProfile profile) {
+        Map<String, SysTenantCapabilityEntity> capabilityMap = withPlatformTenant(() -> sysTenantCapabilityMapper.selectList(
+                new LambdaQueryWrapper<SysTenantCapabilityEntity>()
+                        .eq(SysTenantCapabilityEntity::getTenantId, "platform")
+                        .eq(SysTenantCapabilityEntity::getDeleted, 0)
+                        .orderByAsc(SysTenantCapabilityEntity::getSortOrder)
+                        .orderByAsc(SysTenantCapabilityEntity::getId)
+        ).stream().collect(java.util.stream.Collectors.toMap(
+                SysTenantCapabilityEntity::getCapabilityCode,
+                java.util.function.Function.identity(),
+                (left, right) -> right,
+                java.util.LinkedHashMap::new
+        )));
+        List<String> packageCapabilityCodes = withPlatformTenant(() -> StringUtils.hasText(tenant.getPackageCode())
+                ? sysTenantPackageCapabilityMapper.selectList(new LambdaQueryWrapper<SysTenantPackageCapabilityEntity>()
+                        .eq(SysTenantPackageCapabilityEntity::getTenantId, "platform")
+                        .eq(SysTenantPackageCapabilityEntity::getPackageCode, tenant.getPackageCode()))
                 .stream()
-                .collect(java.util.stream.Collectors.toMap(
-                        item -> item.getConfigKey().substring(prefix.length()),
-                        SysConfigEntity::getConfigValue,
-                        (left, right) -> right,
-                        java.util.LinkedHashMap::new
-                ));
+                .map(SysTenantPackageCapabilityEntity::getCapabilityCode)
+                .distinct()
+                .toList()
+                : List.of());
+        Map<String, SysTenantCapabilityOverrideEntity> overrideMap = sysTenantCapabilityOverrideMapper.selectList(
+                new LambdaQueryWrapper<SysTenantCapabilityOverrideEntity>()
+                        .eq(SysTenantCapabilityOverrideEntity::getTenantId, tenant.getTenantId())
+        ).stream().collect(java.util.stream.Collectors.toMap(
+                SysTenantCapabilityOverrideEntity::getCapabilityCode,
+                java.util.function.Function.identity(),
+                (left, right) -> right,
+                java.util.LinkedHashMap::new
+        ));
+
+        java.util.LinkedHashSet<String> allCodes = new java.util.LinkedHashSet<>(capabilityMap.keySet());
+        allCodes.addAll(packageCapabilityCodes);
+        allCodes.addAll(overrideMap.keySet());
+        List<CapabilityOverrideItemView> items = new java.util.ArrayList<>();
+        for (String code : allCodes) {
+            SysTenantCapabilityEntity capability = capabilityMap.get(code);
+            SysTenantCapabilityOverrideEntity override = overrideMap.get(code);
+            boolean packageEnabled = packageCapabilityCodes.contains(code);
+            Boolean overrideEnabled = override == null ? null : override.getEnabled() != null && override.getEnabled() == 1;
+            boolean effectiveEnabled = overrideEnabled == null ? packageEnabled : overrideEnabled;
+            String baseDesc = capabilityDescription(capability);
+            String effectiveDesc = override != null && StringUtils.hasText(override.getCapabilityDescOverride())
+                    ? override.getCapabilityDescOverride()
+                    : baseDesc;
+            items.add(new CapabilityOverrideItemView(
+                    code,
+                    capability == null ? code : capability.getCapabilityName(),
+                    baseDesc,
+                    packageEnabled,
+                    overrideEnabled,
+                    effectiveEnabled,
+                    override == null ? null : override.getCapabilityDescOverride(),
+                    effectiveDesc
+            ));
+        }
+        return new TenantCapabilityOverrideView(
+                tenant.getTenantId(),
+                tenant.getPackageCode(),
+                profile.packageName(),
+                packageCapabilityCodes,
+                profile.capabilityCodes(),
+                items
+        );
+    }
+
+    private void upsertPackageDefinition(
+            String packageCode,
+            String packageName,
+            Integer userQuota,
+            Integer storageQuotaGb,
+            List<String> capabilityCodes
+    ) {
+        SysTenantPackageEntity entity = withPlatformTenant(() -> sysTenantPackageMapper.selectOne(new LambdaQueryWrapper<SysTenantPackageEntity>()
+                .eq(SysTenantPackageEntity::getTenantId, "platform")
+                .eq(SysTenantPackageEntity::getPackageCode, packageCode)
+                .eq(SysTenantPackageEntity::getDeleted, 0)
+                .last("limit 1")));
+        if (entity == null) {
+            entity = new SysTenantPackageEntity();
+            entity.setTenantId("platform");
+            entity.setPackageCode(packageCode);
+            entity.setEnabled(1);
+            entity.setPackageDesc(packageName);
+            entity.setPackageName(StringUtils.hasText(packageName) ? packageName : packageCode);
+            entity.setUserQuota(userQuota);
+            entity.setStorageQuotaGb(storageQuotaGb);
+            SysTenantPackageEntity insertEntity = entity;
+            withPlatformTenant(() -> sysTenantPackageMapper.insert(insertEntity));
+        } else {
+            entity.setPackageName(StringUtils.hasText(packageName) ? packageName : entity.getPackageName());
+            entity.setUserQuota(userQuota);
+            entity.setStorageQuotaGb(storageQuotaGb);
+            SysTenantPackageEntity updateEntity = entity;
+            withPlatformTenant(() -> sysTenantPackageMapper.updateById(updateEntity));
+        }
+        savePackageCapabilities(packageCode, capabilityCodes);
+    }
+
+    private void savePackageCapabilities(String packageCode, List<String> capabilityCodes) {
+        if (!StringUtils.hasText(packageCode)) {
+            return;
+        }
+        List<String> normalizedCodes = capabilityCodes == null ? List.of() : capabilityCodes.stream()
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .distinct()
+                .toList();
+        ensureCapabilitiesExist(normalizedCodes);
+        withPlatformTenant(() -> sysTenantPackageCapabilityMapper.delete(new LambdaQueryWrapper<SysTenantPackageCapabilityEntity>()
+                .eq(SysTenantPackageCapabilityEntity::getTenantId, "platform")
+                .eq(SysTenantPackageCapabilityEntity::getPackageCode, packageCode)));
+        String operator = SecuritySupport.currentOperator();
+        for (String code : normalizedCodes) {
+            SysTenantPackageCapabilityEntity link = new SysTenantPackageCapabilityEntity();
+            link.setTenantId("platform");
+            link.setPackageCode(packageCode);
+            link.setCapabilityCode(code);
+            link.setCreatedBy(operator);
+            link.setUpdatedBy(operator);
+            withPlatformTenant(() -> sysTenantPackageCapabilityMapper.insert(link));
+        }
+    }
+
+    private void saveTenantCapabilityOverrides(String tenantId, String packageCode, List<String> requestedCapabilityCodes) {
+        List<String> requested = requestedCapabilityCodes == null ? List.of() : requestedCapabilityCodes.stream()
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .distinct()
+                .toList();
+        ensureCapabilitiesExist(requested);
+        List<String> packageCapabilities = StringUtils.hasText(packageCode)
+                ? sysTenantPackageCapabilityMapper.selectList(new LambdaQueryWrapper<SysTenantPackageCapabilityEntity>()
+                        .eq(SysTenantPackageCapabilityEntity::getTenantId, "platform")
+                        .eq(SysTenantPackageCapabilityEntity::getPackageCode, packageCode))
+                .stream().map(SysTenantPackageCapabilityEntity::getCapabilityCode).toList()
+                : List.of();
+        java.util.Set<String> packageSet = new java.util.LinkedHashSet<>(packageCapabilities);
+        java.util.Set<String> requestedSet = new java.util.LinkedHashSet<>(requested);
+        sysTenantCapabilityOverrideMapper.delete(new LambdaQueryWrapper<SysTenantCapabilityOverrideEntity>()
+                .eq(SysTenantCapabilityOverrideEntity::getTenantId, tenantId));
+        String operator = SecuritySupport.currentOperator();
+        for (String code : requestedSet) {
+            if (!packageSet.contains(code)) {
+                SysTenantCapabilityOverrideEntity entity = new SysTenantCapabilityOverrideEntity();
+                entity.setTenantId(tenantId);
+                entity.setCapabilityCode(code);
+                entity.setEnabled(1);
+                entity.setCreatedBy(operator);
+                entity.setUpdatedBy(operator);
+                sysTenantCapabilityOverrideMapper.insert(entity);
+            }
+        }
+        for (String code : packageSet) {
+            if (!requestedSet.contains(code)) {
+                SysTenantCapabilityOverrideEntity entity = new SysTenantCapabilityOverrideEntity();
+                entity.setTenantId(tenantId);
+                entity.setCapabilityCode(code);
+                entity.setEnabled(0);
+                entity.setCreatedBy(operator);
+                entity.setUpdatedBy(operator);
+                sysTenantCapabilityOverrideMapper.insert(entity);
+            }
+        }
+    }
+
+    private void saveTenantCapabilityOverridesFromRequest(
+            String tenantId,
+            String packageCode,
+            List<UpdateTenantCapabilityOverridesRequest.CapabilityOverrideItem> requestedOverrides
+    ) {
+        List<UpdateTenantCapabilityOverridesRequest.CapabilityOverrideItem> safeOverrides =
+                requestedOverrides == null ? List.of() : requestedOverrides;
+        List<String> codes = safeOverrides.stream()
+                .map(UpdateTenantCapabilityOverridesRequest.CapabilityOverrideItem::capabilityCode)
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .distinct()
+                .toList();
+        ensureCapabilitiesExist(codes);
+        java.util.Set<String> packageSet = new java.util.LinkedHashSet<>(withPlatformTenant(() -> StringUtils.hasText(packageCode)
+                ? sysTenantPackageCapabilityMapper.selectList(new LambdaQueryWrapper<SysTenantPackageCapabilityEntity>()
+                        .eq(SysTenantPackageCapabilityEntity::getTenantId, "platform")
+                        .eq(SysTenantPackageCapabilityEntity::getPackageCode, packageCode))
+                .stream()
+                .map(SysTenantPackageCapabilityEntity::getCapabilityCode)
+                .toList()
+                : List.of()));
+        sysTenantCapabilityOverrideMapper.delete(new LambdaQueryWrapper<SysTenantCapabilityOverrideEntity>()
+                .eq(SysTenantCapabilityOverrideEntity::getTenantId, tenantId));
+        String operator = SecuritySupport.currentOperator();
+        for (UpdateTenantCapabilityOverridesRequest.CapabilityOverrideItem item : safeOverrides) {
+            if (!StringUtils.hasText(item.capabilityCode())) {
+                continue;
+            }
+            String code = item.capabilityCode().trim();
+            boolean packageEnabled = packageSet.contains(code);
+            Boolean overrideEnabled = item.enabled();
+            String descOverride = StringUtils.hasText(item.capabilityDescOverride()) ? item.capabilityDescOverride().trim() : null;
+            boolean shouldPersist = overrideEnabled != null || StringUtils.hasText(descOverride);
+            if (!shouldPersist) {
+                continue;
+            }
+            SysTenantCapabilityOverrideEntity entity = new SysTenantCapabilityOverrideEntity();
+            entity.setTenantId(tenantId);
+            entity.setCapabilityCode(code);
+            entity.setEnabled(overrideEnabled == null ? (packageEnabled ? 1 : 0) : (overrideEnabled ? 1 : 0));
+            entity.setCapabilityDescOverride(descOverride);
+            entity.setCreatedBy(operator);
+            entity.setUpdatedBy(operator);
+            sysTenantCapabilityOverrideMapper.insert(entity);
+        }
+    }
+
+    private void ensureCapabilitiesExist(List<String> capabilityCodes) {
+        if (capabilityCodes == null || capabilityCodes.isEmpty()) {
+            return;
+        }
+        List<String> existing = withPlatformTenant(() -> sysTenantCapabilityMapper.selectList(new LambdaQueryWrapper<SysTenantCapabilityEntity>()
+                        .eq(SysTenantCapabilityEntity::getTenantId, "platform")
+                        .eq(SysTenantCapabilityEntity::getDeleted, 0)
+                        .in(SysTenantCapabilityEntity::getCapabilityCode, capabilityCodes))
+                .stream()
+                .map(SysTenantCapabilityEntity::getCapabilityCode)
+                .toList());
+        String operator = SecuritySupport.currentOperator();
+        for (String code : capabilityCodes) {
+            if (existing.contains(code)) {
+                continue;
+            }
+            SysTenantCapabilityEntity entity = new SysTenantCapabilityEntity();
+            entity.setTenantId("platform");
+            entity.setCapabilityCode(code);
+            entity.setCapabilityName(code);
+            entity.setCapabilityDesc(defaultCapabilityDescription(code));
+            entity.setSortOrder(999);
+            entity.setEnabled(1);
+            entity.setCreatedBy(operator);
+            entity.setUpdatedBy(operator);
+            withPlatformTenant(() -> sysTenantCapabilityMapper.insert(entity));
+        }
+    }
+
+    private <T> T withPlatformTenant(Supplier<T> supplier) {
+        String currentTenantId = com.enterprise.auth.platform.tenant.TenantContext.getTenantId();
+        com.enterprise.auth.platform.tenant.TenantContext.setTenantId("platform");
+        try {
+            return supplier.get();
+        } finally {
+            if (StringUtils.hasText(currentTenantId)) {
+                com.enterprise.auth.platform.tenant.TenantContext.setTenantId(currentTenantId);
+            } else {
+                com.enterprise.auth.platform.tenant.TenantContext.clear();
+            }
+        }
     }
 
     private String defaultCapabilityDescription(String code) {
@@ -387,26 +762,19 @@ public class TenantManagementService {
         };
     }
 
-    private Integer parseInteger(String value) {
-        if (!StringUtils.hasText(value)) {
-            return null;
+    private String capabilityDescription(SysTenantCapabilityEntity capability) {
+        if (capability == null || !StringUtils.hasText(capability.getCapabilityDesc())) {
+            return "该能力已启用，可在租户侧继续扩展说明。";
         }
-        try {
-            return Integer.parseInt(value);
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
+        return capability.getCapabilityDesc();
     }
 
-    private List<String> parseCodes(String value) {
-        if (!StringUtils.hasText(value)) {
-            return List.of();
-        }
-        return java.util.Arrays.stream(value.split(","))
-                .map(String::trim)
-                .filter(StringUtils::hasText)
-                .distinct()
-                .toList();
+    private String summarizeOverrides(List<CapabilityOverrideItemView> items) {
+        return items.stream()
+                .filter(item -> item.overrideEnabled() != null || StringUtils.hasText(item.capabilityDescOverride()))
+                .map(item -> item.capabilityCode() + ":" + (item.overrideEnabled() == null ? "inherit" : item.overrideEnabled())
+                        + ":" + trimToNull(item.capabilityDescOverride()))
+                .collect(java.util.stream.Collectors.joining("|"));
     }
 
     private void recordIfChanged(String tenantId, String changeType, String fieldKey, String oldValue, String newValue, String summary, String operator) {
@@ -425,6 +793,7 @@ public class TenantManagementService {
         entity.setNewValue(trimToNull(newValue));
         entity.setSummary(summary);
         entity.setOperator(operator);
+        entity.setOccurredAt(java.time.LocalDateTime.now());
         sysTenantChangeLogMapper.insert(entity);
     }
 
@@ -450,11 +819,17 @@ public class TenantManagementService {
         if ("capabilityCodes".equals(fieldKey)) {
             return "能力范围变更会影响当前租户可见模块与功能开关。";
         }
+        if ("capabilityOverrides".equals(fieldKey)) {
+            return "能力覆盖变更会在套餐默认能力之外，单独调整当前租户的生效状态和说明文案。";
+        }
         if ("tenantStatus".equals(fieldKey)) {
             return "租户状态变更会直接影响登录、访问和管理操作可用性。";
         }
         if ("expireAt".equals(fieldKey)) {
             return "到期时间变更会影响续费提醒、停用策略和运营排期。";
+        }
+        if ("lifecycleNote".equals(fieldKey)) {
+            return "运营备注变更会影响租户交付说明、排期提示和内部协作口径。";
         }
         return null;
     }
@@ -472,5 +847,56 @@ public class TenantManagementService {
             @Schema(description = "操作人") String operator,
             @Schema(description = "变更时间") java.time.Instant occurredAt
     ) {
+    }
+
+    @Schema(description = "租户变更历史摘要")
+    public record TenantHistorySummaryView(
+            @Schema(description = "租户编码") String tenantId,
+            @Schema(description = "命中的变更总数") Integer totalChanges,
+            @Schema(description = "套餐变更数") Long packageChanges,
+            @Schema(description = "能力变更数") Long capabilityChanges,
+            @Schema(description = "状态变更数") Long statusChanges,
+            @Schema(description = "资料变更数") Long profileChanges,
+            @Schema(description = "字段影响分布") Map<String, Long> affectedFieldCounts,
+            @Schema(description = "最近轨迹") List<TenantChangeView> recentTimeline
+    ) {
+    }
+
+    @Schema(description = "租户能力覆盖视图")
+    public record TenantCapabilityOverrideView(
+            @Schema(description = "租户编码") String tenantId,
+            @Schema(description = "套餐编码") String packageCode,
+            @Schema(description = "套餐名称") String packageName,
+            @Schema(description = "套餐默认能力编码集合") List<String> packageCapabilityCodes,
+            @Schema(description = "当前生效能力编码集合") List<String> effectiveCapabilityCodes,
+            @Schema(description = "能力覆盖项") List<CapabilityOverrideItemView> overrides
+    ) {
+    }
+
+    @Schema(description = "能力覆盖项视图")
+    public record CapabilityOverrideItemView(
+            @Schema(description = "能力编码") String capabilityCode,
+            @Schema(description = "能力名称") String capabilityName,
+            @Schema(description = "基础说明") String capabilityDesc,
+            @Schema(description = "套餐是否默认启用") boolean packageEnabled,
+            @Schema(description = "覆盖启用状态；为空表示继承套餐默认值") Boolean overrideEnabled,
+            @Schema(description = "当前是否生效") boolean effectiveEnabled,
+            @Schema(description = "说明覆盖") String capabilityDescOverride,
+            @Schema(description = "当前展示说明") String effectiveDesc
+    ) {
+    }
+
+    private record TenantProfile(
+            String packageCode,
+            String packageName,
+            Integer userQuota,
+            Integer storageQuotaGb,
+            List<String> capabilityCodes,
+            Map<String, String> capabilityDescriptions,
+            String lifecycleNote
+    ) {
+        static TenantProfile empty() {
+            return new TenantProfile(null, null, null, null, List.of(), Map.of(), null);
+        }
     }
 }

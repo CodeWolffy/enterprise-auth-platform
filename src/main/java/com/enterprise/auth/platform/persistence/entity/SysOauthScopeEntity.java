@@ -1,25 +1,27 @@
 package com.enterprise.auth.platform.persistence.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.LocalDateTime;
 
-@TableName("sys_tenant")
-public class SysTenantEntity {
+@TableName("sys_oauth_scope")
+public class SysOauthScopeEntity {
 
     @TableId(type = IdType.AUTO)
     private Long id;
     private String tenantId;
-    private String tenantName;
-    private Integer platformLevel;
-    private Integer tenantStatus;
-    private LocalDateTime expireAt;
-    private String packageCode;
-    private String lifecycleNote;
+    private String scopeCode;
+    private String scopeName;
+    private String scopeDesc;
+    private String scopeType;
+    private Integer defaultSelected;
+    private Integer visibleInConsent;
+    private Integer sortOrder;
+    private Integer enabled;
     @TableField(fill = FieldFill.INSERT)
     private String createdBy;
     @TableField(fill = FieldFill.INSERT_UPDATE)
@@ -35,18 +37,22 @@ public class SysTenantEntity {
     public void setId(Long id) { this.id = id; }
     public String getTenantId() { return tenantId; }
     public void setTenantId(String tenantId) { this.tenantId = tenantId; }
-    public String getTenantName() { return tenantName; }
-    public void setTenantName(String tenantName) { this.tenantName = tenantName; }
-    public Integer getPlatformLevel() { return platformLevel; }
-    public void setPlatformLevel(Integer platformLevel) { this.platformLevel = platformLevel; }
-    public Integer getTenantStatus() { return tenantStatus; }
-    public void setTenantStatus(Integer tenantStatus) { this.tenantStatus = tenantStatus; }
-    public LocalDateTime getExpireAt() { return expireAt; }
-    public void setExpireAt(LocalDateTime expireAt) { this.expireAt = expireAt; }
-    public String getPackageCode() { return packageCode; }
-    public void setPackageCode(String packageCode) { this.packageCode = packageCode; }
-    public String getLifecycleNote() { return lifecycleNote; }
-    public void setLifecycleNote(String lifecycleNote) { this.lifecycleNote = lifecycleNote; }
+    public String getScopeCode() { return scopeCode; }
+    public void setScopeCode(String scopeCode) { this.scopeCode = scopeCode; }
+    public String getScopeName() { return scopeName; }
+    public void setScopeName(String scopeName) { this.scopeName = scopeName; }
+    public String getScopeDesc() { return scopeDesc; }
+    public void setScopeDesc(String scopeDesc) { this.scopeDesc = scopeDesc; }
+    public String getScopeType() { return scopeType; }
+    public void setScopeType(String scopeType) { this.scopeType = scopeType; }
+    public Integer getDefaultSelected() { return defaultSelected; }
+    public void setDefaultSelected(Integer defaultSelected) { this.defaultSelected = defaultSelected; }
+    public Integer getVisibleInConsent() { return visibleInConsent; }
+    public void setVisibleInConsent(Integer visibleInConsent) { this.visibleInConsent = visibleInConsent; }
+    public Integer getSortOrder() { return sortOrder; }
+    public void setSortOrder(Integer sortOrder) { this.sortOrder = sortOrder; }
+    public Integer getEnabled() { return enabled; }
+    public void setEnabled(Integer enabled) { this.enabled = enabled; }
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
     public String getUpdatedBy() { return updatedBy; }

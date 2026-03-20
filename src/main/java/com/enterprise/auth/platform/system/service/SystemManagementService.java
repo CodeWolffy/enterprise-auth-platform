@@ -6,11 +6,13 @@ import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.model.PageResult;
 import com.enterprise.auth.platform.config.PersistenceProperties;
+import com.enterprise.auth.platform.persistence.entity.SysCategoryRuleEntity;
 import com.enterprise.auth.platform.persistence.entity.SysConfigEntity;
 import com.enterprise.auth.platform.persistence.entity.SysDictEntity;
 import com.enterprise.auth.platform.persistence.entity.SysNoticeEntity;
 import com.enterprise.auth.platform.persistence.entity.SysAuditLogEntity;
 import com.enterprise.auth.platform.persistence.mapper.SysAuditLogMapper;
+import com.enterprise.auth.platform.persistence.mapper.SysCategoryRuleMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysConfigMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysDictMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysNoticeMapper;
@@ -23,6 +25,7 @@ import com.enterprise.auth.platform.system.dto.NoticeCrudRequest;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -46,6 +49,7 @@ public class SystemManagementService {
     private final SysConfigMapper sysConfigMapper;
     private final SysNoticeMapper sysNoticeMapper;
     private final SysAuditLogMapper sysAuditLogMapper;
+    private final SysCategoryRuleMapper sysCategoryRuleMapper;
     private final AuditService auditService;
     private final DataScopeService dataScopeService;
 
@@ -55,6 +59,7 @@ public class SystemManagementService {
             @Nullable SysConfigMapper sysConfigMapper,
             @Nullable SysNoticeMapper sysNoticeMapper,
             @Nullable SysAuditLogMapper sysAuditLogMapper,
+            @Nullable SysCategoryRuleMapper sysCategoryRuleMapper,
             AuditService auditService,
             DataScopeService dataScopeService
     ) {
@@ -63,6 +68,7 @@ public class SystemManagementService {
         this.sysConfigMapper = sysConfigMapper;
         this.sysNoticeMapper = sysNoticeMapper;
         this.sysAuditLogMapper = sysAuditLogMapper;
+        this.sysCategoryRuleMapper = sysCategoryRuleMapper;
         this.auditService = auditService;
         this.dataScopeService = dataScopeService;
     }
@@ -206,8 +212,8 @@ public class SystemManagementService {
     public CategoryAnalysis analyzeCategoryOption(String targetType, String code) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
-        SysConfigEntity entity = getCategoryConfig(tenantId, targetType, code);
-        List<String> matchers = splitMatchers(entity.getConfigValue());
+        SysCategoryRuleEntity entity = getCategoryConfig(tenantId, targetType, code);
+        List<String> matchers = splitMatchers(entity.getMatchers());
         int referenceCount = "dict".equalsIgnoreCase(targetType)
                 ? countMatchingDicts(tenantId, matchers)
                 : countMatchingConfigs(tenantId, matchers);
@@ -218,7 +224,7 @@ public class SystemManagementService {
         List<CategoryTrendPoint> trend = buildCategoryTrend(recentAudits);
         return new CategoryAnalysis(
                 code,
-                entity.getConfigName(),
+                entity.getCategoryName(),
                 targetType.toLowerCase(),
                 matchers,
                 referenceCount,
@@ -232,48 +238,48 @@ public class SystemManagementService {
     public CategoryOption createCategoryOption(String targetType, CategoryConfigRequest request) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
-        String prefix = prefixForTargetType(targetType);
-        String configKey = prefix + request.code();
-        if (sysConfigMapper.selectCount(new LambdaQueryWrapper<SysConfigEntity>()
-                .eq(SysConfigEntity::getTenantId, tenantId)
-                .eq(SysConfigEntity::getConfigKey, configKey)
-                .eq(SysConfigEntity::getDeleted, 0)) > 0) {
+        if (sysCategoryRuleMapper.selectCount(new LambdaQueryWrapper<SysCategoryRuleEntity>()
+                .eq(SysCategoryRuleEntity::getTenantId, tenantId)
+                .eq(SysCategoryRuleEntity::getTargetType, targetType.toLowerCase())
+                .eq(SysCategoryRuleEntity::getCategoryCode, request.code())
+                .eq(SysCategoryRuleEntity::getDeleted, 0)) > 0) {
             throw new BusinessException("分类编码已存在");
         }
-        SysConfigEntity entity = new SysConfigEntity();
+        SysCategoryRuleEntity entity = new SysCategoryRuleEntity();
         entity.setTenantId(tenantId);
-        entity.setConfigKey(configKey);
-        entity.setConfigName(request.name());
-        entity.setConfigValue(normalizeMatchers(request.matchers()));
-        sysConfigMapper.insert(entity);
+        entity.setTargetType(targetType.toLowerCase());
+        entity.setCategoryCode(request.code());
+        entity.setCategoryName(request.name());
+        entity.setMatchers(normalizeMatchers(request.matchers()));
+        sysCategoryRuleMapper.insert(entity);
         auditService.record("SYSTEM_CATEGORY_CREATED", SecuritySupport.currentOperator(), tenantId, Map.of(
                 "targetType", targetType,
                 "code", request.code()
         ));
-        return new CategoryOption(request.code(), request.name(), splitMatchers(entity.getConfigValue()));
+        return new CategoryOption(request.code(), request.name(), splitMatchers(entity.getMatchers()));
     }
 
     @Transactional
     public CategoryOption updateCategoryOption(String targetType, String code, CategoryConfigRequest request) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
-        SysConfigEntity entity = getCategoryConfig(tenantId, targetType, code);
-        entity.setConfigName(request.name());
-        entity.setConfigValue(normalizeMatchers(request.matchers()));
-        sysConfigMapper.updateById(entity);
+        SysCategoryRuleEntity entity = getCategoryConfig(tenantId, targetType, code);
+        entity.setCategoryName(request.name());
+        entity.setMatchers(normalizeMatchers(request.matchers()));
+        sysCategoryRuleMapper.updateById(entity);
         auditService.record("SYSTEM_CATEGORY_UPDATED", SecuritySupport.currentOperator(), tenantId, Map.of(
                 "targetType", targetType,
                 "code", code
         ));
-        return new CategoryOption(code, request.name(), splitMatchers(entity.getConfigValue()));
+        return new CategoryOption(code, request.name(), splitMatchers(entity.getMatchers()));
     }
 
     @Transactional
     public void deleteCategoryOption(String targetType, String code) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
-        SysConfigEntity entity = getCategoryConfig(tenantId, targetType, code);
-        sysConfigMapper.deleteById(entity.getId());
+        SysCategoryRuleEntity entity = getCategoryConfig(tenantId, targetType, code);
+        sysCategoryRuleMapper.deleteById(entity.getId());
         auditService.record("SYSTEM_CATEGORY_DELETED", SecuritySupport.currentOperator(), tenantId, Map.of(
                 "targetType", targetType,
                 "code", code
@@ -382,8 +388,6 @@ public class SystemManagementService {
         LambdaQueryWrapper<SysConfigEntity> query = new LambdaQueryWrapper<SysConfigEntity>()
                 .eq(SysConfigEntity::getTenantId, tenantId)
                 .eq(SysConfigEntity::getDeleted, 0)
-                .notLikeRight(SysConfigEntity::getConfigKey, DICT_CATEGORY_PREFIX)
-                .notLikeRight(SysConfigEntity::getConfigKey, CONFIG_CATEGORY_PREFIX)
                 .and(StringUtils.hasText(keyword), wrapper -> wrapper
                         .like(SysConfigEntity::getConfigKey, keyword)
                         .or()
@@ -498,7 +502,12 @@ public class SystemManagementService {
     }
 
     private void requireDatabaseMode() {
-        if (!persistenceProperties.databaseEnabled() || sysDictMapper == null || sysConfigMapper == null || sysNoticeMapper == null || sysAuditLogMapper == null) {
+        if (!persistenceProperties.databaseEnabled()
+                || sysDictMapper == null
+                || sysConfigMapper == null
+                || sysNoticeMapper == null
+                || sysAuditLogMapper == null
+                || sysCategoryRuleMapper == null) {
             throw new BusinessException("当前未启用数据库系统管理能力");
         }
     }
@@ -518,8 +527,7 @@ public class SystemManagementService {
         return sysConfigMapper.selectList(new LambdaQueryWrapper<SysConfigEntity>()
                         .eq(SysConfigEntity::getTenantId, tenantId)
                         .eq(SysConfigEntity::getDeleted, 0)
-                        .notLikeRight(SysConfigEntity::getConfigKey, DICT_CATEGORY_PREFIX)
-                        .notLikeRight(SysConfigEntity::getConfigKey, CONFIG_CATEGORY_PREFIX))
+                        )
                 .stream()
                 .map(SysConfigEntity::getConfigKey)
                 .filter(raw -> matchesAny(matchers, raw))
@@ -545,8 +553,6 @@ public class SystemManagementService {
         return sysConfigMapper.selectList(new LambdaQueryWrapper<SysConfigEntity>()
                         .eq(SysConfigEntity::getTenantId, tenantId)
                         .eq(SysConfigEntity::getDeleted, 0)
-                        .notLikeRight(SysConfigEntity::getConfigKey, DICT_CATEGORY_PREFIX)
-                        .notLikeRight(SysConfigEntity::getConfigKey, CONFIG_CATEGORY_PREFIX)
                         .orderByAsc(SysConfigEntity::getConfigKey))
                 .stream()
                 .filter(item -> matchesAny(matchers, item.getConfigKey()))
@@ -721,25 +727,26 @@ public class SystemManagementService {
     }
 
     private List<CategoryOption> loadCategoryOptions(String tenantId, String prefix) {
-        return sysConfigMapper.selectList(new LambdaQueryWrapper<SysConfigEntity>()
-                        .eq(SysConfigEntity::getTenantId, tenantId)
-                        .eq(SysConfigEntity::getDeleted, 0)
-                        .likeRight(SysConfigEntity::getConfigKey, prefix)
-                        .orderByAsc(SysConfigEntity::getConfigKey))
+        return sysCategoryRuleMapper.selectList(new LambdaQueryWrapper<SysCategoryRuleEntity>()
+                        .eq(SysCategoryRuleEntity::getTenantId, tenantId)
+                        .eq(SysCategoryRuleEntity::getTargetType, targetTypeFromPrefix(prefix))
+                        .eq(SysCategoryRuleEntity::getDeleted, 0)
+                        .orderByAsc(SysCategoryRuleEntity::getCategoryCode))
                 .stream()
                 .map(config -> new CategoryOption(
-                        config.getConfigKey().substring(prefix.length()),
-                        StringUtils.hasText(config.getConfigName()) ? config.getConfigName() : config.getConfigKey(),
-                        splitMatchers(config.getConfigValue())
+                        config.getCategoryCode(),
+                        StringUtils.hasText(config.getCategoryName()) ? config.getCategoryName() : config.getCategoryCode(),
+                        splitMatchers(config.getMatchers())
                 ))
                 .toList();
     }
 
-    private SysConfigEntity getCategoryConfig(String tenantId, String targetType, String code) {
-        SysConfigEntity entity = sysConfigMapper.selectOne(new LambdaQueryWrapper<SysConfigEntity>()
-                .eq(SysConfigEntity::getTenantId, tenantId)
-                .eq(SysConfigEntity::getConfigKey, prefixForTargetType(targetType) + code)
-                .eq(SysConfigEntity::getDeleted, 0)
+    private SysCategoryRuleEntity getCategoryConfig(String tenantId, String targetType, String code) {
+        SysCategoryRuleEntity entity = sysCategoryRuleMapper.selectOne(new LambdaQueryWrapper<SysCategoryRuleEntity>()
+                .eq(SysCategoryRuleEntity::getTenantId, tenantId)
+                .eq(SysCategoryRuleEntity::getTargetType, targetType.toLowerCase())
+                .eq(SysCategoryRuleEntity::getCategoryCode, code)
+                .eq(SysCategoryRuleEntity::getDeleted, 0)
                 .last("limit 1"));
         if (entity == null) {
             throw new BusinessException("分类配置不存在");
@@ -758,6 +765,10 @@ public class SystemManagementService {
             return CONFIG_CATEGORY_PREFIX;
         }
         throw new BusinessException("仅支持 dict 或 config 分类配置");
+    }
+
+    private String targetTypeFromPrefix(String prefix) {
+        return DICT_CATEGORY_PREFIX.equals(prefix) ? "dict" : "config";
     }
 
     private String normalizeMatchers(List<String> matchers) {

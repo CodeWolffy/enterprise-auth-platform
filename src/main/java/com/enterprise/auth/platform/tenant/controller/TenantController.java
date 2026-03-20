@@ -5,6 +5,7 @@ import com.enterprise.auth.platform.common.api.ApiResponse;
 import com.enterprise.auth.platform.common.model.PageResult;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import com.enterprise.auth.platform.tenant.dto.CreateTenantRequest;
+import com.enterprise.auth.platform.tenant.dto.UpdateTenantCapabilityOverridesRequest;
 import com.enterprise.auth.platform.tenant.dto.UpdateTenantRequest;
 import com.enterprise.auth.platform.tenant.service.TenantManagementService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -12,7 +13,6 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -81,6 +81,52 @@ public class TenantController {
                 page,
                 size
         ));
+    }
+
+    @Operation(summary = "查询租户变更历史摘要")
+    @GetMapping("/{tenantId}/history/summary")
+    @PreAuthorize("hasAuthority('tenant:read')")
+    public ApiResponse<TenantManagementService.TenantHistorySummaryView> historySummary(
+            @Parameter(description = "租户编码") @PathVariable String tenantId,
+            @Parameter(description = "变更类型") @RequestParam(required = false) String changeType,
+            @Parameter(description = "字段键") @RequestParam(required = false) String fieldKey,
+            @Parameter(description = "操作人") @RequestParam(required = false) String operator,
+            @Parameter(description = "开始时间，ISO-8601 格式")
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            Instant occurredFrom,
+            @Parameter(description = "结束时间，ISO-8601 格式")
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            Instant occurredTo
+    ) {
+        return ApiResponse.ok(tenantManagementService.historySummary(
+                tenantId,
+                changeType,
+                fieldKey,
+                operator,
+                occurredFrom,
+                occurredTo
+        ));
+    }
+
+    @Operation(summary = "查询租户能力覆盖")
+    @GetMapping("/{tenantId}/capability-overrides")
+    @PreAuthorize("hasAuthority('tenant:read')")
+    public ApiResponse<TenantManagementService.TenantCapabilityOverrideView> capabilityOverrides(
+            @Parameter(description = "租户编码") @PathVariable String tenantId
+    ) {
+        return ApiResponse.ok(tenantManagementService.capabilityOverrides(tenantId));
+    }
+
+    @Operation(summary = "更新租户能力覆盖")
+    @PutMapping("/{tenantId}/capability-overrides")
+    @PreAuthorize("hasAuthority('tenant:write')")
+    public ApiResponse<TenantManagementService.TenantCapabilityOverrideView> updateCapabilityOverrides(
+            @Parameter(description = "租户编码") @PathVariable String tenantId,
+            @Valid @RequestBody UpdateTenantCapabilityOverridesRequest request
+    ) {
+        return ApiResponse.ok(tenantManagementService.updateCapabilityOverrides(tenantId, request));
     }
 
     @Operation(summary = "新增租户")

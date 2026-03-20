@@ -119,7 +119,7 @@ class AuthorizationServerEndpointsTest {
                 .andExpect(content().contentTypeCompatibleWith("text/html"))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("授权确认")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("企业权限管理平台管理端")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("接口读取")));
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("允许读取平台接口与管理数据")));
     }
 
     @Test

@@ -78,6 +78,11 @@ const visibleLinks = computed(() => {
       label: '授权记录',
       icon: Key,
     })
+    links.push({
+      to: '/oauth-scopes',
+      label: 'OAuth2 作用域',
+      icon: Lock,
+    })
   }
 
   return links

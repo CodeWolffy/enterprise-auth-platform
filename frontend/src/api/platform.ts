@@ -8,7 +8,9 @@ import type {
   PermissionView,
   RoleView,
   TenantChangeView,
+  TenantCapabilityOverrideView,
   TenantView,
+  TenantHistorySummaryView,
   UserSummary,
 } from '@/types/auth'
 
@@ -182,6 +184,37 @@ export async function queryTenantHistory(tenantId: string, params?: TenantHistor
   return data.data
 }
 
+export async function queryTenantHistorySummary(tenantId: string, params?: Omit<TenantHistoryQueryParams, 'page' | 'size'>) {
+  const { data } = await http.get<ApiResponse<TenantHistorySummaryView>>(`/api/tenants/${tenantId}/history/summary`, {
+    params,
+  })
+  return data.data
+}
+
+export async function queryTenantCapabilityOverrides(tenantId: string) {
+  const { data } = await http.get<ApiResponse<TenantCapabilityOverrideView>>(
+    `/api/tenants/${tenantId}/capability-overrides`,
+  )
+  return data.data
+}
+
+export async function updateTenantCapabilityOverrides(
+  tenantId: string,
+  payload: {
+    overrides: Array<{
+      capabilityCode: string
+      enabled?: boolean | null
+      capabilityDescOverride?: string | null
+    }>
+  },
+) {
+  const { data } = await http.put<ApiResponse<TenantCapabilityOverrideView>>(
+    `/api/tenants/${tenantId}/capability-overrides`,
+    payload,
+  )
+  return data.data
+}
+
 export interface AuditQueryParams {
   tenantId?: string
   eventType?: string
@@ -239,6 +272,21 @@ export async function downloadAuditExportTask(taskId: number) {
 
 export async function deleteAuditExportTask(taskId: number) {
   await http.delete(`/api/audit/exports/${taskId}`)
+}
+
+export async function retryAuditExportTask(taskId: number) {
+  const { data } = await http.post<ApiResponse<AuditExportTask>>(`/api/audit/exports/${taskId}/retry`)
+  return data.data
+}
+
+export async function archiveAuditExportTask(taskId: number) {
+  const { data } = await http.post<ApiResponse<AuditExportTask>>(`/api/audit/exports/${taskId}/archive`)
+  return data.data
+}
+
+export async function archiveAuditExportTasks(params: { tenantId?: string; status?: string; completedBefore: string }) {
+  const { data } = await http.post<ApiResponse<number>>('/api/audit/exports/archive', null, { params })
+  return data.data
 }
 
 export async function cleanupAuditExportTasks(params: { tenantId?: string; status?: string; completedBefore: string }) {

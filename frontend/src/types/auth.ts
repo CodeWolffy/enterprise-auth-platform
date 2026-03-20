@@ -38,14 +38,57 @@ export interface ClientView {
   clientName: string
   redirectUris: string[]
   scopes: string[]
+  scopeDescriptions?: Record<string, string>
+  scopeDetails?: ClientScopeDetailView[]
+  scopeTypeSummary?: Record<string, number>
   grantTypes: string[]
   publicClient: boolean
   requirePkce: boolean
   requireConsent: boolean
   enabled: boolean
+  integrationGuidance?: ClientIntegrationGuidanceView | null
   issuedClientSecret?: string | null
+  statusHistory?: ClientStatusHistoryView[]
   createdAt?: string
   updatedAt?: string
+}
+
+export interface ClientScopeDetailView {
+  scopeCode: string
+  scopeName: string
+  scopeDesc?: string | null
+  scopeType?: string | null
+  visibleInConsent: boolean
+  defaultSelected: boolean
+}
+
+export interface ClientIntegrationGuidanceView {
+  recommendedGrantType: string
+  requirePkce: boolean
+  requireConsent: boolean
+  summary: string
+  scopeTips: string[]
+}
+
+export interface ClientStatusHistoryView {
+  eventType: string
+  summary: string
+  operator?: string | null
+  occurredAt?: string | null
+  payload?: Record<string, unknown>
+}
+
+export interface OAuthScopeView {
+  id: number
+  scopeCode: string
+  scopeName: string
+  scopeDesc?: string | null
+  scopeType?: string | null
+  defaultSelected: boolean
+  visibleInConsent: boolean
+  sortOrder?: number | null
+  enabled: boolean
+  updatedAt?: string | null
 }
 
 export interface ClientStatusPayload {
@@ -111,6 +154,26 @@ export interface TenantView {
   lifecycleNote?: string | null
 }
 
+export interface TenantCapabilityOverrideItemView {
+  capabilityCode: string
+  capabilityName: string
+  capabilityDesc?: string | null
+  packageEnabled: boolean
+  overrideEnabled?: boolean | null
+  effectiveEnabled: boolean
+  capabilityDescOverride?: string | null
+  effectiveDesc?: string | null
+}
+
+export interface TenantCapabilityOverrideView {
+  tenantId: string
+  packageCode?: string | null
+  packageName?: string | null
+  packageCapabilityCodes: string[]
+  effectiveCapabilityCodes: string[]
+  overrides: TenantCapabilityOverrideItemView[]
+}
+
 export interface TenantChangeView {
   id: number
   tenantId: string
@@ -122,6 +185,39 @@ export interface TenantChangeView {
   impactSummary?: string | null
   operator: string
   occurredAt?: string | null
+}
+
+export interface TenantHistorySummaryView {
+  tenantId: string
+  totalChanges: number
+  packageChanges: number
+  capabilityChanges: number
+  statusChanges: number
+  profileChanges: number
+  affectedFieldCounts: Record<string, number>
+  recentTimeline: TenantChangeView[]
+}
+
+export interface TenantPackageView {
+  id: number
+  packageCode: string
+  packageName: string
+  userQuota?: number | null
+  storageQuotaGb?: number | null
+  packageDesc?: string | null
+  enabled: boolean
+  capabilityCodes: string[]
+  updatedAt?: string | null
+}
+
+export interface TenantCapabilityView {
+  id: number
+  capabilityCode: string
+  capabilityName: string
+  capabilityDesc?: string | null
+  sortOrder?: number | null
+  enabled: boolean
+  updatedAt?: string | null
 }
 
 export interface CategoryOption {
@@ -198,11 +294,14 @@ export interface AuditExportTask {
   tenantId: string
   operator: string
   status: string
+  archived: boolean
+  archivable: boolean
   fileName: string
   recordCount: number
   progressPercent: number
   progressStage: string
   retentionExpired: boolean
+  retentionSummary?: string | null
   expiresAt?: string | null
   requestedAt?: string | null
   completedAt?: string | null
