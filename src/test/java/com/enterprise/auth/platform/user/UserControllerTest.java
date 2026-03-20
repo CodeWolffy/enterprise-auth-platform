@@ -90,9 +90,9 @@ class UserControllerTest {
                         .with(user(principal))
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[?(@.username=='" + SCOPE_USER + "')]").exists())
-                .andExpect(jsonPath("$.data[?(@.username=='" + VISIBLE_USER + "')]").exists())
-                .andExpect(jsonPath("$.data[?(@.username=='" + HIDDEN_USER + "')]").doesNotExist());
+                .andExpect(jsonPath("$.data.records[?(@.username=='" + SCOPE_USER + "')]").exists())
+                .andExpect(jsonPath("$.data.records[?(@.username=='" + VISIBLE_USER + "')]").exists())
+                .andExpect(jsonPath("$.data.records[?(@.username=='" + HIDDEN_USER + "')]").doesNotExist());
     }
 
     @Test

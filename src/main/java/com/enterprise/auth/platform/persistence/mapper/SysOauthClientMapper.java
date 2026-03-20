@@ -12,7 +12,7 @@ public interface SysOauthClientMapper extends BaseMapper<SysOauthClientEntity> {
 
     @Select("""
             SELECT id, tenant_id, client_id, client_secret, client_name, redirect_uris, scopes, grant_types,
-                   require_pkce, require_consent, created_by, updated_by, deleted, created_at, updated_at
+                   require_pkce, require_consent, client_status, created_by, updated_by, deleted, created_at, updated_at
             FROM sys_oauth_client
             WHERE tenant_id = #{tenantId}
               AND client_id = #{clientId}

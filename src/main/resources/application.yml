@@ -4,8 +4,6 @@ server:
 spring:
   application:
     name: enterprise-auth-platform
-  main:
-    banner-mode: "off"
   datasource:
     url: jdbc:mysql://127.0.0.1:3306/enterprise_auth_platform?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: root
@@ -20,6 +18,17 @@ spring:
   jackson:
     time-zone: Asia/Shanghai
     default-property-inclusion: non_null
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      database: 0
+      lettuce:
+        pool:
+          max-active: 8
+          max-wait: -1ms
+          max-idle: 8
+          min-idle: 0
 
 management:
   endpoints:
@@ -61,9 +70,9 @@ app:
     captcha-ttl: 5m
     expose-captcha-answer: true
     redis:
-      session-enabled: false
-      captcha-enabled: false
-      redisson-enabled: false
+      session-enabled: true
+      captcha-enabled: true
+      redisson-enabled: true
       key-prefix: "eap:auth:"
   tenant:
     header-name: X-Tenant-Id

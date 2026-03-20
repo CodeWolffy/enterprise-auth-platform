@@ -372,6 +372,7 @@ CREATE TABLE `sys_oauth_client`  (
   `grant_types` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '授权类型列表，逗号分隔',
   `require_pkce` tinyint NOT NULL DEFAULT 0 COMMENT '是否要求 PKCE',
   `require_consent` tinyint NOT NULL DEFAULT 0 COMMENT '是否要求授权确认页',
+  `client_status` tinyint NOT NULL DEFAULT 1 COMMENT '客户端状态：1 启用，0 禁用',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '创建人',
@@ -385,6 +386,6 @@ CREATE TABLE `sys_oauth_client`  (
 -- ----------------------------
 -- Records of sys_oauth_client
 -- ----------------------------
-INSERT INTO `sys_oauth_client` VALUES (1, 'platform', 'eap-web', '$2a$10$babwhNwwnHRe.kleYGFsdeaIE0O544FkZ7VpQAJQIvx1QOBcx3yL.', '企业权限平台管理端', 'http://127.0.0.1:8080/swagger-ui/oauth2-redirect.html', 'openid,profile,api.read,api.write', 'authorization_code,refresh_token,client_credentials', 0, 0, NOW(), NOW(), 'system', 'system', 0);
+INSERT INTO `sys_oauth_client` VALUES (1, 'platform', 'eap-web', '$2a$10$babwhNwwnHRe.kleYGFsdeaIE0O544FkZ7VpQAJQIvx1QOBcx3yL.', '企业权限平台管理端', 'http://127.0.0.1:8080/swagger-ui/oauth2-redirect.html', 'openid,profile,api.read,api.write', 'authorization_code,refresh_token,client_credentials', 0, 0, 1, NOW(), NOW(), 'system', 'system', 0);
 
 SET FOREIGN_KEY_CHECKS = 1;

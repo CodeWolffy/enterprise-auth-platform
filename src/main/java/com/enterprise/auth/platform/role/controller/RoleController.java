@@ -45,7 +45,7 @@ public class RoleController {
     @GetMapping("/{roleId}/permissions")
     @PreAuthorize("hasAuthority('permission:read')")
     public ApiResponse<List<CatalogService.PermissionView>> assignedPermissions(
-            @Parameter(description = "角色ID") @PathVariable Long roleId
+            @Parameter(description = "角色 ID") @PathVariable Long roleId
     ) {
         return ApiResponse.ok(roleManagementService.listAssignedPermissions(roleId));
     }
@@ -61,7 +61,7 @@ public class RoleController {
     @PutMapping("/{roleId}")
     @PreAuthorize("hasAuthority('role:write')")
     public ApiResponse<CatalogService.RoleView> update(
-            @Parameter(description = "角色ID") @PathVariable Long roleId,
+            @Parameter(description = "角色 ID") @PathVariable Long roleId,
             @Valid @RequestBody UpdateRoleRequest request
     ) {
         return ApiResponse.ok(roleManagementService.update(roleId, request));
@@ -71,7 +71,7 @@ public class RoleController {
     @PutMapping("/{roleId}/permissions")
     @PreAuthorize("hasAuthority('role:write')")
     public ApiResponse<List<CatalogService.PermissionView>> assignPermissions(
-            @Parameter(description = "角色ID") @PathVariable Long roleId,
+            @Parameter(description = "角色 ID") @PathVariable Long roleId,
             @Valid @RequestBody AssignPermissionsRequest request
     ) {
         return ApiResponse.ok(roleManagementService.assignPermissions(roleId, request.permissionCodes()));
@@ -80,7 +80,7 @@ public class RoleController {
     @Operation(summary = "删除角色")
     @DeleteMapping("/{roleId}")
     @PreAuthorize("hasAuthority('role:write')")
-    public ApiResponse<Void> delete(@Parameter(description = "角色ID") @PathVariable Long roleId) {
+    public ApiResponse<Void> delete(@Parameter(description = "角色 ID") @PathVariable Long roleId) {
         roleManagementService.delete(roleId);
         return ApiResponse.ok();
     }

@@ -48,7 +48,7 @@ public class DatabaseRegisteredClientRepository implements RegisteredClientRepos
         entity.setScopes(String.join(",", registeredClient.getScopes()));
         entity.setGrantTypes(registeredClient.getAuthorizationGrantTypes().stream()
                 .map(AuthorizationGrantType::getValue)
-                .reduce((a, b) -> a + "," + b)
+                .reduce((left, right) -> left + "," + right)
                 .orElse(""));
         entity.setRequirePkce(registeredClient.getClientSettings().isRequireProofKey() ? 1 : 0);
         entity.setRequireConsent(registeredClient.getClientSettings().isRequireAuthorizationConsent() ? 1 : 0);
@@ -81,6 +81,7 @@ public class DatabaseRegisteredClientRepository implements RegisteredClientRepos
     private List<RegisteredClient> loadClients() {
         return sysOauthClientMapper.selectList(new LambdaQueryWrapper<SysOauthClientEntity>()
                         .eq(SysOauthClientEntity::getDeleted, 0)
+                        .eq(SysOauthClientEntity::getClientStatus, 1)
                         .orderByAsc(SysOauthClientEntity::getId))
                 .stream()
                 .map(this::fromEntity)

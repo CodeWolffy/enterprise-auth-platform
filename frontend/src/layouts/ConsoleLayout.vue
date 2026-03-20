@@ -12,7 +12,7 @@
             <strong>{{ authStore.snapshot?.username }}</strong>
             <span>{{ authStore.snapshot?.roles?.join(' / ') || '未加载角色' }}</span>
           </div>
-          <el-button type="primary" plain @click="authStore.logout()">退出前端会话</el-button>
+          <el-button type="primary" plain @click="authStore.logout()">退出当前会话</el-button>
         </div>
       </header>
 

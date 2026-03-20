@@ -44,7 +44,7 @@ class OAuthClientControllerTest {
     }
 
     @Test
-    void shouldCreateListUpdateAndDeleteClient() throws Exception {
+    void shouldCreateQueryUpdateRotateToggleAndDeleteClient() throws Exception {
         UserAccount principal = principal(Set.of("auth:read", "auth:write"));
 
         mockMvc.perform(post("/api/oauth-clients")
@@ -67,17 +67,23 @@ class OAuthClientControllerTest {
                 .andExpect(jsonPath("$.data.clientId").value(CLIENT_ID))
                 .andExpect(jsonPath("$.data.issuedClientSecret").value("ClientSecret@123"));
 
+        Long clientRowId = sysOauthClientMapper.selectOne(new LambdaQueryWrapper<SysOauthClientEntity>()
+                        .eq(SysOauthClientEntity::getTenantId, "platform")
+                        .eq(SysOauthClientEntity::getClientId, CLIENT_ID)
+                        .last("limit 1"))
+                .getId();
+
         mockMvc.perform(get("/api/oauth-clients")
                         .with(user(principal))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[?(@.clientId=='" + CLIENT_ID + "')]").exists());
 
-        Long clientRowId = sysOauthClientMapper.selectOne(new LambdaQueryWrapper<SysOauthClientEntity>()
-                        .eq(SysOauthClientEntity::getTenantId, "platform")
-                        .eq(SysOauthClientEntity::getClientId, CLIENT_ID)
-                        .last("limit 1"))
-                .getId();
+        mockMvc.perform(get("/api/oauth-clients/{id}", clientRowId)
+                        .with(user(principal))
+                        .header("X-Tenant-Id", "platform"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.clientName").value("接口联调客户端"));
 
         mockMvc.perform(put("/api/oauth-clients/{id}", clientRowId)
                         .with(user(principal))
@@ -85,7 +91,7 @@ class OAuthClientControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "clientName": "接口联调客户端-更新",
+                                  "clientName": "接口联调客户端更新",
                                   "clientSecret": "ClientSecret@456",
                                   "redirectUris": ["http://127.0.0.1:8081/callback", "http://127.0.0.1:8081/silent"],
                                   "scopes": ["openid", "api.read", "api.write"],
@@ -95,8 +101,32 @@ class OAuthClientControllerTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.clientName").value("接口联调客户端-更新"))
+                .andExpect(jsonPath("$.data.clientName").value("接口联调客户端更新"))
                 .andExpect(jsonPath("$.data.issuedClientSecret").value("ClientSecret@456"));
+
+        mockMvc.perform(post("/api/oauth-clients/{id}/rotate-secret", clientRowId)
+                        .with(user(principal))
+                        .header("X-Tenant-Id", "platform")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "clientSecret": "ClientSecret@789"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.issuedClientSecret").value("ClientSecret@789"));
+
+        mockMvc.perform(put("/api/oauth-clients/{id}/status", clientRowId)
+                        .with(user(principal))
+                        .header("X-Tenant-Id", "platform")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "enabled": false
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.enabled").value(false));
 
         mockMvc.perform(delete("/api/oauth-clients/{id}", clientRowId)
                         .with(user(principal))

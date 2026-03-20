@@ -2,7 +2,8 @@
 
 当前仓库已经进入“数据库为主、前后端联调中”的阶段。
 
-后端采用 `Spring Boot 3.2 + Spring Security + Spring Authorization Server + MyBatis-Plus + MySQL 8.0`，前端采用 `Vue 3 + TypeScript + Vite + Element Plus + Pinia + Vue Router + Axios + Sass + ECharts`。  
+后端采用 `Spring Boot 3.2 + Spring Security + Spring Authorization Server + MyBatis-Plus + MySQL 8.0`，前端采用 `Vue 3 + TypeScript + Vite + Element Plus + Pinia + Vue Router + Axios + Sass + ECharts`。
+
 系统当前已具备统一认证、OAuth2 客户端管理、RBAC、数据权限、多租户、审计、系统管理，以及前端控制台基础骨架。
 
 ## 当前状态
@@ -21,7 +22,12 @@
   - `/oauth2/consent`
 - OAuth2 客户端已改为数据库驱动，来源表：`sys_oauth_client`
 - 已支持中文登录页、中文同意页、多租户登录页
-- 已支持 OAuth2 客户端管理接口
+- 已支持 OAuth2 客户端管理接口：
+  - 客户端列表
+  - 客户端详情
+  - 新增/编辑/删除
+  - 启用/禁用
+  - 密钥轮换
 - 已支持 JWT 会话、刷新令牌、在线会话、强制下线
 - 已支持 RBAC 与数据权限模型
 - 数据权限已下沉到首期核心链路：
@@ -45,6 +51,7 @@
   - 租户管理
   - 安全审计
   - 系统管理
+  - 授权记录
 
 ### 当前验证结果
 
@@ -94,15 +101,16 @@ npm run lint
 - Pinia 2.1.x
 - Vue Router 4.2.x
 - Axios 1.6.x
-- Vite 5.0.x
-- Sass 1.69.x
+- Vite 8.0.x
+- Sass
 - ECharts 5.4.x
 - ESLint + Prettier
 
 说明：
-- 原计划中的 TypeScript 为 `5.3.x`
+
+- 初始规划中的 TypeScript 为 `5.3.x`
 - 当前实际采用 `5.4.5`
-- 这是为了和 `Vue 3.4` 的类型检查兼容更稳
+- 当前 Vite 已升级到 `8.x`，用于解决 Sass legacy JS API 弃用警告
 
 ## 仓库结构
 
@@ -111,7 +119,8 @@ enterprise-auth-platform/
 ├─ src/main/java/com/enterprise/auth/platform
 ├─ src/main/resources
 │  ├─ application.yml
-│  └─ database/enterprise_auth_platform.sql
+│  ├─ database/enterprise_auth_platform.sql
+│  └─ templates/
 ├─ src/test/java/com/enterprise/auth/platform
 └─ frontend/
 ```
@@ -121,6 +130,7 @@ enterprise-auth-platform/
 ### 后端启动
 
 默认配置文件：
+
 - [application.yml](/e:/Myproject/enterprise-auth-platform/src/main/resources/application.yml)
 
 直接运行：
@@ -137,11 +147,13 @@ java -jar target/enterprise-auth-platform-0.0.1-SNAPSHOT.jar
 ```
 
 默认端口：
+
 - `8080`
 
 ### 前端启动
 
 前端目录：
+
 - [frontend](/e:/Myproject/enterprise-auth-platform/frontend)
 
 开发启动：
@@ -153,25 +165,31 @@ npm run dev
 ```
 
 默认端口：
+
 - `5173`
 
 前端默认联调后端地址：
+
 - `http://127.0.0.1:8080`
 
 ## 数据库初始化
 
 当前以单一初始化脚本为准：
+
 - [enterprise_auth_platform.sql](/e:/Myproject/enterprise-auth-platform/src/main/resources/database/enterprise_auth_platform.sql)
 
 默认数据库连接配置：
+
 - 地址：`jdbc:mysql://127.0.0.1:3306/enterprise_auth_platform`
 - 用户名：`root`
 - 密码：`123456`
 
 当前 JDBC 已包含：
+
 - `createDatabaseIfNotExist=true`
 
 因此：
+
 - 如果 MySQL 账号有建库权限，通常不需要手动创建数据库
 - 如果没有建库权限，请先手工创建空库，再执行初始化脚本
 
@@ -195,7 +213,7 @@ SELECT COUNT(*) AS oauth_client_cnt FROM sys_oauth_client;
 
 ## 认证与授权
 
-### 1. 现有管理接口
+### 管理认证接口
 
 - `GET /api/auth/captcha`
 - `POST /api/auth/login`
@@ -205,9 +223,9 @@ SELECT COUNT(*) AS oauth_client_cnt FROM sys_oauth_client;
 - `GET /api/auth/sessions`
 - `POST /api/auth/sessions/{sessionId}/offline`
 
-### 2. 标准 OAuth2 / OIDC
+### 标准 OAuth2 / OIDC
 
-当前系统已经提供最小可运行的 Spring Authorization Server：
+当前系统已提供最小可运行的 Spring Authorization Server：
 
 - `/.well-known/openid-configuration`
 - `/oauth2/authorize`
@@ -216,12 +234,13 @@ SELECT COUNT(*) AS oauth_client_cnt FROM sys_oauth_client;
 - `/login`
 - `/oauth2/consent`
 
-### 3. OAuth2 客户端
+### OAuth2 客户端
 
 客户端统一从数据库表读取：
+
 - `sys_oauth_client`
 
-当前默认已存在两类客户端：
+当前默认存在两类客户端：
 
 - `eap-web`
   - 用于后端管理端 / 测试链路
@@ -297,78 +316,66 @@ SELECT COUNT(*) AS oauth_client_cnt FROM sys_oauth_client;
 
 对应开关在 [application.yml](/e:/Myproject/enterprise-auth-platform/src/main/resources/application.yml) 的 `app.features.*` 下。
 
-## 当前未完善项
+## 当前仍待完善
 
-以下内容已经明确还没做完，后续需要继续推进。
+### 后端
 
-### 后端未完善
-
-- Spring Authorization Server 仍是“首个可用版本”，还缺：
-  - 客户端密钥重置能力
-  - scope 中文配置持久化
-  - 授权记录 / 授权历史
-  - 租户 branding 配置化，而不是当前在登录页内硬编码样式策略
-  - 更完整的第三方接入场景
-
-- OAuth2 客户端管理仍缺：
-  - 客户端详情页
-  - 客户端使用说明返回
-  - 客户端密钥轮换
-  - 客户端状态启停
-
+- Spring Authorization Server 仍是首个可用版本，还缺：
+  - scope 中文说明配置化持久化的完整管理界面
+  - 更完整的客户端接入指引与第三方接入说明
+  - 更细的租户品牌配置化能力
+- OAuth2 客户端管理仍可继续增强：
+  - 客户端使用说明回显
+  - 客户端接入示例
+  - 客户端状态历史
+  - 客户端授权记录联动
 - 数据权限仍未覆盖未来所有模块，后续还要继续下沉到：
   - 岗位 / 职务 / 组织扩展模块
   - 报表与统计查询
   - 导入导出记录
   - 任务中心与报表任务
-
 - 系统管理仍缺更完整产品能力：
   - 字典分组
   - 参数分类
   - 公告状态流转
   - 更完整的服务监控整合
+- MinIO 还未接入实际业务
+- RocketMQ / Seata / XXL-Job / Loki 仍未启用真实链路
+- Redis / Redisson 当前虽已接入能力，但主链路仍可继续增强为默认会话基础设施
 
-- 对象存储 MinIO 还未接入实际业务
-- RocketMQ / Seata / XXL-Job / Loki 仍未启用实际链路
-- Redis / Redisson 当前仍是开关化能力，未在默认链路启用
+### 前端
 
-### 前端未完善
-
-- 页面已具备基础 CRUD 骨架，但仍偏“联调台”，还不是完整产品 UI
-- 用户、角色、权限、部门、租户页面还缺：
-  - 更完善的表单校验
-  - 分页
-  - 搜索筛选
+- 页面已具备基础 CRUD 骨架，但还不是完整产品化后台
+- 用户、角色、权限、部门、租户页面仍可继续增强：
+  - 更完整的表单校验
   - 详情抽屉 / 详情页
+  - 更细的筛选条件
   - 删除前引用校验提示
+- 角色权限分配当前仍是基础多选方式，后续可升级为资源树 / 权限树
+- 部门管理后续应升级为树形结构
+- 审计页面仍可继续补时间区间和多条件组合筛选
+- 系统管理页面仍缺更细的分类视图和组件说明
+- 前端当前未把菜单动态渲染完全下沉到路由生成层，后续可基于 `/api/auth/me` 的菜单快照继续演进
 
-- 角色权限分配目前是多选框方式，后续可升级为资源树/权限树
-- 部门管理目前还是平铺表格，后续应补成树形结构
-- 审计页面还缺时间区间筛选和多条件组合筛选
-- 系统管理页面还缺组件开关说明和更细的分类视图
-- 前端当前未接入菜单动态渲染到路由层，只是导航和页面并存，后续可进一步基于 `/api/auth/me` 的菜单快照动态生成
+### 文档与配置
 
-### 文档未完善
+- README 后续新增模块后仍需同步
+- 数据库初始化脚本中的中文注释仍建议后续做一轮统一清理
+- `application.yml` 里若还有历史遗留的注释乱码，也建议继续统一清理
 
-- README 这次已更新到当前状态，但后续新增模块后仍需同步
-- 数据库脚本中的部分中文注释历史上有编码污染，虽然不影响运行，但后续建议统一清一次初始化脚本内容
-- `application.yml` 中仍有个别中文字段显示不干净，建议后续统一清理配置注释与默认值文本
+## 下一步建议
 
-## 下一步任务清单
-
-为防后续遗漏，建议按下面顺序继续推进。
-
-### P1：继续做成“可交付管理台”
+### P1：继续做成可交付管理台
 
 1. 完善前端页面交互
 - 用户管理增加搜索、分页、详情、重置密码
 - 角色管理增加权限树
 - 部门管理改为树形结构
-- 租户管理增加套餐/状态/到期提醒视图
-- 审计页面增加时间范围筛选和条件筛选
+- 租户管理增加套餐 / 状态 / 到期提醒视图
+- 审计页面增加时间范围和多条件筛选
 
 2. 完善前端动态菜单
-- 基于 `/api/auth/me` 返回的菜单快照动态控制路由可见性
+- 基于 `/api/auth/me` 返回的菜单快照动态控制路由与可见性
 - 按权限隐藏不可访问页面
 
 3. 完善前端异常体验
@@ -379,9 +386,9 @@ SELECT COUNT(*) AS oauth_client_cnt FROM sys_oauth_client;
 ### P2：继续深挖认证中心
 
 1. 完善 OAuth2 客户端能力
-- 客户端详情接口
-- 客户端密钥轮换
-- 客户端启停
+- 客户端使用说明
+- 客户端接入示例
+- 客户端状态历史
 - scope 描述配置化
 
 2. 完善授权记录
@@ -401,7 +408,7 @@ SELECT COUNT(*) AS oauth_client_cnt FROM sys_oauth_client;
 
 ### P4：继续启用预留组件
 
-1. Redis / Redisson 默认链路接入
+1. Redis / Redisson 作为默认会话基础设施
 2. MinIO 接入实际文件上传
 3. XXL-Job 接入任务调度
 4. RocketMQ 接入异步审计或事件发布

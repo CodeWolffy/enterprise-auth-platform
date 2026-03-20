@@ -8,12 +8,30 @@
         </div>
       </div>
 
-      <el-form inline class="toolbar-inline">
-        <el-form-item label="事件类型"><el-input v-model="query.eventType" placeholder="例如 USER_UPDATED" clearable /></el-form-item>
-        <el-form-item label="操作人"><el-input v-model="query.operator" clearable /></el-form-item>
-        <el-form-item label="请求 ID"><el-input v-model="query.requestId" clearable /></el-form-item>
+      <el-form inline class="toolbar-inline" @submit.prevent="doSearch">
+        <el-form-item label="事件类型">
+          <el-input v-model="query.eventType" placeholder="例如 USER_UPDATED" clearable />
+        </el-form-item>
+        <el-form-item label="操作人">
+          <el-input v-model="query.operator" placeholder="按操作人搜索" clearable />
+        </el-form-item>
+        <el-form-item label="请求 ID">
+          <el-input v-model="query.requestId" placeholder="按请求 ID 搜索" clearable />
+        </el-form-item>
+        <el-form-item label="时间范围">
+          <el-date-picker
+            v-model="dateRange"
+            type="datetimerange"
+            range-separator="至"
+            start-placeholder="开始时间"
+            end-placeholder="结束时间"
+            value-format="YYYY-MM-DDTHH:mm:ss"
+            clearable
+          />
+        </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="load">查询</el-button>
+          <el-button type="primary" @click="doSearch">查询</el-button>
+          <el-button @click="resetSearch">重置</el-button>
         </el-form-item>
       </el-form>
 
@@ -36,7 +54,7 @@
         </el-table-column>
       </el-table>
 
-      <div class="toolbar-inline" style="margin-top: 16px">
+      <div class="footer-bar">
         <span>共 {{ page.total }} 条记录</span>
         <el-pagination
           background
@@ -64,6 +82,8 @@ const query = reactive({
   size: 20,
 })
 
+const dateRange = ref<[string, string] | null>(null)
+
 const page = ref<AuditPage>({
   total: 0,
   page: 1,
@@ -73,11 +93,27 @@ const page = ref<AuditPage>({
 
 void load()
 
+function doSearch() {
+  query.page = 1
+  void load()
+}
+
+function resetSearch() {
+  query.eventType = ''
+  query.operator = ''
+  query.requestId = ''
+  dateRange.value = null
+  query.page = 1
+  void load()
+}
+
 async function load() {
   page.value = await queryAuditEvents({
     eventType: query.eventType || undefined,
     operator: query.operator || undefined,
     requestId: query.requestId || undefined,
+    occurredFrom: dateRange.value?.[0] || undefined,
+    occurredTo: dateRange.value?.[1] || undefined,
     page: query.page,
     size: query.size,
   })
@@ -88,3 +124,12 @@ async function handlePageChange(nextPage: number) {
   await load()
 }
 </script>
+
+<style scoped lang="scss">
+.footer-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+}
+</style>

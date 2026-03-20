@@ -12,9 +12,9 @@
       <el-table :data="permissions" stripe>
         <el-table-column prop="permissionName" label="权限名称" min-width="160" />
         <el-table-column prop="permissionCode" label="权限编码" min-width="180" />
-        <el-table-column prop="resourceCode" label="资源" min-width="100" />
-        <el-table-column prop="actionCode" label="动作" min-width="100" />
-        <el-table-column prop="scopeCode" label="作用域" min-width="100" />
+        <el-table-column prop="resourceCode" label="资源编码" min-width="120" />
+        <el-table-column prop="actionCode" label="动作编码" min-width="120" />
+        <el-table-column prop="scopeCode" label="作用域编码" min-width="120" />
         <el-table-column fixed="right" label="操作" width="160">
           <template #default="{ row }">
             <el-button link type="primary" @click="openPermission(row)">编辑</el-button>
@@ -27,13 +27,33 @@
     <el-dialog v-model="visible" :title="editingId ? '编辑权限' : '新增权限'" width="680px">
       <el-form label-position="top">
         <el-row :gutter="16">
-          <el-col :span="12"><el-form-item label="权限名称"><el-input v-model="form.permissionName" /></el-form-item></el-col>
-          <el-col :span="12"><el-form-item label="权限编码"><el-input v-model="form.permissionCode" /></el-form-item></el-col>
+          <el-col :span="12">
+            <el-form-item label="权限名称">
+              <el-input v-model="form.permissionName" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="权限编码">
+              <el-input v-model="form.permissionCode" />
+            </el-form-item>
+          </el-col>
         </el-row>
         <el-row :gutter="16">
-          <el-col :span="8"><el-form-item label="资源编码"><el-input v-model="form.resourceCode" /></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="动作编码"><el-input v-model="form.actionCode" /></el-form-item></el-col>
-          <el-col :span="8"><el-form-item label="作用域编码"><el-input v-model="form.scopeCode" /></el-form-item></el-col>
+          <el-col :span="8">
+            <el-form-item label="资源编码">
+              <el-input v-model="form.resourceCode" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="动作编码">
+              <el-input v-model="form.actionCode" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="作用域编码">
+              <el-input v-model="form.scopeCode" />
+            </el-form-item>
+          </el-col>
         </el-row>
       </el-form>
       <template #footer>

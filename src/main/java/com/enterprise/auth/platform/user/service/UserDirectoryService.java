@@ -15,6 +15,7 @@ import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysUserRoleMapper;
 import com.enterprise.auth.platform.security.DataScopeService;
 import com.enterprise.auth.platform.tenant.TenantContext;
+import com.enterprise.auth.platform.common.model.PageResult;
 import com.enterprise.auth.platform.user.model.UserSummary;
 import com.enterprise.auth.platform.user.repository.UserRepository;
 import java.util.Collections;
@@ -59,11 +60,17 @@ public class UserDirectoryService {
     }
 
     public List<UserSummary> listUsers() {
+        return listUsers(null, null, null, null, 1, 10000).records();
+    }
+
+    public PageResult<UserSummary> listUsers(String username, String mobile, String email, Boolean enabled, int page, int size) {
         String tenantId = currentTenantId();
         // 默认模式仍然走内存目录，但同样要按当前租户过滤，避免演示数据串租户。
         if (!persistenceProperties.databaseEnabled() || sysUserMapper == null) {
-            return userRepository.findAll().stream()
+            List<UserSummary> all = userRepository.findAll().stream()
                     .filter(user -> tenantId.equals(user.tenantId()))
+                    .filter(user -> !StringUtils.hasText(username) || (user.username() != null && user.username().contains(username)))
+                    .filter(user -> enabled == null || user.enabled() == enabled)
                     .map(user -> new UserSummary(
                             user.id(),
                             user.tenantId(),
@@ -78,25 +85,52 @@ public class UserDirectoryService {
                             user.dataScopeType()
                     ))
                     .toList();
+            int total = all.size();
+            int fromIndex = (page - 1) * size;
+            if (fromIndex >= total) {
+                return PageResult.of(total, page, size, List.of());
+            }
+            return PageResult.of(total, page, size, all.subList(fromIndex, Math.min(fromIndex + size, total)));
         }
 
-        List<SysUserEntity> users = sysUserMapper.selectList(new LambdaQueryWrapper<SysUserEntity>()
+        LambdaQueryWrapper<SysUserEntity> query = new LambdaQueryWrapper<SysUserEntity>()
                 .eq(SysUserEntity::getTenantId, tenantId)
-                .eq(SysUserEntity::getDeleted, 0)
-                .orderByAsc(SysUserEntity::getId));
+                .eq(SysUserEntity::getDeleted, 0);
+        if (StringUtils.hasText(username)) {
+            query.like(SysUserEntity::getUsername, username);
+        }
+        if (StringUtils.hasText(mobile)) {
+            query.like(SysUserEntity::getMobile, mobile);
+        }
+        if (StringUtils.hasText(email)) {
+            query.like(SysUserEntity::getEmail, email);
+        }
+        if (enabled != null) {
+            query.eq(SysUserEntity::getEnabled, enabled ? 1 : 0);
+        }
+        query.orderByAsc(SysUserEntity::getId);
+
+        List<SysUserEntity> users = sysUserMapper.selectList(query);
         if (users.isEmpty()) {
-            return List.of();
+            return PageResult.of(0, page, size, List.of());
         }
 
         users = dataScopeService.filterUsers(tenantId, users);
         if (users.isEmpty()) {
-            return List.of();
+            return PageResult.of(0, page, size, List.of());
         }
+
+        int total = users.size();
+        int fromIndex = (page - 1) * size;
+        if (fromIndex >= total) {
+            return PageResult.of(total, page, size, List.of());
+        }
+        users = users.subList(fromIndex, Math.min(fromIndex + size, total));
 
         Map<Long, Set<String>> roleCodesByUserId = loadRoleCodes(tenantId, users);
         Map<Long, Set<String>> permissionsByUserId = loadPermissionCodes(tenantId, roleCodesByUserId);
 
-        return users.stream()
+        List<UserSummary> records = users.stream()
                 .map(user -> new UserSummary(
                         user.getId(),
                         user.getTenantId(),
@@ -111,6 +145,8 @@ public class UserDirectoryService {
                         DataScopeType.SELF
                 ))
                 .toList();
+
+        return PageResult.of(total, page, size, records);
     }
 
     private Map<Long, Set<String>> loadRoleCodes(String tenantId, List<SysUserEntity> users) {

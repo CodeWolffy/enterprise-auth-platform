@@ -3,6 +3,7 @@ package com.enterprise.auth.platform.auth.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.auth.dto.CreateOauthClientRequest;
+import com.enterprise.auth.platform.auth.dto.RotateOauthClientSecretRequest;
 import com.enterprise.auth.platform.auth.dto.UpdateOauthClientRequest;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.config.PersistenceProperties;
@@ -52,6 +53,11 @@ public class OAuthClientManagementService {
                 .toList();
     }
 
+    public OAuthClientView clientDetail(Long id) {
+        requireDatabaseMode();
+        return toView(getClient(id, currentTenantId()), null);
+    }
+
     @Transactional
     public OAuthClientView createClient(CreateOauthClientRequest request) {
         requireDatabaseMode();
@@ -71,6 +77,7 @@ public class OAuthClientManagementService {
         entity.setGrantTypes(join(request.grantTypes()));
         entity.setRequirePkce(Boolean.TRUE.equals(request.publicClient()) || Boolean.TRUE.equals(request.requirePkce()) ? 1 : 0);
         entity.setRequireConsent(Boolean.TRUE.equals(request.requireConsent()) ? 1 : 0);
+        entity.setClientStatus(request.clientStatus() != null ? request.clientStatus() : 1);
         entity.setDeleted(0);
 
         if (existing == null) {
@@ -100,6 +107,9 @@ public class OAuthClientManagementService {
         entity.setGrantTypes(join(request.grantTypes()));
         entity.setRequirePkce(Boolean.TRUE.equals(request.publicClient()) || Boolean.TRUE.equals(request.requirePkce()) ? 1 : 0);
         entity.setRequireConsent(Boolean.TRUE.equals(request.requireConsent()) ? 1 : 0);
+        if (request.clientStatus() != null) {
+            entity.setClientStatus(request.clientStatus());
+        }
         sysOauthClientMapper.updateById(entity);
         auditService.record(
                 "OAUTH_CLIENT_UPDATED",
@@ -113,6 +123,41 @@ public class OAuthClientManagementService {
                         ? null
                         : (StringUtils.hasText(request.clientSecret()) ? request.clientSecret() : null)
         );
+    }
+
+    @Transactional
+    public OAuthClientView updateClientStatus(Long id, boolean enabled) {
+        requireDatabaseMode();
+        String tenantId = currentTenantId();
+        SysOauthClientEntity entity = getClient(id, tenantId);
+        entity.setClientStatus(enabled ? 1 : 0);
+        sysOauthClientMapper.updateById(entity);
+        auditService.record(
+                "OAUTH_CLIENT_STATUS_UPDATED",
+                SecuritySupport.currentOperator(),
+                tenantId,
+                Map.of("clientId", entity.getClientId(), "enabled", enabled)
+        );
+        return toView(entity, null);
+    }
+
+    @Transactional
+    public OAuthClientView rotateClientSecret(Long id, RotateOauthClientSecretRequest request) {
+        requireDatabaseMode();
+        String tenantId = currentTenantId();
+        SysOauthClientEntity entity = getClient(id, tenantId);
+        if (!StringUtils.hasText(entity.getClientSecret())) {
+            throw new BusinessException("公共客户端不支持轮换密钥");
+        }
+        entity.setClientSecret(passwordEncoder.encode(request.clientSecret()));
+        sysOauthClientMapper.updateById(entity);
+        auditService.record(
+                "OAUTH_CLIENT_SECRET_ROTATED",
+                SecuritySupport.currentOperator(),
+                tenantId,
+                Map.of("clientId", entity.getClientId())
+        );
+        return toView(entity, request.clientSecret());
     }
 
     @Transactional
@@ -157,6 +202,7 @@ public class OAuthClientManagementService {
                 !StringUtils.hasText(entity.getClientSecret()),
                 entity.getRequirePkce() != null && entity.getRequirePkce() == 1,
                 entity.getRequireConsent() != null && entity.getRequireConsent() == 1,
+                entity.getClientStatus() == null || entity.getClientStatus() == 1,
                 issuedClientSecret,
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
@@ -192,7 +238,7 @@ public class OAuthClientManagementService {
         if (StringUtils.hasText(existingSecret)) {
             return existingSecret;
         }
-        throw new BusinessException("私有客户端必须提供客户端密钥");
+        throw new BusinessException("机密客户端必须提供客户端密钥");
     }
 
     private void requireDatabaseMode() {
@@ -218,7 +264,8 @@ public class OAuthClientManagementService {
             @Schema(description = "是否公共客户端") boolean publicClient,
             @Schema(description = "是否要求 PKCE") boolean requirePkce,
             @Schema(description = "是否要求授权确认") boolean requireConsent,
-            @Schema(description = "本次返回的原始密钥，仅在创建或重置时返回") String issuedClientSecret,
+            @Schema(description = "是否启用") boolean enabled,
+            @Schema(description = "本次返回的原始密钥，仅在创建或轮换时返回") String issuedClientSecret,
             @Schema(description = "创建时间") LocalDateTime createdAt,
             @Schema(description = "更新时间") LocalDateTime updatedAt
     ) {

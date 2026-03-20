@@ -42,9 +42,18 @@ export interface ClientView {
   publicClient: boolean
   requirePkce: boolean
   requireConsent: boolean
+  enabled: boolean
   issuedClientSecret?: string | null
   createdAt?: string
   updatedAt?: string
+}
+
+export interface ClientStatusPayload {
+  enabled: boolean
+}
+
+export interface RotateClientSecretPayload {
+  clientSecret: string
 }
 
 export interface UserSummary {

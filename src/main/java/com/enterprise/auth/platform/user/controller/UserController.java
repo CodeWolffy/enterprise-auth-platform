@@ -2,6 +2,7 @@ package com.enterprise.auth.platform.user.controller;
 
 import com.enterprise.auth.platform.catalog.CatalogService;
 import com.enterprise.auth.platform.common.api.ApiResponse;
+import com.enterprise.auth.platform.common.model.PageResult;
 import com.enterprise.auth.platform.user.dto.AssignRolesRequest;
 import com.enterprise.auth.platform.user.dto.CreateUserRequest;
 import com.enterprise.auth.platform.user.dto.UpdateUserRequest;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "用户管理")
@@ -36,17 +38,24 @@ public class UserController {
         this.userManagementService = userManagementService;
     }
 
-    @Operation(summary = "查询用户列表")
+    @Operation(summary = "分页查询用户列表")
     @GetMapping
     @PreAuthorize("hasAuthority('user:read')")
-    public ApiResponse<List<UserSummary>> list() {
-        return ApiResponse.ok(userDirectoryService.listUsers());
+    public ApiResponse<PageResult<UserSummary>> list(
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String mobile,
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) Boolean enabled,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return ApiResponse.ok(userDirectoryService.listUsers(username, mobile, email, enabled, page, size));
     }
 
     @Operation(summary = "查询用户已分配角色")
     @GetMapping("/{userId}/roles")
     @PreAuthorize("hasAuthority('user:read')")
-    public ApiResponse<List<CatalogService.RoleView>> assignedRoles(@Parameter(description = "用户ID") @PathVariable Long userId) {
+    public ApiResponse<List<CatalogService.RoleView>> assignedRoles(@Parameter(description = "用户 ID") @PathVariable Long userId) {
         return ApiResponse.ok(userManagementService.listAssignedRoles(userId));
     }
 
@@ -61,7 +70,7 @@ public class UserController {
     @PutMapping("/{userId}")
     @PreAuthorize("hasAuthority('user:write')")
     public ApiResponse<UserSummary> update(
-            @Parameter(description = "用户ID") @PathVariable Long userId,
+            @Parameter(description = "用户 ID") @PathVariable Long userId,
             @Valid @RequestBody UpdateUserRequest request
     ) {
         return ApiResponse.ok(userManagementService.update(userId, request));
@@ -71,7 +80,7 @@ public class UserController {
     @PutMapping("/{userId}/roles")
     @PreAuthorize("hasAuthority('user:write')")
     public ApiResponse<UserSummary> assignRoles(
-            @Parameter(description = "用户ID") @PathVariable Long userId,
+            @Parameter(description = "用户 ID") @PathVariable Long userId,
             @Valid @RequestBody AssignRolesRequest request
     ) {
         return ApiResponse.ok(userManagementService.assignRoles(userId, request.roleCodes()));
@@ -80,7 +89,7 @@ public class UserController {
     @Operation(summary = "删除用户")
     @DeleteMapping("/{userId}")
     @PreAuthorize("hasAuthority('user:write')")
-    public ApiResponse<Void> delete(@Parameter(description = "用户ID") @PathVariable Long userId) {
+    public ApiResponse<Void> delete(@Parameter(description = "用户 ID") @PathVariable Long userId) {
         userManagementService.delete(userId);
         return ApiResponse.ok();
     }

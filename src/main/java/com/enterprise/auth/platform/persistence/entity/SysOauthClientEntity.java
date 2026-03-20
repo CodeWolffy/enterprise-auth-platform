@@ -22,6 +22,7 @@ public class SysOauthClientEntity {
     private String grantTypes;
     private Integer requirePkce;
     private Integer requireConsent;
+    private Integer clientStatus;
     @TableField(fill = FieldFill.INSERT)
     private String createdBy;
     @TableField(fill = FieldFill.INSERT_UPDATE)
@@ -53,6 +54,8 @@ public class SysOauthClientEntity {
     public void setRequirePkce(Integer requirePkce) { this.requirePkce = requirePkce; }
     public Integer getRequireConsent() { return requireConsent; }
     public void setRequireConsent(Integer requireConsent) { this.requireConsent = requireConsent; }
+    public Integer getClientStatus() { return clientStatus; }
+    public void setClientStatus(Integer clientStatus) { this.clientStatus = clientStatus; }
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
     public String getUpdatedBy() { return updatedBy; }

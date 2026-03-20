@@ -33,9 +33,15 @@ public class AuditController {
             @Parameter(description = "租户编码") @RequestParam(required = false) String tenantId,
             @Parameter(description = "事件类型") @RequestParam(required = false) String eventType,
             @Parameter(description = "操作人") @RequestParam(required = false) String operator,
-            @Parameter(description = "请求ID") @RequestParam(required = false) String requestId,
-            @Parameter(description = "发生开始时间，ISO-8601 格式") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant occurredFrom,
-            @Parameter(description = "发生结束时间，ISO-8601 格式") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant occurredTo,
+            @Parameter(description = "请求 ID") @RequestParam(required = false) String requestId,
+            @Parameter(description = "发生开始时间，ISO-8601 格式")
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            Instant occurredFrom,
+            @Parameter(description = "发生结束时间，ISO-8601 格式")
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            Instant occurredTo,
             @Parameter(description = "页码，从 1 开始") @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "每页条数") @RequestParam(defaultValue = "20") int size
     ) {

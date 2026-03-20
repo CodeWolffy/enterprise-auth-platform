@@ -59,6 +59,12 @@ const router = createRouter({
           meta: { title: '部门管理' },
         },
         {
+          path: 'system/consents',
+          name: 'consents',
+          component: () => import('@/views/ConsentsView.vue'),
+          meta: { title: '授权记录' },
+        },
+        {
           path: 'system/tenants',
           name: 'tenants',
           component: () => import('@/views/TenantsView.vue'),
@@ -75,6 +81,24 @@ const router = createRouter({
           name: 'settings',
           component: () => import('@/views/SystemManagementView.vue'),
           meta: { title: '系统管理' },
+        },
+        {
+          path: 'system/settings/dicts',
+          name: 'settings-dicts',
+          component: () => import('@/views/SystemDictsView.vue'),
+          meta: { title: '字典管理' },
+        },
+        {
+          path: 'system/settings/configs',
+          name: 'settings-configs',
+          component: () => import('@/views/SystemConfigsView.vue'),
+          meta: { title: '参数管理' },
+        },
+        {
+          path: 'system/settings/notices',
+          name: 'settings-notices',
+          component: () => import('@/views/SystemNoticesView.vue'),
+          meta: { title: '公告管理' },
         },
       ],
     },
@@ -98,6 +122,15 @@ router.beforeEach(async (to) => {
       return { name: 'login' }
     }
   }
+
+  if (to.path !== '/' && to.name !== 'dashboard' && to.name !== 'consents') {
+    const isAllowed = authStore.menuItems.some((item) => item.path === to.path || to.path.startsWith(item.path + '/'))
+    if (!isAllowed) {
+      ElMessage.error('您没有权限访问该页面')
+      return { name: 'dashboard' }
+    }
+  }
+
   return true
 })
 

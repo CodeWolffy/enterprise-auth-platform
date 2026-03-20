@@ -50,7 +50,7 @@ public class DeptController {
     @PutMapping("/{deptId}")
     @PreAuthorize("hasAuthority('dept:write')")
     public ApiResponse<CatalogService.DepartmentView> update(
-            @Parameter(description = "部门ID") @PathVariable Long deptId,
+            @Parameter(description = "部门 ID") @PathVariable Long deptId,
             @Valid @RequestBody DeptCrudRequest request
     ) {
         return ApiResponse.ok(deptManagementService.update(deptId, request));
@@ -59,7 +59,7 @@ public class DeptController {
     @Operation(summary = "删除部门")
     @DeleteMapping("/{deptId}")
     @PreAuthorize("hasAuthority('dept:write')")
-    public ApiResponse<Void> delete(@Parameter(description = "部门ID") @PathVariable Long deptId) {
+    public ApiResponse<Void> delete(@Parameter(description = "部门 ID") @PathVariable Long deptId) {
         deptManagementService.delete(deptId);
         return ApiResponse.ok();
     }

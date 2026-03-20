@@ -27,8 +27,8 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.server.authorization.InMemoryOAuth2AuthorizationConsentService;
-import org.springframework.security.oauth2.server.authorization.InMemoryOAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
+import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
@@ -106,13 +106,13 @@ public class AuthorizationServerConfig {
     }
 
     @Bean
-    public OAuth2AuthorizationService authorizationService() {
-        return new InMemoryOAuth2AuthorizationService();
+    public OAuth2AuthorizationService authorizationService(JdbcTemplate jdbcTemplate, RegisteredClientRepository registeredClientRepository) {
+        return new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
     }
 
     @Bean
-    public OAuth2AuthorizationConsentService authorizationConsentService() {
-        return new InMemoryOAuth2AuthorizationConsentService();
+    public OAuth2AuthorizationConsentService authorizationConsentService(JdbcTemplate jdbcTemplate, RegisteredClientRepository registeredClientRepository) {
+        return new JdbcOAuth2AuthorizationConsentService(jdbcTemplate, registeredClientRepository);
     }
 
     @Bean
@@ -189,7 +189,7 @@ public class AuthorizationServerConfig {
                     .keyID(UUID.randomUUID().toString())
                     .build();
         } catch (Exception ex) {
-            throw new IllegalStateException("生成授权服务器 RSA 密钥失败。", ex);
+            throw new IllegalStateException("生成授权服务 RSA 密钥失败。", ex);
         }
     }
 }

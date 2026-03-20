@@ -1,6 +1,8 @@
 package com.enterprise.auth.platform.auth.controller;
 
 import com.enterprise.auth.platform.auth.dto.CreateOauthClientRequest;
+import com.enterprise.auth.platform.auth.dto.OauthClientStatusRequest;
+import com.enterprise.auth.platform.auth.dto.RotateOauthClientSecretRequest;
 import com.enterprise.auth.platform.auth.dto.UpdateOauthClientRequest;
 import com.enterprise.auth.platform.auth.service.OAuthClientManagementService;
 import com.enterprise.auth.platform.common.api.ApiResponse;
@@ -37,6 +39,15 @@ public class OAuthClientController {
         return ApiResponse.ok(clientManagementService.clients());
     }
 
+    @Operation(summary = "查询 OAuth2 客户端详情")
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('auth:read')")
+    public ApiResponse<OAuthClientManagementService.OAuthClientView> clientDetail(
+            @Parameter(description = "客户端主键 ID") @PathVariable Long id
+    ) {
+        return ApiResponse.ok(clientManagementService.clientDetail(id));
+    }
+
     @Operation(summary = "新增 OAuth2 客户端")
     @PostMapping
     @PreAuthorize("hasAuthority('auth:write')")
@@ -50,16 +61,36 @@ public class OAuthClientController {
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('auth:write')")
     public ApiResponse<OAuthClientManagementService.OAuthClientView> updateClient(
-            @Parameter(description = "客户端 ID") @PathVariable Long id,
+            @Parameter(description = "客户端主键 ID") @PathVariable Long id,
             @Valid @RequestBody UpdateOauthClientRequest request
     ) {
         return ApiResponse.ok(clientManagementService.updateClient(id, request));
     }
 
+    @Operation(summary = "启用或禁用 OAuth2 客户端")
+    @PutMapping("/{id}/status")
+    @PreAuthorize("hasAuthority('auth:write')")
+    public ApiResponse<OAuthClientManagementService.OAuthClientView> updateClientStatus(
+            @Parameter(description = "客户端主键 ID") @PathVariable Long id,
+            @Valid @RequestBody OauthClientStatusRequest request
+    ) {
+        return ApiResponse.ok(clientManagementService.updateClientStatus(id, request.enabled()));
+    }
+
+    @Operation(summary = "轮换 OAuth2 客户端密钥")
+    @PostMapping("/{id}/rotate-secret")
+    @PreAuthorize("hasAuthority('auth:write')")
+    public ApiResponse<OAuthClientManagementService.OAuthClientView> rotateClientSecret(
+            @Parameter(description = "客户端主键 ID") @PathVariable Long id,
+            @Valid @RequestBody RotateOauthClientSecretRequest request
+    ) {
+        return ApiResponse.ok(clientManagementService.rotateClientSecret(id, request));
+    }
+
     @Operation(summary = "删除 OAuth2 客户端")
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('auth:write')")
-    public ApiResponse<Void> deleteClient(@Parameter(description = "客户端 ID") @PathVariable Long id) {
+    public ApiResponse<Void> deleteClient(@Parameter(description = "客户端主键 ID") @PathVariable Long id) {
         clientManagementService.deleteClient(id);
         return ApiResponse.ok();
     }

@@ -29,6 +29,8 @@ public record CreateOauthClientRequest(
         @Schema(description = "是否要求授权确认")
         Boolean requireConsent,
         @Schema(description = "是否公共客户端，公共客户端走 PKCE 且不保存密钥")
-        Boolean publicClient
+        Boolean publicClient,
+        @Schema(description = "状态：1 启用，0 禁用")
+        Integer clientStatus
 ) {
 }

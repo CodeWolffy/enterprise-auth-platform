@@ -40,7 +40,9 @@
       </div>
       <el-descriptions :column="1" border>
         <el-descriptions-item label="数据权限">{{ authStore.snapshot?.dataScopeType }}</el-descriptions-item>
-        <el-descriptions-item label="角色">{{ authStore.snapshot?.roles.join(', ') || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="角色">
+          {{ authStore.snapshot?.roles.join(', ') || '-' }}
+        </el-descriptions-item>
         <el-descriptions-item label="菜单">
           {{ authStore.snapshot?.menus.map((item) => item.title).join(' / ') || '-' }}
         </el-descriptions-item>
@@ -50,12 +52,18 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { PieChart } from 'echarts/charts'
+import { TooltipComponent } from 'echarts/components'
+import { CanvasRenderer } from 'echarts/renderers'
+import { init, use, type EChartsType } from 'echarts/core'
 import { useAuthStore } from '@/stores/auth'
+
+use([PieChart, TooltipComponent, CanvasRenderer])
 
 const authStore = useAuthStore()
 const chartRef = ref<HTMLDivElement | null>(null)
-let chart: { setOption: (option: unknown) => void } | null = null
+let chart: EChartsType | null = null
 
 async function renderChart() {
   await nextTick()
@@ -63,8 +71,7 @@ async function renderChart() {
     return
   }
   if (!chart) {
-    const echarts = await import('echarts')
-    chart = echarts.init(chartRef.value)
+    chart = init(chartRef.value)
   }
   chart.setOption({
     backgroundColor: 'transparent',
@@ -92,6 +99,22 @@ async function renderChart() {
   })
 }
 
-onMounted(renderChart)
-watch(() => authStore.snapshot, renderChart)
+function resizeChart() {
+  chart?.resize()
+}
+
+onMounted(() => {
+  void renderChart()
+  window.addEventListener('resize', resizeChart)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', resizeChart)
+  chart?.dispose()
+  chart = null
+})
+
+watch(() => authStore.snapshot, () => {
+  void renderChart()
+})
 </script>

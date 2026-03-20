@@ -9,8 +9,24 @@ import type {
   UserSummary,
 } from '@/types/auth'
 
-export async function queryUsers() {
-  const { data } = await http.get<ApiResponse<UserSummary[]>>('/api/users')
+export interface UserQueryParams {
+  username?: string
+  mobile?: string
+  email?: string
+  enabled?: boolean
+  page?: number
+  size?: number
+}
+
+export interface UserPage {
+  total: number
+  page: number
+  size: number
+  records: UserSummary[]
+}
+
+export async function queryUsers(params?: UserQueryParams) {
+  const { data } = await http.get<ApiResponse<UserPage>>('/api/users', { params })
   return data.data
 }
 

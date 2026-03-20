@@ -9,7 +9,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.model.DataScopeType;
 import com.enterprise.auth.platform.persistence.entity.SysOauthClientEntity;
 import com.enterprise.auth.platform.persistence.mapper.SysOauthClientMapper;
@@ -56,9 +55,9 @@ class AuthorizationServerEndpointsTest {
         entity.setDeleted(0);
         if (existing == null) {
             sysOauthClientMapper.insert(entity);
-            return;
+        } else {
+            sysOauthClientMapper.updateById(entity);
         }
-        sysOauthClientMapper.updateById(entity);
     }
 
     @Test
