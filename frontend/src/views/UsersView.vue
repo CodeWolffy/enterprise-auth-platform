@@ -4,7 +4,7 @@
       <article class="stat-card">
         <span class="eyebrow">Users</span>
         <strong>{{ totalUsers }}</strong>
-        <span>当前条件下用户总数</span>
+        <span>当前筛选条件下的用户总数</span>
       </article>
       <article class="stat-card">
         <span class="eyebrow">Enabled</span>
@@ -19,7 +19,7 @@
       <article class="stat-card">
         <span class="eyebrow">Roles</span>
         <strong>{{ averageRoleCount }}</strong>
-        <span>当前列表人均角色数</span>
+        <span>当前页人均角色数</span>
       </article>
     </section>
 
@@ -66,10 +66,10 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="角色" min-width="180">
+        <el-table-column label="角色" min-width="200">
           <template #default="{ row }">{{ row.roles.join(' / ') || '-' }}</template>
         </el-table-column>
-        <el-table-column fixed="right" label="操作" width="310">
+        <el-table-column fixed="right" label="操作" width="320">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button link type="primary" @click="openUser(row)">编辑</el-button>
@@ -93,10 +93,10 @@
       </div>
     </section>
 
-    <el-drawer v-model="detailVisible" title="用户详情" size="640px">
+    <el-drawer v-model="detailVisible" title="用户详情" size="720px">
       <template v-if="detailData">
         <el-descriptions :column="2" border>
-          <el-descriptions-item label="ID">{{ detailData.id }}</el-descriptions-item>
+          <el-descriptions-item label="用户 ID">{{ detailData.id }}</el-descriptions-item>
           <el-descriptions-item label="租户">{{ detailData.tenantId }}</el-descriptions-item>
           <el-descriptions-item label="用户名">{{ detailData.username }}</el-descriptions-item>
           <el-descriptions-item label="显示名称">{{ detailData.displayName || '-' }}</el-descriptions-item>
@@ -107,10 +107,18 @@
               {{ detailData.enabled ? '启用' : '禁用' }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="数据范围">{{ detailData.dataScopeType }}</el-descriptions-item>
+          <el-descriptions-item label="数据权限">{{ detailData.dataScopeType }}</el-descriptions-item>
           <el-descriptions-item label="部门 ID">{{ detailData.deptId || '-' }}</el-descriptions-item>
           <el-descriptions-item label="角色">{{ detailData.roles.join(', ') || '-' }}</el-descriptions-item>
         </el-descriptions>
+
+        <div class="detail-tip">
+          <el-alert
+            title="当前详情会受数据权限约束，列表不可见的用户不会出现在本页面。"
+            type="info"
+            :closable="false"
+          />
+        </div>
       </template>
     </el-drawer>
 
@@ -147,6 +155,7 @@
                 v-model="userForm.password"
                 type="password"
                 :placeholder="editingUserId ? '留空表示不修改密码' : '请输入初始密码'"
+                show-password
               />
             </el-form-item>
           </el-col>
@@ -381,7 +390,7 @@ function promptResetPassword(row: UserSummary) {
     cancelButtonText: '取消',
     inputType: 'password',
     inputPattern: /^.{8,64}$/,
-    inputErrorMessage: '密码长度需在 8 到 64 位之间',
+    inputErrorMessage: '密码长度需要在 8 到 64 位之间',
   })
     .then(async ({ value }) => {
       await updateUser(row.id, {
@@ -406,6 +415,10 @@ async function removeUser(id: number) {
 </script>
 
 <style scoped lang="scss">
+.detail-tip {
+  margin-top: 20px;
+}
+
 .pagination-wrap {
   display: flex;
   justify-content: flex-end;

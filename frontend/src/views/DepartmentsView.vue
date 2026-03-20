@@ -14,7 +14,7 @@
       <article class="stat-card">
         <span class="eyebrow">Leaders</span>
         <strong>{{ leaderBoundCount }}</strong>
-        <span>已配置负责人的部门</span>
+        <span>已配置负责人的部门数</span>
       </article>
       <article class="stat-card">
         <span class="eyebrow">Leaf</span>
@@ -29,7 +29,10 @@
           <span class="eyebrow">Departments</span>
           <h3>部门管理</h3>
         </div>
-        <el-button type="primary" @click="openDepartment()">新增部门</el-button>
+        <div class="panel-actions">
+          <el-button @click="expandAll = !expandAll">{{ expandAll ? '收起全部' : '展开全部' }}</el-button>
+          <el-button type="primary" @click="openDepartment()">新增部门</el-button>
+        </div>
       </div>
 
       <el-form :inline="true" class="toolbar-inline" @submit.prevent="handleSearch">
@@ -42,11 +45,23 @@
         </el-form-item>
       </el-form>
 
-      <el-table v-loading="loading" :data="filteredDepartmentTree" stripe row-key="id" default-expand-all>
-        <el-table-column prop="name" label="部门名称" min-width="180" />
-        <el-table-column prop="code" label="部门编码" min-width="140" />
-        <el-table-column prop="leaderUserId" label="负责人用户 ID" min-width="140" />
-        <el-table-column fixed="right" label="操作" width="280">
+      <el-table
+        v-loading="loading"
+        :data="filteredDepartmentTree"
+        stripe
+        row-key="id"
+        :default-expand-all="expandAll"
+        class="tree-table"
+      >
+        <el-table-column prop="name" label="部门名称" min-width="220" />
+        <el-table-column prop="code" label="部门编码" min-width="160" />
+        <el-table-column label="负责人用户 ID" min-width="140">
+          <template #default="{ row }">{{ row.leaderUserId || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="直属子部门" min-width="120">
+          <template #default="{ row }">{{ childCount(row.id) }}</template>
+        </el-table-column>
+        <el-table-column fixed="right" label="操作" width="300">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button link type="primary" @click="openDepartment(row)">编辑</el-button>
@@ -57,7 +72,7 @@
       </el-table>
     </section>
 
-    <el-drawer v-model="detailVisible" title="部门详情" size="600px">
+    <el-drawer v-model="detailVisible" title="部门详情" size="620px">
       <template v-if="detailDepartment">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="部门名称">{{ detailDepartment.name }}</el-descriptions-item>
@@ -65,12 +80,16 @@
           <el-descriptions-item label="部门 ID">{{ detailDepartment.id }}</el-descriptions-item>
           <el-descriptions-item label="父级部门 ID">{{ detailDepartment.parentId || '-' }}</el-descriptions-item>
           <el-descriptions-item label="负责人用户 ID">{{ detailDepartment.leaderUserId || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="直属子部门数">{{ childCount(detailDepartment.id) }}</el-descriptions-item>
+          <el-descriptions-item label="直属子部门">{{ childCount(detailDepartment.id) }}</el-descriptions-item>
         </el-descriptions>
+
+        <div class="detail-tip">
+          <el-alert title="部门树已接入数据权限过滤，当前列表只展示当前用户有权访问的组织范围。" type="info" :closable="false" />
+        </div>
       </template>
     </el-drawer>
 
-    <el-dialog v-model="visible" :title="editingId ? '编辑部门' : '新增部门'" width="620px">
+    <el-dialog v-model="visible" :title="editingId ? '编辑部门' : '新增部门'" width="640px">
       <el-form ref="formRef" label-position="top" :model="form" :rules="deptRules">
         <el-row :gutter="16">
           <el-col :span="12">
@@ -128,6 +147,7 @@ const detailVisible = ref(false)
 const editingId = ref<number | null>(null)
 const detailDepartment = ref<DepartmentView | null>(null)
 const loading = ref(false)
+const expandAll = ref(true)
 const keyword = ref('')
 const formRef = ref<FormInstance>()
 
@@ -189,11 +209,12 @@ async function load() {
 }
 
 function handleSearch() {
-  return
+  expandAll.value = true
 }
 
 function resetSearch() {
   keyword.value = ''
+  expandAll.value = true
 }
 
 function buildTree(source: DepartmentView[]) {
@@ -205,9 +226,12 @@ function buildTree(source: DepartmentView[]) {
   })
 
   source.forEach((department) => {
-    const current = map.get(department.id)!
+    const current = map.get(department.id)
+    if (!current) {
+      return
+    }
     if (department.parentId && map.has(department.parentId)) {
-      map.get(department.parentId)!.children!.push(current)
+      map.get(department.parentId)?.children?.push(current)
     } else {
       roots.push(current)
     }
@@ -221,9 +245,9 @@ function pruneEmptyChildren(nodes: DepartmentTreeNode[]) {
   nodes.forEach((node) => {
     if (!node.children || node.children.length === 0) {
       delete node.children
-    } else {
-      pruneEmptyChildren(node.children)
+      return
     }
+    pruneEmptyChildren(node.children)
   })
 }
 
@@ -300,3 +324,18 @@ function childCount(id: number) {
   return departments.value.filter((item) => item.parentId === id).length
 }
 </script>
+
+<style scoped lang="scss">
+.panel-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.detail-tip {
+  margin-top: 20px;
+}
+
+.tree-table :deep(.el-table__row .cell) {
+  min-height: 24px;
+}
+</style>

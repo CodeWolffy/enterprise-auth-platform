@@ -93,7 +93,7 @@ public class AuthController {
     @Operation(summary = "强制指定会话下线")
     @PostMapping("/sessions/{sessionId}/offline")
     public ApiResponse<Void> forceOffline(
-            @Parameter(description = "会话ID") @PathVariable String sessionId,
+            @Parameter(description = "会话 ID") @PathVariable String sessionId,
             Authentication authentication
     ) {
         authService.forceOffline(currentUser(authentication), sessionId);

@@ -4,6 +4,7 @@ import { ElMessage } from 'element-plus'
 import { exchangeAuthorizationCode, fetchPermissionSnapshot, refreshOauthToken } from '@/api/auth'
 import type { OAuthTokenResponse, PermissionSnapshot } from '@/types/auth'
 import { createOAuthRedirect } from '@/utils/oauth'
+import { clearDynamicRoutes, registerDynamicRoutes } from '@/router'
 
 const storageKey = 'eap.frontend.auth'
 
@@ -36,6 +37,7 @@ export const useAuthStore = defineStore('auth', () => {
     expiresAt.value = parsed.expiresAt
     tenantId.value = parsed.tenantId
     snapshot.value = parsed.snapshot
+    registerDynamicRoutes(snapshot.value)
   }
 
   function persist() {
@@ -58,6 +60,7 @@ export const useAuthStore = defineStore('auth', () => {
     const { payload, tenantId: resolvedTenantId } = await exchangeAuthorizationCode(code, state)
     applyTokenPayload(payload, resolvedTenantId)
     snapshot.value = await fetchPermissionSnapshot()
+    registerDynamicRoutes(snapshot.value)
     persist()
   }
 
@@ -68,6 +71,7 @@ export const useAuthStore = defineStore('auth', () => {
     const payload = (await refreshOauthToken(refreshToken.value)) as OAuthTokenResponse
     applyTokenPayload(payload, tenantId.value)
     snapshot.value = await fetchPermissionSnapshot()
+    registerDynamicRoutes(snapshot.value)
     persist()
   }
 
@@ -80,6 +84,7 @@ export const useAuthStore = defineStore('auth', () => {
       return
     }
     snapshot.value = await fetchPermissionSnapshot()
+    registerDynamicRoutes(snapshot.value)
     persist()
   }
 
@@ -91,8 +96,10 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken.value = ''
     refreshToken.value = ''
     expiresAt.value = 0
+    tenantId.value = 'platform'
     snapshot.value = null
     localStorage.removeItem(storageKey)
+    clearDynamicRoutes()
   }
 
   function logout() {

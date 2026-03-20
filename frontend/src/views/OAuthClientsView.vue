@@ -69,15 +69,15 @@
     </section>
 
     <el-dialog v-model="visible" :title="editingId ? '编辑客户端' : '新增客户端'" width="720px">
-      <el-form label-position="top">
+      <el-form ref="formRef" label-position="top" :model="form" :rules="rules">
         <el-row :gutter="16">
           <el-col :span="12">
-            <el-form-item label="客户端名称">
+            <el-form-item label="客户端名称" prop="clientName">
               <el-input v-model="form.clientName" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="Client ID">
+            <el-form-item label="Client ID" prop="clientId">
               <el-input v-model="form.clientId" :disabled="Boolean(editingId)" />
             </el-form-item>
           </el-col>
@@ -85,7 +85,7 @@
         <el-form-item label="客户端类型">
           <el-switch v-model="form.publicClient" inline-prompt active-text="公共" inactive-text="机密" />
         </el-form-item>
-        <el-form-item label="客户端密钥">
+        <el-form-item label="客户端密钥" prop="clientSecret">
           <el-input
             v-model="form.clientSecret"
             :placeholder="form.publicClient ? '公共客户端无需填写' : '请输入客户端密钥'"
@@ -98,7 +98,7 @@
         <el-row :gutter="16">
           <el-col :span="12">
             <el-form-item label="作用域">
-              <el-select v-model="form.scopes" multiple>
+              <el-select v-model="form.scopes" multiple style="width: 100%">
                 <el-option
                   v-for="scope in availableScopes"
                   :key="scope.dictCode"
@@ -110,7 +110,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="授权类型">
-              <el-select v-model="form.grantTypes" multiple>
+              <el-select v-model="form.grantTypes" multiple style="width: 100%">
                 <el-option label="authorization_code" value="authorization_code" />
                 <el-option label="refresh_token" value="refresh_token" />
                 <el-option label="client_credentials" value="client_credentials" :disabled="form.publicClient" />
@@ -120,8 +120,13 @@
         </el-row>
         <el-form-item label="安全选项">
           <div class="switch-row">
-            <el-switch v-model="form.requirePkce" inline-prompt active-text="PKCE" inactive-text="PKCE" />
-            <el-switch v-model="form.requireConsent" inline-prompt active-text="需确认" inactive-text="免确认" />
+            <el-switch v-model="form.requirePkce" inline-prompt active-text="启用 PKCE" inactive-text="关闭 PKCE" />
+            <el-switch
+              v-model="form.requireConsent"
+              inline-prompt
+              active-text="需要确认"
+              inactive-text="免确认"
+            />
           </div>
         </el-form-item>
         <el-form-item label="启用状态">
@@ -142,7 +147,7 @@
       </template>
     </el-dialog>
 
-    <el-drawer v-model="detailVisible" title="客户端详情" size="720px">
+    <el-drawer v-model="detailVisible" title="客户端详情" size="760px">
       <template v-if="detail">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="客户端名称">{{ detail.clientName }}</el-descriptions-item>
@@ -169,7 +174,7 @@
             <el-button type="primary" plain @click="openConsents(detail)">查看授权记录</el-button>
           </div>
           <el-alert
-            :title="detail.publicClient ? '当前为公共客户端，推荐 Authorization Code + PKCE。' : '当前为机密客户端，推荐服务端安全保管客户端密钥。'"
+            :title="detail.publicClient ? '当前为公共客户端，推荐使用 Authorization Code + PKCE。' : '当前为机密客户端，请在服务端安全保存客户端密钥。'"
             type="info"
             :closable="false"
           />
@@ -206,6 +211,7 @@
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
 import {
   createClient,
   deleteClient,
@@ -227,6 +233,7 @@ const secretVisible = ref(false)
 const editingId = ref<number | null>(null)
 const rotateClientId = ref<number | null>(null)
 const detail = ref<ClientView | null>(null)
+const formRef = ref<FormInstance>()
 
 const form = reactive({
   clientId: '',
@@ -239,6 +246,23 @@ const form = reactive({
   requirePkce: true,
   requireConsent: true,
   clientStatus: 1,
+})
+
+const rules = reactive<FormRules>({
+  clientId: [{ required: true, message: '请输入 Client ID', trigger: 'blur' }],
+  clientName: [{ required: true, message: '请输入客户端名称', trigger: 'blur' }],
+  clientSecret: [
+    {
+      validator: (_rule, value, callback) => {
+        if (!form.publicClient && !editingId.value && !value) {
+          callback(new Error('机密客户端必须填写客户端密钥'))
+          return
+        }
+        callback()
+      },
+      trigger: 'blur',
+    },
+  ],
 })
 
 const rotateSecretForm = reactive({
@@ -349,6 +373,11 @@ function openConsents(client: ClientView) {
 }
 
 async function submit() {
+  if (!formRef.value) {
+    return
+  }
+  await formRef.value.validate()
+
   const payload = {
     clientId: form.clientId,
     clientName: form.clientName,

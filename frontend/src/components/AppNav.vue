@@ -53,11 +53,23 @@ const iconMap: Record<string, any> = {
   consents: Key,
 }
 
+const titleMap: Record<string, string> = {
+  dashboard: '运行总览',
+  'oauth-clients': 'OAuth2 客户端',
+  users: '用户管理',
+  roles: '角色管理',
+  permissions: '权限管理',
+  depts: '部门管理',
+  tenants: '租户管理',
+  audit: '安全审计',
+  settings: '系统管理',
+}
+
 const visibleLinks = computed(() => {
   const links = authStore.menuItems.map((menu) => ({
     to: menu.path,
-    label: menu.title,
-    icon: iconMap[menu.name] || Tickets,
+    label: titleMap[menu.code] || menu.title,
+    icon: iconMap[menu.code] || Tickets,
   }))
 
   if (authStore.snapshot?.permissions.includes('auth:read')) {

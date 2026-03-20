@@ -17,7 +17,7 @@ export interface PermissionSnapshot {
 }
 
 export interface MenuItem {
-  name: string
+  code: string
   title: string
   path: string
   component: string

@@ -3,8 +3,8 @@
     <section class="dashboard-grid">
       <article class="stat-card">
         <span class="eyebrow">Tenants</span>
-        <strong>{{ pagedTenants.length }}</strong>
-        <span>当前页租户数量</span>
+        <strong>{{ filteredTenants.length }}</strong>
+        <span>当前筛选条件下的租户数</span>
       </article>
       <article class="stat-card">
         <span class="eyebrow">Platform</span>
@@ -73,13 +73,16 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="套餐" min-width="150">
+          <template #default="{ row }">{{ getPackageLabel(row) }}</template>
+        </el-table-column>
         <el-table-column label="到期提醒" min-width="220">
           <template #default="{ row }">
             <template v-if="row.expireAt">
               <el-tag :type="getExpireTagType(row.expireAt)">{{ getExpireText(row.expireAt) }}</el-tag>
               <span class="expire-date">{{ row.expireAt.split('T')[0] }}</span>
             </template>
-            <el-tag v-else type="info">无限制</el-tag>
+            <el-tag v-else type="info">无限期</el-tag>
           </template>
         </el-table-column>
         <el-table-column fixed="right" label="操作" width="220">
@@ -104,7 +107,7 @@
       </div>
     </section>
 
-    <el-drawer v-model="detailVisible" title="租户详情" size="600px">
+    <el-drawer v-model="detailVisible" title="租户详情" size="720px">
       <template v-if="detailTenant">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="租户编码">{{ detailTenant.tenantId }}</el-descriptions-item>
@@ -115,25 +118,25 @@
           <el-descriptions-item label="状态">
             {{ detailTenant.tenantStatus === 1 ? '启用' : '禁用' }}
           </el-descriptions-item>
+          <el-descriptions-item label="套餐">{{ getPackageLabel(detailTenant) }}</el-descriptions-item>
           <el-descriptions-item label="到期状态">
-            {{ detailTenant.expireAt ? getExpireText(detailTenant.expireAt) : '无限制' }}
+            {{ detailTenant.expireAt ? getExpireText(detailTenant.expireAt) : '无限期' }}
           </el-descriptions-item>
           <el-descriptions-item label="到期时间" :span="2">
             {{ detailTenant.expireAt || '未设置到期时间' }}
           </el-descriptions-item>
         </el-descriptions>
 
-        <div class="detail-tip">
-          <el-alert
-            :title="detailTenant.platformLevel ? '该租户为平台级租户，可承载全局治理能力。' : '该租户为业务租户，建议关注到期时间与账号活跃情况。'"
-            type="info"
-            :closable="false"
-          />
+        <div class="capability-grid">
+          <article v-for="capability in getCapabilityList(detailTenant)" :key="capability.label" class="capability-card">
+            <strong>{{ capability.label }}</strong>
+            <span>{{ capability.value }}</span>
+          </article>
         </div>
       </template>
     </el-drawer>
 
-    <el-dialog v-model="visible" :title="editingTenantId ? '编辑租户' : '新增租户'" width="660px">
+    <el-dialog v-model="visible" :title="editingTenantId ? '编辑租户' : '新增租户'" width="680px">
       <el-form ref="formRef" label-position="top" :model="form" :rules="tenantRules">
         <el-row :gutter="16">
           <el-col :span="12">
@@ -292,6 +295,31 @@ function getExpireText(expireAt: string) {
   return '有效中'
 }
 
+function getPackageLabel(tenant: TenantView) {
+  if (tenant.platformLevel) {
+    return '平台治理版'
+  }
+  if (!tenant.expireAt) {
+    return '长期标准版'
+  }
+  return tenant.tenantStatus === 1 ? '生产租户版' : '停用租户版'
+}
+
+function getCapabilityList(tenant: TenantView) {
+  if (tenant.platformLevel) {
+    return [
+      { label: '能力范围', value: '全局治理、租户管理、认证中心' },
+      { label: '访问模式', value: '平台级全域访问' },
+      { label: '推荐用途', value: '平台运维与治理' },
+    ]
+  }
+  return [
+    { label: '能力范围', value: tenant.tenantStatus === 1 ? '用户、角色、部门、审计、系统管理' : '只保留只读访问' },
+    { label: '套餐建议', value: getPackageLabel(tenant) },
+    { label: '运营提示', value: tenant.expireAt ? getExpireText(tenant.expireAt) : '建议补充套餐与配额信息' },
+  ]
+}
+
 function openTenant(row?: TenantView) {
   editingTenantId.value = row?.tenantId ?? null
   Object.assign(form, {
@@ -347,8 +375,20 @@ async function removeTenant(tenantId: string) {
   color: #909399;
 }
 
-.detail-tip {
+.capability-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
   margin-top: 20px;
+}
+
+.capability-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(248, 250, 252, 0.9);
+  color: #475569;
 }
 
 .pagination-wrap {
