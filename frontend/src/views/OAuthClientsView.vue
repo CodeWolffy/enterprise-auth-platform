@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="panel-stack">
     <section class="dashboard-panel">
       <div class="panel-head">
@@ -6,15 +6,71 @@
         <el-button type="primary" @click="openCreate">新增客户端</el-button>
       </div>
 
-      <el-table :data="clients" stripe>
-        <el-table-column prop="clientName" label="客户端名称" min-width="180" />
-        <el-table-column prop="clientId" label="Client ID" min-width="180" />
-        <el-table-column label="类型" min-width="120">
+      <div class="table-tools">
+        <el-radio-group v-model="clientTablePrefs.density" size="small">
+          <el-radio-button value="compact">紧凑</el-radio-button>
+          <el-radio-button value="default">默认</el-radio-button>
+          <el-radio-button value="comfortable">宽松</el-radio-button>
+        </el-radio-group>
+        <el-popover placement="bottom-end" width="240" trigger="click">
+          <template #reference>
+            <el-button size="small">列显示</el-button>
+          </template>
+          <div class="column-chooser">
+            <el-checkbox
+              v-for="item in clientTablePrefs.columns"
+              :key="item.key"
+              :model-value="clientTablePrefs.visibleColumnMap[item.key]"
+              @change="(value: boolean) => clientTablePrefs.setColumnVisible(item.key, value)"
+            >
+              {{ item.label }}
+            </el-checkbox>
+          </div>
+        </el-popover>
+        <el-button size="small" @click="clientTablePrefs.reset()">恢复默认</el-button>
+      </div>
+
+      <el-table :data="clients" stripe :class="`table-density-${clientTablePrefs.density}`" @header-dragend="onClientHeaderDragEnd">
+        <el-table-column
+          v-if="clientTablePrefs.visibleColumnMap.clientName"
+          column-key="clientName"
+          prop="clientName"
+          label="客户端名称"
+          min-width="180"
+          :width="clientTablePrefs.getColumnWidth('clientName')"
+        />
+        <el-table-column
+          v-if="clientTablePrefs.visibleColumnMap.clientId"
+          column-key="clientId"
+          prop="clientId"
+          label="Client ID"
+          min-width="180"
+          :width="clientTablePrefs.getColumnWidth('clientId')"
+        />
+        <el-table-column
+          v-if="clientTablePrefs.visibleColumnMap.type"
+          column-key="type"
+          label="类型"
+          min-width="120"
+          :width="clientTablePrefs.getColumnWidth('type')"
+        >
           <template #default="{ row }"><el-tag :type="row.publicClient ? 'warning' : 'success'">{{ row.publicClient ? '公共客户端' : '机密客户端' }}</el-tag></template>
         </el-table-column>
-        <el-table-column label="授权类型" min-width="220"><template #default="{ row }">{{ row.grantTypes.join(' / ') }}</template></el-table-column>
-        <el-table-column label="状态" width="100"><template #default="{ row }"><el-tag :type="row.enabled ? 'success' : 'info'">{{ row.enabled ? '启用' : '禁用' }}</el-tag></template></el-table-column>
-        <el-table-column fixed="right" label="操作" width="420">
+        <el-table-column
+          v-if="clientTablePrefs.visibleColumnMap.grantTypes"
+          column-key="grantTypes"
+          label="授权类型"
+          min-width="220"
+          :width="clientTablePrefs.getColumnWidth('grantTypes')"
+        ><template #default="{ row }">{{ row.grantTypes.join(' / ') }}</template></el-table-column>
+        <el-table-column
+          v-if="clientTablePrefs.visibleColumnMap.enabled"
+          column-key="enabled"
+          label="状态"
+          min-width="100"
+          :width="clientTablePrefs.getColumnWidth('enabled')"
+        ><template #default="{ row }"><el-tag :type="row.enabled ? 'success' : 'info'">{{ row.enabled ? '启用' : '禁用' }}</el-tag></template></el-table-column>
+        <el-table-column v-if="clientTablePrefs.visibleColumnMap.actions" column-key="actions" fixed="right" label="操作" width="420">
           <template #default="{ row }">
             <el-button link type="primary" @click="viewDetail(row.id)">详情</el-button>
             <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
@@ -126,6 +182,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { createClient, deleteClient, queryClientDetail, queryClients, rotateClientSecret, updateClient, updateClientStatus } from '@/api/oauthClients'
 import { queryOauthScopes } from '@/api/oauthScopes'
+import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { ClientView, OAuthScopeView } from '@/types/auth'
 
 const router = useRouter()
@@ -146,6 +203,14 @@ const defaultSelectedCount = computed(() => (detail.value?.scopeDetails || []).f
 const integrationSummary = computed(() => detail.value ? JSON.stringify({ clientId: detail.value.clientId, recommendedGrantType: detail.value.integrationGuidance?.recommendedGrantType, scopes: detail.value.scopes, grantTypes: detail.value.grantTypes, redirectUris: detail.value.redirectUris, scopeTips: detail.value.integrationGuidance?.scopeTips || [] }, null, 2) : '')
 const authorizeUrlExample = computed(() => !detail.value ? '' : `${window.location.origin}/oauth2/authorize?response_type=code&client_id=${detail.value.clientId}&redirect_uri=${encodeURIComponent(detail.value.redirectUris[0] || 'http://127.0.0.1:5173/auth/callback')}&scope=${encodeURIComponent(detail.value.scopes.join(' '))}&state=demo-state`)
 const tokenCommandExample = computed(() => !detail.value ? '' : ['curl --request POST \\', `  --url ${window.location.origin}/oauth2/token \\`, "  --header 'Content-Type: application/x-www-form-urlencoded' \\", `  --data 'grant_type=client_credentials&client_id=${detail.value.clientId}&client_secret=请替换为实际密钥&scope=${detail.value.scopes.join(' ')}'`].join('\n'))
+const clientTablePrefs = useTablePreferences('eap.table.oauth.clients', [
+  { key: 'clientName', label: '客户端名称', width: 180 },
+  { key: 'clientId', label: 'Client ID', width: 180 },
+  { key: 'type', label: '类型', width: 120 },
+  { key: 'grantTypes', label: '授权类型', width: 220 },
+  { key: 'enabled', label: '状态', width: 100 },
+  { key: 'actions', label: '操作', width: 420 },
+])
 void load()
 async function load() { const [clientList, scopes] = await Promise.all([queryClients(), queryOauthScopes()]); clients.value = clientList; availableScopes.value = scopes.filter((item) => item.enabled) }
 function resetForm() { Object.assign(form, { clientId: '', clientName: '', clientSecret: '', publicClient: true, redirectUrisText: 'http://127.0.0.1:5173/auth/callback', scopes: ['openid', 'profile', 'api.read', 'api.write'], grantTypes: ['authorization_code', 'refresh_token'], requirePkce: true, requireConsent: true, clientStatus: 1 }) }
@@ -158,6 +223,14 @@ async function submit() { if (!formRef.value) return; await formRef.value.valida
 async function submitRotateSecret() { if (!rotateClientId.value) return; const updated = await rotateClientSecret(rotateClientId.value, { clientSecret: rotateSecretForm.clientSecret }); secretVisible.value = false; ElMessage.success('客户端密钥已轮换'); if (updated.issuedClientSecret) { await ElMessageBox.alert(`新的客户端密钥：${updated.issuedClientSecret}`, '请妥善保存密钥', { type: 'success' }) } await load() }
 async function toggleStatus(client: ClientView) { const nextEnabled = !client.enabled; await updateClientStatus(client.id, { enabled: nextEnabled }); ElMessage.success(`客户端已${nextEnabled ? '启用' : '禁用'}`); await load() }
 async function removeClient(client: ClientView) { await ElMessageBox.confirm(`确定要删除客户端 ${client.clientName}（${client.clientId}）吗？`, '删除确认', { type: 'warning' }); await deleteClient(client.id); ElMessage.success('客户端已删除'); await load() }
+
+function onClientHeaderDragEnd(newWidth: number, _oldWidth: number, column: { property?: string; columnKey?: string }) {
+  const key = String(column.columnKey || column.property || '')
+  if (!key) {
+    return
+  }
+  clientTablePrefs.setColumnWidth(key, newWidth)
+}
 </script>
 
 <style scoped lang="scss">
@@ -172,4 +245,6 @@ async function removeClient(client: ClientView) { await ElMessageBox.confirm(`�
 .scope-meta{display:flex;gap:12px;flex-wrap:wrap;color:var(--el-text-color-secondary);font-size:12px}
 .json-pre{margin:0;white-space:pre-wrap;word-break:break-all}
 .history-item{display:grid;gap:4px}
+.table-tools{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin:-4px 0 10px}
+.column-chooser{display:grid;gap:8px;max-height:280px;overflow:auto}
 </style>

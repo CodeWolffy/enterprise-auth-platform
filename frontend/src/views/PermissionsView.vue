@@ -32,13 +32,84 @@
         <el-button type="primary" @click="openPermission()">新增权限</el-button>
       </div>
 
-      <el-table :data="permissions" stripe>
-        <el-table-column prop="permissionName" label="权限名称" min-width="180" />
-        <el-table-column prop="permissionCode" label="权限编码" min-width="180" />
-        <el-table-column prop="resourceCode" label="资源编码" min-width="120" />
-        <el-table-column prop="actionCode" label="动作编码" min-width="120" />
-        <el-table-column prop="scopeCode" label="作用域编码" min-width="120" />
-        <el-table-column fixed="right" label="操作" width="160">
+      <div class="table-tools">
+        <el-radio-group v-model="permissionTablePrefs.density" size="small">
+          <el-radio-button value="compact">紧凑</el-radio-button>
+          <el-radio-button value="default">默认</el-radio-button>
+          <el-radio-button value="comfortable">宽松</el-radio-button>
+        </el-radio-group>
+        <el-popover placement="bottom-end" width="240" trigger="click">
+          <template #reference>
+            <el-button size="small">列显示</el-button>
+          </template>
+          <div class="column-chooser">
+            <el-checkbox
+              v-for="item in permissionTablePrefs.columns"
+              :key="item.key"
+              :model-value="permissionTablePrefs.visibleColumnMap[item.key]"
+              @change="(value: boolean) => permissionTablePrefs.setColumnVisible(item.key, value)"
+            >
+              {{ item.label }}
+            </el-checkbox>
+          </div>
+        </el-popover>
+        <el-button size="small" @click="permissionTablePrefs.reset()">恢复默认</el-button>
+      </div>
+
+      <el-table
+        v-loading="loading"
+        :data="permissions"
+        stripe
+        :class="`table-density-${permissionTablePrefs.density}`"
+        @header-dragend="onPermissionHeaderDragEnd"
+      >
+        <el-table-column
+          v-if="permissionTablePrefs.visibleColumnMap.permissionName"
+          column-key="permissionName"
+          prop="permissionName"
+          label="权限名称"
+          min-width="180"
+          :width="permissionTablePrefs.getColumnWidth('permissionName')"
+        />
+        <el-table-column
+          v-if="permissionTablePrefs.visibleColumnMap.permissionCode"
+          column-key="permissionCode"
+          prop="permissionCode"
+          label="权限编码"
+          min-width="180"
+          :width="permissionTablePrefs.getColumnWidth('permissionCode')"
+        />
+        <el-table-column
+          v-if="permissionTablePrefs.visibleColumnMap.resourceCode"
+          column-key="resourceCode"
+          prop="resourceCode"
+          label="资源编码"
+          min-width="140"
+          :width="permissionTablePrefs.getColumnWidth('resourceCode')"
+        />
+        <el-table-column
+          v-if="permissionTablePrefs.visibleColumnMap.actionCode"
+          column-key="actionCode"
+          prop="actionCode"
+          label="动作编码"
+          min-width="140"
+          :width="permissionTablePrefs.getColumnWidth('actionCode')"
+        />
+        <el-table-column
+          v-if="permissionTablePrefs.visibleColumnMap.scopeCode"
+          column-key="scopeCode"
+          prop="scopeCode"
+          label="作用域编码"
+          min-width="140"
+          :width="permissionTablePrefs.getColumnWidth('scopeCode')"
+        />
+        <el-table-column
+          v-if="permissionTablePrefs.visibleColumnMap.actions"
+          column-key="actions"
+          fixed="right"
+          label="操作"
+          :width="permissionTablePrefs.getColumnWidth('actions') || 160"
+        >
           <template #default="{ row }">
             <el-button link type="primary" @click="openPermission(row)">编辑</el-button>
             <el-button link type="danger" @click="removePermission(row.id)">删除</el-button>
@@ -92,12 +163,23 @@ import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { createPermission, deletePermission, queryPermissions, updatePermission } from '@/api/platform'
+import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { PermissionView } from '@/types/auth'
 
 const permissions = ref<PermissionView[]>([])
+const loading = ref(false)
 const visible = ref(false)
 const editingId = ref<number | null>(null)
 const formRef = ref<FormInstance>()
+
+const permissionTablePrefs = useTablePreferences('table:permissions', [
+  { key: 'permissionName', label: '权限名称', width: 180 },
+  { key: 'permissionCode', label: '权限编码', width: 180 },
+  { key: 'resourceCode', label: '资源编码', width: 140 },
+  { key: 'actionCode', label: '动作编码', width: 140 },
+  { key: 'scopeCode', label: '作用域编码', width: 140 },
+  { key: 'actions', label: '操作', width: 160 },
+])
 
 const form = reactive({
   resourceCode: '',
@@ -122,7 +204,12 @@ const scopeCount = computed(() => new Set(permissions.value.map((item) => item.s
 void load()
 
 async function load() {
-  permissions.value = await queryPermissions()
+  loading.value = true
+  try {
+    permissions.value = await queryPermissions()
+  } finally {
+    loading.value = false
+  }
 }
 
 function openPermission(row?: PermissionView) {
@@ -167,4 +254,29 @@ async function removePermission(id: number) {
   ElMessage.success('权限已删除')
   await load()
 }
+
+function onPermissionHeaderDragEnd(newWidth: number, _oldWidth: number, column: { property?: string; columnKey?: string }) {
+  const key = String(column.columnKey || column.property || '')
+  if (!key) {
+    return
+  }
+  permissionTablePrefs.setColumnWidth(key, newWidth)
+}
 </script>
+
+<style scoped lang="scss">
+.table-tools {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin: -4px 0 10px;
+}
+
+.column-chooser {
+  display: grid;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
+}
+</style>

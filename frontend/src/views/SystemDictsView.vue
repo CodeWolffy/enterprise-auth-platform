@@ -53,19 +53,100 @@
         </el-form-item>
       </el-form>
 
-      <el-table :data="dicts" stripe>
-        <el-table-column prop="category" label="字典分类" min-width="120" />
-        <el-table-column prop="dictType" label="字典类型" min-width="140" />
-        <el-table-column prop="dictCode" label="字典编码" min-width="160" />
-        <el-table-column prop="dictValue" label="字典值" min-width="180" />
-        <el-table-column prop="createdBy" label="创建人" min-width="120" />
-        <el-table-column fixed="right" label="操作" width="220">
+      <div class="table-tools">
+        <el-radio-group v-model="dictTablePrefs.density" size="small">
+          <el-radio-button value="compact">紧凑</el-radio-button>
+          <el-radio-button value="default">默认</el-radio-button>
+          <el-radio-button value="comfortable">宽松</el-radio-button>
+        </el-radio-group>
+        <el-popover placement="bottom-end" width="240" trigger="click">
+          <template #reference>
+            <el-button size="small">列显示</el-button>
+          </template>
+          <div class="column-chooser">
+            <el-checkbox
+              v-for="item in dictTablePrefs.columns"
+              :key="item.key"
+              :model-value="dictTablePrefs.visibleColumnMap[item.key]"
+              @change="(value: boolean) => dictTablePrefs.setColumnVisible(item.key, value)"
+            >
+              {{ item.label }}
+            </el-checkbox>
+          </div>
+        </el-popover>
+        <el-button size="small" @click="dictTablePrefs.reset()">恢复默认</el-button>
+      </div>
+
+      <el-result v-if="loadError" icon="error" title="加载失败" :sub-title="loadError" class="panel-result">
+        <template #extra>
+          <el-button type="primary" @click="load">重试</el-button>
+        </template>
+      </el-result>
+
+      <el-table
+        v-else
+        v-loading="loading"
+        :data="dicts"
+        stripe
+        :class="`table-density-${dictTablePrefs.density}`"
+        @header-dragend="onDictHeaderDragEnd"
+      >
+        <el-table-column
+          v-if="dictTablePrefs.visibleColumnMap.category"
+          column-key="category"
+          prop="category"
+          label="字典分类"
+          min-width="120"
+          :width="dictTablePrefs.getColumnWidth('category')"
+        />
+        <el-table-column
+          v-if="dictTablePrefs.visibleColumnMap.dictType"
+          column-key="dictType"
+          prop="dictType"
+          label="字典类型"
+          min-width="140"
+          :width="dictTablePrefs.getColumnWidth('dictType')"
+        />
+        <el-table-column
+          v-if="dictTablePrefs.visibleColumnMap.dictCode"
+          column-key="dictCode"
+          prop="dictCode"
+          label="字典编码"
+          min-width="160"
+          :width="dictTablePrefs.getColumnWidth('dictCode')"
+        />
+        <el-table-column
+          v-if="dictTablePrefs.visibleColumnMap.dictValue"
+          column-key="dictValue"
+          prop="dictValue"
+          label="字典值"
+          min-width="180"
+          :width="dictTablePrefs.getColumnWidth('dictValue')"
+        />
+        <el-table-column
+          v-if="dictTablePrefs.visibleColumnMap.createdBy"
+          column-key="createdBy"
+          prop="createdBy"
+          label="创建人"
+          min-width="120"
+          :width="dictTablePrefs.getColumnWidth('createdBy')"
+        />
+        <el-table-column
+          v-if="dictTablePrefs.visibleColumnMap.actions"
+          column-key="actions"
+          fixed="right"
+          label="操作"
+          :width="dictTablePrefs.getColumnWidth('actions') || 220"
+        >
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button link type="primary" @click="openDict(row)">编辑</el-button>
             <el-button link type="danger" @click="removeDict(row.id)">删除</el-button>
           </template>
         </el-table-column>
+        <template #empty>
+          <el-empty description="暂无字典数据" />
+        </template>
       </el-table>
 
       <div class="pagination-wrap">
@@ -94,7 +175,7 @@
       </template>
     </el-drawer>
 
-    <el-dialog v-model="visible" :title="editingId ? '编辑字典项' : '新增字典项'" width="520px">
+    <el-dialog v-model="visible" :title="editingId !== null ? '编辑字典项' : '新增字典项'" width="520px">
       <el-form ref="formRef" label-position="top" :model="form" :rules="rules">
         <el-form-item label="字典类型" prop="dictType">
           <el-input v-model="form.dictType" />
@@ -119,9 +200,12 @@ import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { createDict, deleteDict, queryCategories, queryDicts, updateDict } from '@/api/system'
+import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { CategoryOption, DictView } from '@/types/auth'
 
 const dicts = ref<DictView[]>([])
+const loading = ref(false)
+const loadError = ref('')
 const visible = ref(false)
 const detailVisible = ref(false)
 const editingId = ref<number | null>(null)
@@ -137,19 +221,20 @@ const total = ref(0)
 const formRef = ref<FormInstance>()
 const categoryOptions = ref<CategoryOption[]>([])
 
+const dictTablePrefs = useTablePreferences('table:system-dicts', [
+  { key: 'category', label: '字典分类', width: 120 },
+  { key: 'dictType', label: '字典类型', width: 140 },
+  { key: 'dictCode', label: '字典编码', width: 160 },
+  { key: 'dictValue', label: '字典值', width: 180 },
+  { key: 'createdBy', label: '创建人', width: 120 },
+  { key: 'actions', label: '操作', width: 220 },
+])
+
 const form = reactive({
   dictType: '',
   dictCode: '',
   dictValue: '',
 })
-
-function toDictPayload() {
-  return {
-    dictType: form.dictType.trim(),
-    dictCode: form.dictCode.trim(),
-    dictValue: form.dictValue.trim(),
-  }
-}
 
 const rules = reactive<FormRules>({
   dictType: [{ required: true, message: '请输入字典类型', trigger: 'blur' }],
@@ -163,17 +248,27 @@ void load()
 void loadCategories()
 
 async function load() {
-  const result = await queryDicts({
-    dictType: typeKeyword.value || undefined,
-    category: category.value || undefined,
-    keyword: keyword.value || undefined,
-    page: page.value,
-    size: size.value,
-    sortBy: sortBy.value,
-    sortDirection: sortDirection.value,
-  })
-  dicts.value = result.records
-  total.value = result.total
+  loading.value = true
+  loadError.value = ''
+  try {
+    const result = await queryDicts({
+      dictType: typeKeyword.value || undefined,
+      category: category.value || undefined,
+      keyword: keyword.value || undefined,
+      page: page.value,
+      size: size.value,
+      sortBy: sortBy.value,
+      sortDirection: sortDirection.value,
+    })
+    dicts.value = result.records
+    total.value = result.total
+  } catch {
+    dicts.value = []
+    total.value = 0
+    loadError.value = '字典数据加载失败，请稍后重试。'
+  } finally {
+    loading.value = false
+  }
 }
 
 async function loadCategories() {
@@ -198,6 +293,7 @@ function resetSearch() {
 
 function handleSizeChange(value: number) {
   size.value = value
+  page.value = 1
   void load()
 }
 
@@ -225,21 +321,21 @@ async function submit() {
   if (!formRef.value) {
     return
   }
-  try {
-    await formRef.value.validate()
-    const payload = toDictPayload()
-    if (editingId.value !== null) {
-      await updateDict(editingId.value, payload)
-      ElMessage.success('字典项已更新')
-    } else {
-      await createDict(payload)
-      ElMessage.success('字典项已创建')
-    }
-    visible.value = false
-    await load()
-  } catch {
-    // Error toast is handled by HTTP interceptor; keep submit from bubbling unhandled rejections.
+  await formRef.value.validate()
+  const payload = {
+    dictType: form.dictType.trim(),
+    dictCode: form.dictCode.trim(),
+    dictValue: form.dictValue.trim(),
   }
+  if (editingId.value !== null) {
+    await updateDict(editingId.value, payload)
+    ElMessage.success('字典项已更新')
+  } else {
+    await createDict(payload)
+    ElMessage.success('字典项已创建')
+  }
+  visible.value = false
+  await load()
 }
 
 async function removeDict(id: number) {
@@ -248,6 +344,14 @@ async function removeDict(id: number) {
   ElMessage.success('字典项已删除')
   await load()
 }
+
+function onDictHeaderDragEnd(newWidth: number, _oldWidth: number, column: { property?: string; columnKey?: string }) {
+  const key = String(column.columnKey || column.property || '')
+  if (!key) {
+    return
+  }
+  dictTablePrefs.setColumnWidth(key, newWidth)
+}
 </script>
 
 <style scoped lang="scss">
@@ -255,5 +359,24 @@ async function removeDict(id: number) {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+.table-tools {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin: -4px 0 10px;
+}
+
+.column-chooser {
+  display: grid;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.panel-result {
+  margin: 12px 0 8px;
 }
 </style>

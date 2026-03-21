@@ -8,7 +8,10 @@
     "build": "vue-tsc --noEmit && node ./scripts/run-vite.mjs build",
     "preview": "node ./scripts/run-vite.mjs preview",
     "lint": "eslint . --ext .ts,.vue",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test:e2e": "playwright test",
+    "test:visual": "playwright test e2e/visual-baseline.spec.ts",
+    "test:visual:update": "playwright test e2e/visual-baseline.spec.ts --update-snapshots"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",
@@ -21,6 +24,7 @@
     "vue-router": "^4.2.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@types/node": "^20.11.30",
     "@typescript-eslint/eslint-plugin": "^8.57.1",
     "@typescript-eslint/parser": "^8.57.1",

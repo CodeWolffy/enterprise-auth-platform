@@ -21,7 +21,7 @@
 
       <el-form label-position="top">
         <el-form-item label="租户编码">
-          <el-select v-model="tenantId" placeholder="请选择租户">
+          <el-select v-model="tenantId" placeholder="请选择租户" data-testid="login-tenant-select">
             <el-option label="平台租户 (platform)" value="platform" />
             <el-option label="租户 A (tenant-a)" value="tenant-a" />
           </el-select>
@@ -29,7 +29,7 @@
       </el-form>
 
       <div class="auth-actions">
-        <el-button type="primary" size="large" :loading="loading" @click="handleLogin">
+        <el-button type="primary" size="large" :loading="loading" data-testid="login-submit" @click="handleLogin">
           跳转统一认证中心
         </el-button>
       </div>

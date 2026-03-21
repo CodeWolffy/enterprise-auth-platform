@@ -30,8 +30,8 @@
           <h3>安全审计</h3>
         </div>
         <div class="panel-actions">
-          <el-button @click="exportCurrentPage">导出当前查询</el-button>
-          <el-button type="primary" plain @click="createAsyncExport">异步导出</el-button>
+          <el-button data-testid="audit-export-current" @click="exportCurrentPage">导出当前查询</el-button>
+          <el-button type="primary" plain data-testid="audit-export-async" @click="createAsyncExport">异步导出</el-button>
         </div>
       </div>
 
@@ -59,6 +59,7 @@
             start-placeholder="开始时间"
             end-placeholder="结束时间"
             value-format="YYYY-MM-DDTHH:mm:ss"
+            data-testid="audit-date-range"
             clearable
           />
         </el-form-item>
@@ -68,14 +69,43 @@
         </el-form-item>
       </el-form>
 
-      <el-table :data="page.records" stripe>
-        <el-table-column prop="type" label="事件类型" min-width="180" />
-        <el-table-column prop="operator" label="操作人" min-width="120" />
-        <el-table-column prop="tenantId" label="租户" min-width="120" />
-        <el-table-column prop="requestId" label="请求 ID" min-width="180" />
-        <el-table-column prop="clientIp" label="客户端 IP" min-width="140" />
-        <el-table-column prop="occurredAt" label="发生时间" min-width="180" />
-        <el-table-column label="事件明细" min-width="220">
+      <div class="table-tools">
+        <el-radio-group v-model="auditTablePrefs.density" size="small">
+          <el-radio-button value="compact">紧凑</el-radio-button>
+          <el-radio-button value="default">默认</el-radio-button>
+          <el-radio-button value="comfortable">宽松</el-radio-button>
+        </el-radio-group>
+        <el-popover placement="bottom-end" width="260" trigger="click">
+          <template #reference>
+            <el-button size="small">列显示</el-button>
+          </template>
+          <div class="column-chooser">
+            <el-checkbox
+              v-for="item in auditTablePrefs.columns"
+              :key="item.key"
+              :model-value="auditTablePrefs.visibleColumnMap[item.key]"
+              @change="(value: boolean) => auditTablePrefs.setColumnVisible(item.key, value)"
+            >
+              {{ item.label }}
+            </el-checkbox>
+          </div>
+        </el-popover>
+        <el-button size="small" @click="auditTablePrefs.reset()">恢复默认</el-button>
+      </div>
+
+      <el-table
+        :data="page.records"
+        stripe
+        :class="`table-density-${auditTablePrefs.density}`"
+        @header-dragend="onAuditHeaderDragEnd"
+      >
+        <el-table-column v-if="auditTablePrefs.visibleColumnMap.type" column-key="type" prop="type" label="事件类型" min-width="180" :width="auditTablePrefs.getColumnWidth('type')" />
+        <el-table-column v-if="auditTablePrefs.visibleColumnMap.operator" column-key="operator" prop="operator" label="操作人" min-width="120" :width="auditTablePrefs.getColumnWidth('operator')" />
+        <el-table-column v-if="auditTablePrefs.visibleColumnMap.tenantId" column-key="tenantId" prop="tenantId" label="租户" min-width="120" :width="auditTablePrefs.getColumnWidth('tenantId')" />
+        <el-table-column v-if="auditTablePrefs.visibleColumnMap.requestId" column-key="requestId" prop="requestId" label="请求 ID" min-width="180" :width="auditTablePrefs.getColumnWidth('requestId')" />
+        <el-table-column v-if="auditTablePrefs.visibleColumnMap.clientIp" column-key="clientIp" prop="clientIp" label="客户端 IP" min-width="140" :width="auditTablePrefs.getColumnWidth('clientIp')" />
+        <el-table-column v-if="auditTablePrefs.visibleColumnMap.occurredAt" column-key="occurredAt" prop="occurredAt" label="发生时间" min-width="180" :width="auditTablePrefs.getColumnWidth('occurredAt')" />
+        <el-table-column v-if="auditTablePrefs.visibleColumnMap.details" column-key="details" label="事件明细" min-width="220" :width="auditTablePrefs.getColumnWidth('details')">
           <template #default="{ row }">
             <el-popover placement="left" :width="420" trigger="click">
               <template #reference>
@@ -100,6 +130,29 @@
           @size-change="handleSizeChange"
         />
       </div>
+    </section>
+
+    <section class="dashboard-grid">
+      <article class="stat-card">
+        <span class="eyebrow">Tasks</span>
+        <strong>{{ exportTasks.total }}</strong>
+        <span>当前筛选条件下的导出任务总数</span>
+      </article>
+      <article class="stat-card">
+        <span class="eyebrow">Success</span>
+        <strong>{{ exportSuccessCount }}</strong>
+        <span>当前页导出成功任务</span>
+      </article>
+      <article class="stat-card">
+        <span class="eyebrow">Archived</span>
+        <strong>{{ exportArchivedCount }}</strong>
+        <span>当前页已归档任务</span>
+      </article>
+      <article class="stat-card">
+        <span class="eyebrow">Expiring</span>
+        <strong>{{ exportExpiringSoonCount }}</strong>
+        <span>当前页 24 小时内到期任务</span>
+      </article>
     </section>
 
     <section class="dashboard-panel">
@@ -156,10 +209,39 @@
         </el-form-item>
       </el-form>
 
-      <el-table :data="exportTasks.records" stripe>
-        <el-table-column prop="id" label="任务 ID" width="100" />
-        <el-table-column prop="status" label="状态" width="100" />
-        <el-table-column label="进度" min-width="220">
+      <div class="table-tools">
+        <el-radio-group v-model="exportTablePrefs.density" size="small">
+          <el-radio-button value="compact">紧凑</el-radio-button>
+          <el-radio-button value="default">默认</el-radio-button>
+          <el-radio-button value="comfortable">宽松</el-radio-button>
+        </el-radio-group>
+        <el-popover placement="bottom-end" width="260" trigger="click">
+          <template #reference>
+            <el-button size="small">列显示</el-button>
+          </template>
+          <div class="column-chooser">
+            <el-checkbox
+              v-for="item in exportTablePrefs.columns"
+              :key="item.key"
+              :model-value="exportTablePrefs.visibleColumnMap[item.key]"
+              @change="(value: boolean) => exportTablePrefs.setColumnVisible(item.key, value)"
+            >
+              {{ item.label }}
+            </el-checkbox>
+          </div>
+        </el-popover>
+        <el-button size="small" @click="exportTablePrefs.reset()">恢复默认</el-button>
+      </div>
+
+      <el-table
+        :data="exportTasks.records"
+        stripe
+        :class="`table-density-${exportTablePrefs.density}`"
+        @header-dragend="onExportHeaderDragEnd"
+      >
+        <el-table-column v-if="exportTablePrefs.visibleColumnMap.id" column-key="id" prop="id" label="任务 ID" width="100" :min-width="100" :resizable="true" />
+        <el-table-column v-if="exportTablePrefs.visibleColumnMap.status" column-key="status" prop="status" label="状态" width="100" :min-width="100" :resizable="true" />
+        <el-table-column v-if="exportTablePrefs.visibleColumnMap.progress" column-key="progress" label="进度" min-width="220" :width="exportTablePrefs.getColumnWidth('progress')">
           <template #default="{ row }">
             <div class="progress-cell">
               <el-progress :percentage="row.progressPercent" :status="row.status === 'FAILED' ? 'exception' : undefined" />
@@ -167,16 +249,16 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="operator" label="发起人" min-width="120" />
-        <el-table-column prop="recordCount" label="记录数" width="100" />
-        <el-table-column label="归档结果" min-width="210">
+        <el-table-column v-if="exportTablePrefs.visibleColumnMap.operator" column-key="operator" prop="operator" label="发起人" min-width="120" :width="exportTablePrefs.getColumnWidth('operator')" />
+        <el-table-column v-if="exportTablePrefs.visibleColumnMap.recordCount" column-key="recordCount" prop="recordCount" label="记录数" width="100" :min-width="100" :resizable="true" />
+        <el-table-column v-if="exportTablePrefs.visibleColumnMap.archiveResult" column-key="archiveResult" label="归档结果" min-width="210" :width="exportTablePrefs.getColumnWidth('archiveResult')">
           <template #default="{ row }">
             <el-tag :type="row.archived ? 'info' : row.status === 'SUCCESS' ? 'success' : row.status === 'FAILED' ? 'danger' : 'warning'" effect="plain">
               {{ archiveResultSummary(row) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="到期提示" min-width="240">
+        <el-table-column v-if="exportTablePrefs.visibleColumnMap.expiryHint" column-key="expiryHint" label="到期提示" min-width="240" :width="exportTablePrefs.getColumnWidth('expiryHint')">
           <template #default="{ row }">
             <div class="retention-cell">
               <span>{{ expiryHint(row) }}</span>
@@ -188,16 +270,16 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="requestedAt" label="发起时间" min-width="180" />
-        <el-table-column prop="completedAt" label="完成时间" min-width="180" />
-        <el-table-column prop="errorMessage" label="失败原因" min-width="180" show-overflow-tooltip />
-        <el-table-column fixed="right" label="操作" width="340">
+        <el-table-column v-if="exportTablePrefs.visibleColumnMap.requestedAt" column-key="requestedAt" prop="requestedAt" label="发起时间" min-width="180" :width="exportTablePrefs.getColumnWidth('requestedAt')" />
+        <el-table-column v-if="exportTablePrefs.visibleColumnMap.completedAt" column-key="completedAt" prop="completedAt" label="完成时间" min-width="180" :width="exportTablePrefs.getColumnWidth('completedAt')" />
+        <el-table-column v-if="exportTablePrefs.visibleColumnMap.errorMessage" column-key="errorMessage" prop="errorMessage" label="失败原因" min-width="180" show-overflow-tooltip :width="exportTablePrefs.getColumnWidth('errorMessage')" />
+        <el-table-column v-if="exportTablePrefs.visibleColumnMap.actions" column-key="actions" fixed="right" label="操作" width="340" :min-width="240" :resizable="true">
           <template #default="{ row }">
-            <el-button link type="primary" @click="openTaskDetail(row)">详情</el-button>
+            <el-button link type="primary" data-testid="audit-task-detail" @click="openTaskDetail(row)">详情</el-button>
             <el-button link type="primary" :disabled="row.status !== 'SUCCESS'" @click="downloadTask(row.id)">下载</el-button>
-            <el-button link type="warning" :disabled="!row.archivable" @click="archiveTask(row.id)">归档</el-button>
+            <el-button link type="warning" data-testid="audit-task-archive" :disabled="!row.archivable" @click="archiveTask(row.id)">归档</el-button>
             <el-button link type="warning" :disabled="row.status !== 'FAILED'" @click="retryTask(row.id)">重试</el-button>
-            <el-button link type="danger" @click="removeTask(row.id)">删除</el-button>
+            <el-button link type="danger" data-testid="audit-task-delete" @click="removeTask(row.id)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -251,6 +333,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useTablePreferences } from '@/composables/useTablePreferences'
 import {
   archiveAuditExportTask,
   archiveAuditExportTasks,
@@ -313,6 +396,35 @@ const exportPolicy = reactive<AuditExportPolicy>({
 const eventTypeCount = computed(() => new Set(page.value.records.map((item) => item.type)).size)
 const operatorCount = computed(() => new Set(page.value.records.map((item) => item.operator)).size)
 const requestCount = computed(() => new Set(page.value.records.map((item) => item.requestId).filter(Boolean)).size)
+const exportSuccessCount = computed(() => exportTasks.value.records.filter((item) => item.status === 'SUCCESS').length)
+const exportArchivedCount = computed(() => exportTasks.value.records.filter((item) => item.archived).length)
+const exportExpiringSoonCount = computed(() =>
+  exportTasks.value.records.filter((item) => !item.archived && item.expiresAt && daysUntil(item.expiresAt) !== null && (daysUntil(item.expiresAt) as number) <= 1).length,
+)
+
+const auditTablePrefs = useTablePreferences('eap.table.audit.events', [
+  { key: 'type', label: '事件类型', width: 180 },
+  { key: 'operator', label: '操作人', width: 120 },
+  { key: 'tenantId', label: '租户', width: 120 },
+  { key: 'requestId', label: '请求ID', width: 180 },
+  { key: 'clientIp', label: '客户端IP', width: 140 },
+  { key: 'occurredAt', label: '发生时间', width: 180 },
+  { key: 'details', label: '事件明细', width: 220 },
+])
+
+const exportTablePrefs = useTablePreferences('eap.table.audit.exports', [
+  { key: 'id', label: '任务ID', width: 100 },
+  { key: 'status', label: '状态', width: 100 },
+  { key: 'progress', label: '进度', width: 220 },
+  { key: 'operator', label: '发起人', width: 120 },
+  { key: 'recordCount', label: '记录数', width: 100 },
+  { key: 'archiveResult', label: '归档结果', width: 210 },
+  { key: 'expiryHint', label: '到期提示', width: 240 },
+  { key: 'requestedAt', label: '发起时间', width: 180 },
+  { key: 'completedAt', label: '完成时间', width: 180 },
+  { key: 'errorMessage', label: '失败原因', width: 180 },
+  { key: 'actions', label: '操作', width: 340 },
+])
 
 void load()
 
@@ -564,6 +676,22 @@ function openTaskDetail(task: AuditExportTask) {
   detailTask.value = task
   taskDetailVisible.value = true
 }
+
+function onAuditHeaderDragEnd(newWidth: number, _oldWidth: number, column: { property?: string; columnKey?: string }) {
+  const key = String(column.columnKey || column.property || '')
+  if (!key) {
+    return
+  }
+  auditTablePrefs.setColumnWidth(key, newWidth)
+}
+
+function onExportHeaderDragEnd(newWidth: number, _oldWidth: number, column: { property?: string; columnKey?: string }) {
+  const key = String(column.columnKey || column.property || '')
+  if (!key) {
+    return
+  }
+  exportTablePrefs.setColumnWidth(key, newWidth)
+}
 </script>
 
 <style scoped lang="scss">
@@ -614,5 +742,20 @@ function openTaskDetail(task: AuditExportTask) {
 
 .detail-block {
   margin-top: 16px;
+}
+
+.table-tools {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin: -4px 0 10px;
+}
+
+.column-chooser {
+  display: grid;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
 }
 </style>

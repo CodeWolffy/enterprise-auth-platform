@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="panel-stack">
     <section class="dashboard-grid">
       <article class="stat-card">
@@ -35,33 +35,129 @@
         </div>
       </div>
 
-      <el-table v-loading="loading" :data="scopes" stripe>
-        <el-table-column prop="scopeCode" label="作用域编码" min-width="180" />
-        <el-table-column prop="scopeName" label="作用域名称" min-width="160" />
-        <el-table-column prop="scopeType" label="作用域类型" min-width="120" />
-        <el-table-column prop="scopeDesc" label="作用域说明" min-width="260" show-overflow-tooltip />
-        <el-table-column label="默认选中" width="100">
+      <div class="table-tools">
+        <el-radio-group v-model="scopeTablePrefs.density" size="small">
+          <el-radio-button value="compact">紧凑</el-radio-button>
+          <el-radio-button value="default">默认</el-radio-button>
+          <el-radio-button value="comfortable">宽松</el-radio-button>
+        </el-radio-group>
+        <el-popover placement="bottom-end" width="260" trigger="click">
+          <template #reference>
+            <el-button size="small">列显示</el-button>
+          </template>
+          <div class="column-chooser">
+            <el-checkbox
+              v-for="item in scopeTablePrefs.columns"
+              :key="item.key"
+              :model-value="scopeTablePrefs.visibleColumnMap[item.key]"
+              @change="(value: boolean) => scopeTablePrefs.setColumnVisible(item.key, value)"
+            >
+              {{ item.label }}
+            </el-checkbox>
+          </div>
+        </el-popover>
+        <el-button size="small" @click="scopeTablePrefs.reset()">恢复默认</el-button>
+      </div>
+
+      <el-table
+        v-loading="loading"
+        :data="scopes"
+        stripe
+        :class="`table-density-${scopeTablePrefs.density}`"
+        @header-dragend="onScopeHeaderDragEnd"
+      >
+        <el-table-column
+          v-if="scopeTablePrefs.visibleColumnMap.scopeCode"
+          column-key="scopeCode"
+          prop="scopeCode"
+          label="作用域编码"
+          min-width="180"
+          :width="scopeTablePrefs.getColumnWidth('scopeCode')"
+        />
+        <el-table-column
+          v-if="scopeTablePrefs.visibleColumnMap.scopeName"
+          column-key="scopeName"
+          prop="scopeName"
+          label="作用域名称"
+          min-width="160"
+          :width="scopeTablePrefs.getColumnWidth('scopeName')"
+        />
+        <el-table-column
+          v-if="scopeTablePrefs.visibleColumnMap.scopeType"
+          column-key="scopeType"
+          prop="scopeType"
+          label="作用域类型"
+          min-width="120"
+          :width="scopeTablePrefs.getColumnWidth('scopeType')"
+        />
+        <el-table-column
+          v-if="scopeTablePrefs.visibleColumnMap.scopeDesc"
+          column-key="scopeDesc"
+          prop="scopeDesc"
+          label="作用域说明"
+          min-width="260"
+          show-overflow-tooltip
+          :width="scopeTablePrefs.getColumnWidth('scopeDesc')"
+        />
+        <el-table-column
+          v-if="scopeTablePrefs.visibleColumnMap.defaultSelected"
+          column-key="defaultSelected"
+          label="默认选中"
+          min-width="110"
+          :width="scopeTablePrefs.getColumnWidth('defaultSelected')"
+        >
           <template #default="{ row }">
             <el-tag :type="row.defaultSelected ? 'success' : 'info'">{{ row.defaultSelected ? '是' : '否' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="同意页展示" width="120">
+        <el-table-column
+          v-if="scopeTablePrefs.visibleColumnMap.visibleInConsent"
+          column-key="visibleInConsent"
+          label="同意页展示"
+          min-width="120"
+          :width="scopeTablePrefs.getColumnWidth('visibleInConsent')"
+        >
           <template #default="{ row }">
             <el-tag :type="row.visibleInConsent ? 'success' : 'info'">{{ row.visibleInConsent ? '展示' : '隐藏' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="100">
+        <el-table-column
+          v-if="scopeTablePrefs.visibleColumnMap.enabled"
+          column-key="enabled"
+          label="状态"
+          min-width="100"
+          :width="scopeTablePrefs.getColumnWidth('enabled')"
+        >
           <template #default="{ row }">
             <el-tag :type="row.enabled ? 'success' : 'info'">{{ row.enabled ? '启用' : '停用' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="引用客户端" width="130">
+        <el-table-column
+          v-if="scopeTablePrefs.visibleColumnMap.referencedClientCount"
+          column-key="referencedClientCount"
+          label="引用客户端"
+          min-width="130"
+          :width="scopeTablePrefs.getColumnWidth('referencedClientCount')"
+        >
           <template #default="{ row }">
             <el-tag type="info" effect="plain">{{ row.referencedClientCount || 0 }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="sortOrder" label="排序" width="90" />
-        <el-table-column fixed="right" label="操作" width="220">
+        <el-table-column
+          v-if="scopeTablePrefs.visibleColumnMap.sortOrder"
+          column-key="sortOrder"
+          prop="sortOrder"
+          label="排序"
+          min-width="90"
+          :width="scopeTablePrefs.getColumnWidth('sortOrder')"
+        />
+        <el-table-column
+          v-if="scopeTablePrefs.visibleColumnMap.actions"
+          column-key="actions"
+          fixed="right"
+          label="操作"
+          :width="scopeTablePrefs.getColumnWidth('actions') || 220"
+        >
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button link type="primary" @click="openDialog(row)">编辑</el-button>
@@ -158,6 +254,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { createOauthScope, deleteOauthScope, queryOauthScopes, updateOauthScope } from '@/api/oauthScopes'
+import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { OAuthScopeView } from '@/types/auth'
 
 const router = useRouter()
@@ -168,6 +265,19 @@ const editingId = ref<number | null>(null)
 const formRef = ref<FormInstance>()
 const scopes = ref<OAuthScopeView[]>([])
 const detailItem = ref<OAuthScopeView | null>(null)
+
+const scopeTablePrefs = useTablePreferences('table:oauth-scopes', [
+  { key: 'scopeCode', label: '作用域编码', width: 180 },
+  { key: 'scopeName', label: '作用域名称', width: 160 },
+  { key: 'scopeType', label: '作用域类型', width: 120 },
+  { key: 'scopeDesc', label: '作用域说明', width: 260 },
+  { key: 'defaultSelected', label: '默认选中', width: 110 },
+  { key: 'visibleInConsent', label: '同意页展示', width: 120 },
+  { key: 'enabled', label: '状态', width: 100 },
+  { key: 'referencedClientCount', label: '引用客户端', width: 130 },
+  { key: 'sortOrder', label: '排序', width: 90 },
+  { key: 'actions', label: '操作', width: 220 },
+])
 
 const form = reactive({
   scopeCode: '',
@@ -245,6 +355,14 @@ async function removeScope(row: OAuthScopeView) {
 function goToClients() {
   void router.push({ name: 'oauth-clients' })
 }
+
+function onScopeHeaderDragEnd(newWidth: number, _oldWidth: number, column: { property?: string; columnKey?: string }) {
+  const key = String(column.columnKey || column.property || '')
+  if (!key) {
+    return
+  }
+  scopeTablePrefs.setColumnWidth(key, newWidth)
+}
 </script>
 
 <style scoped lang="scss">
@@ -253,5 +371,20 @@ function goToClients() {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.table-tools {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin: -4px 0 10px;
+}
+
+.column-chooser {
+  display: grid;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
 }
 </style>

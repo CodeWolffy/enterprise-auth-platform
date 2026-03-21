@@ -1,5 +1,18 @@
 <template>
   <div class="panel-stack">
+    <section class="dashboard-grid">
+      <article class="stat-card">
+        <span class="eyebrow">Categories</span>
+        <strong>{{ rows.length }}</strong>
+        <span>当前分类条目总数</span>
+      </article>
+      <article class="stat-card">
+        <span class="eyebrow">Matchers</span>
+        <strong>{{ matcherCount }}</strong>
+        <span>当前页匹配规则总数</span>
+      </article>
+    </section>
+
     <section class="dashboard-panel">
       <div class="panel-head">
         <div>
@@ -14,23 +27,89 @@
         <el-tab-pane label="参数分类" name="config" />
       </el-tabs>
 
-      <el-table v-loading="loading" :data="rows" stripe>
-        <el-table-column prop="code" label="分类编码" min-width="160" />
-        <el-table-column prop="name" label="分类名称" min-width="180" />
-        <el-table-column label="匹配规则" min-width="320">
+      <div class="table-tools">
+        <el-radio-group v-model="categoryTablePrefs.density" size="small">
+          <el-radio-button value="compact">紧凑</el-radio-button>
+          <el-radio-button value="default">默认</el-radio-button>
+          <el-radio-button value="comfortable">宽松</el-radio-button>
+        </el-radio-group>
+        <el-popover placement="bottom-end" width="240" trigger="click">
+          <template #reference>
+            <el-button size="small">列显示</el-button>
+          </template>
+          <div class="column-chooser">
+            <el-checkbox
+              v-for="item in categoryTablePrefs.columns"
+              :key="item.key"
+              :model-value="categoryTablePrefs.visibleColumnMap[item.key]"
+              @change="(value: boolean) => categoryTablePrefs.setColumnVisible(item.key, value)"
+            >
+              {{ item.label }}
+            </el-checkbox>
+          </div>
+        </el-popover>
+        <el-button size="small" @click="categoryTablePrefs.reset()">恢复默认</el-button>
+      </div>
+
+      <el-result v-if="loadError" icon="error" title="加载失败" :sub-title="loadError" class="panel-result">
+        <template #extra>
+          <el-button type="primary" @click="load">重试</el-button>
+        </template>
+      </el-result>
+
+      <el-table
+        v-else
+        v-loading="loading"
+        :data="rows"
+        stripe
+        :class="`table-density-${categoryTablePrefs.density}`"
+        @header-dragend="onCategoryHeaderDragEnd"
+      >
+        <el-table-column
+          v-if="categoryTablePrefs.visibleColumnMap.code"
+          column-key="code"
+          prop="code"
+          label="分类编码"
+          min-width="160"
+          :width="categoryTablePrefs.getColumnWidth('code')"
+        />
+        <el-table-column
+          v-if="categoryTablePrefs.visibleColumnMap.name"
+          column-key="name"
+          prop="name"
+          label="分类名称"
+          min-width="180"
+          :width="categoryTablePrefs.getColumnWidth('name')"
+        />
+        <el-table-column
+          v-if="categoryTablePrefs.visibleColumnMap.matchers"
+          column-key="matchers"
+          label="匹配规则"
+          min-width="320"
+          :width="categoryTablePrefs.getColumnWidth('matchers')"
+        >
           <template #default="{ row }">
             <el-tag v-for="matcher in row.matchers" :key="matcher" class="scope-tag" size="small">
               {{ matcher }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column fixed="right" label="操作" width="160">
+        <el-table-column
+          v-if="categoryTablePrefs.visibleColumnMap.actions"
+          column-key="actions"
+          fixed="right"
+          label="操作"
+          :width="categoryTablePrefs.getColumnWidth('actions') || 160"
+        >
           <template #default="{ row }">
             <el-button link type="primary" @click="openAnalysis(row)">分析</el-button>
             <el-button link type="primary" @click="openDialog(row)">编辑</el-button>
             <el-button link type="danger" @click="removeRow(row)">删除</el-button>
           </template>
         </el-table-column>
+        <template #empty>
+          <el-empty description="暂无分类数据" />
+        </template>
       </el-table>
     </section>
 
@@ -43,12 +122,7 @@
           <el-input v-model="form.name" />
         </el-form-item>
         <el-form-item label="匹配规则" prop="matchersText">
-          <el-input
-            v-model="form.matchersText"
-            type="textarea"
-            :rows="4"
-            placeholder="每行一个匹配规则，例如 oauth.*"
-          />
+          <el-input v-model="form.matchersText" type="textarea" :rows="4" placeholder="每行一个匹配规则，例如 oauth.*" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -106,10 +180,11 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, reactive, ref } from 'vue'
+import { computed, nextTick, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { createCategoryOption, deleteCategoryOption, queryCategoryAnalysis, queryCategoryOptions, updateCategoryOption } from '@/api/system'
+import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { CategoryAnalysis, CategoryOption } from '@/types/auth'
 import { BarChart } from 'echarts/charts'
 import { GridComponent, TooltipComponent } from 'echarts/components'
@@ -120,6 +195,7 @@ use([BarChart, GridComponent, TooltipComponent, CanvasRenderer])
 
 const activeTab = ref<'dict' | 'config'>('dict')
 const loading = ref(false)
+const loadError = ref('')
 const rows = ref<CategoryOption[]>([])
 const visible = ref(false)
 const analysisVisible = ref(false)
@@ -127,6 +203,13 @@ const editingCode = ref<string | null>(null)
 const formRef = ref<FormInstance>()
 const analysis = ref<CategoryAnalysis | null>(null)
 const trendChartRef = ref<HTMLElement | null>(null)
+
+const categoryTablePrefs = useTablePreferences('table:system-categories', [
+  { key: 'code', label: '分类编码', width: 160 },
+  { key: 'name', label: '分类名称', width: 180 },
+  { key: 'matchers', label: '匹配规则', width: 320 },
+  { key: 'actions', label: '操作', width: 160 },
+])
 
 const form = reactive({
   code: '',
@@ -143,12 +226,18 @@ const rules = reactive<FormRules>({
   matchersText: [{ required: true, message: '请至少填写一个匹配规则', trigger: 'blur' }],
 })
 
+const matcherCount = computed(() => rows.value.reduce((sum, item) => sum + item.matchers.length, 0))
+
 void load()
 
 async function load() {
   loading.value = true
+  loadError.value = ''
   try {
     rows.value = await queryCategoryOptions(activeTab.value)
+  } catch {
+    rows.value = []
+    loadError.value = '分类数据加载失败，请稍后重试。'
   } finally {
     loading.value = false
   }
@@ -235,6 +324,14 @@ function renderTrendChart() {
     ],
   })
 }
+
+function onCategoryHeaderDragEnd(newWidth: number, _oldWidth: number, column: { property?: string; columnKey?: string }) {
+  const key = String(column.columnKey || column.property || '')
+  if (!key) {
+    return
+  }
+  categoryTablePrefs.setColumnWidth(key, newWidth)
+}
 </script>
 
 <style scoped lang="scss">
@@ -256,5 +353,24 @@ function renderTrendChart() {
 .trend-chart {
   width: 100%;
   height: 260px;
+}
+
+.table-tools {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin: -4px 0 10px;
+}
+
+.column-chooser {
+  display: grid;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.panel-result {
+  margin: 12px 0 8px;
 }
 </style>

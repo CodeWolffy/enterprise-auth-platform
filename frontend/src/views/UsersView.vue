@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="panel-stack">
     <section class="dashboard-grid">
       <article class="stat-card">
@@ -54,22 +54,92 @@
         </el-form-item>
       </el-form>
 
-      <el-table v-loading="loading" :data="users" stripe>
-        <el-table-column prop="username" label="用户名" min-width="140" />
-        <el-table-column prop="displayName" label="显示名称" min-width="140" />
-        <el-table-column prop="mobile" label="手机号" min-width="140" />
-        <el-table-column prop="email" label="邮箱" min-width="200" />
-        <el-table-column label="状态" width="90">
+      <div class="table-tools">
+        <el-radio-group v-model="userTablePrefs.density" size="small">
+          <el-radio-button value="compact">紧凑</el-radio-button>
+          <el-radio-button value="default">默认</el-radio-button>
+          <el-radio-button value="comfortable">宽松</el-radio-button>
+        </el-radio-group>
+        <el-popover placement="bottom-end" width="240" trigger="click">
+          <template #reference>
+            <el-button size="small">列显示</el-button>
+          </template>
+          <div class="column-chooser">
+            <el-checkbox
+              v-for="item in userTablePrefs.columns"
+              :key="item.key"
+              :model-value="userTablePrefs.visibleColumnMap[item.key]"
+              @change="(value: boolean) => userTablePrefs.setColumnVisible(item.key, value)"
+            >
+              {{ item.label }}
+            </el-checkbox>
+          </div>
+        </el-popover>
+        <el-button size="small" @click="userTablePrefs.reset()">恢复默认</el-button>
+      </div>
+
+      <el-table
+        v-loading="loading"
+        :data="users"
+        stripe
+        :class="`table-density-${userTablePrefs.density}`"
+        @header-dragend="onUserHeaderDragEnd"
+      >
+        <el-table-column
+          v-if="userTablePrefs.visibleColumnMap.username"
+          column-key="username"
+          prop="username"
+          label="用户名"
+          min-width="140"
+          :width="userTablePrefs.getColumnWidth('username')"
+        />
+        <el-table-column
+          v-if="userTablePrefs.visibleColumnMap.displayName"
+          column-key="displayName"
+          prop="displayName"
+          label="显示名称"
+          min-width="140"
+          :width="userTablePrefs.getColumnWidth('displayName')"
+        />
+        <el-table-column
+          v-if="userTablePrefs.visibleColumnMap.mobile"
+          column-key="mobile"
+          prop="mobile"
+          label="手机号"
+          min-width="140"
+          :width="userTablePrefs.getColumnWidth('mobile')"
+        />
+        <el-table-column
+          v-if="userTablePrefs.visibleColumnMap.email"
+          column-key="email"
+          prop="email"
+          label="邮箱"
+          min-width="200"
+          :width="userTablePrefs.getColumnWidth('email')"
+        />
+        <el-table-column
+          v-if="userTablePrefs.visibleColumnMap.enabled"
+          column-key="enabled"
+          label="状态"
+          min-width="100"
+          :width="userTablePrefs.getColumnWidth('enabled')"
+        >
           <template #default="{ row }">
             <el-tag :type="row.enabled ? 'success' : 'info'">
               {{ row.enabled ? '启用' : '禁用' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="角色" min-width="200">
+        <el-table-column
+          v-if="userTablePrefs.visibleColumnMap.roles"
+          column-key="roles"
+          label="角色"
+          min-width="200"
+          :width="userTablePrefs.getColumnWidth('roles')"
+        >
           <template #default="{ row }">{{ row.roles.join(' / ') || '-' }}</template>
         </el-table-column>
-        <el-table-column fixed="right" label="操作" width="320">
+        <el-table-column v-if="userTablePrefs.visibleColumnMap.actions" column-key="actions" fixed="right" label="操作" width="320">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button link type="primary" @click="openUser(row)">编辑</el-button>
@@ -209,6 +279,7 @@ import {
   queryUsers,
   updateUser,
 } from '@/api/platform'
+import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { RoleView, UserSummary } from '@/types/auth'
 
 const users = ref<UserSummary[]>([])
@@ -288,6 +359,15 @@ const averageRoleCount = computed(() => {
   const total = users.value.reduce((sum, item) => sum + item.roles.length, 0)
   return (total / users.value.length).toFixed(1)
 })
+const userTablePrefs = useTablePreferences('eap.table.users', [
+  { key: 'username', label: '用户名', width: 140 },
+  { key: 'displayName', label: '显示名称', width: 140 },
+  { key: 'mobile', label: '手机号', width: 140 },
+  { key: 'email', label: '邮箱', width: 200 },
+  { key: 'enabled', label: '状态', width: 100 },
+  { key: 'roles', label: '角色', width: 200 },
+  { key: 'actions', label: '操作', width: 320 },
+])
 
 void load()
 
@@ -412,6 +492,14 @@ async function removeUser(id: number) {
   ElMessage.success('用户已删除')
   await load()
 }
+
+function onUserHeaderDragEnd(newWidth: number, _oldWidth: number, column: { property?: string; columnKey?: string }) {
+  const key = String(column.columnKey || column.property || '')
+  if (!key) {
+    return
+  }
+  userTablePrefs.setColumnWidth(key, newWidth)
+}
 </script>
 
 <style scoped lang="scss">
@@ -423,5 +511,20 @@ async function removeUser(id: number) {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+.table-tools {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin: -4px 0 10px;
+}
+
+.column-chooser {
+  display: grid;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
 }
 </style>

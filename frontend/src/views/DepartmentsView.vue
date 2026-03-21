@@ -14,7 +14,7 @@
       <article class="stat-card">
         <span class="eyebrow">Leaders</span>
         <strong>{{ leaderBoundCount }}</strong>
-        <span>已配置负责人的部门数</span>
+        <span>已配置负责人部门数</span>
       </article>
       <article class="stat-card">
         <span class="eyebrow">Leaf</span>
@@ -45,6 +45,30 @@
         </el-form-item>
       </el-form>
 
+      <div class="table-tools">
+        <el-radio-group v-model="departmentTablePrefs.density" size="small">
+          <el-radio-button value="compact">紧凑</el-radio-button>
+          <el-radio-button value="default">默认</el-radio-button>
+          <el-radio-button value="comfortable">宽松</el-radio-button>
+        </el-radio-group>
+        <el-popover placement="bottom-end" width="240" trigger="click">
+          <template #reference>
+            <el-button size="small">列显示</el-button>
+          </template>
+          <div class="column-chooser">
+            <el-checkbox
+              v-for="item in departmentTablePrefs.columns"
+              :key="item.key"
+              :model-value="departmentTablePrefs.visibleColumnMap[item.key]"
+              @change="(value: boolean) => departmentTablePrefs.setColumnVisible(item.key, value)"
+            >
+              {{ item.label }}
+            </el-checkbox>
+          </div>
+        </el-popover>
+        <el-button size="small" @click="departmentTablePrefs.reset()">恢复默认</el-button>
+      </div>
+
       <el-table
         v-loading="loading"
         :data="filteredDepartmentTree"
@@ -52,16 +76,50 @@
         row-key="id"
         :default-expand-all="expandAll"
         class="tree-table"
+        :class="`table-density-${departmentTablePrefs.density}`"
+        @header-dragend="onDepartmentHeaderDragEnd"
       >
-        <el-table-column prop="name" label="部门名称" min-width="220" />
-        <el-table-column prop="code" label="部门编码" min-width="160" />
-        <el-table-column label="负责人用户 ID" min-width="140">
+        <el-table-column
+          v-if="departmentTablePrefs.visibleColumnMap.name"
+          column-key="name"
+          prop="name"
+          label="部门名称"
+          min-width="220"
+          :width="departmentTablePrefs.getColumnWidth('name')"
+        />
+        <el-table-column
+          v-if="departmentTablePrefs.visibleColumnMap.code"
+          column-key="code"
+          prop="code"
+          label="部门编码"
+          min-width="160"
+          :width="departmentTablePrefs.getColumnWidth('code')"
+        />
+        <el-table-column
+          v-if="departmentTablePrefs.visibleColumnMap.leaderUserId"
+          column-key="leaderUserId"
+          label="负责人用户 ID"
+          min-width="160"
+          :width="departmentTablePrefs.getColumnWidth('leaderUserId')"
+        >
           <template #default="{ row }">{{ row.leaderUserId || '-' }}</template>
         </el-table-column>
-        <el-table-column label="直属子部门" min-width="120">
+        <el-table-column
+          v-if="departmentTablePrefs.visibleColumnMap.childCount"
+          column-key="childCount"
+          label="直属子部门"
+          min-width="130"
+          :width="departmentTablePrefs.getColumnWidth('childCount')"
+        >
           <template #default="{ row }">{{ childCount(row.id) }}</template>
         </el-table-column>
-        <el-table-column fixed="right" label="操作" width="300">
+        <el-table-column
+          v-if="departmentTablePrefs.visibleColumnMap.actions"
+          column-key="actions"
+          fixed="right"
+          label="操作"
+          :width="departmentTablePrefs.getColumnWidth('actions') || 300"
+        >
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button link type="primary" @click="openDepartment(row)">编辑</el-button>
@@ -85,7 +143,7 @@
 
         <div class="detail-tip">
           <el-alert
-            title="部门树已接入数据权限过滤，当前列表只展示当前用户有权访问的组织范围。"
+            title="部门树已接入数据权限过滤，当前列表仅展示当前用户有权访问的组织范围。"
             type="info"
             :closable="false"
           />
@@ -141,6 +199,7 @@ import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { createDepartment, deleteDepartment, queryDepartments, updateDepartment } from '@/api/platform'
+import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { DepartmentView } from '@/types/auth'
 
 type DepartmentTreeNode = DepartmentView & { children?: DepartmentTreeNode[] }
@@ -154,6 +213,14 @@ const loading = ref(false)
 const expandAll = ref(true)
 const keyword = ref('')
 const formRef = ref<FormInstance>()
+
+const departmentTablePrefs = useTablePreferences('table:departments', [
+  { key: 'name', label: '部门名称', width: 220 },
+  { key: 'code', label: '部门编码', width: 160 },
+  { key: 'leaderUserId', label: '负责人用户 ID', width: 160 },
+  { key: 'childCount', label: '直属子部门', width: 130 },
+  { key: 'actions', label: '操作', width: 300 },
+])
 
 const form = reactive({
   parentId: null as number | null,
@@ -327,6 +394,14 @@ async function removeDepartment(id: number) {
 function childCount(id: number) {
   return departments.value.filter((item) => item.parentId === id).length
 }
+
+function onDepartmentHeaderDragEnd(newWidth: number, _oldWidth: number, column: { property?: string; columnKey?: string }) {
+  const key = String(column.columnKey || column.property || '')
+  if (!key) {
+    return
+  }
+  departmentTablePrefs.setColumnWidth(key, newWidth)
+}
 </script>
 
 <style scoped lang="scss">
@@ -341,5 +416,20 @@ function childCount(id: number) {
 
 .tree-table :deep(.el-table__row .cell) {
   min-height: 24px;
+}
+
+.table-tools {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin: -4px 0 10px;
+}
+
+.column-chooser {
+  display: grid;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
 }
 </style>

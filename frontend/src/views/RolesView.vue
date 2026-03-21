@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="panel-stack">
     <section class="dashboard-grid">
       <article class="stat-card">
@@ -52,15 +52,80 @@
         </el-form-item>
       </el-form>
 
-      <el-table v-loading="loading" :data="pagedRoles" stripe>
-        <el-table-column prop="code" label="角色编码" min-width="140" />
-        <el-table-column prop="name" label="角色名称" min-width="160" />
-        <el-table-column prop="description" label="角色描述" min-width="220" show-overflow-tooltip />
-        <el-table-column prop="dataScopeType" label="数据范围" min-width="140" />
-        <el-table-column label="权限数" width="100">
+      <div class="table-tools">
+        <el-radio-group v-model="roleTablePrefs.density" size="small">
+          <el-radio-button value="compact">紧凑</el-radio-button>
+          <el-radio-button value="default">默认</el-radio-button>
+          <el-radio-button value="comfortable">宽松</el-radio-button>
+        </el-radio-group>
+        <el-popover placement="bottom-end" width="240" trigger="click">
+          <template #reference>
+            <el-button size="small">列显示</el-button>
+          </template>
+          <div class="column-chooser">
+            <el-checkbox
+              v-for="item in roleTablePrefs.columns"
+              :key="item.key"
+              :model-value="roleTablePrefs.visibleColumnMap[item.key]"
+              @change="(value: boolean) => roleTablePrefs.setColumnVisible(item.key, value)"
+            >
+              {{ item.label }}
+            </el-checkbox>
+          </div>
+        </el-popover>
+        <el-button size="small" @click="roleTablePrefs.reset()">恢复默认</el-button>
+      </div>
+
+      <el-table
+        v-loading="loading"
+        :data="pagedRoles"
+        stripe
+        :class="`table-density-${roleTablePrefs.density}`"
+        @header-dragend="onRoleHeaderDragEnd"
+      >
+        <el-table-column
+          v-if="roleTablePrefs.visibleColumnMap.code"
+          column-key="code"
+          prop="code"
+          label="角色编码"
+          min-width="140"
+          :width="roleTablePrefs.getColumnWidth('code')"
+        />
+        <el-table-column
+          v-if="roleTablePrefs.visibleColumnMap.name"
+          column-key="name"
+          prop="name"
+          label="角色名称"
+          min-width="160"
+          :width="roleTablePrefs.getColumnWidth('name')"
+        />
+        <el-table-column
+          v-if="roleTablePrefs.visibleColumnMap.description"
+          column-key="description"
+          prop="description"
+          label="角色描述"
+          min-width="220"
+          show-overflow-tooltip
+          :width="roleTablePrefs.getColumnWidth('description')"
+        />
+        <el-table-column
+          v-if="roleTablePrefs.visibleColumnMap.dataScopeType"
+          column-key="dataScopeType"
+          prop="dataScopeType"
+          label="数据范围"
+          min-width="140"
+          :width="roleTablePrefs.getColumnWidth('dataScopeType')"
+        />
+        <el-table-column
+          v-if="roleTablePrefs.visibleColumnMap.permissionCount"
+          column-key="permissionCount"
+          label="权限数"
+          min-width="100"
+          :width="roleTablePrefs.getColumnWidth('permissionCount')"
+        >
           <template #default="{ row }">{{ permissionCountMap[row.id] ?? 0 }}</template>
         </el-table-column>
-        <el-table-column fixed="right" label="操作" width="320">
+        <el-table-column v-if="roleTablePrefs.visibleColumnMap.actions" column-key="actions" fixed="right" label="操作" width="320">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button link type="primary" @click="openRole(row)">编辑</el-button>
@@ -212,6 +277,7 @@ import {
   queryRoles,
   updateRole,
 } from '@/api/platform'
+import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { DepartmentView, PermissionView, RoleView } from '@/types/auth'
 
 type PermissionTreeNode = {
@@ -350,6 +416,14 @@ const deptScopeCount = computed(() =>
 )
 const customScopeCount = computed(() => filteredRoles.value.filter((item) => item.dataScopeType === 'CUSTOM').length)
 const selectedPermissionCodeSet = computed(() => new Set(selectedPermissionCodes.value))
+const roleTablePrefs = useTablePreferences('eap.table.roles', [
+  { key: 'code', label: '角色编码', width: 140 },
+  { key: 'name', label: '角色名称', width: 160 },
+  { key: 'description', label: '角色描述', width: 220 },
+  { key: 'dataScopeType', label: '数据范围', width: 140 },
+  { key: 'permissionCount', label: '权限数', width: 100 },
+  { key: 'actions', label: '操作', width: 320 },
+])
 
 void load()
 
@@ -517,6 +591,14 @@ function buildDepartmentTree(source: DepartmentView[]) {
   })
   return roots
 }
+
+function onRoleHeaderDragEnd(newWidth: number, _oldWidth: number, column: { property?: string; columnKey?: string }) {
+  const key = String(column.columnKey || column.property || '')
+  if (!key) {
+    return
+  }
+  roleTablePrefs.setColumnWidth(key, newWidth)
+}
 </script>
 
 <style scoped lang="scss">
@@ -573,5 +655,20 @@ function buildDepartmentTree(source: DepartmentView[]) {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+.table-tools {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin: -4px 0 10px;
+}
+
+.column-chooser {
+  display: grid;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
 }
 </style>

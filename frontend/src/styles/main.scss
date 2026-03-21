@@ -412,6 +412,21 @@ a {
   padding-bottom: 11px;
 }
 
+.el-table.table-density-compact .el-table__cell {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.el-table.table-density-default .el-table__cell {
+  padding-top: 11px;
+  padding-bottom: 11px;
+}
+
+.el-table.table-density-comfortable .el-table__cell {
+  padding-top: 15px;
+  padding-bottom: 15px;
+}
+
 .el-table .cell {
   line-height: 1.5;
 }

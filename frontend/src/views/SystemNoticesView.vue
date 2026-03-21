@@ -65,24 +65,112 @@
         </el-form-item>
       </el-form>
 
-      <el-table :data="notices" stripe>
-        <el-table-column prop="noticeTitle" label="标题" min-width="180" />
-        <el-table-column prop="noticeContent" label="内容" min-width="260" show-overflow-tooltip />
-        <el-table-column label="发布状态" width="100">
+      <div class="table-tools">
+        <el-radio-group v-model="noticeTablePrefs.density" size="small">
+          <el-radio-button value="compact">紧凑</el-radio-button>
+          <el-radio-button value="default">默认</el-radio-button>
+          <el-radio-button value="comfortable">宽松</el-radio-button>
+        </el-radio-group>
+        <el-popover placement="bottom-end" width="240" trigger="click">
+          <template #reference>
+            <el-button size="small">列显示</el-button>
+          </template>
+          <div class="column-chooser">
+            <el-checkbox
+              v-for="item in noticeTablePrefs.columns"
+              :key="item.key"
+              :model-value="noticeTablePrefs.visibleColumnMap[item.key]"
+              @change="(value: boolean) => noticeTablePrefs.setColumnVisible(item.key, value)"
+            >
+              {{ item.label }}
+            </el-checkbox>
+          </div>
+        </el-popover>
+        <el-button size="small" @click="noticeTablePrefs.reset()">恢复默认</el-button>
+      </div>
+
+      <el-result v-if="loadError" icon="error" title="加载失败" :sub-title="loadError" class="panel-result">
+        <template #extra>
+          <el-button type="primary" @click="load">重试</el-button>
+        </template>
+      </el-result>
+
+      <el-table
+        v-else
+        v-loading="loading"
+        :data="notices"
+        stripe
+        :class="`table-density-${noticeTablePrefs.density}`"
+        @header-dragend="onNoticeHeaderDragEnd"
+      >
+        <el-table-column
+          v-if="noticeTablePrefs.visibleColumnMap.noticeTitle"
+          column-key="noticeTitle"
+          prop="noticeTitle"
+          label="标题"
+          min-width="180"
+          :width="noticeTablePrefs.getColumnWidth('noticeTitle')"
+        />
+        <el-table-column
+          v-if="noticeTablePrefs.visibleColumnMap.noticeContent"
+          column-key="noticeContent"
+          prop="noticeContent"
+          label="内容"
+          min-width="260"
+          show-overflow-tooltip
+          :width="noticeTablePrefs.getColumnWidth('noticeContent')"
+        />
+        <el-table-column
+          v-if="noticeTablePrefs.visibleColumnMap.published"
+          column-key="published"
+          label="发布状态"
+          min-width="110"
+          :width="noticeTablePrefs.getColumnWidth('published')"
+        >
           <template #default="{ row }">
             <el-tag :type="row.published ? 'success' : 'info'">{{ row.published ? '已发布' : '草稿' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="workflowStatus" label="工作流状态" min-width="120" />
-        <el-table-column prop="publishTime" label="发布时间" min-width="180" />
-        <el-table-column prop="createdBy" label="创建人" min-width="120" />
-        <el-table-column fixed="right" label="操作" width="220">
+        <el-table-column
+          v-if="noticeTablePrefs.visibleColumnMap.workflowStatus"
+          column-key="workflowStatus"
+          prop="workflowStatus"
+          label="工作流状态"
+          min-width="120"
+          :width="noticeTablePrefs.getColumnWidth('workflowStatus')"
+        />
+        <el-table-column
+          v-if="noticeTablePrefs.visibleColumnMap.publishTime"
+          column-key="publishTime"
+          prop="publishTime"
+          label="发布时间"
+          min-width="180"
+          :width="noticeTablePrefs.getColumnWidth('publishTime')"
+        />
+        <el-table-column
+          v-if="noticeTablePrefs.visibleColumnMap.createdBy"
+          column-key="createdBy"
+          prop="createdBy"
+          label="创建人"
+          min-width="120"
+          :width="noticeTablePrefs.getColumnWidth('createdBy')"
+        />
+        <el-table-column
+          v-if="noticeTablePrefs.visibleColumnMap.actions"
+          column-key="actions"
+          fixed="right"
+          label="操作"
+          :width="noticeTablePrefs.getColumnWidth('actions') || 220"
+        >
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button link type="primary" @click="openNotice(row)">编辑</el-button>
             <el-button link type="danger" @click="removeNotice(row.id)">删除</el-button>
           </template>
         </el-table-column>
+        <template #empty>
+          <el-empty description="暂无公告数据" />
+        </template>
       </el-table>
 
       <div class="pagination-wrap">
@@ -102,9 +190,7 @@
       <template v-if="detailItem">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="标题" :span="2">{{ detailItem.noticeTitle }}</el-descriptions-item>
-          <el-descriptions-item label="发布状态">
-            {{ detailItem.published ? '已发布' : '草稿' }}
-          </el-descriptions-item>
+          <el-descriptions-item label="发布状态">{{ detailItem.published ? '已发布' : '草稿' }}</el-descriptions-item>
           <el-descriptions-item label="工作流状态">{{ detailItem.workflowStatus }}</el-descriptions-item>
           <el-descriptions-item label="发布时间">{{ detailItem.publishTime || '-' }}</el-descriptions-item>
           <el-descriptions-item label="创建人">{{ detailItem.createdBy }}</el-descriptions-item>
@@ -142,9 +228,12 @@ import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { createNotice, deleteNotice, queryNotices, updateNotice } from '@/api/system'
+import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { NoticeView } from '@/types/auth'
 
 const notices = ref<NoticeView[]>([])
+const loading = ref(false)
+const loadError = ref('')
 const visible = ref(false)
 const detailVisible = ref(false)
 const editingId = ref<number | null>(null)
@@ -158,6 +247,16 @@ const page = ref(1)
 const size = ref(10)
 const total = ref(0)
 const formRef = ref<FormInstance>()
+
+const noticeTablePrefs = useTablePreferences('table:system-notices', [
+  { key: 'noticeTitle', label: '标题', width: 180 },
+  { key: 'noticeContent', label: '内容', width: 260 },
+  { key: 'published', label: '发布状态', width: 110 },
+  { key: 'workflowStatus', label: '工作流状态', width: 120 },
+  { key: 'publishTime', label: '发布时间', width: 180 },
+  { key: 'createdBy', label: '创建人', width: 120 },
+  { key: 'actions', label: '操作', width: 220 },
+])
 
 const form = reactive({
   noticeTitle: '',
@@ -177,17 +276,27 @@ const draftCount = computed(() => notices.value.filter((item) => !item.published
 void load()
 
 async function load() {
-  const result = await queryNotices({
-    keyword: keyword.value || undefined,
-    published: statusFilter.value ? statusFilter.value === 'published' : undefined,
-    workflowStatus: workflowStatus.value || undefined,
-    page: page.value,
-    size: size.value,
-    sortBy: sortBy.value,
-    sortDirection: sortDirection.value,
-  })
-  notices.value = result.records
-  total.value = result.total
+  loading.value = true
+  loadError.value = ''
+  try {
+    const result = await queryNotices({
+      keyword: keyword.value || undefined,
+      published: statusFilter.value ? statusFilter.value === 'published' : undefined,
+      workflowStatus: (workflowStatus.value || undefined) as 'DRAFT' | 'SCHEDULED' | 'PUBLISHED' | undefined,
+      page: page.value,
+      size: size.value,
+      sortBy: sortBy.value,
+      sortDirection: sortDirection.value,
+    })
+    notices.value = result.records
+    total.value = result.total
+  } catch {
+    notices.value = []
+    total.value = 0
+    loadError.value = '公告数据加载失败，请稍后重试。'
+  } finally {
+    loading.value = false
+  }
 }
 
 function handleSearch() {
@@ -207,6 +316,7 @@ function resetSearch() {
 
 function handleSizeChange(value: number) {
   size.value = value
+  page.value = 1
   void load()
 }
 
@@ -253,6 +363,14 @@ async function removeNotice(id: number) {
   ElMessage.success('公告已删除')
   await load()
 }
+
+function onNoticeHeaderDragEnd(newWidth: number, _oldWidth: number, column: { property?: string; columnKey?: string }) {
+  const key = String(column.columnKey || column.property || '')
+  if (!key) {
+    return
+  }
+  noticeTablePrefs.setColumnWidth(key, newWidth)
+}
 </script>
 
 <style scoped lang="scss">
@@ -260,5 +378,24 @@ async function removeNotice(id: number) {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+.table-tools {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin: -4px 0 10px;
+}
+
+.column-chooser {
+  display: grid;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.panel-result {
+  margin: 12px 0 8px;
 }
 </style>

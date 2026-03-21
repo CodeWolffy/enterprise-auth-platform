@@ -50,19 +50,101 @@
         </el-form-item>
       </el-form>
 
-      <el-table :data="configs" stripe>
-        <el-table-column prop="category" label="参数分类" min-width="120" />
-        <el-table-column prop="configKey" label="参数键" min-width="180" />
-        <el-table-column prop="configName" label="参数名称" min-width="180" />
-        <el-table-column prop="configValue" label="参数值" min-width="220" show-overflow-tooltip />
-        <el-table-column prop="createdBy" label="创建人" min-width="120" />
-        <el-table-column fixed="right" label="操作" width="220">
+      <div class="table-tools">
+        <el-radio-group v-model="configTablePrefs.density" size="small">
+          <el-radio-button value="compact">紧凑</el-radio-button>
+          <el-radio-button value="default">默认</el-radio-button>
+          <el-radio-button value="comfortable">宽松</el-radio-button>
+        </el-radio-group>
+        <el-popover placement="bottom-end" width="240" trigger="click">
+          <template #reference>
+            <el-button size="small">列显示</el-button>
+          </template>
+          <div class="column-chooser">
+            <el-checkbox
+              v-for="item in configTablePrefs.columns"
+              :key="item.key"
+              :model-value="configTablePrefs.visibleColumnMap[item.key]"
+              @change="(value: boolean) => configTablePrefs.setColumnVisible(item.key, value)"
+            >
+              {{ item.label }}
+            </el-checkbox>
+          </div>
+        </el-popover>
+        <el-button size="small" @click="configTablePrefs.reset()">恢复默认</el-button>
+      </div>
+
+      <el-result v-if="loadError" icon="error" title="加载失败" :sub-title="loadError" class="panel-result">
+        <template #extra>
+          <el-button type="primary" @click="load">重试</el-button>
+        </template>
+      </el-result>
+
+      <el-table
+        v-else
+        v-loading="loading"
+        :data="configs"
+        stripe
+        :class="`table-density-${configTablePrefs.density}`"
+        @header-dragend="onConfigHeaderDragEnd"
+      >
+        <el-table-column
+          v-if="configTablePrefs.visibleColumnMap.category"
+          column-key="category"
+          prop="category"
+          label="参数分类"
+          min-width="120"
+          :width="configTablePrefs.getColumnWidth('category')"
+        />
+        <el-table-column
+          v-if="configTablePrefs.visibleColumnMap.configKey"
+          column-key="configKey"
+          prop="configKey"
+          label="参数键"
+          min-width="180"
+          :width="configTablePrefs.getColumnWidth('configKey')"
+        />
+        <el-table-column
+          v-if="configTablePrefs.visibleColumnMap.configName"
+          column-key="configName"
+          prop="configName"
+          label="参数名称"
+          min-width="180"
+          :width="configTablePrefs.getColumnWidth('configName')"
+        />
+        <el-table-column
+          v-if="configTablePrefs.visibleColumnMap.configValue"
+          column-key="configValue"
+          prop="configValue"
+          label="参数值"
+          min-width="220"
+          show-overflow-tooltip
+          :width="configTablePrefs.getColumnWidth('configValue')"
+        />
+        <el-table-column
+          v-if="configTablePrefs.visibleColumnMap.createdBy"
+          column-key="createdBy"
+          prop="createdBy"
+          label="创建人"
+          min-width="120"
+          :width="configTablePrefs.getColumnWidth('createdBy')"
+        />
+        <el-table-column
+          v-if="configTablePrefs.visibleColumnMap.actions"
+          column-key="actions"
+          fixed="right"
+          label="操作"
+          :width="configTablePrefs.getColumnWidth('actions') || 220"
+        >
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button link type="primary" @click="openConfig(row)">编辑</el-button>
             <el-button link type="danger" @click="removeConfig(row.id)">删除</el-button>
           </template>
         </el-table-column>
+        <template #empty>
+          <el-empty description="暂无参数数据" />
+        </template>
       </el-table>
 
       <div class="pagination-wrap">
@@ -116,9 +198,12 @@ import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { createConfig, deleteConfig, queryCategories, queryConfigs, updateConfig } from '@/api/system'
+import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { CategoryOption, ConfigView } from '@/types/auth'
 
 const configs = ref<ConfigView[]>([])
+const loading = ref(false)
+const loadError = ref('')
 const visible = ref(false)
 const detailVisible = ref(false)
 const editingId = ref<number | null>(null)
@@ -132,6 +217,15 @@ const size = ref(10)
 const total = ref(0)
 const formRef = ref<FormInstance>()
 const categoryOptions = ref<CategoryOption[]>([])
+
+const configTablePrefs = useTablePreferences('table:system-configs', [
+  { key: 'category', label: '参数分类', width: 120 },
+  { key: 'configKey', label: '参数键', width: 180 },
+  { key: 'configName', label: '参数名称', width: 180 },
+  { key: 'configValue', label: '参数值', width: 220 },
+  { key: 'createdBy', label: '创建人', width: 120 },
+  { key: 'actions', label: '操作', width: 220 },
+])
 
 const form = reactive({
   configKey: '',
@@ -151,16 +245,26 @@ void load()
 void loadCategories()
 
 async function load() {
-  const result = await queryConfigs({
-    keyword: keyword.value || undefined,
-    category: category.value || undefined,
-    page: page.value,
-    size: size.value,
-    sortBy: sortBy.value,
-    sortDirection: sortDirection.value,
-  })
-  configs.value = result.records
-  total.value = result.total
+  loading.value = true
+  loadError.value = ''
+  try {
+    const result = await queryConfigs({
+      keyword: keyword.value || undefined,
+      category: category.value || undefined,
+      page: page.value,
+      size: size.value,
+      sortBy: sortBy.value,
+      sortDirection: sortDirection.value,
+    })
+    configs.value = result.records
+    total.value = result.total
+  } catch {
+    configs.value = []
+    total.value = 0
+    loadError.value = '参数数据加载失败，请稍后重试。'
+  } finally {
+    loading.value = false
+  }
 }
 
 async function loadCategories() {
@@ -184,6 +288,7 @@ function resetSearch() {
 
 function handleSizeChange(value: number) {
   size.value = value
+  page.value = 1
   void load()
 }
 
@@ -225,6 +330,14 @@ async function removeConfig(id: number) {
   ElMessage.success('参数已删除')
   await load()
 }
+
+function onConfigHeaderDragEnd(newWidth: number, _oldWidth: number, column: { property?: string; columnKey?: string }) {
+  const key = String(column.columnKey || column.property || '')
+  if (!key) {
+    return
+  }
+  configTablePrefs.setColumnWidth(key, newWidth)
+}
 </script>
 
 <style scoped lang="scss">
@@ -232,5 +345,24 @@ async function removeConfig(id: number) {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+.table-tools {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin: -4px 0 10px;
+}
+
+.column-chooser {
+  display: grid;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.panel-result {
+  margin: 12px 0 8px;
 }
 </style>
