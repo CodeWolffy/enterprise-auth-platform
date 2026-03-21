@@ -80,6 +80,8 @@ app:
     mybatis-tenant-enabled: true
     mybatis-ignore-tables:
       - flyway_schema_history
+      - oauth2_authorization
+      - oauth2_authorization_consent
   persistence:
     database-enabled: true
   features:

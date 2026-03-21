@@ -85,6 +85,10 @@ const visibleLinks = computed(() => {
     })
   }
 
-  return links
+  const deduped = new Map<string, (typeof links)[number]>()
+  for (const link of links) {
+    deduped.set(link.to, link)
+  }
+  return Array.from(deduped.values())
 })
 </script>

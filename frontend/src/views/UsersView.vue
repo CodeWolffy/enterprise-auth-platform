@@ -95,7 +95,7 @@
 
     <el-drawer v-model="detailVisible" title="用户详情" size="720px">
       <template v-if="detailData">
-        <el-descriptions :column="2" border>
+        <el-descriptions :column="2" border class="drawer-section drawer-section--overview">
           <el-descriptions-item label="用户 ID">{{ detailData.id }}</el-descriptions-item>
           <el-descriptions-item label="租户">{{ detailData.tenantId }}</el-descriptions-item>
           <el-descriptions-item label="用户名">{{ detailData.username }}</el-descriptions-item>
@@ -112,7 +112,7 @@
           <el-descriptions-item label="角色">{{ detailData.roles.join(', ') || '-' }}</el-descriptions-item>
         </el-descriptions>
 
-        <div class="detail-tip">
+        <div class="detail-tip drawer-section drawer-section--guide">
           <el-alert
             title="当前详情会受数据权限约束，列表不可见的用户不会出现在本页面。"
             type="info"

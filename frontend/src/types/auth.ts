@@ -89,6 +89,8 @@ export interface OAuthScopeView {
   sortOrder?: number | null
   enabled: boolean
   updatedAt?: string | null
+  referencedClientCount?: number
+  referencedClientIds?: string[]
 }
 
 export interface ClientStatusPayload {
@@ -208,6 +210,8 @@ export interface TenantPackageView {
   enabled: boolean
   capabilityCodes: string[]
   updatedAt?: string | null
+  referencedTenantCount?: number
+  referencedTenantIds?: string[]
 }
 
 export interface TenantCapabilityView {
@@ -218,6 +222,11 @@ export interface TenantCapabilityView {
   sortOrder?: number | null
   enabled: boolean
   updatedAt?: string | null
+  referencedPackageCount?: number
+  referencedPackageCodes?: string[]
+  referencedTenantCount?: number
+  referencedTenantIds?: string[]
+  overrideReferenceCount?: number
 }
 
 export interface CategoryOption {

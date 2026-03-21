@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { ElMessage } from 'element-plus'
-import { exchangeAuthorizationCode, fetchPermissionSnapshot, refreshOauthToken } from '@/api/auth'
+import { exchangeAuthorizationCode, fetchPermissionSnapshot, logoutCurrentSession, refreshOauthToken } from '@/api/auth'
 import type { OAuthTokenResponse, PermissionSnapshot } from '@/types/auth'
 import { createOAuthRedirect } from '@/utils/oauth'
 import { clearDynamicRoutes, registerDynamicRoutes } from '@/router'
@@ -22,6 +22,7 @@ export const useAuthStore = defineStore('auth', () => {
   const expiresAt = ref(0)
   const tenantId = ref('platform')
   const snapshot = ref<PermissionSnapshot | null>(null)
+  let refreshingPromise: Promise<void> | null = null
 
   const isAuthenticated = computed(() => Boolean(accessToken.value && snapshot.value))
   const menuItems = computed(() => snapshot.value?.menus ?? [])
@@ -64,15 +65,32 @@ export const useAuthStore = defineStore('auth', () => {
     persist()
   }
 
-  async function refreshTokens() {
-    if (!refreshToken.value) {
-      throw new Error('缺少刷新令牌')
+  async function refreshTokens(options?: { reloadSnapshot?: boolean }) {
+    if (refreshingPromise) {
+      await refreshingPromise
+      return
     }
-    const payload = (await refreshOauthToken(refreshToken.value)) as OAuthTokenResponse
-    applyTokenPayload(payload, tenantId.value)
-    snapshot.value = await fetchPermissionSnapshot()
-    registerDynamicRoutes(snapshot.value)
-    persist()
+
+    const reloadSnapshot = Boolean(options?.reloadSnapshot)
+    refreshingPromise = (async () => {
+      if (!refreshToken.value) {
+        throw new Error('missing refresh token')
+      }
+      const payload = (await refreshOauthToken(refreshToken.value)) as OAuthTokenResponse
+      applyTokenPayload(payload, tenantId.value)
+
+      if (reloadSnapshot) {
+        snapshot.value = await fetchPermissionSnapshot()
+        registerDynamicRoutes(snapshot.value)
+      }
+      persist()
+    })()
+
+    try {
+      await refreshingPromise
+    } finally {
+      refreshingPromise = null
+    }
   }
 
   async function bootstrapSnapshot() {
@@ -80,7 +98,7 @@ export const useAuthStore = defineStore('auth', () => {
       return
     }
     if (shouldRefreshToken()) {
-      await refreshTokens()
+      await refreshTokens({ reloadSnapshot: true })
       return
     }
     snapshot.value = await fetchPermissionSnapshot()
@@ -102,9 +120,16 @@ export const useAuthStore = defineStore('auth', () => {
     clearDynamicRoutes()
   }
 
-  function logout() {
+  async function logout() {
+    try {
+      if (accessToken.value) {
+        await logoutCurrentSession()
+      }
+    } catch {
+      // Keep local logout reliable even when backend logout fails.
+    }
     clearSession()
-    ElMessage.success('已退出当前前端会话')
+    ElMessage.success('已退出当前会话')
   }
 
   function applyTokenPayload(payload: OAuthTokenResponse, resolvedTenantId: string) {

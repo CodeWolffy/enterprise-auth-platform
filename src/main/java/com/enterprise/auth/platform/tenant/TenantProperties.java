@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.tenant;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -12,7 +13,13 @@ public record TenantProperties(
 ) {
 
         public List<String> resolvedIgnoreTables() {
-                return mybatisIgnoreTables == null ? List.of() : mybatisIgnoreTables;
+                LinkedHashSet<String> defaults = new LinkedHashSet<>(List.of(
+                                "oauth2_authorization",
+                                "oauth2_authorization_consent"
+                ));
+                if (mybatisIgnoreTables != null) {
+                        defaults.addAll(mybatisIgnoreTables);
+                }
+                return List.copyOf(defaults);
         }
 }
-

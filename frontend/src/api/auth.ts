@@ -50,3 +50,7 @@ export async function refreshOauthToken(refreshToken: string) {
   }
   return response.json()
 }
+
+export async function logoutCurrentSession() {
+  await http.post('/api/auth/logout')
+}

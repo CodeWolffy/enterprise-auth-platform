@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="panel-stack">
     <section class="dashboard-grid">
       <article class="stat-card">
@@ -159,7 +159,7 @@
       <el-table :data="exportTasks.records" stripe>
         <el-table-column prop="id" label="任务 ID" width="100" />
         <el-table-column prop="status" label="状态" width="100" />
-        <el-table-column label="进度" min-width="240">
+        <el-table-column label="进度" min-width="220">
           <template #default="{ row }">
             <div class="progress-cell">
               <el-progress :percentage="row.progressPercent" :status="row.status === 'FAILED' ? 'exception' : undefined" />
@@ -169,23 +169,31 @@
         </el-table-column>
         <el-table-column prop="operator" label="发起人" min-width="120" />
         <el-table-column prop="recordCount" label="记录数" width="100" />
-        <el-table-column label="保留策略" min-width="320">
+        <el-table-column label="归档结果" min-width="210">
+          <template #default="{ row }">
+            <el-tag :type="row.archived ? 'info' : row.status === 'SUCCESS' ? 'success' : row.status === 'FAILED' ? 'danger' : 'warning'" effect="plain">
+              {{ archiveResultSummary(row) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="到期提示" min-width="240">
           <template #default="{ row }">
             <div class="retention-cell">
-              <span>{{ row.retentionSummary || defaultRetentionSummary(row) }}</span>
+              <span>{{ expiryHint(row) }}</span>
               <div class="retention-tags">
-                <el-tag v-if="row.archived" type="info" effect="plain">已归档</el-tag>
                 <el-tag v-if="row.retentionExpired" type="danger" effect="plain">已过保留期</el-tag>
                 <el-tag v-else-if="row.archivable" type="warning" effect="plain">建议归档</el-tag>
+                <el-tag v-if="row.archived" type="info" effect="plain">已归档</el-tag>
               </div>
             </div>
           </template>
         </el-table-column>
         <el-table-column prop="requestedAt" label="发起时间" min-width="180" />
         <el-table-column prop="completedAt" label="完成时间" min-width="180" />
-        <el-table-column prop="errorMessage" label="失败原因" min-width="180" />
-        <el-table-column fixed="right" label="操作" width="280">
+        <el-table-column prop="errorMessage" label="失败原因" min-width="180" show-overflow-tooltip />
+        <el-table-column fixed="right" label="操作" width="340">
           <template #default="{ row }">
+            <el-button link type="primary" @click="openTaskDetail(row)">详情</el-button>
             <el-button link type="primary" :disabled="row.status !== 'SUCCESS'" @click="downloadTask(row.id)">下载</el-button>
             <el-button link type="warning" :disabled="!row.archivable" @click="archiveTask(row.id)">归档</el-button>
             <el-button link type="warning" :disabled="row.status !== 'FAILED'" @click="retryTask(row.id)">重试</el-button>
@@ -208,6 +216,35 @@
         />
       </div>
     </section>
+
+    <el-drawer v-model="taskDetailVisible" title="导出任务详情" size="640px">
+      <template v-if="detailTask">
+        <el-descriptions :column="1" border>
+          <el-descriptions-item label="任务 ID">{{ detailTask.id }}</el-descriptions-item>
+          <el-descriptions-item label="状态">{{ detailTask.status }}</el-descriptions-item>
+          <el-descriptions-item label="发起人">{{ detailTask.operator }}</el-descriptions-item>
+          <el-descriptions-item label="记录数">{{ detailTask.recordCount }}</el-descriptions-item>
+          <el-descriptions-item label="进度">{{ detailTask.progressPercent }}% / {{ detailTask.progressStage }}</el-descriptions-item>
+          <el-descriptions-item label="发起时间">{{ detailTask.requestedAt || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="完成时间">{{ detailTask.completedAt || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="到期时间">{{ detailTask.expiresAt || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="失败原因">{{ detailTask.errorMessage || '无' }}</el-descriptions-item>
+        </el-descriptions>
+
+        <div class="detail-block drawer-section drawer-section--overview">
+          <div class="eyebrow">归档结果说明</div>
+          <el-alert :title="archiveDetailSummary(detailTask)" :type="detailTask.archived ? 'info' : detailTask.status === 'FAILED' ? 'error' : 'success'" :closable="false" style="margin-top: 8px" />
+        </div>
+
+        <div class="detail-block drawer-section drawer-section--guide">
+          <div class="eyebrow">到期处理提示</div>
+          <el-alert :title="expiryHint(detailTask)" :type="detailTask.retentionExpired ? 'error' : detailTask.archivable ? 'warning' : 'info'" :closable="false" style="margin-top: 8px" />
+          <p class="muted-line" style="margin-top: 10px">
+            建议：成功任务在保留期结束前归档，过期任务按策略统一清理，失败任务优先重试或重新发起导出。
+          </p>
+        </div>
+      </template>
+    </el-drawer>
   </div>
 </template>
 
@@ -265,6 +302,8 @@ const exportQuery = reactive({
 })
 
 const cleanupCompletedBefore = ref<string | null>(null)
+const taskDetailVisible = ref(false)
+const detailTask = ref<AuditExportTask | null>(null)
 
 const exportPolicy = reactive<AuditExportPolicy>({
   retentionDays: 7,
@@ -456,17 +495,74 @@ function currentQueryParams() {
   }
 }
 
-function defaultRetentionSummary(task: AuditExportTask) {
+function archiveResultSummary(task: AuditExportTask) {
   if (task.archived) {
-    return '导出结果已归档，仅保留元数据与审计轨迹。'
-  }
-  if (task.status === 'SUCCESS' && task.expiresAt) {
-    return `导出文件保留至 ${task.expiresAt.replace('T', ' ')}。`
+    return '已归档（仅保留元数据）'
   }
   if (task.status === 'FAILED') {
-    return '任务执行失败，可调整筛选条件后重新发起导出。'
+    return '导出失败'
   }
-  return '任务完成后将按当前保留策略保留。'
+  if (task.status === 'SUCCESS') {
+    return '导出成功（可下载）'
+  }
+  if (task.status === 'RUNNING') {
+    return '执行中'
+  }
+  return '待处理'
+}
+
+function archiveDetailSummary(task: AuditExportTask) {
+  if (task.archived) {
+    return '该任务已完成归档，下载文件内容已移除，仅保留任务元数据、审计轨迹和保留策略信息。'
+  }
+  if (task.status === 'SUCCESS') {
+    return '该任务导出成功，当前仍可下载。建议在不再需要文件内容后归档，降低存储成本。'
+  }
+  if (task.status === 'FAILED') {
+    return '该任务执行失败，未生成可下载文件。可按失败原因调整筛选条件后重试。'
+  }
+  return '任务尚未结束，归档结果需待任务完成后确认。'
+}
+
+function expiryHint(task: AuditExportTask) {
+  if (task.archived) {
+    return '任务已归档，不再受导出文件保留期影响。'
+  }
+  if (task.retentionExpired) {
+    return '已超过保留期，建议尽快执行归档或清理。'
+  }
+  if (task.expiresAt) {
+    const days = daysUntil(task.expiresAt)
+    if (days === null) {
+      return `预计到期时间：${formatTime(task.expiresAt)}`
+    }
+    if (days <= 1) {
+      return `将在 24 小时内到期（${formatTime(task.expiresAt)}），请尽快处理。`
+    }
+    return `距离到期约 ${days} 天（${formatTime(task.expiresAt)}）。`
+  }
+  if (task.status === 'FAILED') {
+    return '失败任务通常无可下载文件，可按治理策略定期清理。'
+  }
+  return task.retentionSummary || '任务完成后将按当前保留策略自动进入到期窗口。'
+}
+
+function daysUntil(isoText: string) {
+  const target = Date.parse(isoText)
+  if (Number.isNaN(target)) {
+    return null
+  }
+  const diff = target - Date.now()
+  return Math.ceil(diff / (24 * 60 * 60 * 1000))
+}
+
+function formatTime(isoText: string) {
+  return isoText.replace('T', ' ')
+}
+
+function openTaskDetail(task: AuditExportTask) {
+  detailTask.value = task
+  taskDetailVisible.value = true
 }
 </script>
 
@@ -514,5 +610,9 @@ function defaultRetentionSummary(task: AuditExportTask) {
   margin: 6px 0 0;
   font-size: 13px;
   color: #64748b;
+}
+
+.detail-block {
+  margin-top: 16px;
 }
 </style>

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="panel-stack">
     <section class="dashboard-grid">
       <article class="stat-card">
@@ -55,9 +55,15 @@
             <el-tag :type="row.enabled ? 'success' : 'info'">{{ row.enabled ? '启用' : '停用' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="sortOrder" label="排序" width="90" />
-        <el-table-column fixed="right" label="操作" width="160">
+        <el-table-column label="引用客户端" width="130">
           <template #default="{ row }">
+            <el-tag type="info" effect="plain">{{ row.referencedClientCount || 0 }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="sortOrder" label="排序" width="90" />
+        <el-table-column fixed="right" label="操作" width="220">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button link type="primary" @click="openDialog(row)">编辑</el-button>
             <el-button link type="danger" @click="removeScope(row)">删除</el-button>
           </template>
@@ -105,6 +111,44 @@
         <el-button type="primary" @click="submit">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-drawer v-model="detailVisible" title="作用域详情" size="560px">
+      <template v-if="detailItem">
+        <el-descriptions :column="1" border class="drawer-section drawer-section--overview">
+          <el-descriptions-item label="Scope Code">{{ detailItem.scopeCode }}</el-descriptions-item>
+          <el-descriptions-item label="作用域名称">{{ detailItem.scopeName }}</el-descriptions-item>
+          <el-descriptions-item label="作用域类型">{{ detailItem.scopeType || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="作用域说明">{{ detailItem.scopeDesc || '未配置说明' }}</el-descriptions-item>
+          <el-descriptions-item label="引用客户端数">{{ detailItem.referencedClientCount || 0 }}</el-descriptions-item>
+          <el-descriptions-item label="默认选中">{{ detailItem.defaultSelected ? '是' : '否' }}</el-descriptions-item>
+          <el-descriptions-item label="同意页展示">{{ detailItem.visibleInConsent ? '展示' : '隐藏' }}</el-descriptions-item>
+          <el-descriptions-item label="状态">{{ detailItem.enabled ? '启用' : '停用' }}</el-descriptions-item>
+        </el-descriptions>
+
+        <div class="drawer-section drawer-section--guide">
+          <div class="eyebrow">引用提示</div>
+          <el-alert
+            v-if="(detailItem.referencedClientCount || 0) > 0"
+            :title="`当前作用域被 ${detailItem.referencedClientCount} 个客户端引用，删除前请先处理客户端作用域配置。`"
+            type="warning"
+            :closable="false"
+            style="margin-top: 8px"
+          />
+          <el-alert
+            v-else
+            title="当前作用域尚未被客户端引用，可按需调整或删除。"
+            type="success"
+            :closable="false"
+            style="margin-top: 8px"
+          />
+          <div v-if="detailItem.referencedClientIds?.length" class="tag-row" style="margin-top: 12px">
+            <el-tag v-for="clientId in detailItem.referencedClientIds" :key="clientId" type="info" effect="plain">
+              {{ clientId }}
+            </el-tag>
+          </div>
+        </div>
+      </template>
+    </el-drawer>
   </div>
 </template>
 
@@ -119,9 +163,11 @@ import type { OAuthScopeView } from '@/types/auth'
 const router = useRouter()
 const loading = ref(false)
 const visible = ref(false)
+const detailVisible = ref(false)
 const editingId = ref<number | null>(null)
 const formRef = ref<FormInstance>()
 const scopes = ref<OAuthScopeView[]>([])
+const detailItem = ref<OAuthScopeView | null>(null)
 
 const form = reactive({
   scopeCode: '',
@@ -170,6 +216,11 @@ function openDialog(row?: OAuthScopeView) {
   visible.value = true
 }
 
+function openDetail(row: OAuthScopeView) {
+  detailItem.value = row
+  detailVisible.value = true
+}
+
 async function submit() {
   await formRef.value?.validate()
   const payload = { ...form }
@@ -195,3 +246,12 @@ function goToClients() {
   void router.push({ name: 'oauth-clients' })
 }
 </script>
+
+<style scoped lang="scss">
+.switch-row,
+.tag-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+</style>

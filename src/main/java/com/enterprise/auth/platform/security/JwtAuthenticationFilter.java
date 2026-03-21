@@ -24,9 +24,12 @@ import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
     private final JwtService jwtService;
     private final UserRepository userRepository;
@@ -110,7 +113,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return Optional.empty();
             }
             return Optional.of(userAccountJwtConverter.convert(jwt));
-        } catch (RuntimeException ex) {
+        } catch (JwtException | IllegalArgumentException | ClassCastException ex) {
+            log.debug("Ignore invalid authorization server token: {}", ex.getMessage());
             return Optional.empty();
         }
     }

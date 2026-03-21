@@ -55,7 +55,7 @@
     </section>
 
     <el-drawer v-model="detailVisible" title="租户详情" size="700px">
-      <el-descriptions v-if="detailTenant" :column="2" border>
+      <el-descriptions v-if="detailTenant" :column="2" border class="drawer-section drawer-section--overview">
         <el-descriptions-item label="租户编码">{{ detailTenant.tenantId }}</el-descriptions-item>
         <el-descriptions-item label="租户名称">{{ detailTenant.name }}</el-descriptions-item>
         <el-descriptions-item label="套餐">{{ detailTenant.packageName || detailTenant.packageCode || '未设置' }}</el-descriptions-item>

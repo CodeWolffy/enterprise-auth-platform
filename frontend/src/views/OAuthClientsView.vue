@@ -59,7 +59,7 @@
 
     <el-drawer v-model="detailVisible" title="客户端详情" size="780px">
       <template v-if="detail">
-        <el-descriptions :column="2" border>
+        <el-descriptions :column="2" border class="drawer-section drawer-section--overview">
           <el-descriptions-item label="客户端名称">{{ detail.clientName }}</el-descriptions-item>
           <el-descriptions-item label="Client ID">{{ detail.clientId }}</el-descriptions-item>
           <el-descriptions-item label="类型">{{ detail.publicClient ? '公共客户端' : '机密客户端' }}</el-descriptions-item>
@@ -76,7 +76,7 @@
 
         <el-alert v-if="detail.integrationGuidance" :title="detail.integrationGuidance.summary" type="info" :closable="false" />
 
-        <div class="guide-block">
+        <div class="guide-block drawer-section drawer-section--scopes">
           <div class="panel-head"><div><span class="eyebrow">Scopes</span><h3>作用域说明</h3></div></div>
           <div class="tag-row">
             <el-tag v-for="(count, type) in detail.scopeTypeSummary || {}" :key="type" type="info" effect="plain">{{ type }} × {{ count }}</el-tag>
@@ -94,14 +94,14 @@
           </div>
         </div>
 
-        <div class="guide-block">
+        <div class="guide-block drawer-section drawer-section--guide">
           <div class="panel-head"><div><span class="eyebrow">Guide</span><h3>接入建议</h3></div><el-button type="primary" plain @click="openConsents(detail)">查看授权记录</el-button></div>
           <pre class="json-pre">{{ integrationSummary }}</pre>
           <pre class="json-pre">{{ authorizeUrlExample }}</pre>
           <pre v-if="!detail.publicClient" class="json-pre">{{ tokenCommandExample }}</pre>
         </div>
 
-        <div class="guide-block">
+        <div class="guide-block drawer-section drawer-section--history">
           <div class="panel-head"><div><span class="eyebrow">History</span><h3>状态历史</h3></div></div>
           <el-timeline v-if="detail.statusHistory?.length">
             <el-timeline-item v-for="item in detail.statusHistory" :key="`${item.eventType}-${item.occurredAt}-${item.operator}`" :timestamp="item.occurredAt || '-'" placement="top">

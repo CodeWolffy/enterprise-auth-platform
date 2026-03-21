@@ -5,13 +5,18 @@ import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.auth.dto.OauthScopeCrudRequest;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.config.PersistenceProperties;
+import com.enterprise.auth.platform.persistence.entity.SysOauthClientEntity;
 import com.enterprise.auth.platform.persistence.entity.SysOauthScopeEntity;
+import com.enterprise.auth.platform.persistence.mapper.SysOauthClientMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysOauthScopeMapper;
 import com.enterprise.auth.platform.security.SecuritySupport;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,27 +27,31 @@ public class OAuthScopeManagementService {
 
     private final PersistenceProperties persistenceProperties;
     private final SysOauthScopeMapper sysOauthScopeMapper;
+    private final SysOauthClientMapper sysOauthClientMapper;
     private final AuditService auditService;
 
     public OAuthScopeManagementService(
             PersistenceProperties persistenceProperties,
             @Nullable SysOauthScopeMapper sysOauthScopeMapper,
+            @Nullable SysOauthClientMapper sysOauthClientMapper,
             AuditService auditService
     ) {
         this.persistenceProperties = persistenceProperties;
         this.sysOauthScopeMapper = sysOauthScopeMapper;
+        this.sysOauthClientMapper = sysOauthClientMapper;
         this.auditService = auditService;
     }
 
     public List<OAuthScopeView> scopes() {
         requirePlatformDatabaseMode();
+        Map<String, ScopeReferenceHint> referenceHints = resolveScopeReferences();
         return sysOauthScopeMapper.selectList(new LambdaQueryWrapper<SysOauthScopeEntity>()
                         .eq(SysOauthScopeEntity::getTenantId, "platform")
                         .eq(SysOauthScopeEntity::getDeleted, 0)
                         .orderByAsc(SysOauthScopeEntity::getSortOrder)
                         .orderByAsc(SysOauthScopeEntity::getId))
                 .stream()
-                .map(this::toView)
+                .map(entity -> toView(entity, referenceHints.get(entity.getScopeCode())))
                 .toList();
     }
 
@@ -58,7 +67,7 @@ public class OAuthScopeManagementService {
         sysOauthScopeMapper.insert(entity);
         auditService.record("OAUTH_SCOPE_CREATED", SecuritySupport.currentOperator(), "platform",
                 java.util.Map.of("scopeCode", request.scopeCode()));
-        return toView(entity);
+        return toView(entity, resolveScopeReferences().get(entity.getScopeCode()));
     }
 
     @Transactional
@@ -72,13 +81,17 @@ public class OAuthScopeManagementService {
         sysOauthScopeMapper.updateById(entity);
         auditService.record("OAUTH_SCOPE_UPDATED", SecuritySupport.currentOperator(), "platform",
                 java.util.Map.of("scopeId", id, "scopeCode", request.scopeCode()));
-        return toView(entity);
+        return toView(entity, resolveScopeReferences().get(entity.getScopeCode()));
     }
 
     @Transactional
     public void deleteScope(Long id) {
         requirePlatformDatabaseMode();
         SysOauthScopeEntity entity = getScope(id);
+        ScopeReferenceHint referenceHint = resolveScopeReferences().get(entity.getScopeCode());
+        if (referenceHint != null && referenceHint.referencedClientCount() > 0) {
+            throw new BusinessException("当前作用域仍被客户端引用，无法删除");
+        }
         sysOauthScopeMapper.deleteById(id);
         auditService.record("OAUTH_SCOPE_DELETED", SecuritySupport.currentOperator(), "platform",
                 java.util.Map.of("scopeId", id, "scopeCode", entity.getScopeCode()));
@@ -115,7 +128,9 @@ public class OAuthScopeManagementService {
         return entity;
     }
 
-    private OAuthScopeView toView(SysOauthScopeEntity entity) {
+    private OAuthScopeView toView(SysOauthScopeEntity entity, @Nullable ScopeReferenceHint referenceHint) {
+        int referencedClientCount = referenceHint == null ? 0 : referenceHint.referencedClientCount();
+        List<String> referencedClientIds = referenceHint == null ? List.of() : referenceHint.sampleClientIds();
         return new OAuthScopeView(
                 entity.getId(),
                 entity.getScopeCode(),
@@ -126,8 +141,49 @@ public class OAuthScopeManagementService {
                 entity.getVisibleInConsent() == null || entity.getVisibleInConsent() == 1,
                 entity.getSortOrder(),
                 entity.getEnabled() == null || entity.getEnabled() == 1,
-                entity.getUpdatedAt() == null ? entity.getCreatedAt() : entity.getUpdatedAt()
+                entity.getUpdatedAt() == null ? entity.getCreatedAt() : entity.getUpdatedAt(),
+                referencedClientCount,
+                referencedClientIds
         );
+    }
+
+    private Map<String, ScopeReferenceHint> resolveScopeReferences() {
+        if (sysOauthClientMapper == null) {
+            return Map.of();
+        }
+        List<SysOauthClientEntity> clients = sysOauthClientMapper.selectList(new LambdaQueryWrapper<SysOauthClientEntity>()
+                .eq(SysOauthClientEntity::getTenantId, "platform")
+                .eq(SysOauthClientEntity::getDeleted, 0)
+                .orderByAsc(SysOauthClientEntity::getId));
+        if (clients.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Set<String>> scopeClientIds = new LinkedHashMap<>();
+        for (SysOauthClientEntity client : clients) {
+            String clientId = StringUtils.hasText(client.getClientId()) ? client.getClientId().trim() : "";
+            if (!StringUtils.hasText(clientId)) {
+                continue;
+            }
+            for (String scopeCode : splitScopes(client.getScopes())) {
+                scopeClientIds.computeIfAbsent(scopeCode, ignored -> new java.util.LinkedHashSet<>()).add(clientId);
+            }
+        }
+        Map<String, ScopeReferenceHint> hints = new LinkedHashMap<>();
+        for (Map.Entry<String, Set<String>> entry : scopeClientIds.entrySet()) {
+            List<String> sampleClientIds = entry.getValue().stream().limit(5).toList();
+            hints.put(entry.getKey(), new ScopeReferenceHint(entry.getValue().size(), sampleClientIds));
+        }
+        return hints;
+    }
+
+    private List<String> splitScopes(String scopes) {
+        if (!StringUtils.hasText(scopes)) {
+            return List.of();
+        }
+        return List.of(scopes.split(",")).stream()
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .toList();
     }
 
     private void requirePlatformDatabaseMode() {
@@ -151,7 +207,12 @@ public class OAuthScopeManagementService {
             @Schema(description = "是否在同意页展示") boolean visibleInConsent,
             @Schema(description = "排序值") Integer sortOrder,
             @Schema(description = "是否启用") boolean enabled,
-            @Schema(description = "更新时间") LocalDateTime updatedAt
+            @Schema(description = "更新时间") LocalDateTime updatedAt,
+            @Schema(description = "引用该作用域的客户端数量") int referencedClientCount,
+            @Schema(description = "引用该作用域的客户端示例（最多 5 条）") List<String> referencedClientIds
     ) {
+    }
+
+    private record ScopeReferenceHint(int referencedClientCount, List<String> sampleClientIds) {
     }
 }

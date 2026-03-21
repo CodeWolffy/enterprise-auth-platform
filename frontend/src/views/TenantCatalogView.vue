@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="panel-stack">
     <section class="dashboard-grid">
       <article class="stat-card">
@@ -50,14 +50,20 @@
                 <el-tag v-for="code in row.capabilityCodes" :key="code" class="scope-tag" size="small">{{ code }}</el-tag>
               </template>
             </el-table-column>
+            <el-table-column label="引用租户" width="110">
+              <template #default="{ row }">
+                <el-tag type="info" effect="plain">{{ row.referencedTenantCount || 0 }}</el-tag>
+              </template>
+            </el-table-column>
             <el-table-column prop="packageDesc" label="套餐说明" min-width="220" show-overflow-tooltip />
             <el-table-column label="状态" width="100">
               <template #default="{ row }">
                 <el-tag :type="row.enabled ? 'success' : 'info'">{{ row.enabled ? '启用' : '停用' }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column fixed="right" label="操作" width="160">
+            <el-table-column fixed="right" label="操作" width="220">
               <template #default="{ row }">
+                <el-button link type="primary" @click="openPackageDetail(row)">详情</el-button>
                 <el-button link type="primary" @click="openPackageDialog(row)">编辑</el-button>
                 <el-button link type="danger" @click="removePackage(row)">删除</el-button>
               </template>
@@ -77,14 +83,20 @@
             <el-table-column prop="capabilityCode" label="能力编码" min-width="180" />
             <el-table-column prop="capabilityName" label="能力名称" min-width="180" />
             <el-table-column prop="capabilityDesc" label="能力说明" min-width="260" show-overflow-tooltip />
+            <el-table-column label="引用套餐" width="110">
+              <template #default="{ row }">
+                <el-tag type="info" effect="plain">{{ row.referencedPackageCount || 0 }}</el-tag>
+              </template>
+            </el-table-column>
             <el-table-column prop="sortOrder" label="排序" width="90" />
             <el-table-column label="状态" width="100">
               <template #default="{ row }">
                 <el-tag :type="row.enabled ? 'success' : 'info'">{{ row.enabled ? '启用' : '停用' }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column fixed="right" label="操作" width="160">
+            <el-table-column fixed="right" label="操作" width="220">
               <template #default="{ row }">
+                <el-button link type="primary" @click="openCapabilityDetail(row)">详情</el-button>
                 <el-button link type="primary" @click="openCapabilityDialog(row)">编辑</el-button>
                 <el-button link type="danger" @click="removeCapability(row)">删除</el-button>
               </template>
@@ -178,6 +190,87 @@
         <el-button type="primary" @click="submitCapability">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-drawer v-model="packageDetailVisible" title="套餐详情" size="560px">
+      <template v-if="detailPackage">
+        <el-descriptions :column="1" border>
+          <el-descriptions-item label="套餐编码">{{ detailPackage.packageCode }}</el-descriptions-item>
+          <el-descriptions-item label="套餐名称">{{ detailPackage.packageName }}</el-descriptions-item>
+          <el-descriptions-item label="用户配额">{{ detailPackage.userQuota ?? '-' }}</el-descriptions-item>
+          <el-descriptions-item label="存储配额(GB)">{{ detailPackage.storageQuotaGb ?? '-' }}</el-descriptions-item>
+          <el-descriptions-item label="套餐说明">{{ detailPackage.packageDesc || '未配置说明' }}</el-descriptions-item>
+          <el-descriptions-item label="状态">{{ detailPackage.enabled ? '启用' : '停用' }}</el-descriptions-item>
+          <el-descriptions-item label="引用租户数">{{ detailPackage.referencedTenantCount || 0 }}</el-descriptions-item>
+        </el-descriptions>
+
+        <div class="detail-block">
+          <div class="eyebrow">能力清单</div>
+          <div class="tag-wrap">
+            <el-tag v-for="code in detailPackage.capabilityCodes" :key="code" type="info" effect="plain">{{ code }}</el-tag>
+          </div>
+        </div>
+
+        <div class="detail-block">
+          <div class="eyebrow">引用提示</div>
+          <el-alert
+            v-if="(detailPackage.referencedTenantCount || 0) > 0"
+            :title="`当前套餐被 ${detailPackage.referencedTenantCount} 个租户使用，删除或变更前请先评估租户迁移。`"
+            type="warning"
+            :closable="false"
+            style="margin-top: 8px"
+          />
+          <el-alert
+            v-else
+            title="当前套餐尚未被租户引用，可按需调整。"
+            type="success"
+            :closable="false"
+            style="margin-top: 8px"
+          />
+          <div v-if="detailPackage.referencedTenantIds?.length" class="tag-wrap" style="margin-top: 10px">
+            <el-tag v-for="tenantId in detailPackage.referencedTenantIds" :key="tenantId">{{ tenantId }}</el-tag>
+          </div>
+        </div>
+      </template>
+    </el-drawer>
+
+    <el-drawer v-model="capabilityDetailVisible" title="能力详情" size="560px">
+      <template v-if="detailCapability">
+        <el-descriptions :column="1" border>
+          <el-descriptions-item label="能力编码">{{ detailCapability.capabilityCode }}</el-descriptions-item>
+          <el-descriptions-item label="能力名称">{{ detailCapability.capabilityName }}</el-descriptions-item>
+          <el-descriptions-item label="能力说明">{{ detailCapability.capabilityDesc || '未配置说明' }}</el-descriptions-item>
+          <el-descriptions-item label="排序值">{{ detailCapability.sortOrder ?? '-' }}</el-descriptions-item>
+          <el-descriptions-item label="状态">{{ detailCapability.enabled ? '启用' : '停用' }}</el-descriptions-item>
+          <el-descriptions-item label="引用套餐数">{{ detailCapability.referencedPackageCount || 0 }}</el-descriptions-item>
+          <el-descriptions-item label="覆盖租户数">{{ detailCapability.referencedTenantCount || 0 }}</el-descriptions-item>
+          <el-descriptions-item label="覆盖记录数">{{ detailCapability.overrideReferenceCount || 0 }}</el-descriptions-item>
+        </el-descriptions>
+
+        <div class="detail-block">
+          <div class="eyebrow">引用提示</div>
+          <el-alert
+            v-if="(detailCapability.referencedPackageCount || 0) > 0 || (detailCapability.overrideReferenceCount || 0) > 0"
+            title="该能力存在引用关系，删除前请先解除套餐绑定并清理租户覆盖配置。"
+            type="warning"
+            :closable="false"
+            style="margin-top: 8px"
+          />
+          <el-alert
+            v-else
+            title="当前能力无引用关系，可按需调整。"
+            type="success"
+            :closable="false"
+            style="margin-top: 8px"
+          />
+          <div v-if="detailCapability.referencedPackageCodes?.length" class="tag-wrap" style="margin-top: 10px">
+            <el-tag v-for="pkg in detailCapability.referencedPackageCodes" :key="pkg" type="info" effect="plain">套餐: {{ pkg }}</el-tag>
+          </div>
+          <div v-if="detailCapability.referencedTenantIds?.length" class="tag-wrap" style="margin-top: 10px">
+            <el-tag v-for="tenantId in detailCapability.referencedTenantIds" :key="tenantId">租户: {{ tenantId }}</el-tag>
+          </div>
+        </div>
+      </template>
+    </el-drawer>
   </div>
 </template>
 
@@ -202,12 +295,16 @@ const loadingPackages = ref(false)
 const loadingCapabilities = ref(false)
 const packageVisible = ref(false)
 const capabilityVisible = ref(false)
+const packageDetailVisible = ref(false)
+const capabilityDetailVisible = ref(false)
 const editingPackageId = ref<number | null>(null)
 const editingCapabilityId = ref<number | null>(null)
 const packageFormRef = ref<FormInstance>()
 const capabilityFormRef = ref<FormInstance>()
 const packages = ref<TenantPackageView[]>([])
 const capabilities = ref<TenantCapabilityView[]>([])
+const detailPackage = ref<TenantPackageView | null>(null)
+const detailCapability = ref<TenantCapabilityView | null>(null)
 
 const packageForm = reactive({
   packageCode: '',
@@ -289,6 +386,16 @@ function openCapabilityDialog(row?: TenantCapabilityView) {
   capabilityVisible.value = true
 }
 
+function openPackageDetail(row: TenantPackageView) {
+  detailPackage.value = row
+  packageDetailVisible.value = true
+}
+
+function openCapabilityDetail(row: TenantCapabilityView) {
+  detailCapability.value = row
+  capabilityDetailVisible.value = true
+}
+
 async function submitPackage() {
   await packageFormRef.value?.validate()
   const payload = { ...packageForm }
@@ -318,6 +425,10 @@ async function submitCapability() {
 }
 
 async function removePackage(row: TenantPackageView) {
+  if ((row.referencedTenantCount || 0) > 0) {
+    ElMessage.warning(`套餐仍被 ${row.referencedTenantCount} 个租户使用，请先迁移租户后再删除`)
+    return
+  }
   await ElMessageBox.confirm(`确认删除套餐 ${row.packageName} 吗？`, '删除确认', { type: 'warning' })
   await deleteTenantPackage(row.id)
   ElMessage.success('套餐已删除')
@@ -325,6 +436,10 @@ async function removePackage(row: TenantPackageView) {
 }
 
 async function removeCapability(row: TenantCapabilityView) {
+  if ((row.referencedPackageCount || 0) > 0 || (row.overrideReferenceCount || 0) > 0) {
+    ElMessage.warning('能力仍存在套餐或租户覆盖引用，请先解除引用后再删除')
+    return
+  }
   await ElMessageBox.confirm(`确认删除能力 ${row.capabilityName} 吗？`, '删除确认', { type: 'warning' })
   await deleteTenantCapability(row.id)
   ElMessage.success('能力已删除')
@@ -340,5 +455,15 @@ async function removeCapability(row: TenantCapabilityView) {
 .scope-tag {
   margin-right: 6px;
   margin-bottom: 6px;
+}
+
+.detail-block {
+  margin-top: 16px;
+}
+
+.tag-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 </style>

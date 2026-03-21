@@ -85,7 +85,7 @@
 
     <el-drawer v-model="detailVisible" title="角色详情" size="680px">
       <template v-if="detailRole">
-        <el-descriptions :column="2" border>
+        <el-descriptions :column="2" border class="drawer-section drawer-section--overview">
           <el-descriptions-item label="角色编码">{{ detailRole.code }}</el-descriptions-item>
           <el-descriptions-item label="角色名称">{{ detailRole.name }}</el-descriptions-item>
           <el-descriptions-item label="数据范围">{{ detailRole.dataScopeType }}</el-descriptions-item>
@@ -94,13 +94,13 @@
           <el-descriptions-item label="角色描述" :span="2">{{ detailRole.description || '-' }}</el-descriptions-item>
         </el-descriptions>
 
-        <div v-if="detailRole.customDeptIds?.length" class="scope-tags">
+        <div v-if="detailRole.customDeptIds?.length" class="scope-tags drawer-section drawer-section--scopes">
           <el-tag v-for="deptId in detailRole.customDeptIds" :key="deptId" type="warning" effect="plain">
             部门 #{{ deptId }}
           </el-tag>
         </div>
 
-        <div class="tree-panel">
+        <div class="tree-panel drawer-section drawer-section--history">
         <div class="tree-panel__head">
           <strong>权限树</strong>
           <span>{{ assignedPermissionCodes.length }} 个权限点</span>

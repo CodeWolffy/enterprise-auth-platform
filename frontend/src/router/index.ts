@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import type { PermissionSnapshot } from '@/types/auth'
 import { useAuthStore } from '@/stores/auth'
@@ -17,13 +18,6 @@ const PUBLIC_ROUTES: RouteRecordRaw[] = [
     meta: { public: true, title: '登录回调' },
   },
 ]
-
-const SHELL_ROUTE: RouteRecordRaw = {
-  path: '/',
-  name: 'console-shell',
-  component: () => import('@/layouts/ConsoleLayout.vue'),
-  children: [],
-}
 
 const DYNAMIC_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = {
   dashboard: {
@@ -124,81 +118,19 @@ const DYNAMIC_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = {
   },
 }
 
-const dynamicRouteNames = new Set<string>()
-
-function normalizeMenuPath(path: string | undefined) {
-  if (!path) {
-    return ''
-  }
-  return path.replace(/^\/+/, '')
-}
-
-function resolveRouteByMenu(menu: { code: string; path: string }) {
-  const byCode = DYNAMIC_ROUTE_DEFINITIONS[menu.code]
-  if (byCode) {
-    return byCode
-  }
-  const normalizedPath = normalizeMenuPath(menu.path)
-  return Object.values(DYNAMIC_ROUTE_DEFINITIONS).find((route) => normalizeMenuPath(String(route.path)) === normalizedPath)
-}
-
-const router = createRouter({
-  history: createWebHistory(),
-  routes: [...PUBLIC_ROUTES, SHELL_ROUTE],
-})
-
-function clearDynamicRoutes() {
-  for (const name of dynamicRouteNames) {
-    if (router.hasRoute(name)) {
-      router.removeRoute(name)
-    }
-  }
-  dynamicRouteNames.clear()
-}
-
-function registerDynamicRoutes(snapshot: PermissionSnapshot | null) {
-  clearDynamicRoutes()
-  if (!snapshot) {
-    return
-  }
-
-  const menuCodes = new Set(snapshot.menus.map((item) => item.code))
-  const menuPaths = new Set(snapshot.menus.map((item) => normalizeMenuPath(item.path)))
-  for (const menu of snapshot.menus) {
-    const route = resolveRouteByMenu(menu)
-    if (!route) {
-      continue
-    }
-    if (router.hasRoute(String(route.name))) {
-      continue
-    }
-    router.addRoute('console-shell', route)
-    dynamicRouteNames.add(String(route.name))
-  }
-
-  for (const [code, route] of Object.entries(DYNAMIC_ROUTE_DEFINITIONS)) {
-    if (menuCodes.has(code) || menuPaths.has(normalizeMenuPath(String(route.path)))) {
-      continue
-    }
-    const requiredPermission = route.meta?.requiresPermission as string | undefined
-    if (requiredPermission && snapshot.permissions.includes(requiredPermission)) {
-      if (router.hasRoute(String(route.name))) {
-        continue
-      }
-      router.addRoute('console-shell', route)
-      dynamicRouteNames.add(String(route.name))
-    }
-  }
-
-  if (!router.hasRoute('console-home')) {
-    router.addRoute('console-shell', {
+const SHELL_ROUTE: RouteRecordRaw = {
+  path: '/',
+  name: 'console-shell',
+  component: () => import('@/layouts/ConsoleLayout.vue'),
+  children: [
+    {
       path: '',
       name: 'console-home',
-      redirect: snapshot.menus[0]?.path || '/dashboard',
+      redirect: '/dashboard',
       meta: { hidden: true },
-    })
-    dynamicRouteNames.add('console-home')
-  }
+    },
+    ...Object.values(DYNAMIC_ROUTE_DEFINITIONS),
+  ],
 }
 
 function isAllowedRoute(snapshot: PermissionSnapshot | null, path: string) {
@@ -221,6 +153,14 @@ function isAllowedRoute(snapshot: PermissionSnapshot | null, path: string) {
   return false
 }
 
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [...PUBLIC_ROUTES, SHELL_ROUTE],
+  scrollBehavior() {
+    return { top: 0, left: 0 }
+  },
+})
+
 router.beforeEach(async (to) => {
   const authStore = useAuthStore()
   if (to.meta.public) {
@@ -237,14 +177,14 @@ router.beforeEach(async (to) => {
     } else if (authStore.shouldRefreshToken()) {
       await authStore.refreshTokens()
     }
-  } catch {
-    ElMessage.error('登录态已失效，请重新登录')
+  } catch (error) {
+    const status = axios.isAxiosError(error) ? error.response?.status : undefined
+    if (status !== 401 && status !== 403) {
+      ElMessage.error('会话加载失败，请稍后重试')
+    }
     authStore.clearSession()
-    clearDynamicRoutes()
     return { name: 'login' }
   }
-
-  registerDynamicRoutes(authStore.snapshot)
 
   if (to.path !== '/' && !isAllowedRoute(authStore.snapshot, to.path)) {
     ElMessage.error('您没有权限访问该页面')
@@ -257,6 +197,14 @@ router.beforeEach(async (to) => {
 router.afterEach((to) => {
   document.title = `${String(to.meta.title ?? '控制台')} | 企业级权限管理平台`
 })
+
+function registerDynamicRoutes(_snapshot: PermissionSnapshot | null) {
+  // Routes are now statically registered for stability.
+}
+
+function clearDynamicRoutes() {
+  // Keep for backward compatibility with auth store API.
+}
 
 export { registerDynamicRoutes, clearDynamicRoutes }
 export default router
