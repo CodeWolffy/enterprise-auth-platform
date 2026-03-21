@@ -11,11 +11,13 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AdvancedSearch: typeof import('./src/components/AdvancedSearch.vue')['default']
     AppNav: typeof import('./src/components/AppNav.vue')['default']
     ElAlert: typeof import('element-plus/es')['ElAlert']
     ElButton: typeof import('element-plus/es')['ElButton']
     ElCheckbox: typeof import('element-plus/es')['ElCheckbox']
     ElCol: typeof import('element-plus/es')['ElCol']
+    ElColorPicker: typeof import('element-plus/es')['ElColorPicker']
     ElDatePicker: typeof import('element-plus/es')['ElDatePicker']
     ElDescriptions: typeof import('element-plus/es')['ElDescriptions']
     ElDescriptionsItem: typeof import('element-plus/es')['ElDescriptionsItem']

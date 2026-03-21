@@ -22,7 +22,7 @@
         <el-button type="primary" @click="openDict()">新增字典项</el-button>
       </div>
 
-      <el-form :inline="true" class="toolbar-inline" @submit.prevent="handleSearch">
+      <AdvancedSearch @search="handleSearch" @reset="resetSearch">
         <el-form-item label="字典类型">
           <el-input v-model="typeKeyword" placeholder="输入字典类型" clearable />
         </el-form-item>
@@ -47,11 +47,7 @@
             <el-option label="降序" value="desc" />
           </el-select>
         </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch">搜索</el-button>
-          <el-button @click="resetSearch">重置</el-button>
-        </el-form-item>
-      </el-form>
+      </AdvancedSearch>
 
       <div class="table-tools">
         <el-radio-group v-model="dictTablePrefs.density" size="small">
@@ -198,6 +194,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import AdvancedSearch from '@/components/AdvancedSearch.vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { createDict, deleteDict, queryCategories, queryDicts, updateDict } from '@/api/system'
 import { useTablePreferences } from '@/composables/useTablePreferences'

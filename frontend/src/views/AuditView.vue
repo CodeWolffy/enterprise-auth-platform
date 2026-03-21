@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="panel-stack">
     <section class="dashboard-grid">
       <article class="stat-card">
@@ -35,7 +35,7 @@
         </div>
       </div>
 
-      <el-form inline class="toolbar-inline" @submit.prevent="doSearch">
+      <AdvancedSearch @search="doSearch" @reset="resetSearch">
         <el-form-item label="租户">
           <el-input v-model="query.tenantId" placeholder="按租户编码搜索" clearable />
         </el-form-item>
@@ -63,11 +63,7 @@
             clearable
           />
         </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="doSearch">查询</el-button>
-          <el-button @click="resetSearch">重置</el-button>
-        </el-form-item>
-      </el-form>
+      </AdvancedSearch>
 
       <div class="table-tools">
         <el-radio-group v-model="auditTablePrefs.density" size="small">
@@ -104,7 +100,11 @@
         <el-table-column v-if="auditTablePrefs.visibleColumnMap.tenantId" column-key="tenantId" prop="tenantId" label="租户" min-width="120" :width="auditTablePrefs.getColumnWidth('tenantId')" />
         <el-table-column v-if="auditTablePrefs.visibleColumnMap.requestId" column-key="requestId" prop="requestId" label="请求 ID" min-width="180" :width="auditTablePrefs.getColumnWidth('requestId')" />
         <el-table-column v-if="auditTablePrefs.visibleColumnMap.clientIp" column-key="clientIp" prop="clientIp" label="客户端 IP" min-width="140" :width="auditTablePrefs.getColumnWidth('clientIp')" />
-        <el-table-column v-if="auditTablePrefs.visibleColumnMap.occurredAt" column-key="occurredAt" prop="occurredAt" label="发生时间" min-width="180" :width="auditTablePrefs.getColumnWidth('occurredAt')" />
+        <el-table-column v-if="auditTablePrefs.visibleColumnMap.occurredAt" column-key="occurredAt" label="发生时间" min-width="180" :width="auditTablePrefs.getColumnWidth('occurredAt')">
+          <template #default="{ row }">
+            {{ row.occurredAt ? row.occurredAt.replace('T', ' ').replace('Z', '') : '-' }}
+          </template>
+        </el-table-column>
         <el-table-column v-if="auditTablePrefs.visibleColumnMap.details" column-key="details" label="事件明细" min-width="220" :width="auditTablePrefs.getColumnWidth('details')">
           <template #default="{ row }">
             <el-popover placement="left" :width="420" trigger="click">
@@ -170,7 +170,7 @@
         </div>
       </div>
 
-      <el-form inline class="toolbar-inline" @submit.prevent="loadExportTasks">
+      <AdvancedSearch @search="applyExportSearch" @reset="resetExportSearch">
         <el-form-item label="租户">
           <el-input v-model="exportQuery.tenantId" placeholder="按租户编码搜索" clearable />
         </el-form-item>
@@ -202,12 +202,10 @@
         <el-form-item label="最大任务数">
           <el-input-number v-model="exportPolicy.maxTasks" :min="1" :max="5000" />
         </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="applyExportSearch">筛选</el-button>
-          <el-button @click="resetExportSearch">重置</el-button>
+        <template #extra-actions>
           <el-button type="success" plain @click="saveRetentionPolicy">保存保留策略</el-button>
-        </el-form-item>
-      </el-form>
+        </template>
+      </AdvancedSearch>
 
       <div class="table-tools">
         <el-radio-group v-model="exportTablePrefs.density" size="small">
@@ -333,6 +331,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import AdvancedSearch from '@/components/AdvancedSearch.vue'
 import { useTablePreferences } from '@/composables/useTablePreferences'
 import {
   archiveAuditExportTask,
@@ -485,7 +484,7 @@ async function exportCurrentPage() {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = `audit-export-${Date.now()}.csv`
+  anchor.download = `audit-export-${Date.now()}.xlsx`
   anchor.click()
   URL.revokeObjectURL(url)
   ElMessage.success('已导出审计记录')
@@ -507,7 +506,7 @@ async function downloadTask(taskId: number) {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = `audit-export-task-${taskId}.csv`
+  anchor.download = `audit-export-task-${taskId}.xlsx`
   anchor.click()
   URL.revokeObjectURL(url)
 }

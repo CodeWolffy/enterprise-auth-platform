@@ -54,3 +54,12 @@ export async function refreshOauthToken(refreshToken: string) {
 export async function logoutCurrentSession() {
   await http.post('/api/auth/logout')
 }
+
+export async function querySessions() {
+  const { data } = await http.get<ApiResponse<any[]>>('/api/auth/sessions')
+  return data.data
+}
+
+export async function forceOffline(sessionId: string) {
+  await http.post(`/api/auth/sessions/${sessionId}/offline`)
+}

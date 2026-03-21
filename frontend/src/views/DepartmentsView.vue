@@ -35,15 +35,11 @@
         </div>
       </div>
 
-      <el-form :inline="true" class="toolbar-inline" @submit.prevent="handleSearch">
+      <AdvancedSearch @search="handleSearch" @reset="resetSearch">
         <el-form-item label="关键字">
           <el-input v-model="keyword" placeholder="按部门名称或编码搜索" clearable />
         </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch">搜索</el-button>
-          <el-button @click="resetSearch">重置</el-button>
-        </el-form-item>
-      </el-form>
+      </AdvancedSearch>
 
       <div class="table-tools">
         <el-radio-group v-model="departmentTablePrefs.density" size="small">
@@ -197,6 +193,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import AdvancedSearch from '@/components/AdvancedSearch.vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { createDepartment, deleteDepartment, queryDepartments, updateDepartment } from '@/api/platform'
 import { useTablePreferences } from '@/composables/useTablePreferences'

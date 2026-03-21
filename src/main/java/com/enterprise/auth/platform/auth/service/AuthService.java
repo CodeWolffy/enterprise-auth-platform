@@ -19,9 +19,11 @@ import com.enterprise.auth.platform.user.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.lang.Nullable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -40,6 +42,7 @@ public class AuthService {
     private final PersistenceProperties persistenceProperties;
     private final SysUserMapper sysUserMapper;
     private final DataScopeService dataScopeService;
+    private final StringRedisTemplate stringRedisTemplate;
 
     public AuthService(
             CaptchaService captchaService,
@@ -51,7 +54,8 @@ public class AuthService {
             SecurityProperties securityProperties,
             PersistenceProperties persistenceProperties,
             @Nullable SysUserMapper sysUserMapper,
-            DataScopeService dataScopeService
+            DataScopeService dataScopeService,
+            StringRedisTemplate stringRedisTemplate
     ) {
         this.captchaService = captchaService;
         this.sessionStore = sessionStore;
@@ -63,25 +67,48 @@ public class AuthService {
         this.persistenceProperties = persistenceProperties;
         this.sysUserMapper = sysUserMapper;
         this.dataScopeService = dataScopeService;
+        this.stringRedisTemplate = stringRedisTemplate;
     }
 
     public TokenResponse login(LoginRequest request, HttpServletRequest servletRequest) {
         captchaService.validate(request.captchaId(), request.captchaCode());
         String tenantId = StringUtils.hasText(request.tenantId()) ? request.tenantId() : TenantContext.getTenantId();
         String clientIp = clientIp(servletRequest);
+        
+        String lockKey = "auth:lock:" + tenantId + ":" + request.username();
+        String failKey = "auth:fail:" + tenantId + ":" + request.username();
+        
+        if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(lockKey))) {
+            auditService.record("LOGIN_BLOCKED", request.username(), tenantId, Map.of("reason", "account_locked", "clientIp", clientIp));
+            throw new BusinessException("密码错误次数过多，账号已锁定15分钟，请稍后再试");
+        }
+
         UserAccount user = userRepository.findByUsername(tenantId, request.username())
                 .orElseThrow(() -> {
                     auditService.record("LOGIN_FAILED", request.username(), tenantId, Map.of("reason", "user_not_found", "clientIp", clientIp));
                     return new BusinessException("用户名或密码错误");
                 });
         if (!passwordEncoder.matches(request.password(), user.password())) {
+            Long fails = stringRedisTemplate.opsForValue().increment(failKey);
+            if (fails != null && fails == 1) {
+                stringRedisTemplate.expire(failKey, Duration.ofMinutes(15));
+            }
+            if (fails != null && fails >= 5) {
+                stringRedisTemplate.opsForValue().set(lockKey, "LOCKED", Duration.ofMinutes(15));
+                stringRedisTemplate.delete(failKey);
+                auditService.record("ACCOUNT_LOCKED", request.username(), tenantId, Map.of("reason", "exceed_max_failures", "clientIp", clientIp));
+                throw new BusinessException("密码错误次数过多，账号已锁定15分钟，请稍后再试");
+            }
             auditService.record("LOGIN_FAILED", request.username(), tenantId, Map.of("reason", "bad_credentials", "clientIp", clientIp));
-            throw new BusinessException("用户名或密码错误");
+            long remaining = 5 - (fails == null ? 0 : fails);
+            throw new BusinessException("用户名或密码错误，还剩 " + remaining + " 次机会");
         }
         if (!user.enabled()) {
             auditService.record("LOGIN_FAILED", user.username(), tenantId, Map.of("reason", "disabled", "clientIp", clientIp));
             throw new BusinessException("用户已禁用");
         }
+
+        stringRedisTemplate.delete(failKey);
 
         String sessionId = UUID.randomUUID().toString();
         Instant now = Instant.now();

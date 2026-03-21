@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="panel-stack">
     <section class="dashboard-grid">
       <article class="stat-card">
@@ -29,7 +29,7 @@
         <el-button type="primary" @click="openTenant()">新增租户</el-button>
       </div>
 
-      <el-form :inline="true" class="toolbar-inline" @submit.prevent="handleSearch">
+      <AdvancedSearch @search="handleSearch" @reset="resetSearch">
         <el-form-item label="关键字"><el-input v-model="keyword" placeholder="搜索租户编码或名称" clearable /></el-form-item>
         <el-form-item label="租户级别">
           <el-select v-model="platformFilter" clearable style="width: 160px">
@@ -45,11 +45,7 @@
             <el-option label="禁用" value="0" />
           </el-select>
         </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch">搜索</el-button>
-          <el-button @click="resetSearch">重置</el-button>
-        </el-form-item>
-      </el-form>
+      </AdvancedSearch>
 
       <div class="table-tools">
         <el-radio-group v-model="tenantTablePrefs.density" size="small">
@@ -119,7 +115,7 @@
     </el-drawer>
 
     <el-drawer v-model="historyVisible" title="租户变更历史" size="860px">
-      <el-form :inline="true" class="toolbar-inline" @submit.prevent="applyHistorySearch">
+      <AdvancedSearch @search="applyHistorySearch" @reset="resetHistorySearch">
         <el-form-item label="类型">
           <el-select v-model="historyQuery.changeType" clearable style="width: 160px">
             <el-option label="全部" value="" />
@@ -133,8 +129,7 @@
         <el-form-item label="字段"><el-input v-model="historyQuery.fieldKey" placeholder="按字段键筛选" clearable /></el-form-item>
         <el-form-item label="操作人"><el-input v-model="historyQuery.operator" placeholder="按操作人筛选" clearable /></el-form-item>
         <el-form-item label="时间范围"><el-date-picker v-model="historyDateRange" type="datetimerange" range-separator="至" start-placeholder="开始时间" end-placeholder="结束时间" value-format="YYYY-MM-DDTHH:mm:ss" clearable /></el-form-item>
-        <el-form-item><el-button type="primary" @click="applyHistorySearch">筛选</el-button><el-button @click="resetHistorySearch">重置</el-button></el-form-item>
-      </el-form>
+      </AdvancedSearch>
 
       <div class="history-insight">
         <article class="insight-card"><strong>{{ historySummary.totalChanges }}</strong><span>命中变更总数</span></article>
@@ -214,6 +209,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import AdvancedSearch from '@/components/AdvancedSearch.vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { createTenant, deleteTenant, queryTenantCapabilityOverrides, queryTenantHistory, queryTenantHistorySummary, queryTenants, updateTenant, updateTenantCapabilityOverrides } from '@/api/platform'
 import { queryTenantCapabilities, queryTenantPackages } from '@/api/tenantCatalog'

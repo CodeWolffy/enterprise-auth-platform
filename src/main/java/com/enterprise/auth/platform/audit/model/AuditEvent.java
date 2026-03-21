@@ -3,6 +3,7 @@ package com.enterprise.auth.platform.audit.model;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.Map;
+import java.io.Serializable;
 
 @Schema(description = "审计事件")
 public record AuditEvent(
@@ -13,5 +14,6 @@ public record AuditEvent(
         @Schema(description = "客户端IP") String clientIp,
         @Schema(description = "发生时间") Instant occurredAt,
         @Schema(description = "事件明细") Map<String, Object> details
-) {
+) implements Serializable {
+    private static final long serialVersionUID = 1L;
 }

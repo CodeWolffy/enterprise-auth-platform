@@ -14,8 +14,11 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.io.ByteArrayOutputStream;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -31,6 +34,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.alibaba.excel.EasyExcel;
+import com.enterprise.auth.platform.audit.model.AuditExportVO;
 
 @Tag(name = "安全审计")
 @RestController
@@ -98,11 +104,25 @@ public class AuditController {
                         "recordCount", records.size()
                 )
         );
-        String csv = buildCsv(records);
+        
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
+        List<AuditExportVO> voList = records.stream().map(event -> new AuditExportVO(
+                event.type(),
+                event.operator(),
+                event.tenantId(),
+                event.requestId(),
+                event.clientIp(),
+                event.occurredAt() != null ? formatter.format(event.occurredAt()) : "",
+                event.details() == null ? "{}" : event.details().toString()
+        )).toList();
+
+        ByteArrayOutputStream os = new ByteArrayOutputStream();
+        EasyExcel.write(os, AuditExportVO.class).sheet("审计日志").doWrite(voList);
+
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=audit-events.csv")
-                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
-                .body(csv.getBytes(StandardCharsets.UTF_8));
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=audit-events.xlsx")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(os.toByteArray());
     }
 
     @Operation(summary = "创建异步审计导出任务")
@@ -161,7 +181,7 @@ public class AuditController {
         AuditExportTaskService.DownloadFile file = auditExportTaskService.download(taskId);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + file.fileName())
-                .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(file.content());
     }
 
@@ -221,29 +241,5 @@ public class AuditController {
             int size
     ) {
         return new AuditQuery(tenantId, eventType, operator, requestId, clientIp, occurredFrom, occurredTo, page, size);
-    }
-
-    private String buildCsv(List<AuditEvent> records) {
-        StringBuilder builder = new StringBuilder();
-        builder.append("type,operator,tenantId,requestId,clientIp,occurredAt,details\n");
-        for (AuditEvent record : records) {
-            appendCell(builder, record.type());
-            appendCell(builder, record.operator());
-            appendCell(builder, record.tenantId());
-            appendCell(builder, record.requestId());
-            appendCell(builder, record.clientIp());
-            appendCell(builder, String.valueOf(record.occurredAt()));
-            appendCell(builder, String.valueOf(record.details()));
-            builder.append('\n');
-        }
-        return builder.toString();
-    }
-
-    private void appendCell(StringBuilder builder, String value) {
-        if (builder.charAt(builder.length() - 1) != '\n') {
-            builder.append(',');
-        }
-        String normalized = value == null ? "" : value.replace("\"", "\"\"");
-        builder.append('"').append(normalized).append('"');
     }
 }

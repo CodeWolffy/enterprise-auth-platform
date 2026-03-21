@@ -22,7 +22,7 @@
         <el-button type="primary" @click="openConfig()">新增参数</el-button>
       </div>
 
-      <el-form :inline="true" class="toolbar-inline" @submit.prevent="handleSearch">
+      <AdvancedSearch @search="handleSearch" @reset="resetSearch">
         <el-form-item label="参数分类">
           <el-select v-model="category" placeholder="全部分类" clearable style="width: 180px">
             <el-option v-for="item in categoryOptions" :key="item.code" :label="item.name" :value="item.code" />
@@ -44,11 +44,7 @@
             <el-option label="降序" value="desc" />
           </el-select>
         </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch">搜索</el-button>
-          <el-button @click="resetSearch">重置</el-button>
-        </el-form-item>
-      </el-form>
+      </AdvancedSearch>
 
       <div class="table-tools">
         <el-radio-group v-model="configTablePrefs.density" size="small">
@@ -196,6 +192,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import AdvancedSearch from '@/components/AdvancedSearch.vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { createConfig, deleteConfig, queryCategories, queryConfigs, updateConfig } from '@/api/system'
 import { useTablePreferences } from '@/composables/useTablePreferences'

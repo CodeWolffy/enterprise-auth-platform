@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="panel-stack">
     <section class="dashboard-grid">
       <article class="stat-card">
@@ -23,6 +23,7 @@
       </article>
     </section>
 
+
     <section class="dashboard-panel">
       <div class="panel-head">
         <div>
@@ -32,7 +33,7 @@
         <el-button type="primary" @click="openRole()">新增角色</el-button>
       </div>
 
-      <el-form :inline="true" class="toolbar-inline" @submit.prevent="handleSearch">
+      <AdvancedSearch @search="handleSearch" @reset="resetSearch">
         <el-form-item label="关键字">
           <el-input v-model="keyword" placeholder="搜索角色名称、编码或描述" clearable />
         </el-form-item>
@@ -46,11 +47,7 @@
             <el-option label="自定义范围" value="CUSTOM" />
           </el-select>
         </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch">搜索</el-button>
-          <el-button @click="resetSearch">重置</el-button>
-        </el-form-item>
-      </el-form>
+      </AdvancedSearch>
 
       <div class="table-tools">
         <el-radio-group v-model="roleTablePrefs.density" size="small">
@@ -266,11 +263,10 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import AdvancedSearch from '@/components/AdvancedSearch.vue'
 import type { ElTree, FormInstance, FormRules } from 'element-plus'
 import {
   assignRolePermissions,
-  createRole,
-  deleteRole,
   queryDepartments,
   queryAssignedPermissions,
   queryPermissions,

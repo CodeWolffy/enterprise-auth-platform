@@ -425,26 +425,26 @@ CREATE TABLE `sys_permission`  (
 -- ----------------------------
 -- Records of sys_permission
 -- ----------------------------
-INSERT INTO `sys_permission` VALUES (1, 'platform', 'auth', 'read', 'tenant', 'auth:read', '2026-03-20 00:09:53', NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
-INSERT INTO `sys_permission` VALUES (2, 'platform', 'auth', 'write', 'tenant', 'auth:write', '2026-03-20 00:09:53', NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
-INSERT INTO `sys_permission` VALUES (3, 'platform', 'user', 'read', 'tenant', 'user:read', '2026-03-20 00:09:53', NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
-INSERT INTO `sys_permission` VALUES (4, 'platform', 'user', 'write', 'tenant', 'user:write', '2026-03-20 00:09:53', NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
-INSERT INTO `sys_permission` VALUES (5, 'platform', 'role', 'read', 'tenant', 'role:read', '2026-03-20 00:09:53', NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
-INSERT INTO `sys_permission` VALUES (6, 'platform', 'role', 'write', 'tenant', 'role:write', '2026-03-20 00:09:53', NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
-INSERT INTO `sys_permission` VALUES (7, 'platform', 'permission', 'read', 'tenant', 'permission:read', '2026-03-20 00:09:53', NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
-INSERT INTO `sys_permission` VALUES (8, 'platform', 'permission', 'write', 'tenant', 'permission:write', '2026-03-20 00:09:53', NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
-INSERT INTO `sys_permission` VALUES (9, 'platform', 'dept', 'read', 'tenant', 'dept:read', '2026-03-20 00:09:53', NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
-INSERT INTO `sys_permission` VALUES (10, 'platform', 'dept', 'write', 'tenant', 'dept:write', '2026-03-20 00:09:53', NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
-INSERT INTO `sys_permission` VALUES (11, 'platform', 'tenant', 'read', 'platform', 'tenant:read', '2026-03-20 00:09:53', NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
-INSERT INTO `sys_permission` VALUES (12, 'platform', 'tenant', 'write', 'platform', 'tenant:write', '2026-03-20 00:09:53', NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
-INSERT INTO `sys_permission` VALUES (13, 'platform', 'audit', 'read', 'tenant', 'audit:read', '2026-03-20 00:09:53', NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
-INSERT INTO `sys_permission` VALUES (14, 'platform', 'audit', 'write', 'tenant', 'audit:write', '2026-03-20 00:09:53', NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
-INSERT INTO `sys_permission` VALUES (15, 'platform', 'system', 'read', 'tenant', 'system:read', '2026-03-20 00:09:53', NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
-INSERT INTO `sys_permission` VALUES (16, 'platform', 'system', 'write', 'tenant', 'system:write', '2026-03-20 00:09:53', NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
-INSERT INTO `sys_permission` VALUES (17, 'platform', 'session', 'write', 'tenant', 'session:write', '2026-03-20 00:09:53', NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
-INSERT INTO `sys_permission` VALUES (18, 'tenant-a', 'audit', 'read', 'tenant', 'audit:read', '2026-03-20 00:09:53', NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
-INSERT INTO `sys_permission` VALUES (19, 'tenant-a', 'user', 'read', 'tenant', 'user:read', '2026-03-20 00:09:53', NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
-INSERT INTO `sys_permission` VALUES (20, 'tenant-a', 'permission', 'read', 'tenant', 'permission:read', '2026-03-20 00:09:53', NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
+INSERT INTO `sys_permission` VALUES (1, 'platform', 'auth', 'read', 'tenant', 'auth:read', '2026-03-20 00:09:53', '认证读取', '2026-03-20 00:09:53', NULL, NULL, 0);
+INSERT INTO `sys_permission` VALUES (2, 'platform', 'auth', 'write', 'tenant', 'auth:write', '2026-03-20 00:09:53', '认证写入', '2026-03-20 00:09:53', NULL, NULL, 0);
+INSERT INTO `sys_permission` VALUES (3, 'platform', 'user', 'read', 'tenant', 'user:read', '2026-03-20 00:09:53', '用户读取', '2026-03-20 00:09:53', NULL, NULL, 0);
+INSERT INTO `sys_permission` VALUES (4, 'platform', 'user', 'write', 'tenant', 'user:write', '2026-03-20 00:09:53', '用户写入', '2026-03-20 00:09:53', NULL, NULL, 0);
+INSERT INTO `sys_permission` VALUES (5, 'platform', 'role', 'read', 'tenant', 'role:read', '2026-03-20 00:09:53', '角色读取', '2026-03-20 00:09:53', NULL, NULL, 0);
+INSERT INTO `sys_permission` VALUES (6, 'platform', 'role', 'write', 'tenant', 'role:write', '2026-03-20 00:09:53', '角色写入', '2026-03-20 00:09:53', NULL, NULL, 0);
+INSERT INTO `sys_permission` VALUES (7, 'platform', 'permission', 'read', 'tenant', 'permission:read', '2026-03-20 00:09:53', '权限读取', '2026-03-20 00:09:53', NULL, NULL, 0);
+INSERT INTO `sys_permission` VALUES (8, 'platform', 'permission', 'write', 'tenant', 'permission:write', '2026-03-20 00:09:53', '权限写入', '2026-03-20 00:09:53', NULL, NULL, 0);
+INSERT INTO `sys_permission` VALUES (9, 'platform', 'dept', 'read', 'tenant', 'dept:read', '2026-03-20 00:09:53', '部门读取', '2026-03-20 00:09:53', NULL, NULL, 0);
+INSERT INTO `sys_permission` VALUES (10, 'platform', 'dept', 'write', 'tenant', 'dept:write', '2026-03-20 00:09:53', '部门写入', '2026-03-20 00:09:53', NULL, NULL, 0);
+INSERT INTO `sys_permission` VALUES (11, 'platform', 'tenant', 'read', 'platform', 'tenant:read', '2026-03-20 00:09:53', '租户读取', '2026-03-20 00:09:53', NULL, NULL, 0);
+INSERT INTO `sys_permission` VALUES (12, 'platform', 'tenant', 'write', 'platform', 'tenant:write', '2026-03-20 00:09:53', '租户写入', '2026-03-20 00:09:53', NULL, NULL, 0);
+INSERT INTO `sys_permission` VALUES (13, 'platform', 'audit', 'read', 'tenant', 'audit:read', '2026-03-20 00:09:53', '审计读取', '2026-03-20 00:09:53', NULL, NULL, 0);
+INSERT INTO `sys_permission` VALUES (14, 'platform', 'audit', 'write', 'tenant', 'audit:write', '2026-03-20 00:09:53', '审计写入', '2026-03-20 00:09:53', NULL, NULL, 0);
+INSERT INTO `sys_permission` VALUES (15, 'platform', 'system', 'read', 'tenant', 'system:read', '2026-03-20 00:09:53', '系统设施读取', '2026-03-20 00:09:53', NULL, NULL, 0);
+INSERT INTO `sys_permission` VALUES (16, 'platform', 'system', 'write', 'tenant', 'system:write', '2026-03-20 00:09:53', '系统设施写入', '2026-03-20 00:09:53', NULL, NULL, 0);
+INSERT INTO `sys_permission` VALUES (17, 'platform', 'session', 'write', 'tenant', 'session:write', '2026-03-20 00:09:53', '会话管控(下线等)', '2026-03-20 00:09:53', NULL, NULL, 0);
+INSERT INTO `sys_permission` VALUES (18, 'tenant-a', 'audit', 'read', 'tenant', 'audit:read', '2026-03-20 00:09:53', '审计读取', '2026-03-20 00:09:53', NULL, NULL, 0);
+INSERT INTO `sys_permission` VALUES (19, 'tenant-a', 'user', 'read', 'tenant', 'user:read', '2026-03-20 00:09:53', '用户读取', '2026-03-20 00:09:53', NULL, NULL, 0);
+INSERT INTO `sys_permission` VALUES (20, 'tenant-a', 'permission', 'read', 'tenant', 'permission:read', '2026-03-20 00:09:53', '权限读取', '2026-03-20 00:09:53', NULL, NULL, 0);
 INSERT INTO `sys_permission` VALUES (21, 'platform', 'demo', 'write', 'tenant', 'demo:write:19852792270800', '2026-03-20 14:30:51', '演示写入', '2026-03-20 14:30:51', 'system', 'system', 1);
 
 -- ----------------------------

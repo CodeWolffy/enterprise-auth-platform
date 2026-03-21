@@ -69,7 +69,8 @@ http.interceptors.response.use(
     if (error.response?.status === 401 || error.response?.status === 403) {
       showError('登录状态已失效，请重新登录')
       redirectToLogin()
-      return Promise.reject(error)
+      // 返回一个永远 pending 的 Promise，打断后续组件层的 Promise 链，防止引起 Unhandled rejection
+      return new Promise(() => {})
     }
 
     const message = error.response?.data?.message ?? '请求失败，请稍后重试'

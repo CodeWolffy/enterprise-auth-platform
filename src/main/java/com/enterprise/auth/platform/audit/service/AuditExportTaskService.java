@@ -3,6 +3,7 @@ package com.enterprise.auth.platform.audit.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.audit.dto.AuditExportPolicyRequest;
 import com.enterprise.auth.platform.audit.model.AuditEvent;
+import com.enterprise.auth.platform.audit.model.AuditPage;
 import com.enterprise.auth.platform.audit.model.AuditQuery;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.model.PageResult;
@@ -14,10 +15,12 @@ import com.enterprise.auth.platform.security.SecuritySupport;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +28,11 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+
+import com.alibaba.excel.EasyExcel;
+import com.alibaba.excel.ExcelWriter;
+import com.alibaba.excel.write.metadata.WriteSheet;
+import com.enterprise.auth.platform.audit.model.AuditExportVO;
 
 @Service
 public class AuditExportTaskService {
@@ -56,7 +64,7 @@ public class AuditExportTaskService {
         entity.setTenantId(resolveTenantId(query));
         entity.setOperator(SecuritySupport.currentOperator());
         entity.setStatus("PENDING");
-        entity.setFileName("audit-export-" + System.currentTimeMillis() + ".csv");
+        entity.setFileName("audit-export-" + System.currentTimeMillis() + ".xlsx");
         entity.setRequestedAt(LocalDateTime.now());
         entity.setQueryJson(toJson(queryPayload(query)));
         entity.setRecordCount(0);
@@ -256,15 +264,52 @@ public class AuditExportTaskService {
         try {
             entity.setStatus("RUNNING");
             sysAuditExportTaskMapper.updateById(entity);
-            List<AuditEvent> records = auditService.export(query);
-            entity.setRecordCount(records.size());
-            entity.setFileContent(buildCsv(records).getBytes(StandardCharsets.UTF_8));
+
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            long totalRead = 0;
+            try (ExcelWriter excelWriter = EasyExcel.write(outputStream, AuditExportVO.class).build()) {
+                WriteSheet writeSheet = EasyExcel.writerSheet("审计日志").build();
+                int pageSize = 10000;
+                long total = -1;
+                int currentPage = 1;
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
+
+                while (total == -1 || totalRead < total) {
+                    AuditQuery pageQuery = new AuditQuery(
+                            query.tenantId(), query.eventType(), query.operator(), query.requestId(), query.clientIp(),
+                            query.occurredFrom(), query.occurredTo(), currentPage, pageSize
+                    );
+                    AuditPage pageResult = auditService.query(pageQuery);
+                    if (total == -1) total = pageResult.total();
+
+                    List<AuditExportVO> voList = pageResult.records().stream().map(event -> new AuditExportVO(
+                            event.type(),
+                            event.operator(),
+                            event.tenantId(),
+                            event.requestId(),
+                            event.clientIp(),
+                            event.occurredAt() != null ? formatter.format(event.occurredAt()) : "",
+                            toJson(event.details())
+                    )).toList();
+
+                    excelWriter.write(voList, writeSheet);
+                    totalRead += pageResult.records().size();
+
+                    if (pageResult.records().isEmpty()) {
+                        break;
+                    }
+                    currentPage++;
+                }
+            }
+
+            entity.setRecordCount((int) totalRead);
+            entity.setFileContent(outputStream.toByteArray());
             entity.setStatus("SUCCESS");
             entity.setCompletedAt(LocalDateTime.now());
             sysAuditExportTaskMapper.updateById(entity);
             auditService.record("AUDIT_EXPORT_TASK_COMPLETED", entity.getOperator(), entity.getTenantId(), Map.of(
                     "taskId", entity.getId(),
-                    "recordCount", records.size()
+                    "recordCount", entity.getRecordCount()
             ));
         } catch (Exception ex) {
             entity.setStatus("FAILED");
@@ -331,30 +376,6 @@ public class AuditExportTaskService {
         } catch (Exception ex) {
             return "{}";
         }
-    }
-
-    private String buildCsv(List<AuditEvent> records) {
-        StringBuilder builder = new StringBuilder();
-        builder.append("type,operator,tenantId,requestId,clientIp,occurredAt,details\n");
-        for (AuditEvent record : records) {
-            appendCell(builder, record.type());
-            appendCell(builder, record.operator());
-            appendCell(builder, record.tenantId());
-            appendCell(builder, record.requestId());
-            appendCell(builder, record.clientIp());
-            appendCell(builder, String.valueOf(record.occurredAt()));
-            appendCell(builder, String.valueOf(record.details()));
-            builder.append('\n');
-        }
-        return builder.toString();
-    }
-
-    private void appendCell(StringBuilder builder, String value) {
-        if (builder.charAt(builder.length() - 1) != '\n') {
-            builder.append(',');
-        }
-        String normalized = value == null ? "" : value.replace("\"", "\"\"");
-        builder.append('"').append(normalized).append('"');
     }
 
     private ExportTaskView toView(SysAuditExportTaskEntity entity, ExportPolicy policy) {

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="panel-stack">
     <section class="dashboard-grid">
       <article class="stat-card">
@@ -26,13 +26,14 @@
     <section class="dashboard-panel">
       <div class="panel-head">
         <div>
+
           <span class="eyebrow">Users</span>
           <h3>用户管理</h3>
         </div>
         <el-button type="primary" @click="openUser()">新增用户</el-button>
       </div>
 
-      <el-form :inline="true" class="toolbar-inline" @submit.prevent="doSearch">
+      <AdvancedSearch @search="doSearch" @reset="resetSearch">
         <el-form-item label="用户名">
           <el-input v-model="queryParams.username" placeholder="按用户名搜索" clearable />
         </el-form-item>
@@ -48,11 +49,7 @@
             <el-option label="禁用" :value="false" />
           </el-select>
         </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="doSearch">搜索</el-button>
-          <el-button @click="resetSearch">重置</el-button>
-        </el-form-item>
-      </el-form>
+      </AdvancedSearch>
 
       <div class="table-tools">
         <el-radio-group v-model="userTablePrefs.density" size="small">
@@ -269,11 +266,10 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import AdvancedSearch from '@/components/AdvancedSearch.vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import {
   assignUserRoles,
-  createUser,
-  deleteUser,
   queryAssignedRoles,
   queryRoles,
   queryUsers,

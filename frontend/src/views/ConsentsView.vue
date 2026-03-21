@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import AdvancedSearch from '@/components/AdvancedSearch.vue'
 import { queryConsents, revokeConsent } from '@/api/authConsents'
 import type { ConsentView } from '@/api/authConsents'
 
@@ -117,30 +118,24 @@ void load()
         </div>
       </div>
 
-      <div class="toolbar-inline">
-        <el-form :inline="true" :model="searchForm" @submit.prevent="handleSearch">
-          <el-form-item label="授权用户">
-            <el-input
-              v-model="searchForm.principalName"
-              placeholder="输入用户名，支持模糊匹配"
-              clearable
-              @clear="handleSearch"
-            />
-          </el-form-item>
-          <el-form-item label="客户端 ID">
-            <el-input
-              v-model="searchForm.clientId"
-              placeholder="输入客户端 Client ID"
-              clearable
-              @clear="handleSearch"
-            />
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" @click="handleSearch">搜索</el-button>
-            <el-button @click="resetSearch">重置</el-button>
-          </el-form-item>
-        </el-form>
-      </div>
+      <AdvancedSearch @search="handleSearch" @reset="resetSearch">
+        <el-form-item label="授权用户">
+          <el-input
+            v-model="searchForm.principalName"
+            placeholder="输入用户名，支持模糊匹配"
+            clearable
+            @clear="handleSearch"
+          />
+        </el-form-item>
+        <el-form-item label="客户端 ID">
+          <el-input
+            v-model="searchForm.clientId"
+            placeholder="输入客户端 Client ID"
+            clearable
+            @clear="handleSearch"
+          />
+        </el-form-item>
+      </AdvancedSearch>
 
       <el-table v-loading="loading" :data="consents" stripe>
         <el-table-column prop="principalName" label="授权用户" min-width="140" />

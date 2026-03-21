@@ -125,6 +125,11 @@
             <version>${fastjson2.version}</version>
         </dependency>
         <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>easyexcel</artifactId>
+            <version>3.3.4</version>
+        </dependency>
+        <dependency>
             <groupId>com.google.code.findbugs</groupId>
             <artifactId>jsr305</artifactId>
             <version>${jsr305.version}</version>

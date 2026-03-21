@@ -31,6 +31,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.io.Serializable;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -73,6 +76,7 @@ public class SystemManagementService {
         this.dataScopeService = dataScopeService;
     }
 
+    @Cacheable(value = "system:dicts", key = "#root.target.generateCacheKey(new Object[]{#dictType, #category, #keyword, #page, #size, #sortBy, #sortDirection})")
     public PageResult<DictView> dicts(String dictType, String category, String keyword, int page, int size, String sortBy, String sortDirection) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -90,6 +94,7 @@ public class SystemManagementService {
     }
 
     @Transactional
+    @CacheEvict(value = {"system:dicts", "system:categories:all", "system:categories:target"}, allEntries = true)
     public DictView createDict(DictCrudRequest request) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -105,6 +110,7 @@ public class SystemManagementService {
     }
 
     @Transactional
+    @CacheEvict(value = {"system:dicts", "system:categories:all", "system:categories:target"}, allEntries = true)
     public DictView updateDict(Long id, DictCrudRequest request) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -118,6 +124,7 @@ public class SystemManagementService {
     }
 
     @Transactional
+    @CacheEvict(value = {"system:dicts", "system:categories:all", "system:categories:target"}, allEntries = true)
     public void deleteDict(Long id) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -126,6 +133,7 @@ public class SystemManagementService {
         auditService.record("DICT_DELETED", SecuritySupport.currentOperator(), tenantId, Map.of("dictId", id));
     }
 
+    @Cacheable(value = "system:configs", key = "#root.target.generateCacheKey(new Object[]{#category, #keyword, #page, #size, #sortBy, #sortDirection})")
     public PageResult<ConfigView> configs(String category, String keyword, int page, int size, String sortBy, String sortDirection) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -143,6 +151,7 @@ public class SystemManagementService {
     }
 
     @Transactional
+    @CacheEvict(value = {"system:configs", "system:categories:all", "system:categories:target"}, allEntries = true)
     public ConfigView createConfig(ConfigCrudRequest request) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -158,6 +167,7 @@ public class SystemManagementService {
     }
 
     @Transactional
+    @CacheEvict(value = {"system:configs", "system:categories:all", "system:categories:target"}, allEntries = true)
     public ConfigView updateConfig(Long id, ConfigCrudRequest request) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -171,6 +181,7 @@ public class SystemManagementService {
     }
 
     @Transactional
+    @CacheEvict(value = {"system:configs", "system:categories:all", "system:categories:target"}, allEntries = true)
     public void deleteConfig(Long id) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -195,6 +206,7 @@ public class SystemManagementService {
         );
     }
 
+    @Cacheable(value = "system:categories:all", key = "#root.target.currentTenantId()")
     public Map<String, List<CategoryOption>> categories() {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -204,6 +216,7 @@ public class SystemManagementService {
         );
     }
 
+    @Cacheable(value = "system:categories:target", key = "#root.target.generateCacheKey(new Object[]{#targetType})")
     public List<CategoryOption> categoryOptions(String targetType) {
         requireDatabaseMode();
         return loadCategoryOptions(currentTenantId(), prefixForTargetType(targetType));
@@ -235,6 +248,7 @@ public class SystemManagementService {
     }
 
     @Transactional
+    @CacheEvict(value = {"system:categories:all", "system:categories:target", "system:dicts", "system:configs"}, allEntries = true)
     public CategoryOption createCategoryOption(String targetType, CategoryConfigRequest request) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -260,6 +274,7 @@ public class SystemManagementService {
     }
 
     @Transactional
+    @CacheEvict(value = {"system:categories:all", "system:categories:target", "system:dicts", "system:configs"}, allEntries = true)
     public CategoryOption updateCategoryOption(String targetType, String code, CategoryConfigRequest request) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -275,6 +290,7 @@ public class SystemManagementService {
     }
 
     @Transactional
+    @CacheEvict(value = {"system:categories:all", "system:categories:target", "system:dicts", "system:configs"}, allEntries = true)
     public void deleteCategoryOption(String targetType, String code) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -610,9 +626,17 @@ public class SystemManagementService {
         return trend;
     }
 
-    private String currentTenantId() {
+    public String currentTenantId() {
         String tenantId = TenantContext.getTenantId();
         return StringUtils.hasText(tenantId) ? tenantId : "platform";
+    }
+
+    public String generateCacheKey(Object... params) {
+        StringBuilder key = new StringBuilder(currentTenantId());
+        for (Object param : params) {
+            key.append(':').append(param == null ? "" : param);
+        }
+        return key.toString();
     }
 
     private SFunction<SysDictEntity, ?> resolveDictSort(String sortBy) {
@@ -805,7 +829,8 @@ public class SystemManagementService {
             @Schema(description = "字典编码") String dictCode,
             @Schema(description = "字典值") String dictValue,
             @Schema(description = "创建人") String createdBy
-    ) {
+    ) implements Serializable {
+        private static final long serialVersionUID = 1L;
     }
 
     @Schema(description = "参数项视图")
@@ -816,7 +841,8 @@ public class SystemManagementService {
             @Schema(description = "参数名称") String configName,
             @Schema(description = "参数值") String configValue,
             @Schema(description = "创建人") String createdBy
-    ) {
+    ) implements Serializable {
+        private static final long serialVersionUID = 1L;
     }
 
     @Schema(description = "公告视图")
@@ -828,7 +854,8 @@ public class SystemManagementService {
             @Schema(description = "发布时间") LocalDateTime publishTime,
             @Schema(description = "工作流状态") String workflowStatus,
             @Schema(description = "创建人") String createdBy
-    ) {
+    ) implements Serializable {
+        private static final long serialVersionUID = 1L;
     }
 
     @Schema(description = "系统分类选项")
@@ -836,7 +863,9 @@ public class SystemManagementService {
             @Schema(description = "分类编码") String code,
             @Schema(description = "分类名称") String name,
             @Schema(description = "匹配规则") List<String> matchers
-    ) {
+    ) implements Serializable {
+        private static final long serialVersionUID = 1L;
+
         boolean matches(String rawKey) {
             if (!StringUtils.hasText(rawKey)) {
                 return false;
@@ -867,7 +896,8 @@ public class SystemManagementService {
             @Schema(description = "引用样例") List<String> sampleReferences,
             @Schema(description = "最近审计记录") List<CategoryAuditView> recentAudits,
             @Schema(description = "七日趋势") List<CategoryTrendPoint> trend
-    ) {
+    ) implements Serializable {
+        private static final long serialVersionUID = 1L;
     }
 
     @Schema(description = "分类配置审计记录")
@@ -876,14 +906,16 @@ public class SystemManagementService {
             @Schema(description = "操作人") String operator,
             @Schema(description = "发生时间") LocalDateTime occurredAt,
             @Schema(description = "审计负载") String payloadJson
-    ) {
+    ) implements Serializable {
+        private static final long serialVersionUID = 1L;
     }
 
     @Schema(description = "分类配置趋势点")
     public record CategoryTrendPoint(
             @Schema(description = "日期") String date,
             @Schema(description = "次数") Integer count
-    ) {
+    ) implements Serializable {
+        private static final long serialVersionUID = 1L;
     }
 
     private static final class StreamUtil {
