@@ -31,7 +31,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Testcontainers(disabledWithoutDocker = true)
-@SpringBootTest
+@SpringBootTest(properties = "app.security.expose-captcha-answer=true")
 @ActiveProfiles("mysql")
 class MysqlPersistenceIntegrationTest {
 

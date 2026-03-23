@@ -3,6 +3,7 @@ package com.enterprise.auth.platform.auth.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.enterprise.auth.platform.auth.dto.ConsentView;
+import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.model.PageResult;
 import com.enterprise.auth.platform.persistence.entity.SysAuditLogEntity;
 import com.enterprise.auth.platform.persistence.entity.SysOauthClientEntity;
@@ -10,6 +11,7 @@ import com.enterprise.auth.platform.persistence.entity.SysOauthConsentEntity;
 import com.enterprise.auth.platform.persistence.mapper.SysAuditLogMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysOauthClientMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysOauthConsentMapper;
+import com.enterprise.auth.platform.tenant.TenantContext;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
@@ -48,22 +50,16 @@ public class OauthConsentService {
     }
 
     public PageResult<ConsentView> queryConsents(int page, int size, String clientId, String principalName) {
+        String tenantId = currentTenantId();
+        List<String> tenantClientRowIds = loadTenantClientRowIds(tenantId, clientId);
+        if (tenantClientRowIds.isEmpty()) {
+            return PageResult.of(0, page, size, List.of());
+        }
+
         LambdaQueryWrapper<SysOauthConsentEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(SysOauthConsentEntity::getRegisteredClientId, tenantClientRowIds);
         if (StringUtils.hasText(principalName)) {
             wrapper.like(SysOauthConsentEntity::getPrincipalName, principalName.trim());
-        }
-        if (StringUtils.hasText(clientId)) {
-            List<String> matchedClientIds = sysOauthClientMapper.selectList(new LambdaQueryWrapper<SysOauthClientEntity>()
-                            .eq(SysOauthClientEntity::getDeleted, 0)
-                            .like(SysOauthClientEntity::getClientId, clientId.trim()))
-                    .stream()
-                    .map(SysOauthClientEntity::getId)
-                    .map(String::valueOf)
-                    .toList();
-            if (matchedClientIds.isEmpty()) {
-                return PageResult.of(0, page, size, List.of());
-            }
-            wrapper.in(SysOauthConsentEntity::getRegisteredClientId, matchedClientIds);
         }
 
         Page<SysOauthConsentEntity> resultPage = sysOauthConsentMapper.selectPage(
@@ -76,10 +72,12 @@ public class OauthConsentService {
                 .map(SysOauthConsentEntity::getRegisteredClientId)
                 .distinct()
                 .toList();
+
         Map<String, SysOauthClientEntity> clientMap = registeredClientIds.isEmpty()
                 ? Map.of()
                 : sysOauthClientMapper.selectList(new LambdaQueryWrapper<SysOauthClientEntity>()
                                 .in(SysOauthClientEntity::getId, registeredClientIds)
+                                .eq(SysOauthClientEntity::getTenantId, tenantId)
                                 .eq(SysOauthClientEntity::getDeleted, 0))
                         .stream()
                         .collect(Collectors.toMap(
@@ -89,12 +87,22 @@ public class OauthConsentService {
                         ));
 
         List<ConsentView> records = resultPage.getRecords().stream()
-                .map(consent -> toView(consent, clientMap.get(consent.getRegisteredClientId())))
+                .map(consent -> toView(consent, clientMap.get(consent.getRegisteredClientId()), tenantId))
                 .toList();
         return PageResult.of(resultPage.getTotal(), (int) resultPage.getCurrent(), (int) resultPage.getSize(), records);
     }
 
     public void revokeConsent(String registeredClientId, String principalName) {
+        String tenantId = currentTenantId();
+        SysOauthClientEntity client = sysOauthClientMapper.selectOne(new LambdaQueryWrapper<SysOauthClientEntity>()
+                .eq(SysOauthClientEntity::getId, parseClientId(registeredClientId))
+                .eq(SysOauthClientEntity::getTenantId, tenantId)
+                .eq(SysOauthClientEntity::getDeleted, 0)
+                .last("limit 1"));
+        if (client == null) {
+            throw new BusinessException("ACCESS_DENIED", "No permission to revoke this consent record");
+        }
+
         org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsent consent =
                 authorizationConsentService.findById(registeredClientId, principalName);
         if (consent != null) {
@@ -105,13 +113,27 @@ public class OauthConsentService {
                 .eq(SysOauthConsentEntity::getPrincipalName, principalName));
     }
 
-    private ConsentView toView(SysOauthConsentEntity consent, SysOauthClientEntity client) {
+    private List<String> loadTenantClientRowIds(String tenantId, String fuzzyClientId) {
+        LambdaQueryWrapper<SysOauthClientEntity> query = new LambdaQueryWrapper<SysOauthClientEntity>()
+                .eq(SysOauthClientEntity::getTenantId, tenantId)
+                .eq(SysOauthClientEntity::getDeleted, 0);
+        if (StringUtils.hasText(fuzzyClientId)) {
+            query.like(SysOauthClientEntity::getClientId, fuzzyClientId.trim());
+        }
+        return sysOauthClientMapper.selectList(query)
+                .stream()
+                .map(SysOauthClientEntity::getId)
+                .map(String::valueOf)
+                .toList();
+    }
+
+    private ConsentView toView(SysOauthConsentEntity consent, SysOauthClientEntity client, String tenantId) {
         String publicClientId = client == null ? consent.getRegisteredClientId() : client.getClientId();
-        String clientName = client == null ? "未知客户端" : client.getClientName();
+        String clientName = client == null ? "unknown-client" : client.getClientName();
         ConsentAuditSummary summary = summarizeAudit(consent.getRegisteredClientId(), publicClientId, consent.getPrincipalName());
         return new ConsentView(
                 consent.getRegisteredClientId(),
-                client == null ? "platform" : client.getTenantId(),
+                client == null ? tenantId : client.getTenantId(),
                 publicClientId,
                 clientName,
                 consent.getPrincipalName(),
@@ -148,7 +170,9 @@ public class OauthConsentService {
                 continue;
             }
             count++;
-            Instant occurredAt = event.getOccurredAt() == null ? null : event.getOccurredAt().atZone(ZoneId.systemDefault()).toInstant();
+            Instant occurredAt = event.getOccurredAt() == null
+                    ? null
+                    : event.getOccurredAt().atZone(ZoneId.systemDefault()).toInstant();
             if ("OAUTH_CONSENT_GRANTED".equals(event.getEventType()) && lastGrantedAt == null) {
                 lastGrantedAt = occurredAt;
             }
@@ -172,6 +196,19 @@ public class OauthConsentService {
 
     private String stringValue(Object value) {
         return value == null ? null : String.valueOf(value);
+    }
+
+    private Long parseClientId(String registeredClientId) {
+        try {
+            return Long.parseLong(registeredClientId);
+        } catch (NumberFormatException ex) {
+            return -1L;
+        }
+    }
+
+    private String currentTenantId() {
+        String tenantId = TenantContext.getTenantId();
+        return StringUtils.hasText(tenantId) ? tenantId : "platform";
     }
 
     private record ConsentAuditSummary(Instant lastGrantedAt, Instant lastRevokedAt, long auditEventCount) {

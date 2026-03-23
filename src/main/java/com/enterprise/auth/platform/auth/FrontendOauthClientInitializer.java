@@ -5,6 +5,7 @@ import com.enterprise.auth.platform.config.FrontendProperties;
 import com.enterprise.auth.platform.persistence.entity.SysOauthClientEntity;
 import com.enterprise.auth.platform.persistence.mapper.SysOauthClientMapper;
 import jakarta.annotation.PostConstruct;
+import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -27,6 +28,12 @@ public class FrontendOauthClientInitializer {
     public void initializeFrontendClient() {
         if (!StringUtils.hasText(frontendProperties.publicClientId())) {
             return;
+        }
+        List<SysOauthClientEntity> duplicates = sysOauthClientMapper.selectList(new LambdaQueryWrapper<SysOauthClientEntity>()
+                .eq(SysOauthClientEntity::getClientId, frontendProperties.publicClientId())
+                .eq(SysOauthClientEntity::getDeleted, 0));
+        if (duplicates.stream().map(SysOauthClientEntity::getTenantId).distinct().count() > 1) {
+            throw new IllegalStateException("前端 OAuth2 client_id 必须全局唯一: " + frontendProperties.publicClientId());
         }
         SysOauthClientEntity existing = sysOauthClientMapper.selectOne(new LambdaQueryWrapper<SysOauthClientEntity>()
                 .eq(SysOauthClientEntity::getTenantId, "platform")

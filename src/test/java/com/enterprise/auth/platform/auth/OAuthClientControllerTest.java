@@ -41,6 +41,7 @@ class OAuthClientControllerTest {
     @AfterEach
     void tearDown() {
         sysOauthClientMapper.hardDeleteByTenantAndClientId("platform", CLIENT_ID);
+        sysOauthClientMapper.hardDeleteByTenantAndClientId("tenant-b", CLIENT_ID);
     }
 
     @Test

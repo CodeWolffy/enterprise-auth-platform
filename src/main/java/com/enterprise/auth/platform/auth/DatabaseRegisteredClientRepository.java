@@ -6,6 +6,7 @@ import com.enterprise.auth.platform.persistence.entity.SysOauthClientEntity;
 import com.enterprise.auth.platform.persistence.mapper.SysOauthClientMapper;
 import java.sql.Connection;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -72,18 +73,33 @@ public class DatabaseRegisteredClientRepository implements RegisteredClientRepos
     @Override
     public RegisteredClient findByClientId(String clientId) {
         requireDatabase();
-        return loadClients().stream()
-                .filter(client -> client.getClientId().equals(clientId))
-                .findFirst()
-                .orElse(null);
+        List<SysOauthClientEntity> matches = sysOauthClientMapper.selectList(new LambdaQueryWrapper<SysOauthClientEntity>()
+                        .eq(SysOauthClientEntity::getDeleted, 0)
+                        .eq(SysOauthClientEntity::getClientStatus, 1)
+                        .eq(SysOauthClientEntity::getClientId, clientId)
+                        .orderByAsc(SysOauthClientEntity::getId));
+        if (matches.isEmpty()) {
+            return null;
+        }
+        if (matches.size() > 1) {
+            throw new IllegalStateException("检测到重复的 OAuth2 client_id，请保持 client_id 全局唯一: " + clientId);
+        }
+        return fromEntity(matches.get(0));
     }
 
     private List<RegisteredClient> loadClients() {
-        return sysOauthClientMapper.selectList(new LambdaQueryWrapper<SysOauthClientEntity>()
+        List<SysOauthClientEntity> entities = sysOauthClientMapper.selectList(new LambdaQueryWrapper<SysOauthClientEntity>()
                         .eq(SysOauthClientEntity::getDeleted, 0)
                         .eq(SysOauthClientEntity::getClientStatus, 1)
-                        .orderByAsc(SysOauthClientEntity::getId))
-                .stream()
+                        .orderByAsc(SysOauthClientEntity::getId));
+        Map<String, Long> counts = entities.stream()
+                .collect(java.util.stream.Collectors.groupingBy(SysOauthClientEntity::getClientId, java.util.stream.Collectors.counting()));
+        counts.forEach((clientId, count) -> {
+            if (count > 1) {
+                throw new IllegalStateException("检测到重复的 OAuth2 client_id，请保持 client_id 全局唯一: " + clientId);
+            }
+        });
+        return entities.stream()
                 .map(this::fromEntity)
                 .toList();
     }

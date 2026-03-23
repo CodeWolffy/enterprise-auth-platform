@@ -128,6 +128,7 @@ public class OAuthClientManagementService {
     public OAuthClientView createClient(CreateOauthClientRequest request) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
+        ensureGlobalClientIdUnique(request.clientId(), null);
         SysOauthClientEntity existing = findClientByClientId(tenantId, request.clientId());
         if (existing != null && (existing.getDeleted() == null || existing.getDeleted() == 0)) {
             throw new BusinessException("客户端编号已存在");
@@ -244,6 +245,17 @@ public class OAuthClientManagementService {
 
     private SysOauthClientEntity findClientByClientId(String tenantId, String clientId) {
         return sysOauthClientMapper.selectIncludingDeleted(tenantId, clientId);
+    }
+
+    private void ensureGlobalClientIdUnique(String clientId, Long currentId) {
+        SysOauthClientEntity duplicated = sysOauthClientMapper.selectOne(new LambdaQueryWrapper<SysOauthClientEntity>()
+                .eq(SysOauthClientEntity::getClientId, clientId)
+                .eq(SysOauthClientEntity::getDeleted, 0)
+                .ne(currentId != null, SysOauthClientEntity::getId, currentId)
+                .last("limit 1"));
+        if (duplicated != null) {
+            throw new BusinessException("clientId 已被其他租户或客户端占用，请保持全局唯一");
+        }
     }
 
     private SysOauthClientEntity getClient(Long id, String tenantId) {

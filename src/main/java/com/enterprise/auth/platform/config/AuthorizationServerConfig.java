@@ -6,12 +6,16 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.enterprise.auth.platform.auth.DatabaseRegisteredClientRepository;
+import com.enterprise.auth.platform.auth.service.AuthorizationSessionService;
 import com.enterprise.auth.platform.auth.service.AuditingAuthorizationConsentService;
 import com.enterprise.auth.platform.persistence.mapper.SysOauthClientMapper;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import com.enterprise.auth.platform.tenant.TenantFilter;
 import com.enterprise.auth.platform.tenant.TenantProperties;
 import com.enterprise.auth.platform.user.repository.UserRepository;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jose.jwk.source.JWKSource;
@@ -23,6 +27,7 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -32,6 +37,9 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.jackson2.SecurityJackson2Modules;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
@@ -114,24 +122,6 @@ public class AuthorizationServerConfig {
         return new DatabaseRegisteredClientRepository(sysOauthClientMapper, jdbcTemplate, securityProperties);
     }
 
-    @Bean
-    public OAuth2AuthorizationService authorizationService(JdbcTemplate jdbcTemplate, RegisteredClientRepository registeredClientRepository) {
-        JdbcOAuth2AuthorizationService authorizationService = new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
-        ObjectMapper authorizationObjectMapper = authorizationObjectMapper();
-
-        JdbcOAuth2AuthorizationService.OAuth2AuthorizationRowMapper authorizationRowMapper =
-                new JdbcOAuth2AuthorizationService.OAuth2AuthorizationRowMapper(registeredClientRepository);
-        authorizationRowMapper.setObjectMapper(authorizationObjectMapper);
-        authorizationService.setAuthorizationRowMapper(authorizationRowMapper);
-
-        JdbcOAuth2AuthorizationService.OAuth2AuthorizationParametersMapper authorizationParametersMapper =
-                new JdbcOAuth2AuthorizationService.OAuth2AuthorizationParametersMapper();
-        authorizationParametersMapper.setObjectMapper(authorizationObjectMapper);
-        authorizationService.setAuthorizationParametersMapper(authorizationParametersMapper);
-
-        return authorizationService;
-    }
-
     private ObjectMapper authorizationObjectMapper() {
         ClassLoader classLoader = AuthorizationServerConfig.class.getClassLoader();
         List<Module> securityModules = SecurityJackson2Modules.getModules(classLoader);
@@ -139,11 +129,44 @@ public class AuthorizationServerConfig {
         objectMapper.registerModules(securityModules);
         objectMapper.registerModule(new OAuth2AuthorizationServerJackson2Module());
         objectMapper.addMixIn(UserAccount.class, UserAccountMixin.class);
-        allowLegacyImmutableCollections(objectMapper);
+        allowTrustedValueTypes(objectMapper);
         return objectMapper;
     }
 
-    private void allowLegacyImmutableCollections(ObjectMapper objectMapper) {
+    @Bean
+    public JdbcOAuth2AuthorizationService.OAuth2AuthorizationRowMapper authorizationRowMapper(
+            RegisteredClientRepository registeredClientRepository
+    ) {
+        ObjectMapper authorizationObjectMapper = authorizationObjectMapper();
+        JdbcOAuth2AuthorizationService.OAuth2AuthorizationRowMapper authorizationRowMapper =
+                new JdbcOAuth2AuthorizationService.OAuth2AuthorizationRowMapper(registeredClientRepository);
+        authorizationRowMapper.setObjectMapper(authorizationObjectMapper);
+        return authorizationRowMapper;
+    }
+
+    @Bean
+    public OAuth2AuthorizationService authorizationService(
+            JdbcTemplate jdbcTemplate,
+            RegisteredClientRepository registeredClientRepository,
+            @Qualifier("authorizationRowMapper") JdbcOAuth2AuthorizationService.OAuth2AuthorizationRowMapper authorizationRowMapper
+    ) {
+        JdbcOAuth2AuthorizationService authorizationService = new JdbcOAuth2AuthorizationService(jdbcTemplate, registeredClientRepository);
+        authorizationService.setAuthorizationRowMapper(authorizationRowMapper);
+
+        JdbcOAuth2AuthorizationService.OAuth2AuthorizationParametersMapper authorizationParametersMapper =
+                new JdbcOAuth2AuthorizationService.OAuth2AuthorizationParametersMapper();
+        authorizationParametersMapper.setObjectMapper(authorizationObjectMapper());
+        authorizationService.setAuthorizationParametersMapper(authorizationParametersMapper);
+
+        return authorizationService;
+    }
+    private void allowTrustedValueTypes(ObjectMapper objectMapper) {
+        objectMapper.addMixIn(Long.class, TrustedValueMixin.class);
+        objectMapper.addMixIn(Integer.class, TrustedValueMixin.class);
+        objectMapper.addMixIn(Boolean.class, TrustedValueMixin.class);
+        objectMapper.addMixIn(Double.class, TrustedValueMixin.class);
+        objectMapper.addMixIn(Float.class, TrustedValueMixin.class);
+
         // Compatibility for previously serialized rows that captured JDK immutable collection impl classes.
         String[] legacySetImplNames = {
                 "java.util.ImmutableCollections$SetN",
@@ -152,7 +175,7 @@ public class AuthorizationServerConfig {
         for (String className : legacySetImplNames) {
             try {
                 Class<?> implClass = Class.forName(className);
-                objectMapper.addMixIn(implClass, TrustedSetMixin.class);
+                objectMapper.addMixIn(implClass, TrustedValueMixin.class);
             } catch (ClassNotFoundException ignored) {
                 // Different JDK may not expose all immutable implementation variants.
             }
@@ -170,7 +193,7 @@ public class AuthorizationServerConfig {
     }
 
     @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS)
-    private abstract static class TrustedSetMixin {
+    private abstract static class TrustedValueMixin {
     }
 
     @Bean
@@ -185,8 +208,8 @@ public class AuthorizationServerConfig {
     }
 
     @Bean
-    public JWKSource<SecurityContext> jwkSource() {
-        RSAKey rsaKey = rsaKey();
+    public JWKSource<SecurityContext> jwkSource(AuthorizationServerProperties properties) {
+        RSAKey rsaKey = rsaKey(properties);
         JWKSet jwkSet = new JWKSet(rsaKey);
         return (selector, context) -> selector.select(jwkSet);
     }
@@ -204,14 +227,22 @@ public class AuthorizationServerConfig {
     }
 
     @Bean
-    public OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer() {
+    public OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(
+            UserRepository userRepository,
+            AuthorizationSessionService authorizationSessionService
+    ) {
         return context -> {
             if (!OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
                 return;
             }
-            UserAccount user = resolveUser(context);
+            UserAccount snapshotUser = resolveUser(context);
+            UserAccount user = resolveCurrentUser(snapshotUser, context.getAuthorization() == null ? null : context.getAuthorization().getId(),
+                    userRepository, authorizationSessionService);
             if (user == null) {
                 return;
+            }
+            if (context.getAuthorization() != null) {
+                authorizationSessionService.activate(user, context.getAuthorization().getId());
             }
             context.getClaims().claim("uid", user.id());
             context.getClaims().claim("tenant", user.tenantId());
@@ -223,6 +254,37 @@ public class AuthorizationServerConfig {
             context.getClaims().claim("sid", context.getAuthorization() == null ? "oauth2-access-token" : context.getAuthorization().getId());
             context.getClaims().claim("typ", "access");
         };
+    }
+
+    private UserAccount resolveCurrentUser(
+            UserAccount snapshotUser,
+            String authorizationId,
+            UserRepository userRepository,
+            AuthorizationSessionService authorizationSessionService
+    ) {
+        if (snapshotUser == null) {
+            return null;
+        }
+        UserAccount currentUser = userRepository.findById(snapshotUser.id())
+                .orElseThrow(() -> invalidGrant("user_not_found", authorizationId, authorizationSessionService));
+        if (!currentUser.enabled()) {
+            throw invalidGrant("user_disabled", authorizationId, authorizationSessionService);
+        }
+        if (currentUser.sessionVersion() != snapshotUser.sessionVersion()) {
+            throw invalidGrant("session_version_changed", authorizationId, authorizationSessionService);
+        }
+        return currentUser;
+    }
+
+    private OAuth2AuthenticationException invalidGrant(
+            String errorDescription,
+            String authorizationId,
+            AuthorizationSessionService authorizationSessionService
+    ) {
+        if (StringUtils.hasText(authorizationId)) {
+            authorizationSessionService.revoke(authorizationId);
+        }
+        return new OAuth2AuthenticationException(new OAuth2Error(OAuth2ErrorCodes.INVALID_GRANT, errorDescription, null));
     }
 
     private UserAccount resolveUser(JwtEncodingContext context) {
@@ -246,19 +308,30 @@ public class AuthorizationServerConfig {
         return null;
     }
 
-    private RSAKey rsaKey() {
+    private RSAKey rsaKey(AuthorizationServerProperties properties) {
         try {
+            Path jwkPath = Path.of(properties.resolvedJwkFile());
+            if (Files.exists(jwkPath)) {
+                return RSAKey.parse(Files.readString(jwkPath, StandardCharsets.UTF_8));
+            }
+            Path parent = jwkPath.toAbsolutePath().getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
             KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
             keyPairGenerator.initialize(2048);
             KeyPair keyPair = keyPairGenerator.generateKeyPair();
             RSAPublicKey publicKey = (RSAPublicKey) keyPair.getPublic();
             RSAPrivateKey privateKey = (RSAPrivateKey) keyPair.getPrivate();
-            return new RSAKey.Builder(publicKey)
+            RSAKey rsaKey = new RSAKey.Builder(publicKey)
                     .privateKey(privateKey)
                     .keyID(UUID.randomUUID().toString())
                     .build();
+            Files.writeString(jwkPath, rsaKey.toJSONString(), StandardCharsets.UTF_8);
+            return rsaKey;
         } catch (Exception ex) {
-            throw new IllegalStateException("生成授权服务 RSA 密钥失败。", ex);
+            throw new IllegalStateException("Failed to initialize authorization server RSA key", ex);
         }
     }
 }
+

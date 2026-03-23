@@ -17,9 +17,9 @@ import com.enterprise.auth.platform.tenant.TenantContext;
 import com.enterprise.auth.platform.user.model.UserAccount;
 import com.enterprise.auth.platform.user.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -32,6 +32,9 @@ import org.springframework.util.StringUtils;
 @Service
 public class AuthService {
 
+    private static final long MAX_LOGIN_FAILURES = 5;
+    private static final Duration LOGIN_FAILURE_WINDOW = Duration.ofMinutes(15);
+
     private final CaptchaService captchaService;
     private final SessionStore sessionStore;
     private final JwtService jwtService;
@@ -43,6 +46,7 @@ public class AuthService {
     private final SysUserMapper sysUserMapper;
     private final DataScopeService dataScopeService;
     private final StringRedisTemplate stringRedisTemplate;
+    private final AuthorizationSessionService authorizationSessionService;
 
     public AuthService(
             CaptchaService captchaService,
@@ -55,7 +59,8 @@ public class AuthService {
             PersistenceProperties persistenceProperties,
             @Nullable SysUserMapper sysUserMapper,
             DataScopeService dataScopeService,
-            StringRedisTemplate stringRedisTemplate
+            StringRedisTemplate stringRedisTemplate,
+            AuthorizationSessionService authorizationSessionService
     ) {
         this.captchaService = captchaService;
         this.sessionStore = sessionStore;
@@ -68,51 +73,43 @@ public class AuthService {
         this.sysUserMapper = sysUserMapper;
         this.dataScopeService = dataScopeService;
         this.stringRedisTemplate = stringRedisTemplate;
+        this.authorizationSessionService = authorizationSessionService;
     }
 
     public TokenResponse login(LoginRequest request, HttpServletRequest servletRequest) {
         captchaService.validate(request.captchaId(), request.captchaCode());
         String tenantId = StringUtils.hasText(request.tenantId()) ? request.tenantId() : TenantContext.getTenantId();
         String clientIp = clientIp(servletRequest);
-        
-        String lockKey = "auth:lock:" + tenantId + ":" + request.username();
-        String failKey = "auth:fail:" + tenantId + ":" + request.username();
-        
+
+        String lockKey = lockKey(tenantId, request.username());
+        String failKey = failKey(tenantId, request.username());
+
         if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(lockKey))) {
-            auditService.record("LOGIN_BLOCKED", request.username(), tenantId, Map.of("reason", "account_locked", "clientIp", clientIp));
-            throw new BusinessException("密码错误次数过多，账号已锁定15分钟，请稍后再试");
+            auditService.record("LOGIN_BLOCKED", request.username(), tenantId,
+                    Map.of("reason", "account_locked", "clientIp", clientIp));
+            throw new BusinessException("ACCOUNT_LOCKED", "Account is locked. Try again later.");
         }
 
         UserAccount user = userRepository.findByUsername(tenantId, request.username())
-                .orElseThrow(() -> {
-                    auditService.record("LOGIN_FAILED", request.username(), tenantId, Map.of("reason", "user_not_found", "clientIp", clientIp));
-                    return new BusinessException("用户名或密码错误");
-                });
-        if (!passwordEncoder.matches(request.password(), user.password())) {
-            Long fails = stringRedisTemplate.opsForValue().increment(failKey);
-            if (fails != null && fails == 1) {
-                stringRedisTemplate.expire(failKey, Duration.ofMinutes(15));
-            }
-            if (fails != null && fails >= 5) {
-                stringRedisTemplate.opsForValue().set(lockKey, "LOCKED", Duration.ofMinutes(15));
-                stringRedisTemplate.delete(failKey);
-                auditService.record("ACCOUNT_LOCKED", request.username(), tenantId, Map.of("reason", "exceed_max_failures", "clientIp", clientIp));
-                throw new BusinessException("密码错误次数过多，账号已锁定15分钟，请稍后再试");
-            }
-            auditService.record("LOGIN_FAILED", request.username(), tenantId, Map.of("reason", "bad_credentials", "clientIp", clientIp));
-            long remaining = 5 - (fails == null ? 0 : fails);
-            throw new BusinessException("用户名或密码错误，还剩 " + remaining + " 次机会");
+                .orElse(null);
+        if (user == null) {
+            throw buildLoginFailure(tenantId, request.username(), failKey, lockKey, "user_not_found", clientIp);
         }
+
+        if (!passwordEncoder.matches(request.password(), user.password())) {
+            throw buildLoginFailure(tenantId, request.username(), failKey, lockKey, "bad_credentials", clientIp);
+        }
+
         if (!user.enabled()) {
-            auditService.record("LOGIN_FAILED", user.username(), tenantId, Map.of("reason", "disabled", "clientIp", clientIp));
-            throw new BusinessException("用户已禁用");
+            auditService.record("LOGIN_FAILED", user.username(), tenantId,
+                    Map.of("reason", "disabled", "clientIp", clientIp));
+            throw new BusinessException("USER_DISABLED", "User is disabled");
         }
 
         stringRedisTemplate.delete(failKey);
 
         String sessionId = UUID.randomUUID().toString();
         Instant now = Instant.now();
-        // 自定义登录链路继续通过会话存储处理刷新、下线和失效控制。
         UserSession session = new UserSession(
                 sessionId,
                 user.id(),
@@ -127,62 +124,71 @@ public class AuthService {
         );
         sessionStore.save(session);
         updateLastLogin(user.id(), clientIp);
-        auditService.record("LOGIN_SUCCESS", user.username(), user.tenantId(), Map.of("sessionId", sessionId, "clientIp", clientIp));
+        auditService.record("LOGIN_SUCCESS", user.username(), user.tenantId(),
+                Map.of("sessionId", sessionId, "clientIp", clientIp));
         return issueTokens(user, sessionId);
     }
 
     public TokenResponse refresh(String refreshToken) {
-        TokenClaims claims = jwtService.decode(refreshToken);
+        TokenClaims claims;
+        try {
+            claims = jwtService.decode(refreshToken);
+        } catch (Exception ex) {
+            throw new BusinessException("INVALID_TOKEN", "Invalid refresh token");
+        }
+
         if (!"refresh".equals(claims.tokenType())) {
-            throw new BusinessException("刷新令牌类型错误");
+            throw new BusinessException("INVALID_TOKEN", "Invalid refresh token type");
         }
+
         UserSession session = sessionStore.findBySessionId(claims.sessionId())
-                .orElseThrow(() -> new BusinessException("会话不存在"));
+                .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "Session not found"));
         if (!session.active() || Instant.now().isAfter(session.expiresAt())) {
-            throw new BusinessException("会话已过期");
+            throw new BusinessException("SESSION_EXPIRED", "Session expired");
         }
+
         UserAccount user = userRepository.findById(claims.userId())
-                .orElseThrow(() -> new BusinessException("用户不存在"));
-        if (user.sessionVersion() != claims.sessionVersion()) {
-            throw new BusinessException("令牌版本已失效");
+                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "User not found"));
+
+        if (!user.enabled()) {
+            authorizationSessionService.revoke(session.sessionId());
+            throw new BusinessException("USER_DISABLED", "User disabled");
         }
+        if (user.sessionVersion() != claims.sessionVersion()) {
+            authorizationSessionService.revoke(session.sessionId());
+            throw new BusinessException("TOKEN_VERSION_MISMATCH", "Token version invalid");
+        }
+        if (!user.tenantId().equals(session.tenantId()) || !user.tenantId().equals(claims.tenantId())) {
+            authorizationSessionService.revoke(session.sessionId());
+            throw new BusinessException("TENANT_MISMATCH", "Tenant context mismatch");
+        }
+
         sessionStore.touch(session.sessionId());
         return issueTokens(user, session.sessionId());
     }
 
     public void logout(String sessionId, String username, String tenantId) {
-        sessionStore.deactivate(sessionId);
+        authorizationSessionService.revoke(sessionId);
         auditService.record("LOGOUT", username, tenantId, Map.of("sessionId", sessionId));
     }
 
     public List<UserSessionResponse> sessions(UserAccount currentUser) {
-        return sessionStore.findByUserId(currentUser.id()).stream()
-                .map(session -> new UserSessionResponse(
-                        session.sessionId(),
-                        session.username(),
-                        session.tenantId(),
-                        session.clientIp(),
-                        session.device(),
-                        session.issuedAt(),
-                        session.expiresAt(),
-                        session.lastAccessAt(),
-                        session.active()
-                ))
-                .toList();
+        return authorizationSessionService.listSessions(currentUser);
     }
 
     public void forceOffline(UserAccount currentUser, String sessionId) {
-        UserSession session = sessionStore.findBySessionId(sessionId)
-                .orElseThrow(() -> new BusinessException("会话不存在"));
+        AuthorizationSessionService.SessionDescriptor session = authorizationSessionService.findSessionDescriptor(sessionId)
+                .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "Session not found"));
         boolean sameOwner = currentUser.id().equals(session.userId());
         boolean canManage = currentUser.permissions().contains("session:write");
         boolean sameTenant = currentUser.tenantId().equals(session.tenantId());
         boolean visibleTarget = dataScopeService.canAccessUser(currentUser.tenantId(), session.userId());
         if (!sameOwner && (!canManage || !sameTenant || !visibleTarget)) {
-            throw new BusinessException("无权操作该会话");
+            throw new BusinessException("ACCESS_DENIED", "No permission to operate this session");
         }
-        sessionStore.deactivate(sessionId);
-        auditService.record("SESSION_FORCED_OFFLINE", currentUser.username(), currentUser.tenantId(), Map.of("sessionId", sessionId));
+        authorizationSessionService.revoke(sessionId);
+        auditService.record("SESSION_FORCED_OFFLINE", currentUser.username(), currentUser.tenantId(),
+                Map.of("sessionId", sessionId));
     }
 
     private TokenResponse issueTokens(UserAccount user, String sessionId) {
@@ -215,5 +221,39 @@ public class AuthService {
             return forwarded.split(",")[0].trim();
         }
         return request.getRemoteAddr();
+    }
+
+    private String failKey(String tenantId, String username) {
+        return "auth:fail:" + tenantId + ":" + username;
+    }
+
+    private String lockKey(String tenantId, String username) {
+        return "auth:lock:" + tenantId + ":" + username;
+    }
+
+    private BusinessException buildLoginFailure(
+            String tenantId,
+            String username,
+            String failKey,
+            String lockKey,
+            String reason,
+            String clientIp
+    ) {
+        Long fails = stringRedisTemplate.opsForValue().increment(failKey);
+        if (fails != null && fails == 1) {
+            stringRedisTemplate.expire(failKey, LOGIN_FAILURE_WINDOW);
+        }
+
+        if (fails != null && fails >= MAX_LOGIN_FAILURES) {
+            stringRedisTemplate.opsForValue().set(lockKey, "LOCKED", LOGIN_FAILURE_WINDOW);
+            stringRedisTemplate.delete(failKey);
+            auditService.record("ACCOUNT_LOCKED", username, tenantId,
+                    Map.of("reason", "exceed_max_failures", "clientIp", clientIp));
+            return new BusinessException("ACCOUNT_LOCKED", "Account is locked. Try again later.");
+        }
+
+        auditService.record("LOGIN_FAILED", username, tenantId, Map.of("reason", reason, "clientIp", clientIp));
+        long remaining = Math.max(0, MAX_LOGIN_FAILURES - (fails == null ? 0 : fails));
+        return new BusinessException("BAD_CREDENTIALS", "Username or password is incorrect, remaining attempts: " + remaining);
     }
 }

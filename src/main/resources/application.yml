@@ -49,12 +49,13 @@ knife4j:
 app:
   authorization-server:
     issuer: http://127.0.0.1:8080
+    jwk-file: data/oauth2-jwk.json
   frontend:
     allowed-origins:
       - http://127.0.0.1:5173
       - http://localhost:5173
     public-client-id: eap-frontend-spa
-    public-client-name: 前端管理台
+    public-client-name: Frontend Console
     redirect-uris:
       - http://127.0.0.1:5173/auth/callback
       - http://localhost:5173/auth/callback
@@ -64,11 +65,11 @@ app:
       - api.read
       - api.write
   security:
-    jwt-secret: "change-me-to-a-32-char-secret-key-for-prod"
+    jwt-secret: "LOCAL_CHANGE_ME_7B3f1D5k9Q2m6R8t0W4xY7zA1cE5gH9J"
     access-token-ttl: 30m
     refresh-token-ttl: 7d
     captcha-ttl: 5m
-    expose-captcha-answer: true
+    expose-captcha-answer: false
     redis:
       session-enabled: true
       captcha-enabled: true

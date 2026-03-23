@@ -21,7 +21,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-@SpringBootTest
+@SpringBootTest(properties = "app.security.expose-captcha-answer=true")
 class AuthServiceTest {
 
     private static final String TEST_PASSWORD = "AuthTest@123";
@@ -42,12 +42,15 @@ class AuthServiceTest {
     private SysUserMapper sysUserMapper;
 
     private String originalPasswordHash;
+    private Integer originalEnabled;
 
     @BeforeEach
     void setUpAdminPassword() {
         SysUserEntity admin = loadAdminEntity();
         originalPasswordHash = admin.getPasswordHash();
+        originalEnabled = admin.getEnabled();
         admin.setPasswordHash(passwordEncoder.encode(TEST_PASSWORD));
+        admin.setEnabled(1);
         admin.setUpdatedBy("test");
         sysUserMapper.updateById(admin);
     }
@@ -59,6 +62,7 @@ class AuthServiceTest {
         }
         SysUserEntity admin = loadAdminEntity();
         admin.setPasswordHash(originalPasswordHash);
+        admin.setEnabled(originalEnabled == null ? 1 : originalEnabled);
         admin.setUpdatedBy("test");
         sysUserMapper.updateById(admin);
     }
@@ -95,6 +99,55 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.refresh(login.refreshToken()))
                 .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void disabledUserShouldNotRefreshToken() {
+        TokenResponse login = loginAsAdmin();
+        SysUserEntity admin = loadAdminEntity();
+        admin.setEnabled(0);
+        admin.setUpdatedBy("test");
+        sysUserMapper.updateById(admin);
+
+        assertThatThrownBy(() -> authService.refresh(login.refreshToken()))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void unknownUsernameShouldAlsoTriggerLockingPolicy() {
+        for (int i = 0; i < 5; i++) {
+            CaptchaService.CaptchaChallenge challenge = captchaService.create();
+            MockHttpServletRequest request = new MockHttpServletRequest();
+            request.addHeader("X-Forwarded-For", "127.0.0.1");
+            assertThatThrownBy(() -> authService.login(
+                    new LoginRequest(
+                            "missing-user",
+                            TEST_PASSWORD,
+                            challenge.captchaId(),
+                            challenge.previewCode(),
+                            "platform",
+                            "chrome"
+                    ),
+                    request
+            )).isInstanceOf(BusinessException.class);
+        }
+
+        CaptchaService.CaptchaChallenge challenge = captchaService.create();
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("X-Forwarded-For", "127.0.0.1");
+        assertThatThrownBy(() -> authService.login(
+                new LoginRequest(
+                        "missing-user",
+                        TEST_PASSWORD,
+                        challenge.captchaId(),
+                        challenge.previewCode(),
+                        "platform",
+                        "chrome"
+                ),
+                request
+        ))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("locked");
     }
 
     private TokenResponse loginAsAdmin() {
