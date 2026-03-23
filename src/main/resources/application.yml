@@ -83,6 +83,7 @@ app:
     mybatis-ignore-tables:
       - oauth2_authorization
       - oauth2_authorization_consent
+      - sys_tenant
   persistence:
     database-enabled: true
   features:

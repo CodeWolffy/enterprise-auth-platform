@@ -13,6 +13,7 @@ interface PersistedSession {
   refreshToken: string
   expiresAt: number
   tenantId: string
+  operatorTenantId?: string
   snapshot: PermissionSnapshot | null
 }
 
@@ -21,11 +22,13 @@ export const useAuthStore = defineStore('auth', () => {
   const refreshToken = ref('')
   const expiresAt = ref(0)
   const tenantId = ref('platform')
+  const operatorTenantId = ref('platform')
   const snapshot = ref<PermissionSnapshot | null>(null)
   let refreshingPromise: Promise<void> | null = null
 
   const isAuthenticated = computed(() => Boolean(accessToken.value && snapshot.value))
   const menuItems = computed(() => snapshot.value?.menus ?? [])
+  const canSwitchTenant = computed(() => Boolean(snapshot.value?.superAdmin))
 
   function restore() {
     const raw = sessionStorage.getItem(storageKey) ?? localStorage.getItem(storageKey)
@@ -37,7 +40,9 @@ export const useAuthStore = defineStore('auth', () => {
     refreshToken.value = parsed.refreshToken
     expiresAt.value = parsed.expiresAt
     tenantId.value = parsed.tenantId
+    operatorTenantId.value = parsed.operatorTenantId || parsed.tenantId || 'platform'
     snapshot.value = parsed.snapshot
+    syncTenantFromSnapshot()
     registerDynamicRoutes(snapshot.value)
     sessionStorage.setItem(storageKey, raw)
     localStorage.removeItem(storageKey)
@@ -49,6 +54,7 @@ export const useAuthStore = defineStore('auth', () => {
       refreshToken: refreshToken.value,
       expiresAt: expiresAt.value,
       tenantId: tenantId.value,
+      operatorTenantId: operatorTenantId.value,
       snapshot: snapshot.value,
     }
     sessionStorage.setItem(storageKey, JSON.stringify(payload))
@@ -63,6 +69,7 @@ export const useAuthStore = defineStore('auth', () => {
     const { payload, tenantId: resolvedTenantId } = await exchangeAuthorizationCode(code, state)
     applyTokenPayload(payload, resolvedTenantId)
     snapshot.value = await fetchPermissionSnapshot()
+    syncTenantFromSnapshot()
     registerDynamicRoutes(snapshot.value)
     persist()
   }
@@ -79,10 +86,11 @@ export const useAuthStore = defineStore('auth', () => {
         throw new Error('missing refresh token')
       }
       const payload = await refreshOauthToken()
-      applyTokenPayload(payload, tenantId.value)
+      applyTokenPayload(payload, operatorTenantId.value || tenantId.value)
 
       if (reloadSnapshot) {
         snapshot.value = await fetchPermissionSnapshot()
+        syncTenantFromSnapshot()
         registerDynamicRoutes(snapshot.value)
       }
       persist()
@@ -104,8 +112,30 @@ export const useAuthStore = defineStore('auth', () => {
       return
     }
     snapshot.value = await fetchPermissionSnapshot()
+    syncTenantFromSnapshot()
     registerDynamicRoutes(snapshot.value)
     persist()
+  }
+
+  async function switchTenant(targetTenantId: string) {
+    const trimmed = targetTenantId.trim()
+    if (!trimmed || trimmed === tenantId.value) {
+      return
+    }
+    if (!canSwitchTenant.value) {
+      throw new Error('当前账号不支持租户切换')
+    }
+    const previousTenantId = tenantId.value
+    tenantId.value = trimmed
+    try {
+      snapshot.value = await fetchPermissionSnapshot()
+      syncTenantFromSnapshot()
+      registerDynamicRoutes(snapshot.value)
+      persist()
+    } catch (error) {
+      tenantId.value = previousTenantId
+      throw error
+    }
   }
 
   function shouldRefreshToken() {
@@ -117,6 +147,7 @@ export const useAuthStore = defineStore('auth', () => {
     refreshToken.value = ''
     expiresAt.value = 0
     tenantId.value = 'platform'
+    operatorTenantId.value = 'platform'
     snapshot.value = null
     sessionStorage.removeItem(storageKey)
     localStorage.removeItem(storageKey)
@@ -140,7 +171,23 @@ export const useAuthStore = defineStore('auth', () => {
     refreshToken.value = 'cookie-refresh'
     const expires = Date.parse(payload.expiresAt)
     expiresAt.value = Number.isNaN(expires) ? Date.now() + 5 * 60 * 1000 : expires
-    tenantId.value = payload.tenantId || resolvedTenantId
+    operatorTenantId.value = payload.tenantId || resolvedTenantId
+    if (!tenantId.value) {
+      tenantId.value = operatorTenantId.value
+    }
+  }
+
+  function syncTenantFromSnapshot() {
+    if (!snapshot.value) {
+      return
+    }
+    const operator = snapshot.value.operatorTenantId || operatorTenantId.value || snapshot.value.tenantId
+    operatorTenantId.value = operator
+    if (snapshot.value.superAdmin) {
+      tenantId.value = snapshot.value.tenantId || tenantId.value || operator
+      return
+    }
+    tenantId.value = operator
   }
 
   return {
@@ -148,14 +195,17 @@ export const useAuthStore = defineStore('auth', () => {
     refreshToken,
     expiresAt,
     tenantId,
+    operatorTenantId,
     snapshot,
     isAuthenticated,
     menuItems,
+    canSwitchTenant,
     restore,
     bootstrapSnapshot,
     startLogin,
     finishLogin,
     refreshTokens,
+    switchTenant,
     shouldRefreshToken,
     clearSession,
     logout,

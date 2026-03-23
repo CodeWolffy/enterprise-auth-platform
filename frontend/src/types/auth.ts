@@ -9,11 +9,13 @@ export interface PermissionSnapshot {
   userId: number
   username: string
   tenantId: string
+  operatorTenantId?: string
   roles: string[]
   permissions: string[]
   dataScopeType: string
   customDeptIds: number[]
   menus: MenuItem[]
+  superAdmin?: boolean
 }
 
 export interface MenuItem {

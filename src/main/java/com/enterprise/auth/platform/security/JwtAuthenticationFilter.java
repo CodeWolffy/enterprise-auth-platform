@@ -19,6 +19,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -45,6 +46,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final UserAccountJwtConverter userAccountJwtConverter;
     private final AuthorizationSessionService authorizationSessionService;
     private final TenantProperties tenantProperties;
+    private final PlatformAdminSupport platformAdminSupport;
 
     public JwtAuthenticationFilter(
             JwtService jwtService,
@@ -53,7 +55,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @Nullable JwtDecoder authorizationServerJwtDecoder,
             UserAccountJwtConverter userAccountJwtConverter,
             AuthorizationSessionService authorizationSessionService,
-            TenantProperties tenantProperties
+            TenantProperties tenantProperties,
+            PlatformAdminSupport platformAdminSupport
     ) {
         this.jwtService = jwtService;
         this.userRepository = userRepository;
@@ -62,6 +65,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         this.userAccountJwtConverter = userAccountJwtConverter;
         this.authorizationSessionService = authorizationSessionService;
         this.tenantProperties = tenantProperties;
+        this.platformAdminSupport = platformAdminSupport;
     }
 
     @Override
@@ -84,11 +88,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             authentication.ifPresent(auth -> {
                 SecurityContextHolder.getContext().setAuthentication(auth);
                 if (auth.getPrincipal() instanceof UserAccount user) {
-                    // Bind tenant context to token tenant to avoid forged header/param switching.
-                    TenantContext.setTenantId(user.tenantId());
+                    String requestedTenantId = resolveRequestedTenant(request);
+                    TenantContext.setTenantId(platformAdminSupport.resolveEffectiveTenant(user, requestedTenantId));
                 }
             });
         } catch (BusinessException ex) {
+            log.debug("Reject token authentication, code={}, message={}", ex.code(), ex.getMessage());
             SecurityContextHolder.clearContext();
         }
 
@@ -130,8 +135,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throw new BusinessException("SESSION_EXPIRED", "Session expired");
         }
 
-        UserAccount user = userRepository.findById(claims.userId())
-                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "User not found"));
+        UserAccount user = loadUserByTokenTenant(claims);
 
         validateSessionSubjectBinding(session, claims, user);
         validateTenantBinding(request, claims, user, session.tenantId());
@@ -162,6 +166,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             Jwt jwt = authorizationServerJwtDecoder.decode(token);
             if (!userAccountJwtConverter.supports(jwt)) {
+                log.debug("Authorization server jwt ignored: unsupported claims set");
                 return Optional.empty();
             }
 
@@ -170,8 +175,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 throw new BusinessException("ACCESS_TOKEN_TYPE_INVALID", "Invalid access token type");
             }
 
-            UserAccount user = userRepository.findById(claims.userId())
-                    .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "User not found"));
+            UserAccount user = loadUserByTokenTenant(claims);
             if (!user.enabled()) {
                 authorizationSessionService.revoke(claims.sessionId());
                 throw new BusinessException("USER_DISABLED", "User disabled");
@@ -216,7 +220,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String requestedTenantId = resolveRequestedTenant(request);
-        if (StringUtils.hasText(requestedTenantId) && !requestedTenantId.equals(tokenTenantId)) {
+        if (!StringUtils.hasText(requestedTenantId)) {
+            return;
+        }
+        if (requestedTenantId.equals(tokenTenantId)) {
+            return;
+        }
+        if (!platformAdminSupport.canSwitchTenant(user, requestedTenantId)) {
             throw new BusinessException("TENANT_MISMATCH", "Tenant context mismatch");
         }
     }
@@ -233,6 +243,33 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (mismatch) {
             authorizationSessionService.revoke(claims.sessionId());
             throw new BusinessException("SESSION_SUBJECT_MISMATCH", "Session subject mismatch");
+        }
+    }
+
+    private UserAccount loadUserByTokenTenant(TokenClaims claims) {
+        return runInTokenTenant(claims.tenantId(), () -> userRepository.findById(claims.userId())
+                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "User not found")));
+    }
+
+    private <T> T runInTokenTenant(String tenantId, Supplier<T> action) {
+        if (!StringUtils.hasText(tenantId)) {
+            return action.get();
+        }
+        String currentTenantId = TenantContext.getTenantId();
+        boolean switched = !tenantId.equals(currentTenantId);
+        if (!switched) {
+            return action.get();
+        }
+
+        TenantContext.setTenantId(tenantId);
+        try {
+            return action.get();
+        } finally {
+            if (StringUtils.hasText(currentTenantId)) {
+                TenantContext.setTenantId(currentTenantId);
+            } else {
+                TenantContext.clear();
+            }
         }
     }
 

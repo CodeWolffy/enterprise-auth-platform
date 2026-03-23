@@ -10,6 +10,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.enterprise.auth.platform.persistence.entity.SysOauthClientEntity;
 import com.enterprise.auth.platform.persistence.mapper.SysOauthClientMapper;
 import com.enterprise.auth.platform.config.FrontendProperties;
+import com.enterprise.auth.platform.auth.model.UserSession;
+import com.enterprise.auth.platform.auth.service.JwtService;
+import com.enterprise.auth.platform.auth.store.SessionStore;
+import com.enterprise.auth.platform.common.model.DataScopeType;
+import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
+import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
 import com.enterprise.auth.platform.user.model.UserAccount;
 import com.enterprise.auth.platform.user.repository.UserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -17,8 +23,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,6 +59,12 @@ class CookieSessionSecurityIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
+    private JwtService jwtService;
+
+    @Autowired
+    private SessionStore sessionStore;
+
+    @Autowired
     private FrontendProperties frontendProperties;
 
     @Autowired
@@ -58,8 +73,12 @@ class CookieSessionSecurityIntegrationTest {
     @Autowired
     private SysOauthClientMapper sysOauthClientMapper;
 
+    @Autowired
+    private SysUserMapper sysUserMapper;
+
     private SysOauthClientEntity originalClient;
     private boolean createdClient;
+    private Long temporaryUserId;
 
     @BeforeEach
     void prepareFrontendClientForCookieFlow() {
@@ -101,6 +120,10 @@ class CookieSessionSecurityIntegrationTest {
 
     @AfterEach
     void restoreFrontendClient() {
+        if (temporaryUserId != null) {
+            sysUserMapper.deleteById(temporaryUserId);
+            temporaryUserId = null;
+        }
         if (createdClient) {
             sysOauthClientMapper.hardDeleteByTenantAndClientId("platform", FRONTEND_CLIENT_ID);
             return;
@@ -143,32 +166,94 @@ class CookieSessionSecurityIntegrationTest {
     }
 
     @Test
-    void forgedTenantHeaderShouldBeRejectedInCookieMode() throws Exception {
+    void platformSuperAdminShouldBeAbleToSwitchTenantByHeader() throws Exception {
         OAuthTokens tokens = issueFrontendTokens();
 
         mockMvc.perform(get("/api/auth/me")
                         .cookie(new Cookie(AuthCookieConstants.ACCESS_TOKEN_COOKIE, tokens.accessToken()))
                         .header("X-Tenant-Id", "tenant-a"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.tenantId").value("tenant-a"))
+                .andExpect(jsonPath("$.data.operatorTenantId").value("platform"))
+                .andExpect(jsonPath("$.data.superAdmin").value(true));
+    }
+
+    @Test
+    void tenantAuditorShouldNotSwitchToPlatformTenantByHeader() throws Exception {
+        UserAccount ordinaryUser = createTemporaryOrdinaryUser("tenant-a");
+        String targetTenantId = "platform";
+        String sessionId = UUID.randomUUID().toString();
+        Instant now = Instant.now();
+        sessionStore.save(new UserSession(
+                sessionId,
+                ordinaryUser.id(),
+                ordinaryUser.username(),
+                ordinaryUser.tenantId(),
+                "127.0.0.1",
+                "integration-test",
+                now,
+                now.plusSeconds(600),
+                now,
+                true
+        ));
+        String accessToken = jwtService.issueAccessToken(ordinaryUser, sessionId);
+
+        mockMvc.perform(get("/api/auth/me")
+                        .cookie(new Cookie(AuthCookieConstants.ACCESS_TOKEN_COOKIE, accessToken))
+                        .header("X-Tenant-Id", targetTenantId))
                 .andExpect(status().isForbidden());
     }
 
+    private UserAccount createTemporaryOrdinaryUser(String tenantId) {
+        String username = "it_user_" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+        SysUserEntity entity = new SysUserEntity();
+        entity.setTenantId(tenantId);
+        entity.setUsername(username);
+        entity.setDisplayName("Integration Test User");
+        entity.setPasswordHash(passwordEncoder.encode("Temp@123456"));
+        entity.setEnabled(1);
+        entity.setSessionVersion(1);
+        entity.setDeleted(0);
+        entity.setCreatedBy("test");
+        entity.setUpdatedBy("test");
+        entity.setPasswordUpdatedAt(LocalDateTime.now());
+        sysUserMapper.insert(entity);
+        temporaryUserId = entity.getId();
+        return new UserAccount(
+                entity.getId(),
+                tenantId,
+                username,
+                entity.getPasswordHash(),
+                true,
+                Set.of("AUDITOR"),
+                Set.of(),
+                Set.of(),
+                DataScopeType.SELF,
+                1
+        );
+    }
+
     private OAuthTokens issueFrontendTokens() throws Exception {
+        UserAccount principal = userRepository.findByUsername("platform", "admin").orElseThrow();
+        return issueFrontendTokensForUser(principal, "platform", "state-cookie-001");
+    }
+
+    private OAuthTokens issueFrontendTokensForUser(UserAccount principal, String requestTenantId, String state) throws Exception {
         String codeVerifier = UUID.randomUUID() + UUID.randomUUID().toString().replace("-", "");
         String codeChallenge = codeChallenge(codeVerifier);
-        UserAccount principal = userRepository.findByUsername("platform", "admin").orElseThrow();
         MvcResult authorizeResult = mockMvc.perform(get(
                         "/oauth2/authorize?response_type={responseType}&client_id={clientId}&redirect_uri={redirectUri}&scope={scope}&state={state}&tenantId={tenantId}&code_challenge={codeChallenge}&code_challenge_method={challengeMethod}",
                         "code",
                         FRONTEND_CLIENT_ID,
                         REDIRECT_URI,
                         "openid profile api.read",
-                        "state-cookie-001",
-                        "platform",
+                        state,
+                        requestTenantId,
                         codeChallenge,
                         "S256"
                 )
                         .with(user(principal))
-                        .header("X-Tenant-Id", "platform"))
+                        .header("X-Tenant-Id", requestTenantId))
                 .andExpect(status().is3xxRedirection())
                 .andReturn();
 

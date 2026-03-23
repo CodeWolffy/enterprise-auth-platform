@@ -16,6 +16,23 @@
     <div class="tenant-card">
       <span>当前租户</span>
       <strong>{{ authStore.tenantId }}</strong>
+      <el-select
+        v-if="authStore.canSwitchTenant"
+        :model-value="authStore.tenantId"
+        placeholder="切换租户视角"
+        size="small"
+        filterable
+        style="margin-top: 8px"
+        @change="handleTenantChange"
+      >
+        <el-option
+          v-for="tenant in tenantOptions"
+          :key="tenant.tenantId"
+          :label="`${tenant.name} (${tenant.tenantId})`"
+          :value="tenant.tenantId"
+        />
+      </el-select>
+      <small v-if="authStore.canSwitchTenant">操作者租户：{{ authStore.operatorTenantId }}</small>
       <small>{{ authStore.snapshot?.dataScopeType ?? '未登录' }}</small>
     </div>
   </aside>
@@ -34,11 +51,14 @@ import {
   Setting,
   Tickets,
 } from '@element-plus/icons-vue'
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import { queryTenants } from '@/api/platform'
 
 const authStore = useAuthStore()
+const tenantOptions = ref<Array<{ tenantId: string; name: string }>>([])
 
 const iconMap: Record<string, any> = {
   dashboard: Monitor,
@@ -91,4 +111,30 @@ const visibleLinks = computed(() => {
   }
   return Array.from(deduped.values())
 })
+
+watch(
+  () => [authStore.canSwitchTenant, authStore.accessToken] as const,
+  async ([canSwitch, token]) => {
+    if (!canSwitch || !token) {
+      tenantOptions.value = []
+      return
+    }
+    try {
+      const page = await queryTenants({ page: 1, size: 200 })
+      tenantOptions.value = page.records.map((item) => ({ tenantId: item.tenantId, name: item.name }))
+    } catch {
+      tenantOptions.value = []
+    }
+  },
+  { immediate: true },
+)
+
+async function handleTenantChange(value: string) {
+  try {
+    await authStore.switchTenant(value)
+    ElMessage.success(`已切换到租户视角：${value}`)
+  } catch {
+    ElMessage.error('租户切换失败')
+  }
+}
 </script>

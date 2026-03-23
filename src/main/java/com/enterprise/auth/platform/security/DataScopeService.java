@@ -26,10 +26,16 @@ public class DataScopeService {
 
     private final SysUserMapper sysUserMapper;
     private final SysDeptMapper sysDeptMapper;
+    private final PlatformAdminSupport platformAdminSupport;
 
-    public DataScopeService(@Nullable SysUserMapper sysUserMapper, @Nullable SysDeptMapper sysDeptMapper) {
+    public DataScopeService(
+            @Nullable SysUserMapper sysUserMapper,
+            @Nullable SysDeptMapper sysDeptMapper,
+            PlatformAdminSupport platformAdminSupport
+    ) {
         this.sysUserMapper = sysUserMapper;
         this.sysDeptMapper = sysDeptMapper;
+        this.platformAdminSupport = platformAdminSupport;
     }
 
     public Optional<UserAccount> currentUser() {
@@ -164,6 +170,9 @@ public class DataScopeService {
     }
 
     private ScopeContext buildContext(String tenantId, UserAccount principal) {
+        if (platformAdminSupport.isPlatformSuperAdmin(principal)) {
+            return ScopeContext.ALL;
+        }
         if (!tenantId.equals(principal.tenantId())) {
             return ScopeContext.NONE;
         }

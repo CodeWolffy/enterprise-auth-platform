@@ -24,16 +24,23 @@ import com.enterprise.auth.platform.persistence.mapper.SysTenantChangeLogMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysTenantPackageCapabilityMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysTenantPackageMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
+import com.enterprise.auth.platform.security.PlatformAdminSupport;
 import com.enterprise.auth.platform.security.SecuritySupport;
+import com.enterprise.auth.platform.tenant.TenantContext;
 import com.enterprise.auth.platform.tenant.dto.CreateTenantRequest;
 import com.enterprise.auth.platform.tenant.dto.UpdateTenantCapabilityOverridesRequest;
 import com.enterprise.auth.platform.tenant.dto.UpdateTenantRequest;
+import com.enterprise.auth.platform.user.model.UserAccount;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Supplier;
 import org.springframework.lang.Nullable;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -53,6 +60,7 @@ public class TenantManagementService {
     private final SysTenantChangeLogMapper sysTenantChangeLogMapper;
     private final CatalogService catalogService;
     private final AuditService auditService;
+    private final PlatformAdminSupport platformAdminSupport;
 
     public TenantManagementService(
             PersistenceProperties persistenceProperties,
@@ -66,7 +74,8 @@ public class TenantManagementService {
             @Nullable SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper,
             @Nullable SysTenantChangeLogMapper sysTenantChangeLogMapper,
             CatalogService catalogService,
-            AuditService auditService
+            AuditService auditService,
+            PlatformAdminSupport platformAdminSupport
     ) {
         this.persistenceProperties = persistenceProperties;
         this.sysTenantMapper = sysTenantMapper;
@@ -80,11 +89,13 @@ public class TenantManagementService {
         this.sysTenantChangeLogMapper = sysTenantChangeLogMapper;
         this.catalogService = catalogService;
         this.auditService = auditService;
+        this.platformAdminSupport = platformAdminSupport;
     }
 
     @Transactional
     public CatalogService.TenantView create(CreateTenantRequest request) {
         requireDatabaseMode();
+        requirePlatformSuperAdmin();
         String operator = SecuritySupport.currentOperator();
         if (existsTenant(request.tenantId())) {
             throw new BusinessException("租户标识已存在");
@@ -115,6 +126,7 @@ public class TenantManagementService {
     @Transactional
     public CatalogService.TenantView update(String tenantId, UpdateTenantRequest request) {
         requireDatabaseMode();
+        requirePlatformSuperAdmin();
         SysTenantEntity entity = getTenant(tenantId);
         String oldTenantName = entity.getTenantName();
         Integer oldTenantStatus = entity.getTenantStatus();
@@ -151,11 +163,20 @@ public class TenantManagementService {
     @Transactional
     public void delete(String tenantId) {
         requireDatabaseMode();
+        requirePlatformSuperAdmin();
         String operator = SecuritySupport.currentOperator();
         SysTenantEntity entity = getTenant(tenantId);
-        if ((sysUserMapper.selectCount(new LambdaQueryWrapper<SysUserEntity>().eq(SysUserEntity::getTenantId, tenantId).eq(SysUserEntity::getDeleted, 0)) > 0)
-                || (sysRoleMapper.selectCount(new LambdaQueryWrapper<SysRoleEntity>().eq(SysRoleEntity::getTenantId, tenantId).eq(SysRoleEntity::getDeleted, 0)) > 0)
-                || (sysDeptMapper.selectCount(new LambdaQueryWrapper<SysDeptEntity>().eq(SysDeptEntity::getTenantId, tenantId).eq(SysDeptEntity::getDeleted, 0)) > 0)) {
+        boolean tenantHasRelatedData = withTenant(tenantId, () ->
+                (sysUserMapper.selectCount(new LambdaQueryWrapper<SysUserEntity>()
+                        .eq(SysUserEntity::getTenantId, tenantId)
+                        .eq(SysUserEntity::getDeleted, 0)) > 0)
+                        || (sysRoleMapper.selectCount(new LambdaQueryWrapper<SysRoleEntity>()
+                        .eq(SysRoleEntity::getTenantId, tenantId)
+                        .eq(SysRoleEntity::getDeleted, 0)) > 0)
+                        || (sysDeptMapper.selectCount(new LambdaQueryWrapper<SysDeptEntity>()
+                        .eq(SysDeptEntity::getTenantId, tenantId)
+                        .eq(SysDeptEntity::getDeleted, 0)) > 0));
+        if (tenantHasRelatedData) {
             throw new BusinessException("租户下仍存在用户、角色或部门数据，暂不允许删除");
         }
 
@@ -168,10 +189,13 @@ public class TenantManagementService {
 
     public PageResult<CatalogService.TenantView> page(String keyword, Boolean platformLevel, Integer tenantStatus, int page, int size) {
         requireDatabaseMode();
+        boolean platformSuperAdmin = isPlatformSuperAdmin();
+        String operatorTenantId = currentTenantId();
         int safePage = Math.max(page, 1);
         int safeSize = Math.max(size, 1);
         LambdaQueryWrapper<SysTenantEntity> query = new LambdaQueryWrapper<SysTenantEntity>()
                 .eq(SysTenantEntity::getDeleted, 0)
+                .eq(!platformSuperAdmin, SysTenantEntity::getTenantId, operatorTenantId)
                 .eq(platformLevel != null, SysTenantEntity::getPlatformLevel, Boolean.TRUE.equals(platformLevel) ? 1 : 0)
                 .eq(tenantStatus != null, SysTenantEntity::getTenantStatus, tenantStatus)
                 .and(StringUtils.hasText(keyword), wrapper -> wrapper
@@ -185,6 +209,7 @@ public class TenantManagementService {
         int offset = (safePage - 1) * safeSize;
         List<SysTenantEntity> entities = sysTenantMapper.selectList(new LambdaQueryWrapper<SysTenantEntity>()
                 .eq(SysTenantEntity::getDeleted, 0)
+                .eq(!platformSuperAdmin, SysTenantEntity::getTenantId, operatorTenantId)
                 .eq(platformLevel != null, SysTenantEntity::getPlatformLevel, Boolean.TRUE.equals(platformLevel) ? 1 : 0)
                 .eq(tenantStatus != null, SysTenantEntity::getTenantStatus, tenantStatus)
                 .and(StringUtils.hasText(keyword), wrapper -> wrapper
@@ -212,6 +237,7 @@ public class TenantManagementService {
             int size
     ) {
         requireDatabaseMode();
+        ensureTenantReadable(tenantId);
         int safePage = Math.max(page, 1);
         int safeSize = Math.max(size, 1);
         LambdaQueryWrapper<SysTenantChangeLogEntity> query = buildHistoryQuery(
@@ -250,6 +276,7 @@ public class TenantManagementService {
             java.time.Instant occurredTo
     ) {
         requireDatabaseMode();
+        ensureTenantReadable(tenantId);
         List<SysTenantChangeLogEntity> records = sysTenantChangeLogMapper.selectList(
                 buildHistoryQuery(tenantId, changeType, fieldKey, operator, occurredFrom, occurredTo)
                         .orderByDesc(SysTenantChangeLogEntity::getOccurredAt)
@@ -294,6 +321,7 @@ public class TenantManagementService {
 
     public TenantCapabilityOverrideView capabilityOverrides(String tenantId) {
         requireDatabaseMode();
+        ensureTenantReadable(tenantId);
         SysTenantEntity tenant = getTenant(tenantId);
         Map<String, TenantProfile> profiles = loadTenantProfiles(List.of(tenant));
         TenantProfile profile = profiles.getOrDefault(tenantId, TenantProfile.empty());
@@ -306,6 +334,7 @@ public class TenantManagementService {
             UpdateTenantCapabilityOverridesRequest request
     ) {
         requireDatabaseMode();
+        ensureTenantReadable(tenantId);
         SysTenantEntity tenant = getTenant(tenantId);
         TenantCapabilityOverrideView before = capabilityOverrides(tenantId);
         saveTenantCapabilityOverridesFromRequest(tenantId, tenant.getPackageCode(), request == null ? List.of() : request.overrides());
@@ -735,16 +764,57 @@ public class TenantManagementService {
     }
 
     private <T> T withPlatformTenant(Supplier<T> supplier) {
-        String currentTenantId = com.enterprise.auth.platform.tenant.TenantContext.getTenantId();
-        com.enterprise.auth.platform.tenant.TenantContext.setTenantId("platform");
+        return withTenant("platform", supplier);
+    }
+
+    private <T> T withTenant(String tenantId, Supplier<T> supplier) {
+        String currentTenantId = TenantContext.getTenantId();
+        TenantContext.setTenantId(tenantId);
         try {
             return supplier.get();
         } finally {
             if (StringUtils.hasText(currentTenantId)) {
-                com.enterprise.auth.platform.tenant.TenantContext.setTenantId(currentTenantId);
+                TenantContext.setTenantId(currentTenantId);
             } else {
-                com.enterprise.auth.platform.tenant.TenantContext.clear();
+                TenantContext.clear();
             }
+        }
+    }
+
+    private Optional<UserAccount> currentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken) {
+            return Optional.empty();
+        }
+        if (authentication.getPrincipal() instanceof UserAccount user) {
+            return Optional.of(user);
+        }
+        return Optional.empty();
+    }
+
+    private boolean isPlatformSuperAdmin() {
+        return currentUser().map(platformAdminSupport::isPlatformSuperAdmin).orElse(false);
+    }
+
+    private String currentTenantId() {
+        String tenantId = TenantContext.getTenantId();
+        return StringUtils.hasText(tenantId) ? tenantId : "platform";
+    }
+
+    private void ensureTenantReadable(String tenantId) {
+        if (isPlatformSuperAdmin()) {
+            return;
+        }
+        if (!currentTenantId().equals(tenantId)) {
+            throw new BusinessException("ACCESS_DENIED", "No permission to access this tenant");
+        }
+    }
+
+    private void requirePlatformSuperAdmin() {
+        if (!isPlatformSuperAdmin()) {
+            throw new BusinessException("ACCESS_DENIED", "Platform super admin required");
         }
     }
 
