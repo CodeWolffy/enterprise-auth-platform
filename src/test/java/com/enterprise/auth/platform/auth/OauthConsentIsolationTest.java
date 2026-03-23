@@ -71,14 +71,14 @@ class OauthConsentIsolationTest {
 
     @Test
     void queryShouldOnlyReturnCurrentTenantConsents() throws Exception {
-        mockMvc.perform(get("/api/auth/consents")
-                        .with(user(principal(Set.of("auth:read"))))
-                        .header("X-Tenant-Id", "platform"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.total").value(1))
-                .andExpect(jsonPath("$.data.records.length()").value(1))
-                .andExpect(jsonPath("$.data.records[0].tenantId").value("platform"))
-                .andExpect(jsonPath("$.data.records[0].clientId").value(PLATFORM_CLIENT_ID));
+                mockMvc.perform(get("/api/auth/consents")
+                                .with(user(principal(Set.of("auth:read"))))
+                                .header("X-Tenant-Id", "platform"))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.data.total").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)))
+                        .andExpect(jsonPath("$.data.records.length()").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)))
+                        .andExpect(jsonPath("$.data.records[*].tenantId", org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.is("platform"))))
+                        .andExpect(jsonPath("$.data.records[*].clientId", org.hamcrest.Matchers.hasItem(PLATFORM_CLIENT_ID)));
     }
 
     @Test

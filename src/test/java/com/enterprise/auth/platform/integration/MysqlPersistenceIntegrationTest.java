@@ -48,7 +48,6 @@ class MysqlPersistenceIntegrationTest {
         registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
         registry.add("spring.datasource.username", MYSQL::getUsername);
         registry.add("spring.datasource.password", MYSQL::getPassword);
-        registry.add("spring.flyway.enabled", () -> true);
         registry.add("app.persistence.database-enabled", () -> true);
     }
 

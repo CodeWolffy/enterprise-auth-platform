@@ -267,6 +267,8 @@ import AdvancedSearch from '@/components/AdvancedSearch.vue'
 import type { ElTree, FormInstance, FormRules } from 'element-plus'
 import {
   assignRolePermissions,
+  createRole,
+  deleteRole,
   queryDepartments,
   queryAssignedPermissions,
   queryPermissions,

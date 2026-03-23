@@ -198,7 +198,7 @@ router.afterEach((to) => {
   document.title = `${String(to.meta.title ?? '控制台')} | 企业级权限管理平台`
 })
 
-function registerDynamicRoutes(_snapshot: PermissionSnapshot | null) {
+function registerDynamicRoutes() {
   // Routes are now statically registered for stability.
 }
 

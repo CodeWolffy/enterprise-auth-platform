@@ -13,8 +13,6 @@ spring:
     admin:
       client:
         enabled: false
-  flyway:
-    enabled: false
   jackson:
     time-zone: Asia/Shanghai
     default-property-inclusion: non_null
@@ -83,7 +81,6 @@ app:
     platform-tenant-id: platform
     mybatis-tenant-enabled: true
     mybatis-ignore-tables:
-      - flyway_schema_history
       - oauth2_authorization
       - oauth2_authorization_consent
   persistence:

@@ -156,6 +156,7 @@ npm run dev
 ```bash
 mvn "-Dmaven.repo.local=.m2repo" compile
 mvn "-Dmaven.repo.local=.m2repo" test
+mvn "-Dmaven.repo.local=.m2repo" verify
 ```
 
 ### 前端
@@ -172,6 +173,16 @@ npm run test:e2e
 npm run test:visual
 npm run test:visual:update
 ```
+
+### CI 工作流
+- 主 CI：`.github/workflows/ci.yml`（后端 verify + 前端 lint/build + 前端 E2E）。
+- 前端视觉回归：`.github/workflows/frontend-visual-regression.yml`。
+
+---
+
+## 部署前检查清单
+
+- 见 `DEPLOYMENT_CHECKLIST.md`（覆盖 DB、Redis、issuer、allowed-origins、回调地址、租户参数等）。
 
 ---
 
@@ -190,11 +201,13 @@ npm run test:visual:update
 - 前端统一抽屉模板扩展至更多管理页。
 - `ConsentsView` 与 `TenantCatalogView` 补齐表格偏好能力（列显隐、列宽记忆、密度切换、恢复默认）。
 - 新增 E2E 回归覆盖上述关键流程。
+- 新增 CORS 回归测试：`CorsSecurityRegressionTest`（允许配置域名、拒绝 `null` Origin、不影响登录表单）。
 - 后端新增：
   - 套餐/能力 impact-analysis 接口。
   - OAuth2 client/scope linkage 联动引导接口。
   - 审计导出自动治理接口与自动触发机制。
 - 后端回归测试补齐：`AuditControllerTest` 覆盖治理接口 `dryRun` 与执行模式。
+- 新增主 CI 工作流：后端 `mvn verify`、前端 `lint/build`、前端 E2E。
 
 ### 待继续
 - 统一清理后端注解描述和文档中的历史编码乱码（不影响功能，但影响可读性）。

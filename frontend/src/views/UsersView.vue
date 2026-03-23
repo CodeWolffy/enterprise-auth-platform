@@ -270,6 +270,8 @@ import AdvancedSearch from '@/components/AdvancedSearch.vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import {
   assignUserRoles,
+  createUser,
+  deleteUser,
   queryAssignedRoles,
   queryRoles,
   queryUsers,

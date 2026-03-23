@@ -97,7 +97,7 @@ async function kickSession(sessionId: string) {
     await forceOffline(sessionId)
     ElMessage.success('已强制下线该设备')
     await loadSessions()
-  } catch (e) {
+  } catch {
     // cancelled
   }
 }
