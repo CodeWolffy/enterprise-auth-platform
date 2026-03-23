@@ -68,6 +68,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function finishLogin(code: string, state: string) {
     const { payload, tenantId: resolvedTenantId } = await exchangeAuthorizationCode(code, state)
     applyTokenPayload(payload, resolvedTenantId)
+    tenantId.value = payload.tenantId || resolvedTenantId
     snapshot.value = await fetchPermissionSnapshot()
     syncTenantFromSnapshot()
     registerDynamicRoutes(snapshot.value)

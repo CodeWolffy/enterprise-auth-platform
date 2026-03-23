@@ -6,6 +6,7 @@ import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.config.AuthorizationServerProperties;
 import com.enterprise.auth.platform.config.FrontendProperties;
 import com.enterprise.auth.platform.config.SecurityProperties;
+import com.enterprise.auth.platform.tenant.TenantProperties;
 import com.enterprise.auth.platform.security.UserAccountJwtConverter;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,6 +32,7 @@ public class OAuthCookieSessionService {
 
     private final FrontendProperties frontendProperties;
     private final SecurityProperties securityProperties;
+    private final TenantProperties tenantProperties;
     private final JwtDecoder authorizationServerJwtDecoder;
     private final UserAccountJwtConverter userAccountJwtConverter;
     private final ObjectMapper objectMapper;
@@ -40,6 +42,7 @@ public class OAuthCookieSessionService {
     public OAuthCookieSessionService(
             FrontendProperties frontendProperties,
             SecurityProperties securityProperties,
+            TenantProperties tenantProperties,
             AuthorizationServerProperties authorizationServerProperties,
             JwtDecoder authorizationServerJwtDecoder,
             UserAccountJwtConverter userAccountJwtConverter,
@@ -47,6 +50,7 @@ public class OAuthCookieSessionService {
     ) {
         this.frontendProperties = frontendProperties;
         this.securityProperties = securityProperties;
+        this.tenantProperties = tenantProperties;
         this.authorizationServerJwtDecoder = authorizationServerJwtDecoder;
         this.userAccountJwtConverter = userAccountJwtConverter;
         this.objectMapper = objectMapper;
@@ -72,7 +76,8 @@ public class OAuthCookieSessionService {
         params.add("redirect_uri", redirectUri);
         params.add("code", code);
         params.add("code_verifier", codeVerifier);
-        TokenPayload tokenPayload = requestToken(params);
+        params.add("tenantId", resolveTenantId(request));
+        TokenPayload tokenPayload = requestToken(params, request);
         writeTokenCookies(tokenPayload, request, response);
         return toSessionResponse(tokenPayload);
     }
@@ -87,7 +92,8 @@ public class OAuthCookieSessionService {
         params.add("client_id", frontendProperties.publicClientId());
         maybeAddClientSecret(params);
         params.add("refresh_token", refreshToken);
-        TokenPayload tokenPayload = requestToken(params);
+        params.add("tenantId", resolveTenantId(request));
+        TokenPayload tokenPayload = requestToken(params, request);
         writeTokenCookies(tokenPayload, request, response);
         return toSessionResponse(tokenPayload);
     }
@@ -97,11 +103,23 @@ public class OAuthCookieSessionService {
         writeCookie(response, request, AuthCookieConstants.REFRESH_TOKEN_COOKIE, "", 0);
     }
 
-    private TokenPayload requestToken(LinkedMultiValueMap<String, String> params) {
+    private TokenPayload requestToken(LinkedMultiValueMap<String, String> params, HttpServletRequest request) {
         try {
+            String userAgent = request.getHeader(HttpHeaders.USER_AGENT);
+            String forwardedFor = request.getHeader("X-Forwarded-For");
             String body = restClient.post()
                     .uri(tokenEndpoint)
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .headers(headers -> {
+                        if (StringUtils.hasText(userAgent)) {
+                            headers.set(HttpHeaders.USER_AGENT, userAgent);
+                        }
+                        if (StringUtils.hasText(forwardedFor)) {
+                            headers.set("X-Forwarded-For", forwardedFor);
+                        } else if (StringUtils.hasText(request.getRemoteAddr())) {
+                            headers.set("X-Forwarded-For", request.getRemoteAddr());
+                        }
+                    })
                     .body(params)
                     .retrieve()
                     .body(String.class);
@@ -192,6 +210,14 @@ public class OAuthCookieSessionService {
         if (!frontendProperties.resolvedRedirectUris().contains(redirectUri)) {
             throw new BusinessException("INVALID_REDIRECT_URI", "Redirect URI is not allowed");
         }
+    }
+
+    private String resolveTenantId(HttpServletRequest request) {
+        String tenantId = request.getHeader(tenantProperties.headerName());
+        if (!StringUtils.hasText(tenantId)) {
+            tenantId = request.getParameter("tenantId");
+        }
+        return StringUtils.hasText(tenantId) ? tenantId : tenantProperties.platformTenantId();
     }
 
     private record TokenPayload(

@@ -4,6 +4,8 @@ import com.enterprise.auth.platform.common.api.ApiResponse;
 import jakarta.validation.ConstraintViolationException;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.BindException;
@@ -12,8 +14,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -39,14 +40,20 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ApiResponse<Void> handleDenied(AccessDeniedException exception) {
-        return ApiResponse.fail("ACCESS_DENIED", "无权访问当前资源");
+        return ApiResponse.fail("ACCESS_DENIED", "No permission to access this resource");
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ApiResponse<Void> handleNotFound(NoResourceFoundException exception) {
+        return ApiResponse.fail("RESOURCE_NOT_FOUND", "Resource not found");
     }
 
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResponse<Void> handleUnexpected(Exception exception) {
-        log.error("系统内部异常", exception);
-        return ApiResponse.fail("INTERNAL_ERROR", "系统内部异常");
+        log.error("Unhandled server exception", exception);
+        return ApiResponse.fail("INTERNAL_ERROR", "Internal server error");
     }
 
     private String validationMessage(Exception exception) {
@@ -60,14 +67,14 @@ public class GlobalExceptionHandler {
             return constraintViolationException.getConstraintViolations().stream()
                     .map(violation -> violation.getMessage())
                     .findFirst()
-                    .orElse("请求参数校验失败");
+                    .orElse("Request parameter validation failed");
         }
-        return "请求参数校验失败";
+        return "Request parameter validation failed";
     }
 
     private String fieldErrors(List<FieldError> fieldErrors) {
         if (fieldErrors == null || fieldErrors.isEmpty()) {
-            return "请求参数校验失败";
+            return "Request parameter validation failed";
         }
         return fieldErrors.stream()
                 .map(error -> error.getField() + ":" + error.getDefaultMessage())

@@ -279,9 +279,11 @@ import {
 } from '@/api/platform'
 import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { RoleView, UserSummary } from '@/types/auth'
+import { useAuthStore } from '@/stores/auth'
 
 const users = ref<UserSummary[]>([])
 const roles = ref<RoleView[]>([])
+const authStore = useAuthStore()
 const totalUsers = ref(0)
 const userVisible = ref(false)
 const roleVisible = ref(false)
@@ -372,7 +374,11 @@ void load()
 async function load() {
   loading.value = true
   try {
-    const [userPage, roleList] = await Promise.all([queryUsers(queryParams), queryRoles()])
+    const shouldLoadRoles = authStore.snapshot?.permissions.includes('role:read')
+    const [userPage, roleList] = await Promise.all([
+      queryUsers(queryParams),
+      shouldLoadRoles ? queryRoles() : Promise.resolve([] as RoleView[]),
+    ])
     users.value = userPage.records
     totalUsers.value = userPage.total
     roles.value = roleList

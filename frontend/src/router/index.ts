@@ -187,8 +187,12 @@ router.beforeEach(async (to) => {
   }
 
   if (to.path !== '/' && !isAllowedRoute(authStore.snapshot, to.path)) {
+    const fallbackPath = authStore.snapshot?.menus[0]?.path
+    if (to.path === '/dashboard' && fallbackPath && fallbackPath !== '/dashboard') {
+      return { path: fallbackPath }
+    }
     ElMessage.error('您没有权限访问该页面')
-    return { path: authStore.snapshot?.menus[0]?.path || '/dashboard' }
+    return { path: fallbackPath || '/dashboard' }
   }
 
   return true

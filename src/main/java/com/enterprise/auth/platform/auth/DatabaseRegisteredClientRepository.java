@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.config.SecurityProperties;
 import com.enterprise.auth.platform.persistence.entity.SysOauthClientEntity;
 import com.enterprise.auth.platform.persistence.mapper.SysOauthClientMapper;
+import com.enterprise.auth.platform.tenant.TenantContext;
+import com.enterprise.auth.platform.tenant.TenantProperties;
 import java.sql.Connection;
 import java.util.List;
 import java.util.Map;
@@ -24,16 +26,19 @@ public class DatabaseRegisteredClientRepository implements RegisteredClientRepos
     private final SysOauthClientMapper sysOauthClientMapper;
     private final JdbcTemplate jdbcTemplate;
     private final SecurityProperties securityProperties;
+    private final TenantProperties tenantProperties;
     private final AtomicReference<Boolean> tableExists = new AtomicReference<>();
 
     public DatabaseRegisteredClientRepository(
             @Nullable SysOauthClientMapper sysOauthClientMapper,
             @Nullable JdbcTemplate jdbcTemplate,
-            SecurityProperties securityProperties
+            SecurityProperties securityProperties,
+            TenantProperties tenantProperties
     ) {
         this.sysOauthClientMapper = sysOauthClientMapper;
         this.jdbcTemplate = jdbcTemplate;
         this.securityProperties = securityProperties;
+        this.tenantProperties = tenantProperties;
     }
 
     @Override
@@ -64,10 +69,25 @@ public class DatabaseRegisteredClientRepository implements RegisteredClientRepos
     @Override
     public RegisteredClient findById(String id) {
         requireDatabase();
-        return loadClients().stream()
-                .filter(client -> client.getId().equals(id))
-                .findFirst()
-                .orElse(null);
+        SysOauthClientEntity currentTenantClient = sysOauthClientMapper.selectOne(new LambdaQueryWrapper<SysOauthClientEntity>()
+                .eq(SysOauthClientEntity::getDeleted, 0)
+                .eq(SysOauthClientEntity::getClientStatus, 1)
+                .eq(SysOauthClientEntity::getId, id)
+                .last("LIMIT 1"));
+        if (currentTenantClient != null) {
+            return fromEntity(currentTenantClient);
+        }
+        String currentTenantId = TenantContext.getTenantId();
+        String platformTenantId = tenantProperties.platformTenantId();
+        if (StringUtils.hasText(currentTenantId) && currentTenantId.equals(platformTenantId)) {
+            return null;
+        }
+        SysOauthClientEntity platformClient = runInTenant(platformTenantId, () -> sysOauthClientMapper.selectOne(new LambdaQueryWrapper<SysOauthClientEntity>()
+                .eq(SysOauthClientEntity::getDeleted, 0)
+                .eq(SysOauthClientEntity::getClientStatus, 1)
+                .eq(SysOauthClientEntity::getId, id)
+                .last("LIMIT 1")));
+        return platformClient == null ? null : fromEntity(platformClient);
     }
 
     @Override
@@ -186,5 +206,19 @@ public class DatabaseRegisteredClientRepository implements RegisteredClientRepos
             case "client_credentials" -> AuthorizationGrantType.CLIENT_CREDENTIALS;
             default -> new AuthorizationGrantType(value);
         };
+    }
+
+    private <T> T runInTenant(String tenantId, java.util.function.Supplier<T> supplier) {
+        String currentTenantId = TenantContext.getTenantId();
+        TenantContext.setTenantId(tenantId);
+        try {
+            return supplier.get();
+        } finally {
+            if (StringUtils.hasText(currentTenantId)) {
+                TenantContext.setTenantId(currentTenantId);
+            } else {
+                TenantContext.clear();
+            }
+        }
     }
 }

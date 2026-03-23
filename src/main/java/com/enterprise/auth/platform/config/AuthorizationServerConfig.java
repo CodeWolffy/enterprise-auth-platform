@@ -178,10 +178,11 @@ public class AuthorizationServerConfig {
     @Bean
     public RegisteredClientRepository registeredClientRepository(
             SecurityProperties securityProperties,
+            TenantProperties tenantProperties,
             SysOauthClientMapper sysOauthClientMapper,
             JdbcTemplate jdbcTemplate
     ) {
-        return new DatabaseRegisteredClientRepository(sysOauthClientMapper, jdbcTemplate, securityProperties);
+        return new DatabaseRegisteredClientRepository(sysOauthClientMapper, jdbcTemplate, securityProperties, tenantProperties);
     }
 
     private ObjectMapper authorizationObjectMapper() {

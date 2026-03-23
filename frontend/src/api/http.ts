@@ -58,7 +58,12 @@ http.interceptors.request.use(async (config) => {
     }
   }
   if (authStore.tenantId) {
-    config.headers['X-Tenant-Id'] = authStore.tenantId
+    const currentTenantHeader = typeof config.headers?.get === 'function'
+      ? config.headers.get('X-Tenant-Id')
+      : config.headers?.['X-Tenant-Id']
+    if (!currentTenantHeader) {
+      config.headers['X-Tenant-Id'] = authStore.tenantId
+    }
   }
   return config
 })

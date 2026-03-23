@@ -41,11 +41,22 @@ export async function exchangeAuthorizationCode(code: string, state: string) {
     throw new Error('授权状态校验失败，请重新登录')
   }
   await ensureCsrfToken()
-  const { data } = await http.post<ApiResponse<CookieSessionResponse>>('/api/auth/oauth/exchange', {
-    code,
-    codeVerifier: context.verifier,
-    redirectUri: getRedirectUri(),
-  })
+  const { data } = await http.post<ApiResponse<CookieSessionResponse>>(
+    '/api/auth/oauth/exchange',
+    {
+      code,
+      codeVerifier: context.verifier,
+      redirectUri: getRedirectUri(),
+    },
+    {
+      headers: {
+        'X-Tenant-Id': context.tenantId,
+      },
+      params: {
+        tenantId: context.tenantId,
+      },
+    },
+  )
   return { payload: data.data, tenantId: data.data.tenantId || context.tenantId }
 }
 
