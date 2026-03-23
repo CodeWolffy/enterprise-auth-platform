@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+﻿import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import { apiEnvelope, AUTH_STORAGE_KEY, defaultSnapshot, fulfillJson } from './helpers'
 
@@ -315,5 +315,189 @@ test.describe('关键流程回归', () => {
     await page.locator('[data-testid="audit-export-async"]').click()
     await expect(page.locator('[data-testid="audit-task-detail"]')).toHaveCount(2)
     await expect(page.getByText('queued').first()).toBeVisible()
+  })
+  test('consents: table preferences persist and revoke flow works', async ({ page }) => {
+    await loginByCallback(page)
+    await page.unroute('**/api/auth/me')
+
+    let records = [
+      {
+        registeredClientId: 'client-reg-1',
+        tenantId: 'platform',
+        clientId: 'eap-web',
+        clientName: 'EAP Web',
+        principalName: 'alice',
+        authorities: ['openid', 'profile'],
+        lastGrantedAt: '2026-03-22T10:00:00',
+        lastRevokedAt: null,
+        auditEventCount: 3,
+      },
+    ]
+
+    await page.route('**/*', async (route) => {
+      const request = route.request()
+      const url = new URL(request.url())
+      const method = request.method()
+      if (!url.pathname.startsWith('/api/')) {
+        await route.continue()
+        return
+      }
+
+      if (url.pathname === '/api/auth/consents' && method === 'GET') {
+        await fulfillJson(
+          route,
+          200,
+          apiEnvelope({
+            total: records.length,
+            page: 1,
+            size: 10,
+            records,
+          }),
+        )
+        return
+      }
+
+      if (url.pathname === '/api/auth/consents' && method === 'DELETE') {
+        const clientId = url.searchParams.get('registeredClientId')
+        const principalName = url.searchParams.get('principalName')
+        records = records.filter(
+          (item) => !(item.registeredClientId === clientId && item.principalName === principalName),
+        )
+        await route.fulfill({
+          status: 204,
+          headers: {
+            'access-control-allow-origin': '*',
+            'access-control-allow-headers': '*',
+            'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS',
+          },
+        })
+        return
+      }
+
+      await fulfillJson(route, 200, apiEnvelope({}))
+    })
+
+    await page.goto('/system/consents')
+    await expect(page.getByText('alice')).toBeVisible()
+
+    await page.getByRole('button', { name: '列显示' }).click()
+    await page.locator('.column-chooser .el-checkbox').filter({ hasText: '审计联动' }).click()
+    await page.keyboard.press('Escape')
+    await expect(page.locator('.el-table th').filter({ hasText: '审计联动' })).toHaveCount(0)
+
+    await page.reload()
+    await expect(page.locator('.el-table th').filter({ hasText: '审计联动' })).toHaveCount(0)
+    await expect
+      .poll(async () =>
+        page.evaluate(() => {
+          const raw = window.localStorage.getItem('eap.table.consents')
+          return raw ? JSON.parse(raw) : null
+        }),
+      )
+      .toMatchObject({ visibleColumns: expect.not.arrayContaining(['audit']) })
+
+    await page.getByRole('button', { name: '撤销授权' }).first().click()
+    await page.locator('.el-message-box__btns .el-button--primary').click()
+    await expect(page.getByText('alice')).toHaveCount(0)
+  })
+
+  test('tenant-catalog: both tab tables persist column preferences', async ({ page }) => {
+    await loginByCallback(page)
+    await page.unroute('**/api/auth/me')
+
+    await page.route('**/*', async (route) => {
+      const request = route.request()
+      const url = new URL(request.url())
+      const method = request.method()
+      if (!url.pathname.startsWith('/api/')) {
+        await route.continue()
+        return
+      }
+
+      if (url.pathname === '/api/tenant-catalog/packages' && method === 'GET') {
+        await fulfillJson(
+          route,
+          200,
+          apiEnvelope([
+            {
+              id: 1,
+              tenantId: 'platform',
+              packageCode: 'pkg-standard',
+              packageName: '标准版',
+              userQuota: 200,
+              storageQuotaGb: 200,
+              packageDesc: '适用于常规业务租户',
+              enabled: true,
+              capabilityCodes: ['oauth', 'audit'],
+              referencedTenantCount: 1,
+              referencedTenantIds: ['tenant-a'],
+            },
+          ]),
+        )
+        return
+      }
+
+      if (url.pathname === '/api/tenant-catalog/capabilities' && method === 'GET') {
+        await fulfillJson(
+          route,
+          200,
+          apiEnvelope([
+            {
+              id: 11,
+              tenantId: 'platform',
+              capabilityCode: 'audit',
+              capabilityName: '审计',
+              capabilityDesc: '审计查询与导出',
+              sortOrder: 10,
+              enabled: true,
+              referencedPackageCount: 1,
+              referencedPackageCodes: ['pkg-standard'],
+              referencedTenantCount: 0,
+              referencedTenantIds: [],
+              overrideReferenceCount: 0,
+            },
+          ]),
+        )
+        return
+      }
+
+      await fulfillJson(route, 200, apiEnvelope({}))
+    })
+
+    await page.goto('/system/settings/tenant-catalog')
+    await expect(page.getByText('套餐定义')).toBeVisible()
+
+    await page.getByRole('button', { name: '列显示' }).first().click()
+    await page.locator('.column-chooser .el-checkbox').filter({ hasText: '套餐说明' }).click()
+    await page.keyboard.press('Escape')
+    await expect(page.locator('.el-table th').filter({ hasText: '套餐说明' })).toHaveCount(0)
+
+    await page.getByRole('tab', { name: '能力管理' }).click()
+    await page.getByRole('button', { name: '列显示' }).first().click()
+    await page.locator('.column-chooser .el-checkbox').filter({ hasText: '排序' }).click()
+    await page.keyboard.press('Escape')
+    await expect(page.locator('.el-table th').filter({ hasText: '排序' })).toHaveCount(0)
+
+    await page.reload()
+    await expect(page.locator('.el-table th').filter({ hasText: '套餐说明' })).toHaveCount(0)
+    await expect
+      .poll(async () =>
+        page.evaluate(() => {
+          const raw = window.localStorage.getItem('eap.table.tenant.catalog.packages')
+          return raw ? JSON.parse(raw) : null
+        }),
+      )
+      .toMatchObject({ visibleColumns: expect.not.arrayContaining(['packageDesc']) })
+
+    await page.getByRole('tab', { name: '能力管理' }).click()
+    await expect(page.locator('.el-table th').filter({ hasText: '排序' })).toHaveCount(0)
+    await expect
+      .poll(async () =>
+        page.evaluate(() => {
+          const raw = window.localStorage.getItem('eap.table.tenant.catalog.capabilities')
+          return raw ? JSON.parse(raw) : null
+        }),
+      )
+      .toMatchObject({ visibleColumns: expect.not.arrayContaining(['sortOrder']) })
   })
 })

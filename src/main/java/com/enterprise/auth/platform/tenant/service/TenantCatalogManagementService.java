@@ -90,6 +90,129 @@ public class TenantCatalogManagementService {
                 .toList();
     }
 
+    public TenantPackageImpactView packageImpact(Long id) {
+        requirePlatformDatabaseMode();
+        SysTenantPackageEntity entity = getPackage(id);
+        Map<String, List<String>> packageCapabilities = loadPackageCapabilities();
+        Map<String, PackageReferenceHint> packageReferences = loadPackageReferences();
+        List<String> capabilityCodes = packageCapabilities.getOrDefault(entity.getPackageCode(), List.of());
+        PackageReferenceHint referenceHint = packageReferences.get(entity.getPackageCode());
+        int referencedTenantCount = referenceHint == null ? 0 : referenceHint.referencedTenantCount();
+        List<String> referencedTenantIds = referenceHint == null ? List.of() : referenceHint.sampleTenantIds();
+
+        List<ImpactRuleView> rules = new ArrayList<>();
+        rules.add(new ImpactRuleView(
+                "PACKAGE_REFERENCED_TENANTS",
+                "ERROR",
+                referencedTenantCount > 0,
+                "套餐被租户引用时不允许直接删除，需先迁移租户。",
+                referencedTenantCount,
+                true
+        ));
+        rules.add(new ImpactRuleView(
+                "PACKAGE_EMPTY_CAPABILITIES",
+                "WARN",
+                capabilityCodes.isEmpty(),
+                "套餐未配置任何能力，租户接入后可能无法使用业务模块。",
+                capabilityCodes.size(),
+                false
+        ));
+        rules.add(new ImpactRuleView(
+                "PACKAGE_DISABLED_WHILE_REFERENCED",
+                "WARN",
+                (entity.getEnabled() != null && entity.getEnabled() == 0) && referencedTenantCount > 0,
+                "已被引用的套餐处于停用状态，可能导致租户功能可用性下降。",
+                referencedTenantCount,
+                false
+        ));
+
+        List<String> actions = new ArrayList<>();
+        if (referencedTenantCount > 0) {
+            actions.add("先将引用租户迁移到新套餐，再执行删除或高风险变更。");
+        }
+        if (capabilityCodes.isEmpty()) {
+            actions.add("至少补齐一项基础能力（如 oauth、user、audit）后再下发到租户。");
+        }
+        if (actions.isEmpty()) {
+            actions.add("当前未发现阻断项，可按变更流程执行。");
+        }
+
+        return new TenantPackageImpactView(
+                entity.getId(),
+                entity.getPackageCode(),
+                entity.getPackageName(),
+                entity.getEnabled() == null || entity.getEnabled() == 1,
+                capabilityCodes,
+                referencedTenantCount,
+                referencedTenantIds,
+                rules,
+                actions
+        );
+    }
+
+    public TenantCapabilityImpactView capabilityImpact(Long id) {
+        requirePlatformDatabaseMode();
+        SysTenantCapabilityEntity entity = getCapability(id);
+        Map<String, CapabilityReferenceHint> capabilityReferences = loadCapabilityReferences();
+        CapabilityReferenceHint hint = capabilityReferences.get(entity.getCapabilityCode());
+        int referencedPackageCount = hint == null ? 0 : hint.referencedPackageCount();
+        int referencedTenantCount = hint == null ? 0 : hint.referencedTenantCount();
+        int overrideReferenceCount = hint == null ? 0 : hint.overrideReferenceCount();
+        List<String> referencedPackageCodes = hint == null ? List.of() : hint.samplePackageCodes();
+        List<String> referencedTenantIds = hint == null ? List.of() : hint.sampleTenantIds();
+
+        List<ImpactRuleView> rules = new ArrayList<>();
+        rules.add(new ImpactRuleView(
+                "CAPABILITY_REFERENCED_PACKAGES",
+                "ERROR",
+                referencedPackageCount > 0,
+                "能力被套餐引用时不允许直接删除，需先解除套餐绑定。",
+                referencedPackageCount,
+                true
+        ));
+        rules.add(new ImpactRuleView(
+                "CAPABILITY_OVERRIDE_REFERENCES",
+                "ERROR",
+                overrideReferenceCount > 0,
+                "能力存在租户覆盖记录时不允许直接删除，需先清理覆盖配置。",
+                overrideReferenceCount,
+                true
+        ));
+        rules.add(new ImpactRuleView(
+                "CAPABILITY_DISABLED_WHILE_REFERENCED",
+                "WARN",
+                (entity.getEnabled() != null && entity.getEnabled() == 0) && (referencedPackageCount > 0 || overrideReferenceCount > 0),
+                "能力已停用但仍有引用，可能导致租户侧功能不一致。",
+                referencedTenantCount,
+                false
+        ));
+
+        List<String> actions = new ArrayList<>();
+        if (referencedPackageCount > 0) {
+            actions.add("先在套餐中移除该能力，再执行删除。");
+        }
+        if (overrideReferenceCount > 0) {
+            actions.add("清理租户能力覆盖记录后再执行删除。");
+        }
+        if (actions.isEmpty()) {
+            actions.add("当前未发现阻断项，可按变更流程执行。");
+        }
+
+        return new TenantCapabilityImpactView(
+                entity.getId(),
+                entity.getCapabilityCode(),
+                entity.getCapabilityName(),
+                entity.getEnabled() == null || entity.getEnabled() == 1,
+                referencedPackageCount,
+                referencedPackageCodes,
+                referencedTenantCount,
+                referencedTenantIds,
+                overrideReferenceCount,
+                rules,
+                actions
+        );
+    }
+
     @Transactional
     public TenantPackageView createPackage(TenantPackageCrudRequest request) {
         requirePlatformDatabaseMode();
@@ -498,6 +621,47 @@ public class TenantCatalogManagementService {
             @Schema(description = "通过套餐覆盖到的租户数量") int referencedTenantCount,
             @Schema(description = "通过套餐覆盖到的租户示例（最多 5 条）") List<String> referencedTenantIds,
             @Schema(description = "租户能力覆盖记录数量") int overrideReferenceCount
+    ) {
+    }
+
+    @Schema(description = "套餐变更影响分析")
+    public record TenantPackageImpactView(
+            @Schema(description = "主键 ID") Long id,
+            @Schema(description = "套餐编码") String packageCode,
+            @Schema(description = "套餐名称") String packageName,
+            @Schema(description = "是否启用") boolean enabled,
+            @Schema(description = "能力编码集合") List<String> capabilityCodes,
+            @Schema(description = "引用租户数量") int referencedTenantCount,
+            @Schema(description = "引用租户示例（最多 5 条）") List<String> referencedTenantIds,
+            @Schema(description = "命中的规则列表") List<ImpactRuleView> rules,
+            @Schema(description = "建议操作") List<String> recommendedActions
+    ) {
+    }
+
+    @Schema(description = "能力变更影响分析")
+    public record TenantCapabilityImpactView(
+            @Schema(description = "主键 ID") Long id,
+            @Schema(description = "能力编码") String capabilityCode,
+            @Schema(description = "能力名称") String capabilityName,
+            @Schema(description = "是否启用") boolean enabled,
+            @Schema(description = "引用套餐数量") int referencedPackageCount,
+            @Schema(description = "引用套餐示例（最多 5 条）") List<String> referencedPackageCodes,
+            @Schema(description = "关联租户数量（经套餐映射）") int referencedTenantCount,
+            @Schema(description = "关联租户示例（最多 5 条）") List<String> referencedTenantIds,
+            @Schema(description = "覆盖记录数量") int overrideReferenceCount,
+            @Schema(description = "命中的规则列表") List<ImpactRuleView> rules,
+            @Schema(description = "建议操作") List<String> recommendedActions
+    ) {
+    }
+
+    @Schema(description = "影响规则命中结果")
+    public record ImpactRuleView(
+            @Schema(description = "规则编码") String ruleCode,
+            @Schema(description = "规则等级：ERROR/WARN") String level,
+            @Schema(description = "是否命中") boolean hit,
+            @Schema(description = "规则说明") String message,
+            @Schema(description = "关联数量") int relatedCount,
+            @Schema(description = "是否阻断删除等高风险操作") boolean blocking
     ) {
     }
 

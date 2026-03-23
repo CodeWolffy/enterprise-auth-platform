@@ -158,7 +158,7 @@
 
     <el-drawer v-model="detailVisible" title="参数详情" size="600px">
       <template v-if="detailItem">
-        <el-descriptions :column="2" border>
+        <el-descriptions :column="2" border class="drawer-section drawer-section--overview">
           <el-descriptions-item label="参数键">{{ detailItem.configKey }}</el-descriptions-item>
           <el-descriptions-item label="参数分类">{{ detailItem.category }}</el-descriptions-item>
           <el-descriptions-item label="参数名称">{{ detailItem.configName }}</el-descriptions-item>

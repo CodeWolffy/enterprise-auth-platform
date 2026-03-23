@@ -133,7 +133,7 @@
 
     <el-drawer v-model="analysisVisible" title="分类引用分析" size="720px">
       <template v-if="analysis">
-        <el-descriptions :column="2" border>
+        <el-descriptions :column="2" border class="drawer-section drawer-section--overview">
           <el-descriptions-item label="分类编码">{{ analysis.code }}</el-descriptions-item>
           <el-descriptions-item label="分类名称">{{ analysis.name }}</el-descriptions-item>
           <el-descriptions-item label="目标类型">{{ analysis.targetType }}</el-descriptions-item>
@@ -145,12 +145,12 @@
           </el-descriptions-item>
         </el-descriptions>
 
-        <section class="analysis-section">
+        <section class="analysis-section drawer-section drawer-section--guide">
           <h4>七日影响趋势</h4>
           <div ref="trendChartRef" class="trend-chart"></div>
         </section>
 
-        <section class="analysis-section">
+        <section class="analysis-section drawer-section drawer-section--guide">
           <h4>引用样例</h4>
           <el-empty v-if="!analysis.sampleReferences.length" description="暂无引用样例" />
           <el-timeline v-else>
@@ -160,7 +160,7 @@
           </el-timeline>
         </section>
 
-        <section class="analysis-section">
+        <section class="analysis-section drawer-section drawer-section--history">
           <h4>最近审计记录</h4>
           <el-empty v-if="!analysis.recentAudits.length" description="暂无分类变更审计" />
           <el-table v-else :data="analysis.recentAudits" stripe>

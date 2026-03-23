@@ -56,6 +56,15 @@ public class TenantCatalogController {
         return ApiResponse.ok(tenantCatalogManagementService.updatePackage(id, request));
     }
 
+    @Operation(summary = "套餐变更影响分析")
+    @GetMapping("/packages/{id}/impact")
+    @PreAuthorize("hasAuthority('tenant:read')")
+    public ApiResponse<TenantCatalogManagementService.TenantPackageImpactView> packageImpact(
+            @Parameter(description = "套餐主键 ID") @PathVariable Long id
+    ) {
+        return ApiResponse.ok(tenantCatalogManagementService.packageImpact(id));
+    }
+
     @Operation(summary = "删除套餐")
     @DeleteMapping("/packages/{id}")
     @PreAuthorize("hasAuthority('tenant:write')")
@@ -88,6 +97,15 @@ public class TenantCatalogController {
             @Valid @RequestBody TenantCapabilityCrudRequest request
     ) {
         return ApiResponse.ok(tenantCatalogManagementService.updateCapability(id, request));
+    }
+
+    @Operation(summary = "能力变更影响分析")
+    @GetMapping("/capabilities/{id}/impact")
+    @PreAuthorize("hasAuthority('tenant:read')")
+    public ApiResponse<TenantCatalogManagementService.TenantCapabilityImpactView> capabilityImpact(
+            @Parameter(description = "能力主键 ID") @PathVariable Long id
+    ) {
+        return ApiResponse.ok(tenantCatalogManagementService.capabilityImpact(id));
     }
 
     @Operation(summary = "删除能力")

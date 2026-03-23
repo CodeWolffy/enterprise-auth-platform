@@ -48,6 +48,15 @@ public class OAuthClientController {
         return ApiResponse.ok(clientManagementService.clientDetail(id));
     }
 
+    @Operation(summary = "客户端-作用域联动引导")
+    @GetMapping("/{id}/scope-linkage")
+    @PreAuthorize("hasAuthority('auth:read')")
+    public ApiResponse<OAuthClientManagementService.OAuthClientScopeLinkageView> scopeLinkage(
+            @Parameter(description = "客户端主键 ID") @PathVariable Long id
+    ) {
+        return ApiResponse.ok(clientManagementService.scopeLinkage(id));
+    }
+
     @Operation(summary = "新增 OAuth2 客户端")
     @PostMapping
     @PreAuthorize("hasAuthority('auth:write')")

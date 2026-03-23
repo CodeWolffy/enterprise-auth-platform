@@ -21,9 +21,13 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -93,7 +97,7 @@ public class AuditExportTaskService {
     public ExportTaskView archive(Long taskId) {
         SysAuditExportTaskEntity entity = getTask(taskId);
         if ("PENDING".equals(entity.getStatus()) || "RUNNING".equals(entity.getStatus())) {
-            throw new BusinessException("执行中的导出任务不允许归档");
+            throw new BusinessException("Cannot archive export task while it is running");
         }
         if ("ARCHIVED".equals(entity.getStatus())) {
             return toView(entity, policy(entity.getTenantId()));
@@ -108,6 +112,7 @@ public class AuditExportTaskService {
                 "taskId", entity.getId(),
                 "fileName", entity.getFileName()
         ));
+        runGovernanceSafely(entity.getTenantId(), "archive");
         return toView(entity, policy(entity.getTenantId()));
     }
 
@@ -136,7 +141,7 @@ public class AuditExportTaskService {
     public DownloadFile download(Long taskId) {
         SysAuditExportTaskEntity entity = getTask(taskId);
         if (!"SUCCESS".equals(entity.getStatus()) || entity.getFileContent() == null) {
-            throw new BusinessException("导出文件尚未生成完成或已归档");
+            throw new BusinessException("Export file is not ready or has been archived");
         }
         return new DownloadFile(entity.getFileName(), entity.getFileContent());
     }
@@ -154,7 +159,7 @@ public class AuditExportTaskService {
     @Transactional
     public int cleanup(String tenantId, String status, Instant completedBefore) {
         if (completedBefore == null) {
-            throw new BusinessException("清理导出任务必须指定完成时间上限");
+            throw new BusinessException("completedBefore is required for cleanup");
         }
         LambdaQueryWrapper<SysAuditExportTaskEntity> query = new LambdaQueryWrapper<SysAuditExportTaskEntity>()
                 .eq(StringUtils.hasText(tenantId), SysAuditExportTaskEntity::getTenantId, tenantId)
@@ -179,7 +184,7 @@ public class AuditExportTaskService {
     @Transactional
     public int archiveCompleted(String tenantId, String status, Instant completedBefore) {
         if (completedBefore == null) {
-            throw new BusinessException("批量归档必须指定完成时间上限");
+            throw new BusinessException("completedBefore is required for batch archive");
         }
         LambdaQueryWrapper<SysAuditExportTaskEntity> query = new LambdaQueryWrapper<SysAuditExportTaskEntity>()
                 .eq(StringUtils.hasText(tenantId), SysAuditExportTaskEntity::getTenantId, tenantId)
@@ -251,7 +256,114 @@ public class AuditExportTaskService {
                 "retentionDays", request.retentionDays(),
                 "maxTasks", request.maxTasks()
         ));
+        runGovernanceSafely(resolvedTenantId, "policy-update");
         return policy(resolvedTenantId);
+    }
+
+    @Transactional
+    public GovernanceResult governance(String tenantId, boolean dryRun) {
+        String resolvedTenantId = StringUtils.hasText(tenantId) ? tenantId : "platform";
+        ExportPolicy currentPolicy = policy(resolvedTenantId);
+        int retentionDays = Math.max(1, currentPolicy.retentionDays());
+        int maxTasks = Math.max(1, currentPolicy.maxTasks());
+        LocalDateTime retentionCutoff = LocalDateTime.now().minusDays(retentionDays);
+
+        List<SysAuditExportTaskEntity> completedTasks = sysAuditExportTaskMapper.selectList(
+                new LambdaQueryWrapper<SysAuditExportTaskEntity>()
+                        .eq(SysAuditExportTaskEntity::getTenantId, resolvedTenantId)
+                        .isNotNull(SysAuditExportTaskEntity::getCompletedAt)
+                        .ne(SysAuditExportTaskEntity::getStatus, "PENDING")
+                        .ne(SysAuditExportTaskEntity::getStatus, "RUNNING")
+                        .orderByAsc(SysAuditExportTaskEntity::getCompletedAt)
+                        .orderByAsc(SysAuditExportTaskEntity::getId)
+        );
+        if (completedTasks.isEmpty()) {
+            return new GovernanceResult(
+                    resolvedTenantId, true, dryRun, retentionDays, maxTasks, retentionCutoff.atZone(ZoneId.systemDefault()).toInstant(),
+                    0, 0, 0, 0, 0, List.of(), List.of()
+            );
+        }
+
+        List<Long> archiveIds = new ArrayList<>();
+        List<Long> deleteIds = new ArrayList<>();
+        Set<Long> archiveSeen = new HashSet<>();
+        Set<Long> deleteSeen = new HashSet<>();
+        List<SysAuditExportTaskEntity> withinRetention = new ArrayList<>();
+
+        for (SysAuditExportTaskEntity task : completedTasks) {
+            if (task.getCompletedAt() != null && !task.getCompletedAt().isAfter(retentionCutoff)) {
+                if (!"ARCHIVED".equals(task.getStatus()) && archiveSeen.add(task.getId())) {
+                    archiveIds.add(task.getId());
+                }
+                if (deleteSeen.add(task.getId())) {
+                    deleteIds.add(task.getId());
+                }
+            } else {
+                withinRetention.add(task);
+            }
+        }
+
+        if (withinRetention.size() > maxTasks) {
+            List<SysAuditExportTaskEntity> ordered = withinRetention.stream()
+                    .sorted(Comparator.comparing(SysAuditExportTaskEntity::getCompletedAt).reversed()
+                            .thenComparing(SysAuditExportTaskEntity::getId, Comparator.reverseOrder()))
+                    .toList();
+            List<SysAuditExportTaskEntity> overflow = ordered.subList(maxTasks, ordered.size());
+            for (SysAuditExportTaskEntity task : overflow) {
+                if (!"ARCHIVED".equals(task.getStatus()) && archiveSeen.add(task.getId())) {
+                    archiveIds.add(task.getId());
+                }
+                if (deleteSeen.add(task.getId())) {
+                    deleteIds.add(task.getId());
+                }
+            }
+        }
+
+        int archivedCount = 0;
+        int deletedCount = 0;
+        if (!dryRun) {
+            for (Long archiveId : archiveIds) {
+                SysAuditExportTaskEntity task = sysAuditExportTaskMapper.selectById(archiveId);
+                if (task == null || "ARCHIVED".equals(task.getStatus())) {
+                    continue;
+                }
+                task.setFileContent(null);
+                task.setStatus("ARCHIVED");
+                if (task.getCompletedAt() == null) {
+                    task.setCompletedAt(LocalDateTime.now());
+                }
+                archivedCount += sysAuditExportTaskMapper.updateById(task);
+            }
+            for (Long deleteId : deleteIds) {
+                deletedCount += sysAuditExportTaskMapper.deleteById(deleteId);
+            }
+            auditService.record("AUDIT_EXPORT_POLICY_GOVERNED", SecuritySupport.currentOperator(), resolvedTenantId, Map.of(
+                    "retentionDays", retentionDays,
+                    "maxTasks", maxTasks,
+                    "scanned", completedTasks.size(),
+                    "archived", archivedCount,
+                    "deleted", deletedCount
+            ));
+        } else {
+            archivedCount = archiveIds.size();
+            deletedCount = deleteIds.size();
+        }
+
+        return new GovernanceResult(
+                resolvedTenantId,
+                false,
+                dryRun,
+                retentionDays,
+                maxTasks,
+                retentionCutoff.atZone(ZoneId.systemDefault()).toInstant(),
+                completedTasks.size(),
+                archiveIds.size(),
+                deleteIds.size(),
+                archivedCount,
+                deletedCount,
+                archiveIds.stream().limit(20).toList(),
+                deleteIds.stream().limit(20).toList()
+        );
     }
 
     public void processTask(Long taskId, AuditQuery query) {
@@ -268,7 +380,7 @@ public class AuditExportTaskService {
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
             long totalRead = 0;
             try (ExcelWriter excelWriter = EasyExcel.write(outputStream, AuditExportVO.class).build()) {
-                WriteSheet writeSheet = EasyExcel.writerSheet("审计日志").build();
+                WriteSheet writeSheet = EasyExcel.writerSheet("Audit Logs").build();
                 int pageSize = 10000;
                 long total = -1;
                 int currentPage = 1;
@@ -311,6 +423,7 @@ public class AuditExportTaskService {
                     "taskId", entity.getId(),
                     "recordCount", entity.getRecordCount()
             ));
+            runGovernanceSafely(entity.getTenantId(), "task-completed");
         } catch (Exception ex) {
             entity.setStatus("FAILED");
             entity.setErrorMessage(ex.getMessage());
@@ -320,13 +433,26 @@ public class AuditExportTaskService {
                     "taskId", entity.getId(),
                     "errorMessage", ex.getMessage() == null ? "" : ex.getMessage()
             ));
+            runGovernanceSafely(entity.getTenantId(), "task-failed");
+        }
+    }
+
+    private void runGovernanceSafely(String tenantId, String trigger) {
+        try {
+            governance(tenantId, false);
+        } catch (Exception ex) {
+            String resolvedTenantId = StringUtils.hasText(tenantId) ? tenantId : "platform";
+            auditService.record("AUDIT_EXPORT_POLICY_GOVERNANCE_SKIPPED", SecuritySupport.currentOperator(), resolvedTenantId, Map.of(
+                    "trigger", trigger,
+                    "reason", ex.getMessage() == null ? "" : ex.getMessage()
+            ));
         }
     }
 
     private SysAuditExportTaskEntity getTask(Long taskId) {
         SysAuditExportTaskEntity entity = sysAuditExportTaskMapper.selectById(taskId);
         if (entity == null) {
-            throw new BusinessException("导出任务不存在");
+            throw new BusinessException("Export task not found");
         }
         return entity;
     }
@@ -346,7 +472,7 @@ public class AuditExportTaskService {
                     2000
             );
         } catch (Exception ex) {
-            throw new BusinessException("导出任务查询条件解析失败");
+            throw new BusinessException("閻庣數鍘ч崵顓熺鐠囨彃顫ら柡灞诲劥椤曟寮堕垾鍙夘偨閻熸瑱绲鹃悗鑺ュ緞鏉堫偉袝");
         }
     }
 
@@ -386,12 +512,12 @@ public class AuditExportTaskService {
             default -> 0;
         };
         String progressStage = switch (entity.getStatus()) {
-            case "PENDING" -> "等待执行";
-            case "RUNNING" -> "正在生成文件";
-            case "SUCCESS" -> "文件已生成";
-            case "FAILED" -> "执行失败";
-            case "ARCHIVED" -> "结果已归档";
-            default -> "未知状态";
+            case "PENDING" -> "Waiting";
+            case "RUNNING" -> "Generating file";
+            case "SUCCESS" -> "Completed";
+            case "FAILED" -> "Failed";
+            case "ARCHIVED" -> "Archived";
+            default -> "Unknown";
         };
         Instant expiresAt = entity.getCompletedAt() == null
                 ? null
@@ -424,16 +550,16 @@ public class AuditExportTaskService {
             boolean retentionExpired
     ) {
         return switch (entity.getStatus()) {
-            case "PENDING" -> "任务等待执行，完成后将按 " + policy.retentionDays() + " 天保留导出结果。";
-            case "RUNNING" -> "任务执行中，完成后将按 " + policy.retentionDays() + " 天保留导出结果。";
+            case "PENDING" -> "Task is pending. Export file will be retained for " + policy.retentionDays() + " days after completion.";
+            case "RUNNING" -> "Task is running. Export file will be retained for " + policy.retentionDays() + " days after completion.";
             case "FAILED" -> expiresAt == null
-                    ? "任务执行失败，可调整筛选条件后重新发起导出。"
-                    : "失败任务记录保留至 " + expiresAt + "，可按需清理或保留用于排障。";
-            case "ARCHIVED" -> "导出结果已归档，仅保留元数据与审计轨迹；如需再次下载，请重新导出。";
+                    ? "Task failed. You can adjust the query and retry export."
+                    : "Failed task metadata is retained until " + expiresAt + ".";
+            case "ARCHIVED" -> "Export result has been archived. Metadata is retained for audit tracking.";
             case "SUCCESS" -> retentionExpired
-                    ? "导出文件已超过保留期，建议及时归档或清理任务记录。"
-                    : "导出文件保留至 " + expiresAt + "，到期前可归档保留元数据，到期后建议清理。";
-            default -> "请按当前导出策略管理任务记录。";
+                    ? "Export file has exceeded retention. Archive or clean up promptly."
+                    : "Export file is retained until " + expiresAt + ".";
+            default -> "Manage this task according to current retention policy.";
         };
     }
 
@@ -459,34 +585,52 @@ public class AuditExportTaskService {
         return Instant.parse(String.valueOf(value));
     }
 
-    @Schema(description = "审计导出任务视图")
+    @Schema(description = "Audit export task view")
     public record ExportTaskView(
-            @Schema(description = "任务 ID") Long id,
-            @Schema(description = "租户编码") String tenantId,
-            @Schema(description = "发起人") String operator,
-            @Schema(description = "任务状态") String status,
-            @Schema(description = "是否已归档") Boolean archived,
-            @Schema(description = "是否允许归档") Boolean archivable,
-            @Schema(description = "文件名") String fileName,
-            @Schema(description = "导出记录数") Integer recordCount,
-            @Schema(description = "进度百分比") Integer progressPercent,
-            @Schema(description = "进度阶段") String progressStage,
-            @Schema(description = "是否已超过保留期") Boolean retentionExpired,
-            @Schema(description = "保留策略提示") String retentionSummary,
-            @Schema(description = "预计过期时间") Instant expiresAt,
-            @Schema(description = "发起时间") Instant requestedAt,
-            @Schema(description = "完成时间") Instant completedAt,
-            @Schema(description = "失败原因") String errorMessage
+            @Schema(description = "Task ID") Long id,
+            @Schema(description = "Tenant ID") String tenantId,
+            @Schema(description = "Operator") String operator,
+            @Schema(description = "Task status") String status,
+            @Schema(description = "Whether archived") Boolean archived,
+            @Schema(description = "Whether archivable") Boolean archivable,
+            @Schema(description = "File name") String fileName,
+            @Schema(description = "Record count") Integer recordCount,
+            @Schema(description = "Progress percentage") Integer progressPercent,
+            @Schema(description = "Progress stage") String progressStage,
+            @Schema(description = "Whether retention expired") Boolean retentionExpired,
+            @Schema(description = "Retention summary") String retentionSummary,
+            @Schema(description = "Expires at") Instant expiresAt,
+            @Schema(description = "Requested at") Instant requestedAt,
+            @Schema(description = "Completed at") Instant completedAt,
+            @Schema(description = "Error message") String errorMessage
     ) {
     }
 
     public record DownloadFile(String fileName, byte[] content) {
     }
 
-    @Schema(description = "审计导出保留策略")
+    @Schema(description = "Audit export retention policy")
     public record ExportPolicy(
-            @Schema(description = "导出结果保留天数") Integer retentionDays,
-            @Schema(description = "单租户最多保留任务数") Integer maxTasks
+            @Schema(description = "Retention days") Integer retentionDays,
+            @Schema(description = "Maximum tasks") Integer maxTasks
+    ) {
+    }
+
+    @Schema(description = "Audit export governance execution result")
+    public record GovernanceResult(
+            @Schema(description = "Tenant ID") String tenantId,
+            @Schema(description = "Whether no task to process") Boolean noData,
+            @Schema(description = "Whether dry run") Boolean dryRun,
+            @Schema(description = "Retention days") Integer retentionDays,
+            @Schema(description = "Maximum tasks") Integer maxTasks,
+            @Schema(description = "Retention cutoff") Instant retentionCutoff,
+            @Schema(description = "Scanned completed tasks") Integer scannedTasks,
+            @Schema(description = "Planned archive count") Integer plannedArchiveCount,
+            @Schema(description = "Planned delete count") Integer plannedDeleteCount,
+            @Schema(description = "Archived count") Integer archivedCount,
+            @Schema(description = "Deleted count") Integer deletedCount,
+            @Schema(description = "Archived task ID samples") List<Long> archivedSampleIds,
+            @Schema(description = "Deleted task ID samples") List<Long> deletedSampleIds
     ) {
     }
 }

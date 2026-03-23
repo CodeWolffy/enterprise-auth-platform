@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AdvancedSearch from '@/components/AdvancedSearch.vue'
+import { useTablePreferences } from '@/composables/useTablePreferences'
 import { queryConsents, revokeConsent } from '@/api/authConsents'
 import type { ConsentView } from '@/api/authConsents'
 
@@ -18,6 +19,14 @@ const size = ref(10)
 const total = ref(0)
 const loading = ref(false)
 const consents = ref<ConsentView[]>([])
+
+const consentTablePrefs = useTablePreferences('eap.table.consents', [
+  { key: 'principalName', label: '授权用户', width: 140 },
+  { key: 'client', label: '客户端', width: 220 },
+  { key: 'scopes', label: '已授权作用域', width: 280 },
+  { key: 'audit', label: '审计联动', width: 260 },
+  { key: 'actions', label: '操作', width: 120 },
+])
 
 const filteredClientLabel = computed(() => searchForm.value.clientId || '全部客户端')
 const auditedCount = computed(() => consents.value.reduce((sum, item) => sum + item.auditEventCount, 0))
@@ -62,12 +71,21 @@ function resetSearch() {
 
 function handleSizeChange(value: number) {
   size.value = value
+  page.value = 1
   void load()
 }
 
 function handleCurrentChange(value: number) {
   page.value = value
   void load()
+}
+
+function onConsentHeaderDragEnd(newWidth: number, _oldWidth: number, column: { property?: string; columnKey?: string }) {
+  const key = String(column.columnKey || column.property || '')
+  if (!key) {
+    return
+  }
+  consentTablePrefs.setColumnWidth(key, newWidth)
 }
 
 async function handleRevoke(row: ConsentView) {
@@ -137,9 +155,52 @@ void load()
         </el-form-item>
       </AdvancedSearch>
 
-      <el-table v-loading="loading" :data="consents" stripe>
-        <el-table-column prop="principalName" label="授权用户" min-width="140" />
-        <el-table-column label="客户端" min-width="220">
+      <div class="table-tools">
+        <el-radio-group v-model="consentTablePrefs.density" size="small">
+          <el-radio-button value="compact">紧凑</el-radio-button>
+          <el-radio-button value="default">默认</el-radio-button>
+          <el-radio-button value="comfortable">宽松</el-radio-button>
+        </el-radio-group>
+        <el-popover placement="bottom-end" width="240" trigger="click">
+          <template #reference>
+            <el-button size="small">列显示</el-button>
+          </template>
+          <div class="column-chooser">
+            <el-checkbox
+              v-for="item in consentTablePrefs.columns"
+              :key="item.key"
+              :model-value="consentTablePrefs.visibleColumnMap[item.key]"
+              @change="(value: boolean) => consentTablePrefs.setColumnVisible(item.key, value)"
+            >
+              {{ item.label }}
+            </el-checkbox>
+          </div>
+        </el-popover>
+        <el-button size="small" @click="consentTablePrefs.reset()">恢复默认</el-button>
+      </div>
+
+      <el-table
+        v-loading="loading"
+        :data="consents"
+        stripe
+        :class="`table-density-${consentTablePrefs.density}`"
+        @header-dragend="onConsentHeaderDragEnd"
+      >
+        <el-table-column
+          v-if="consentTablePrefs.visibleColumnMap.principalName"
+          column-key="principalName"
+          prop="principalName"
+          label="授权用户"
+          min-width="140"
+          :width="consentTablePrefs.getColumnWidth('principalName')"
+        />
+        <el-table-column
+          v-if="consentTablePrefs.visibleColumnMap.client"
+          column-key="client"
+          label="客户端"
+          min-width="220"
+          :width="consentTablePrefs.getColumnWidth('client')"
+        >
           <template #default="{ row }">
             <div class="client-cell">
               <strong>{{ row.clientName }}</strong>
@@ -147,14 +208,26 @@ void load()
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="已授权作用域" min-width="280">
+        <el-table-column
+          v-if="consentTablePrefs.visibleColumnMap.scopes"
+          column-key="scopes"
+          label="已授权作用域"
+          min-width="280"
+          :width="consentTablePrefs.getColumnWidth('scopes')"
+        >
           <template #default="{ row }">
             <el-tag v-for="scope in row.authorities" :key="scope" size="small" class="scope-tag">
               {{ scope }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="审计联动" min-width="260">
+        <el-table-column
+          v-if="consentTablePrefs.visibleColumnMap.audit"
+          column-key="audit"
+          label="审计联动"
+          min-width="260"
+          :width="consentTablePrefs.getColumnWidth('audit')"
+        >
           <template #default="{ row }">
             <div class="client-cell">
               <small>租户：{{ row.tenantId }}</small>
@@ -164,7 +237,13 @@ void load()
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column
+          v-if="consentTablePrefs.visibleColumnMap.actions"
+          column-key="actions"
+          label="操作"
+          fixed="right"
+          :width="consentTablePrefs.getColumnWidth('actions') || 120"
+        >
           <template #default="{ row }">
             <el-button link type="danger" @click="handleRevoke(row)">撤销授权</el-button>
           </template>
@@ -200,6 +279,21 @@ void load()
 .scope-tag {
   margin-right: 6px;
   margin-bottom: 6px;
+}
+
+.table-tools {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin: -4px 0 10px;
+}
+
+.column-chooser {
+  display: grid;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
 }
 
 .pagination {

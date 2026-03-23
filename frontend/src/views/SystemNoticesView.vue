@@ -184,7 +184,7 @@
 
     <el-drawer v-model="detailVisible" title="公告详情" size="620px">
       <template v-if="detailItem">
-        <el-descriptions :column="2" border>
+        <el-descriptions :column="2" border class="drawer-section drawer-section--overview">
           <el-descriptions-item label="标题" :span="2">{{ detailItem.noticeTitle }}</el-descriptions-item>
           <el-descriptions-item label="发布状态">{{ detailItem.published ? '已发布' : '草稿' }}</el-descriptions-item>
           <el-descriptions-item label="工作流状态">{{ detailItem.workflowStatus }}</el-descriptions-item>

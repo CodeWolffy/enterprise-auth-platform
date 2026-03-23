@@ -40,28 +40,113 @@
             </div>
             <el-button type="primary" @click="openPackageDialog()">新增套餐</el-button>
           </div>
-          <el-table v-loading="loadingPackages" :data="packages" stripe>
-            <el-table-column prop="packageCode" label="套餐编码" min-width="160" />
-            <el-table-column prop="packageName" label="套餐名称" min-width="180" />
-            <el-table-column prop="userQuota" label="用户配额" width="110" />
-            <el-table-column prop="storageQuotaGb" label="存储配额(GB)" width="130" />
-            <el-table-column label="能力集合" min-width="240">
+          <div class="table-tools">
+            <el-radio-group v-model="packageTablePrefs.density" size="small">
+              <el-radio-button value="compact">紧凑</el-radio-button>
+              <el-radio-button value="default">默认</el-radio-button>
+              <el-radio-button value="comfortable">宽松</el-radio-button>
+            </el-radio-group>
+            <el-popover placement="bottom-end" width="240" trigger="click">
+              <template #reference>
+                <el-button size="small">列显示</el-button>
+              </template>
+              <div class="column-chooser">
+                <el-checkbox
+                  v-for="item in packageTablePrefs.columns"
+                  :key="item.key"
+                  :model-value="packageTablePrefs.visibleColumnMap[item.key]"
+                  @change="(value: boolean) => packageTablePrefs.setColumnVisible(item.key, value)"
+                >
+                  {{ item.label }}
+                </el-checkbox>
+              </div>
+            </el-popover>
+            <el-button size="small" @click="packageTablePrefs.reset()">恢复默认</el-button>
+          </div>
+          <el-table
+            v-loading="loadingPackages"
+            :data="packages"
+            stripe
+            :class="`table-density-${packageTablePrefs.density}`"
+            @header-dragend="onPackageHeaderDragEnd"
+          >
+            <el-table-column
+              v-if="packageTablePrefs.visibleColumnMap.packageCode"
+              column-key="packageCode"
+              prop="packageCode"
+              label="套餐编码"
+              min-width="160"
+              :width="packageTablePrefs.getColumnWidth('packageCode')"
+            />
+            <el-table-column
+              v-if="packageTablePrefs.visibleColumnMap.packageName"
+              column-key="packageName"
+              prop="packageName"
+              label="套餐名称"
+              min-width="180"
+              :width="packageTablePrefs.getColumnWidth('packageName')"
+            />
+            <el-table-column
+              v-if="packageTablePrefs.visibleColumnMap.userQuota"
+              column-key="userQuota"
+              prop="userQuota"
+              label="用户配额"
+              :width="packageTablePrefs.getColumnWidth('userQuota') || 110"
+            />
+            <el-table-column
+              v-if="packageTablePrefs.visibleColumnMap.storageQuotaGb"
+              column-key="storageQuotaGb"
+              prop="storageQuotaGb"
+              label="存储配额(GB)"
+              :width="packageTablePrefs.getColumnWidth('storageQuotaGb') || 130"
+            />
+            <el-table-column
+              v-if="packageTablePrefs.visibleColumnMap.capabilityCodes"
+              column-key="capabilityCodes"
+              label="能力集合"
+              min-width="240"
+              :width="packageTablePrefs.getColumnWidth('capabilityCodes')"
+            >
               <template #default="{ row }">
                 <el-tag v-for="code in row.capabilityCodes" :key="code" class="scope-tag" size="small">{{ code }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="引用租户" width="110">
+            <el-table-column
+              v-if="packageTablePrefs.visibleColumnMap.referencedTenantCount"
+              column-key="referencedTenantCount"
+              label="引用租户"
+              :width="packageTablePrefs.getColumnWidth('referencedTenantCount') || 110"
+            >
               <template #default="{ row }">
                 <el-tag type="info" effect="plain">{{ row.referencedTenantCount || 0 }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="packageDesc" label="套餐说明" min-width="220" show-overflow-tooltip />
-            <el-table-column label="状态" width="100">
+            <el-table-column
+              v-if="packageTablePrefs.visibleColumnMap.packageDesc"
+              column-key="packageDesc"
+              prop="packageDesc"
+              label="套餐说明"
+              min-width="220"
+              show-overflow-tooltip
+              :width="packageTablePrefs.getColumnWidth('packageDesc')"
+            />
+            <el-table-column
+              v-if="packageTablePrefs.visibleColumnMap.enabled"
+              column-key="enabled"
+              label="状态"
+              :width="packageTablePrefs.getColumnWidth('enabled') || 100"
+            >
               <template #default="{ row }">
                 <el-tag :type="row.enabled ? 'success' : 'info'">{{ row.enabled ? '启用' : '停用' }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column fixed="right" label="操作" width="220">
+            <el-table-column
+              v-if="packageTablePrefs.visibleColumnMap.actions"
+              column-key="actions"
+              fixed="right"
+              label="操作"
+              :width="packageTablePrefs.getColumnWidth('actions') || 220"
+            >
               <template #default="{ row }">
                 <el-button link type="primary" @click="openPackageDetail(row)">详情</el-button>
                 <el-button link type="primary" @click="openPackageDialog(row)">编辑</el-button>
@@ -79,22 +164,95 @@
             </div>
             <el-button type="primary" @click="openCapabilityDialog()">新增能力</el-button>
           </div>
-          <el-table v-loading="loadingCapabilities" :data="capabilities" stripe>
-            <el-table-column prop="capabilityCode" label="能力编码" min-width="180" />
-            <el-table-column prop="capabilityName" label="能力名称" min-width="180" />
-            <el-table-column prop="capabilityDesc" label="能力说明" min-width="260" show-overflow-tooltip />
-            <el-table-column label="引用套餐" width="110">
+          <div class="table-tools">
+            <el-radio-group v-model="capabilityTablePrefs.density" size="small">
+              <el-radio-button value="compact">紧凑</el-radio-button>
+              <el-radio-button value="default">默认</el-radio-button>
+              <el-radio-button value="comfortable">宽松</el-radio-button>
+            </el-radio-group>
+            <el-popover placement="bottom-end" width="240" trigger="click">
+              <template #reference>
+                <el-button size="small">列显示</el-button>
+              </template>
+              <div class="column-chooser">
+                <el-checkbox
+                  v-for="item in capabilityTablePrefs.columns"
+                  :key="item.key"
+                  :model-value="capabilityTablePrefs.visibleColumnMap[item.key]"
+                  @change="(value: boolean) => capabilityTablePrefs.setColumnVisible(item.key, value)"
+                >
+                  {{ item.label }}
+                </el-checkbox>
+              </div>
+            </el-popover>
+            <el-button size="small" @click="capabilityTablePrefs.reset()">恢复默认</el-button>
+          </div>
+          <el-table
+            v-loading="loadingCapabilities"
+            :data="capabilities"
+            stripe
+            :class="`table-density-${capabilityTablePrefs.density}`"
+            @header-dragend="onCapabilityHeaderDragEnd"
+          >
+            <el-table-column
+              v-if="capabilityTablePrefs.visibleColumnMap.capabilityCode"
+              column-key="capabilityCode"
+              prop="capabilityCode"
+              label="能力编码"
+              min-width="180"
+              :width="capabilityTablePrefs.getColumnWidth('capabilityCode')"
+            />
+            <el-table-column
+              v-if="capabilityTablePrefs.visibleColumnMap.capabilityName"
+              column-key="capabilityName"
+              prop="capabilityName"
+              label="能力名称"
+              min-width="180"
+              :width="capabilityTablePrefs.getColumnWidth('capabilityName')"
+            />
+            <el-table-column
+              v-if="capabilityTablePrefs.visibleColumnMap.capabilityDesc"
+              column-key="capabilityDesc"
+              prop="capabilityDesc"
+              label="能力说明"
+              min-width="260"
+              show-overflow-tooltip
+              :width="capabilityTablePrefs.getColumnWidth('capabilityDesc')"
+            />
+            <el-table-column
+              v-if="capabilityTablePrefs.visibleColumnMap.referencedPackageCount"
+              column-key="referencedPackageCount"
+              label="引用套餐"
+              :width="capabilityTablePrefs.getColumnWidth('referencedPackageCount') || 110"
+            >
               <template #default="{ row }">
                 <el-tag type="info" effect="plain">{{ row.referencedPackageCount || 0 }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="sortOrder" label="排序" width="90" />
-            <el-table-column label="状态" width="100">
+            <el-table-column
+              v-if="capabilityTablePrefs.visibleColumnMap.sortOrder"
+              column-key="sortOrder"
+              prop="sortOrder"
+              label="排序"
+              :width="capabilityTablePrefs.getColumnWidth('sortOrder') || 90"
+            />
+            <el-table-column
+              v-if="capabilityTablePrefs.visibleColumnMap.enabled"
+              column-key="enabled"
+              label="状态"
+              :width="capabilityTablePrefs.getColumnWidth('enabled') || 100"
+            >
               <template #default="{ row }">
                 <el-tag :type="row.enabled ? 'success' : 'info'">{{ row.enabled ? '启用' : '停用' }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column fixed="right" label="操作" width="220">
+            <el-table-column
+              v-if="capabilityTablePrefs.visibleColumnMap.actions"
+              column-key="actions"
+              fixed="right"
+              label="操作"
+              :width="capabilityTablePrefs.getColumnWidth('actions') || 220"
+            >
               <template #default="{ row }">
                 <el-button link type="primary" @click="openCapabilityDetail(row)">详情</el-button>
                 <el-button link type="primary" @click="openCapabilityDialog(row)">编辑</el-button>
@@ -193,7 +351,7 @@
 
     <el-drawer v-model="packageDetailVisible" title="套餐详情" size="560px">
       <template v-if="detailPackage">
-        <el-descriptions :column="1" border>
+        <el-descriptions :column="1" border class="drawer-section drawer-section--overview">
           <el-descriptions-item label="套餐编码">{{ detailPackage.packageCode }}</el-descriptions-item>
           <el-descriptions-item label="套餐名称">{{ detailPackage.packageName }}</el-descriptions-item>
           <el-descriptions-item label="用户配额">{{ detailPackage.userQuota ?? '-' }}</el-descriptions-item>
@@ -203,14 +361,14 @@
           <el-descriptions-item label="引用租户数">{{ detailPackage.referencedTenantCount || 0 }}</el-descriptions-item>
         </el-descriptions>
 
-        <div class="detail-block">
+        <div class="detail-block drawer-section drawer-section--scopes">
           <div class="eyebrow">能力清单</div>
           <div class="tag-wrap">
             <el-tag v-for="code in detailPackage.capabilityCodes" :key="code" type="info" effect="plain">{{ code }}</el-tag>
           </div>
         </div>
 
-        <div class="detail-block">
+        <div class="detail-block drawer-section drawer-section--guide">
           <div class="eyebrow">引用提示</div>
           <el-alert
             v-if="(detailPackage.referencedTenantCount || 0) > 0"
@@ -235,7 +393,7 @@
 
     <el-drawer v-model="capabilityDetailVisible" title="能力详情" size="560px">
       <template v-if="detailCapability">
-        <el-descriptions :column="1" border>
+        <el-descriptions :column="1" border class="drawer-section drawer-section--overview">
           <el-descriptions-item label="能力编码">{{ detailCapability.capabilityCode }}</el-descriptions-item>
           <el-descriptions-item label="能力名称">{{ detailCapability.capabilityName }}</el-descriptions-item>
           <el-descriptions-item label="能力说明">{{ detailCapability.capabilityDesc || '未配置说明' }}</el-descriptions-item>
@@ -246,7 +404,7 @@
           <el-descriptions-item label="覆盖记录数">{{ detailCapability.overrideReferenceCount || 0 }}</el-descriptions-item>
         </el-descriptions>
 
-        <div class="detail-block">
+        <div class="detail-block drawer-section drawer-section--guide">
           <div class="eyebrow">引用提示</div>
           <el-alert
             v-if="(detailCapability.referencedPackageCount || 0) > 0 || (detailCapability.overrideReferenceCount || 0) > 0"
@@ -278,6 +436,7 @@
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
+import { useTablePreferences } from '@/composables/useTablePreferences'
 import {
   createTenantCapability,
   createTenantPackage,
@@ -305,6 +464,26 @@ const packages = ref<TenantPackageView[]>([])
 const capabilities = ref<TenantCapabilityView[]>([])
 const detailPackage = ref<TenantPackageView | null>(null)
 const detailCapability = ref<TenantCapabilityView | null>(null)
+const packageTablePrefs = useTablePreferences('eap.table.tenant.catalog.packages', [
+  { key: 'packageCode', label: '套餐编码', width: 160 },
+  { key: 'packageName', label: '套餐名称', width: 180 },
+  { key: 'userQuota', label: '用户配额', width: 110 },
+  { key: 'storageQuotaGb', label: '存储配额(GB)', width: 130 },
+  { key: 'capabilityCodes', label: '能力集合', width: 240 },
+  { key: 'referencedTenantCount', label: '引用租户', width: 110 },
+  { key: 'packageDesc', label: '套餐说明', width: 220 },
+  { key: 'enabled', label: '状态', width: 100 },
+  { key: 'actions', label: '操作', width: 220 },
+])
+const capabilityTablePrefs = useTablePreferences('eap.table.tenant.catalog.capabilities', [
+  { key: 'capabilityCode', label: '能力编码', width: 180 },
+  { key: 'capabilityName', label: '能力名称', width: 180 },
+  { key: 'capabilityDesc', label: '能力说明', width: 260 },
+  { key: 'referencedPackageCount', label: '引用套餐', width: 110 },
+  { key: 'sortOrder', label: '排序', width: 90 },
+  { key: 'enabled', label: '状态', width: 100 },
+  { key: 'actions', label: '操作', width: 220 },
+])
 
 const packageForm = reactive({
   packageCode: '',
@@ -445,6 +624,22 @@ async function removeCapability(row: TenantCapabilityView) {
   ElMessage.success('能力已删除')
   await Promise.all([loadCapabilities(), loadPackages()])
 }
+
+function onPackageHeaderDragEnd(newWidth: number, _oldWidth: number, column: { property?: string; columnKey?: string }) {
+  const key = String(column.columnKey || column.property || '')
+  if (!key) {
+    return
+  }
+  packageTablePrefs.setColumnWidth(key, newWidth)
+}
+
+function onCapabilityHeaderDragEnd(newWidth: number, _oldWidth: number, column: { property?: string; columnKey?: string }) {
+  const key = String(column.columnKey || column.property || '')
+  if (!key) {
+    return
+  }
+  capabilityTablePrefs.setColumnWidth(key, newWidth)
+}
 </script>
 
 <style scoped lang="scss">
@@ -459,6 +654,21 @@ async function removeCapability(row: TenantCapabilityView) {
 
 .detail-block {
   margin-top: 16px;
+}
+
+.table-tools {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin: -4px 0 10px;
+}
+
+.column-chooser {
+  display: grid;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
 }
 
 .tag-wrap {

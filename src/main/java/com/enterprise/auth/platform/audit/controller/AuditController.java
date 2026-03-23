@@ -174,6 +174,16 @@ public class AuditController {
         return ApiResponse.ok(auditExportTaskService.updatePolicy(tenantId, request));
     }
 
+    @Operation(summary = "按策略执行审计导出自动治理")
+    @PostMapping("/exports/governance")
+    @PreAuthorize("hasAuthority('audit:write')")
+    public ApiResponse<AuditExportTaskService.GovernanceResult> governExportTasks(
+            @RequestParam(required = false) String tenantId,
+            @RequestParam(defaultValue = "false") boolean dryRun
+    ) {
+        return ApiResponse.ok(auditExportTaskService.governance(tenantId, dryRun));
+    }
+
     @Operation(summary = "下载异步审计导出文件")
     @GetMapping("/exports/{taskId}/download")
     @PreAuthorize("hasAuthority('audit:read')")

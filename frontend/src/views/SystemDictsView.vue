@@ -160,7 +160,7 @@
 
     <el-drawer v-model="detailVisible" title="字典项详情" size="560px">
       <template v-if="detailItem">
-        <el-descriptions :column="2" border>
+        <el-descriptions :column="2" border class="drawer-section drawer-section--overview">
           <el-descriptions-item label="字典类型">{{ detailItem.dictType }}</el-descriptions-item>
           <el-descriptions-item label="字典分类">{{ detailItem.category }}</el-descriptions-item>
           <el-descriptions-item label="字典编码">{{ detailItem.dictCode }}</el-descriptions-item>

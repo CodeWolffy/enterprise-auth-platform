@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -74,6 +75,53 @@ public class OAuthClientManagementService {
     public OAuthClientView clientDetail(Long id) {
         requireDatabaseMode();
         return toView(getClient(id, currentTenantId()), null, true);
+    }
+
+    public OAuthClientScopeLinkageView scopeLinkage(Long id) {
+        requireDatabaseMode();
+        String tenantId = currentTenantId();
+        SysOauthClientEntity entity = getClient(id, tenantId);
+        List<String> clientScopes = split(entity.getScopes());
+        List<OAuthClientScopeView> scopeDetails = resolveScopeDetails(tenantId, clientScopes);
+        Map<String, SysOauthScopeEntity> configuredScopes = loadConfiguredScopes(tenantId);
+
+        List<String> missingScopeCodes = clientScopes.stream()
+                .filter(code -> !configuredScopes.containsKey(code))
+                .distinct()
+                .toList();
+
+        List<String> recommendedScopeCodes = configuredScopes.values().stream()
+                .filter(item -> item.getDefaultSelected() != null && item.getDefaultSelected() == 1)
+                .map(SysOauthScopeEntity::getScopeCode)
+                .filter(code -> !clientScopes.contains(code))
+                .limit(8)
+                .toList();
+
+        List<String> actions = new ArrayList<>();
+        if (!missingScopeCodes.isEmpty()) {
+            actions.add("补齐缺失作用域定义，确保 consent 页和审计解释一致。");
+        }
+        boolean consentVisible = scopeDetails.stream().anyMatch(OAuthClientScopeView::visibleInConsent);
+        if ((entity.getRequireConsent() != null && entity.getRequireConsent() == 1) && !consentVisible) {
+            actions.add("当前客户端要求授权确认，但未配置可展示作用域，建议至少开启一个 visibleInConsent 作用域。");
+        }
+        if ((entity.getRequirePkce() == null || entity.getRequirePkce() == 0) && !StringUtils.hasText(entity.getClientSecret())) {
+            actions.add("公共客户端建议启用 PKCE，降低授权码劫持风险。");
+        }
+        if (actions.isEmpty()) {
+            actions.add("当前客户端与作用域定义联动正常。");
+        }
+
+        return new OAuthClientScopeLinkageView(
+                entity.getId(),
+                entity.getClientId(),
+                entity.getClientName(),
+                clientScopes,
+                scopeDetails,
+                missingScopeCodes,
+                recommendedScopeCodes,
+                actions
+        );
     }
 
     @Transactional
@@ -264,16 +312,7 @@ public class OAuthClientManagementService {
         if (scopes.isEmpty()) {
             return List.of();
         }
-        Map<String, SysOauthScopeEntity> configured = new LinkedHashMap<>();
-        if (sysOauthScopeMapper != null) {
-            sysOauthScopeMapper.selectList(new LambdaQueryWrapper<SysOauthScopeEntity>()
-                            .in(SysOauthScopeEntity::getTenantId, List.of("platform", tenantId))
-                            .eq(SysOauthScopeEntity::getDeleted, 0)
-                            .eq(SysOauthScopeEntity::getEnabled, 1)
-                            .orderByAsc(SysOauthScopeEntity::getSortOrder)
-                            .orderByAsc(SysOauthScopeEntity::getId))
-                    .forEach(item -> configured.putIfAbsent(item.getScopeCode(), item));
-        }
+        Map<String, SysOauthScopeEntity> configured = loadConfiguredScopes(tenantId);
         Map<String, String> descriptionMap = resolveScopeDescriptions(tenantId, scopes);
         return new LinkedHashSet<>(scopes).stream()
                 .map(scopeCode -> {
@@ -288,6 +327,21 @@ public class OAuthClientManagementService {
                     );
                 })
                 .toList();
+    }
+
+    private Map<String, SysOauthScopeEntity> loadConfiguredScopes(String tenantId) {
+        Map<String, SysOauthScopeEntity> configured = new LinkedHashMap<>();
+        if (sysOauthScopeMapper == null) {
+            return configured;
+        }
+        sysOauthScopeMapper.selectList(new LambdaQueryWrapper<SysOauthScopeEntity>()
+                        .in(SysOauthScopeEntity::getTenantId, List.of("platform", tenantId))
+                        .eq(SysOauthScopeEntity::getDeleted, 0)
+                        .eq(SysOauthScopeEntity::getEnabled, 1)
+                        .orderByAsc(SysOauthScopeEntity::getSortOrder)
+                        .orderByAsc(SysOauthScopeEntity::getId))
+                .forEach(item -> configured.putIfAbsent(item.getScopeCode(), item));
+        return configured;
     }
 
     private Map<String, Long> summarizeScopeTypes(List<OAuthClientScopeView> scopeDetails) {
@@ -476,6 +530,18 @@ public class OAuthClientManagementService {
             @Schema(description = "操作人") String operator,
             @Schema(description = "发生时间") java.time.Instant occurredAt,
             @Schema(description = "事件负载") Map<String, Object> payload
+    ) {
+    }
+    @Schema(description = "OAuth2 客户端作用域联动引导")
+    public record OAuthClientScopeLinkageView(
+            @Schema(description = "主键 ID") Long id,
+            @Schema(description = "客户端编码") String clientId,
+            @Schema(description = "客户端名称") String clientName,
+            @Schema(description = "客户端声明作用域") List<String> clientScopes,
+            @Schema(description = "作用域详情") List<OAuthClientScopeView> scopeDetails,
+            @Schema(description = "缺失定义的作用域编码") List<String> missingScopeCodes,
+            @Schema(description = "建议补充到客户端的默认作用域") List<String> recommendedScopeCodes,
+            @Schema(description = "联动建议") List<String> actions
     ) {
     }
 }

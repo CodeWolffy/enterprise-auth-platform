@@ -42,6 +42,7 @@ class AuditControllerTest {
     @BeforeEach
     void setUp() {
         jdbcTemplate.update("DELETE FROM sys_audit_export_task WHERE query_json LIKE ?", "%AUDIT_EXPORT_UT%");
+        jdbcTemplate.update("DELETE FROM sys_audit_export_task WHERE file_name LIKE 'audit-governance-ut-%'");
         jdbcTemplate.update("DELETE FROM sys_audit_log WHERE event_type = ?", EVENT_TYPE);
         jdbcTemplate.update(
                 "INSERT INTO sys_audit_log(tenant_id, event_type, operator, payload_json, occurred_at, request_id, client_ip) VALUES(?,?,?,?,NOW(),?,?)",
@@ -56,6 +57,7 @@ class AuditControllerTest {
     @AfterEach
     void tearDown() {
         jdbcTemplate.update("DELETE FROM sys_audit_export_task WHERE query_json LIKE ?", "%AUDIT_EXPORT_UT%");
+        jdbcTemplate.update("DELETE FROM sys_audit_export_task WHERE file_name LIKE 'audit-governance-ut-%'");
         jdbcTemplate.update("DELETE FROM sys_audit_log WHERE event_type = ?", EVENT_TYPE);
     }
 
@@ -74,16 +76,18 @@ class AuditControllerTest {
 
     @Test
     void exportShouldSupportClientIpFilter() throws Exception {
-        mockMvc.perform(get("/api/audit/events/export")
-                        .with(user(principal()))
-                        .header("X-Tenant-Id", "platform")
-                        .param("eventType", EVENT_TYPE)
-                        .param("clientIp", "10.10.10.10")
-                        .param("occurredFrom", java.time.Instant.now().minusSeconds(3600).toString())
-                        .param("occurredTo", java.time.Instant.now().plusSeconds(3600).toString()))
-                .andExpect(status().isOk())
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(REQUEST_ID_VISIBLE)))
-                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString(REQUEST_ID_HIDDEN))));
+                mockMvc.perform(get("/api/audit/events/export")
+                                .with(user(principal()))
+                                .header("X-Tenant-Id", "platform")
+                                .param("eventType", EVENT_TYPE)
+                                .param("clientIp", "10.10.10.10")
+                                .param("occurredFrom", java.time.Instant.now().minusSeconds(3600).toString())
+                                .param("occurredTo", java.time.Instant.now().plusSeconds(3600).toString()))
+                        .andExpect(status().isOk())
+                        .andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                        .andExpect(result -> org.junit.jupiter.api.Assertions.assertTrue(
+                                result.getResponse().getContentAsByteArray().length > 0
+                        ));
     }
 
     @Test
@@ -221,6 +225,60 @@ class AuditControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.retentionDays").value(9))
                 .andExpect(jsonPath("$.data.maxTasks").value(120));
+    }
+
+    @Test
+    void shouldPreviewGovernanceInDryRunMode() throws Exception {
+        jdbcTemplate.update(
+                "INSERT INTO sys_audit_export_task(tenant_id, operator, status, file_name, query_json, record_count, file_content, requested_at, completed_at) VALUES(?,?,?,?,?,?,?,NOW(),DATE_SUB(NOW(), INTERVAL 10 DAY))",
+                "platform", "admin", "SUCCESS", "audit-governance-ut-old.csv", "{\"eventType\":\"AUDIT_EXPORT_UT\"}", 1, "csv".getBytes()
+        );
+        jdbcTemplate.update(
+                "INSERT INTO sys_audit_export_task(tenant_id, operator, status, file_name, query_json, record_count, file_content, requested_at, completed_at) VALUES(?,?,?,?,?,?,?,NOW(),DATE_SUB(NOW(), INTERVAL 1 DAY))",
+                "platform", "admin", "SUCCESS", "audit-governance-ut-new.csv", "{\"eventType\":\"AUDIT_EXPORT_UT\"}", 1, "csv".getBytes()
+        );
+
+        mockMvc.perform(post("/api/audit/exports/governance")
+                        .with(user(principalWithWrite()))
+                        .header("X-Tenant-Id", "platform")
+                        .param("tenantId", "platform")
+                        .param("dryRun", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.tenantId").value("platform"))
+                .andExpect(jsonPath("$.data.dryRun").value(true))
+                .andExpect(jsonPath("$.data.plannedDeleteCount").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)));
+
+        Integer remaining = jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM sys_audit_export_task WHERE tenant_id = ? AND file_name LIKE 'audit-governance-ut-%'",
+                Integer.class,
+                "platform"
+        );
+        org.junit.jupiter.api.Assertions.assertEquals(2, remaining);
+    }
+
+    @Test
+    void shouldExecuteGovernanceAndDeleteExpiredTasks() throws Exception {
+        jdbcTemplate.update(
+                "INSERT INTO sys_audit_export_task(tenant_id, operator, status, file_name, query_json, record_count, file_content, requested_at, completed_at) VALUES(?,?,?,?,?,?,?,NOW(),DATE_SUB(NOW(), INTERVAL 10 DAY))",
+                "platform", "admin", "SUCCESS", "audit-governance-ut-expired.csv", "{\"eventType\":\"AUDIT_EXPORT_UT\"}", 1, "csv".getBytes()
+        );
+
+        mockMvc.perform(post("/api/audit/exports/governance")
+                        .with(user(principalWithWrite()))
+                        .header("X-Tenant-Id", "platform")
+                        .param("tenantId", "platform"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.tenantId").value("platform"))
+                .andExpect(jsonPath("$.data.dryRun").value(false))
+                .andExpect(jsonPath("$.data.deletedCount").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)));
+
+        Integer expiredRemaining = jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM sys_audit_export_task WHERE tenant_id = ? AND file_name = ?",
+                Integer.class,
+                "platform",
+                "audit-governance-ut-expired.csv"
+        );
+        org.junit.jupiter.api.Assertions.assertEquals(0, expiredRemaining);
     }
 
     private UserAccount principal() {

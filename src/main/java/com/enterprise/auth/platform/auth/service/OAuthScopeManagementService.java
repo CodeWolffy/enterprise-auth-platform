@@ -14,6 +14,7 @@ import com.enterprise.auth.platform.tenant.TenantContext;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -53,6 +54,51 @@ public class OAuthScopeManagementService {
                 .stream()
                 .map(entity -> toView(entity, referenceHints.get(entity.getScopeCode())))
                 .toList();
+    }
+
+    public OAuthScopeClientLinkageView scopeLinkage(Long id) {
+        requirePlatformDatabaseMode();
+        SysOauthScopeEntity scope = getScope(id);
+        List<SysOauthClientEntity> clients = sysOauthClientMapper == null ? List.of() : sysOauthClientMapper.selectList(
+                new LambdaQueryWrapper<SysOauthClientEntity>()
+                        .eq(SysOauthClientEntity::getTenantId, "platform")
+                        .eq(SysOauthClientEntity::getDeleted, 0)
+                        .orderByAsc(SysOauthClientEntity::getId)
+        );
+
+        List<OAuthScopeLinkedClientView> linkedClients = clients.stream()
+                .filter(client -> splitScopes(client.getScopes()).contains(scope.getScopeCode()))
+                .map(client -> new OAuthScopeLinkedClientView(
+                        client.getId(),
+                        client.getClientId(),
+                        client.getClientName(),
+                        client.getClientStatus() == null || client.getClientStatus() == 1,
+                        client.getRequirePkce() != null && client.getRequirePkce() == 1,
+                        client.getRequireConsent() != null && client.getRequireConsent() == 1
+                ))
+                .toList();
+
+        List<String> actions = new java.util.ArrayList<>();
+        if (!linkedClients.isEmpty()) {
+            actions.add("变更作用域名称或说明前，建议同步通知已关联客户端接入方。");
+        }
+        if (!linkedClients.isEmpty() && (scope.getVisibleInConsent() == null || scope.getVisibleInConsent() == 0)) {
+            actions.add("该作用域已被客户端引用但在 consent 页不可见，建议评估是否需要展示。");
+        }
+        if (linkedClients.isEmpty()) {
+            actions.add("当前作用域未被客户端引用，可先维护配置后再逐步下发。");
+        }
+
+        return new OAuthScopeClientLinkageView(
+                scope.getId(),
+                scope.getScopeCode(),
+                scope.getScopeName(),
+                scope.getEnabled() == null || scope.getEnabled() == 1,
+                scope.getVisibleInConsent() == null || scope.getVisibleInConsent() == 1,
+                linkedClients.size(),
+                linkedClients,
+                actions
+        );
     }
 
     @Transactional
@@ -214,5 +260,28 @@ public class OAuthScopeManagementService {
     }
 
     private record ScopeReferenceHint(int referencedClientCount, List<String> sampleClientIds) {
+    }
+    @Schema(description = "OAuth2 作用域客户端联动视图")
+    public record OAuthScopeClientLinkageView(
+            @Schema(description = "主键 ID") Long id,
+            @Schema(description = "作用域编码") String scopeCode,
+            @Schema(description = "作用域名称") String scopeName,
+            @Schema(description = "是否启用") boolean enabled,
+            @Schema(description = "是否在同意页展示") boolean visibleInConsent,
+            @Schema(description = "关联客户端数量") int linkedClientCount,
+            @Schema(description = "关联客户端详情") List<OAuthScopeLinkedClientView> linkedClients,
+            @Schema(description = "联动建议") List<String> actions
+    ) {
+    }
+
+    @Schema(description = "作用域关联客户端")
+    public record OAuthScopeLinkedClientView(
+            @Schema(description = "主键 ID") Long id,
+            @Schema(description = "客户端编码") String clientId,
+            @Schema(description = "客户端名称") String clientName,
+            @Schema(description = "是否启用") boolean enabled,
+            @Schema(description = "是否启用 PKCE") boolean requirePkce,
+            @Schema(description = "是否要求 consent") boolean requireConsent
+    ) {
     }
 }

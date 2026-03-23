@@ -128,7 +128,7 @@
 
     <el-drawer v-model="detailVisible" title="部门详情" size="620px">
       <template v-if="detailDepartment">
-        <el-descriptions :column="2" border>
+        <el-descriptions :column="2" border class="drawer-section drawer-section--overview">
           <el-descriptions-item label="部门名称">{{ detailDepartment.name }}</el-descriptions-item>
           <el-descriptions-item label="部门编码">{{ detailDepartment.code || '-' }}</el-descriptions-item>
           <el-descriptions-item label="部门 ID">{{ detailDepartment.id }}</el-descriptions-item>
@@ -137,7 +137,7 @@
           <el-descriptions-item label="直属子部门">{{ childCount(detailDepartment.id) }}</el-descriptions-item>
         </el-descriptions>
 
-        <div class="detail-tip">
+        <div class="detail-tip drawer-section drawer-section--guide">
           <el-alert
             title="部门树已接入数据权限过滤，当前列表仅展示当前用户有权访问的组织范围。"
             type="info"
