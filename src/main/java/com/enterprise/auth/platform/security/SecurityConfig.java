@@ -35,7 +35,11 @@ public class SecurityConfig {
         http.csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository)
                         .csrfTokenRequestHandler(csrfTokenRequestHandler)
-                        .ignoringRequestMatchers("/api/auth/login", "/api/auth/refresh"))
+                        .ignoringRequestMatchers(
+                                "/api/auth/login",
+                                "/api/auth/refresh",
+                                "/api/auth/oauth/exchange",
+                                "/api/auth/oauth/refresh"))
                 .cors(Customizer.withDefaults())
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)

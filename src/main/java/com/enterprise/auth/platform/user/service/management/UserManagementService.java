@@ -126,10 +126,8 @@ public class UserManagementService {
         requireDatabaseMode();
         String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
-        SysUserEntity entity = getUser(userId, tenantId);
+        getUser(userId, tenantId);
         syncUserRoles(tenantId, userId, roleCodes);
-        entity.setSessionVersion((entity.getSessionVersion() == null ? 1 : entity.getSessionVersion()) + 1);
-        sysUserMapper.updateById(entity);
         auditService.record("USER_ROLE_ASSIGNED", operator, tenantId, Map.of("userId", userId, "roleCodes", roleCodes));
         return loadSummary(userId);
     }

@@ -5,6 +5,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -104,6 +105,44 @@ class AuthorizationCodeSessionFlowTest {
                 .andExpect(jsonPath("$.data.username").value("admin"));
 
         mockMvc.perform(post("/api/auth/logout")
+                        .with(csrf())
+                        .header("Authorization", "Bearer " + tokens.accessToken())
+                        .header("X-Tenant-Id", "platform"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/auth/me")
+                        .header("Authorization", "Bearer " + tokens.accessToken())
+                        .header("X-Tenant-Id", "platform"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/oauth2/token")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("grant_type", "refresh_token")
+                        .param("client_id", CLIENT_ID)
+                        .param("client_secret", CLIENT_SECRET)
+                        .param("refresh_token", tokens.refreshToken()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("invalid_grant"));
+    }
+
+    @Test
+    void forceOfflineShouldRevokeAuthorizationServerAccessAndRefreshTokens() throws Exception {
+        OAuthTokens tokens = issueTokens();
+
+        MvcResult sessions = mockMvc.perform(get("/api/auth/sessions")
+                        .header("Authorization", "Bearer " + tokens.accessToken())
+                        .header("X-Tenant-Id", "platform"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].sessionId").isNotEmpty())
+                .andReturn();
+
+        String sessionId = objectMapper.readTree(sessions.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .path("data")
+                .path(0)
+                .path("sessionId")
+                .asText();
+
+        mockMvc.perform(post("/api/auth/sessions/{sessionId}/offline", sessionId)
                         .with(csrf())
                         .header("Authorization", "Bearer " + tokens.accessToken())
                         .header("X-Tenant-Id", "platform"))

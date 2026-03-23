@@ -134,21 +134,11 @@ class CookieSessionSecurityIntegrationTest {
     }
 
     @Test
-    void oauthCookieRefreshShouldEnforceCsrfAndRotateCookies() throws Exception {
+    void oauthCookieRefreshShouldRotateCookies() throws Exception {
         OAuthTokens tokens = issueFrontendTokens();
 
-        CsrfContext csrfContext = fetchCsrf();
-
-        mockMvc.perform(post("/api/auth/oauth/refresh")
-                        .cookie(new Cookie(AuthCookieConstants.REFRESH_TOKEN_COOKIE, tokens.refreshToken())))
-                .andExpect(status().isForbidden());
-
         MvcResult refreshResult = mockMvc.perform(post("/api/auth/oauth/refresh")
-                        .cookie(
-                                new Cookie(AuthCookieConstants.REFRESH_TOKEN_COOKIE, tokens.refreshToken()),
-                                copyCookie(csrfContext.xsrfCookie())
-                        )
-                        .header(csrfContext.headerName(), csrfContext.token()))
+                        .cookie(new Cookie(AuthCookieConstants.REFRESH_TOKEN_COOKIE, tokens.refreshToken())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.tenantId").value("platform"))
                 .andExpect(jsonPath("$.data.sessionId").isNotEmpty())
@@ -202,6 +192,16 @@ class CookieSessionSecurityIntegrationTest {
                         .cookie(new Cookie(AuthCookieConstants.ACCESS_TOKEN_COOKIE, accessToken))
                         .header("X-Tenant-Id", targetTenantId))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void issuedAccessTokenShouldCarryCurrentSessionVersionFromDatabase() throws Exception {
+        OAuthTokens tokens = issueFrontendTokens();
+        JsonNode payload = decodeJwtPayload(tokens.accessToken());
+        Integer tokenVersion = payload.path("ver").isMissingNode() ? null : payload.path("ver").asInt();
+        SysUserEntity admin = sysUserMapper.selectById(1L);
+        assertThat(admin).isNotNull();
+        assertThat(tokenVersion).isEqualTo(admin.getSessionVersion());
     }
 
     private UserAccount createTemporaryOrdinaryUser(String tenantId) {
@@ -325,6 +325,13 @@ class CookieSessionSecurityIntegrationTest {
         copy.setUpdatedBy(source.getUpdatedBy());
         copy.setDeleted(source.getDeleted());
         return copy;
+    }
+
+    private JsonNode decodeJwtPayload(String jwtToken) throws Exception {
+        String[] parts = jwtToken.split("\\.");
+        assertThat(parts).hasSize(3);
+        String payload = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
+        return objectMapper.readTree(payload);
     }
 
     private record OAuthTokens(String accessToken, String refreshToken) {

@@ -179,8 +179,21 @@ router.beforeEach(async (to) => {
     }
   } catch (error) {
     const status = axios.isAxiosError(error) ? error.response?.status : undefined
-    if (status !== 401 && status !== 403) {
+    const code = axios.isAxiosError(error) ? error.response?.data?.code : undefined
+    const shouldClearSession = status === 401
+      || (status === 403 && [
+        'SESSION_EXPIRED',
+        'SESSION_NOT_FOUND',
+        'INVALID_TOKEN',
+        'TOKEN_VERSION_MISMATCH',
+        'TENANT_MISMATCH',
+        'USER_DISABLED',
+        'SESSION_SUBJECT_MISMATCH',
+        'ACCESS_TOKEN_TYPE_INVALID',
+      ].includes(String(code ?? '')))
+    if (!shouldClearSession) {
       ElMessage.error('会话加载失败，请稍后重试')
+      return false
     }
     authStore.clearSession()
     return { name: 'login' }
@@ -203,7 +216,7 @@ router.afterEach((to) => {
 })
 
 function registerDynamicRoutes() {
-  // Routes are now statically registered for stability.
+  // Routes are statically registered for stability.
 }
 
 function clearDynamicRoutes() {

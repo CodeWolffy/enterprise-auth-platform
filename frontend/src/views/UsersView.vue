@@ -462,10 +462,14 @@ async function submitRoleAssignment() {
   if (!roleTargetUserId.value) {
     return
   }
-  await assignUserRoles(roleTargetUserId.value, selectedRoleCodes.value)
-  roleVisible.value = false
-  ElMessage.success('用户角色已更新')
-  await load()
+  try {
+    await assignUserRoles(roleTargetUserId.value, selectedRoleCodes.value)
+    roleVisible.value = false
+    ElMessage.success('用户角色已更新')
+    await load()
+  } catch {
+    // Error message is handled by the unified http interceptor.
+  }
 }
 
 function promptResetPassword(row: UserSummary) {

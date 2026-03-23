@@ -6,11 +6,13 @@ import com.enterprise.auth.platform.auth.model.UserSession;
 import com.enterprise.auth.platform.auth.service.AuthorizationSessionService;
 import com.enterprise.auth.platform.auth.service.JwtService;
 import com.enterprise.auth.platform.auth.store.SessionStore;
+import com.enterprise.auth.platform.common.api.ApiResponse;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import com.enterprise.auth.platform.tenant.TenantProperties;
 import com.enterprise.auth.platform.user.model.UserAccount;
 import com.enterprise.auth.platform.user.repository.UserRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
@@ -23,6 +25,8 @@ import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.lang.Nullable;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -47,6 +51,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final AuthorizationSessionService authorizationSessionService;
     private final TenantProperties tenantProperties;
     private final PlatformAdminSupport platformAdminSupport;
+    private final ObjectMapper objectMapper;
 
     public JwtAuthenticationFilter(
             JwtService jwtService,
@@ -56,7 +61,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             UserAccountJwtConverter userAccountJwtConverter,
             AuthorizationSessionService authorizationSessionService,
             TenantProperties tenantProperties,
-            PlatformAdminSupport platformAdminSupport
+            PlatformAdminSupport platformAdminSupport,
+            ObjectMapper objectMapper
     ) {
         this.jwtService = jwtService;
         this.userRepository = userRepository;
@@ -66,6 +72,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         this.authorizationSessionService = authorizationSessionService;
         this.tenantProperties = tenantProperties;
         this.platformAdminSupport = platformAdminSupport;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -76,14 +83,32 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         String token = resolveBearerToken(request);
         if (!StringUtils.hasText(token)) {
+            log.warn("[AUTH-DIAG] No token found for {} {}", request.getMethod(), request.getRequestURI());
             filterChain.doFilter(request, response);
             return;
         }
+        log.warn("[AUTH-DIAG] Token found for {} {}, length={}", request.getMethod(), request.getRequestURI(), token.length());
 
         try {
             Optional<UsernamePasswordAuthenticationToken> authentication = authenticateCustomToken(request, token);
             if (authentication.isEmpty()) {
+                log.warn("[AUTH-DIAG] Custom token auth returned empty for {} {}", request.getMethod(), request.getRequestURI());
                 authentication = authenticateAuthorizationServerToken(request, token);
+                if (authentication.isEmpty()) {
+                    log.warn("[AUTH-DIAG] AuthServer token auth also returned empty for {} {}", request.getMethod(), request.getRequestURI());
+                } else {
+                    log.warn("[AUTH-DIAG] AuthServer token auth SUCCEEDED for {} {}", request.getMethod(), request.getRequestURI());
+                }
+            } else {
+                log.warn("[AUTH-DIAG] Custom token auth SUCCEEDED for {} {}", request.getMethod(), request.getRequestURI());
+            }
+            if (authentication.isEmpty()) {
+                if (!isTokenFailureBypassEndpoint(request)) {
+                    writeAuthFailure(response, new BusinessException("INVALID_TOKEN", "Invalid access token"));
+                    return;
+                }
+                filterChain.doFilter(request, response);
+                return;
             }
             authentication.ifPresent(auth -> {
                 SecurityContextHolder.getContext().setAuthentication(auth);
@@ -93,11 +118,35 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
             });
         } catch (BusinessException ex) {
-            log.debug("Reject token authentication, code={}, message={}", ex.code(), ex.getMessage());
+            log.warn("[AUTH-DIAG] Reject token for {} {}, code={}, message={}", request.getMethod(), request.getRequestURI(), ex.code(), ex.getMessage());
             SecurityContextHolder.clearContext();
+            if (!isTokenFailureBypassEndpoint(request)) {
+                writeAuthFailure(response, ex);
+                return;
+            }
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isTokenFailureBypassEndpoint(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        return "/api/auth/captcha".equals(uri)
+                || "/api/auth/csrf".equals(uri)
+                || "/api/auth/login".equals(uri)
+                || "/api/auth/refresh".equals(uri)
+                || "/api/auth/oauth/exchange".equals(uri)
+                || "/api/auth/oauth/refresh".equals(uri);
+    }
+
+    private void writeAuthFailure(HttpServletResponse response, BusinessException exception) throws IOException {
+        if (response.isCommitted()) {
+            return;
+        }
+        response.setStatus(HttpStatus.UNAUTHORIZED.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
+        objectMapper.writeValue(response.getWriter(), ApiResponse.fail(exception.code(), exception.getMessage()));
     }
 
     private String resolveBearerToken(HttpServletRequest request) {
@@ -200,7 +249,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             authorizationSessionService.touch(claims.sessionId());
             return Optional.of(authentication);
         } catch (JwtException | IllegalArgumentException | ClassCastException ex) {
-            log.debug("Ignore invalid authorization server token: {}", ex.getMessage());
+            log.warn("[AUTH-DIAG] AuthServer JWT decode failed: {} - {}", ex.getClass().getSimpleName(), ex.getMessage());
             return Optional.empty();
         }
     }
