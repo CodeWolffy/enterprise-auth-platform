@@ -2,7 +2,18 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 
-const backendOrigin = import.meta.env.VITE_BACKEND_ORIGIN ?? 'http://127.0.0.1:8080'
+function resolveBackendOrigin() {
+  const configuredOrigin = import.meta.env.VITE_BACKEND_ORIGIN
+  if (configuredOrigin) {
+    return configuredOrigin
+  }
+  if (typeof window === 'undefined') {
+    return 'http://127.0.0.1:8080'
+  }
+  return `${window.location.protocol}//${window.location.hostname}:8080`
+}
+
+const backendOrigin = resolveBackendOrigin()
 let redirectingToLogin = false
 
 export const http = axios.create({
@@ -57,6 +68,10 @@ http.interceptors.response.use(
   async (error) => {
     const authStore = useAuthStore()
     const requestUrl = String(error.config?.url ?? '')
+    const inAuthCallback = typeof window !== 'undefined' && window.location.pathname === '/auth/callback'
+    const bypassRedirect = requestUrl.includes('/api/auth/csrf')
+      || requestUrl.includes('/api/auth/oauth/exchange')
+      || (inAuthCallback && requestUrl.includes('/api/auth/me'))
     const canRetryRefresh = !requestUrl.includes('/api/auth/oauth/refresh') && !requestUrl.includes('/api/auth/oauth/exchange')
     if (error.response?.status === 401 && authStore.accessToken && !error.config.__retry && canRetryRefresh) {
       error.config.__retry = true
@@ -68,6 +83,9 @@ http.interceptors.response.use(
         redirectToLogin()
         return Promise.reject(error)
       }
+    }
+    if ((error.response?.status === 401 || error.response?.status === 403) && bypassRedirect) {
+      return Promise.reject(error)
     }
     if (error.response?.status === 401 || error.response?.status === 403) {
       showError('登录状态已失效，请重新登录')

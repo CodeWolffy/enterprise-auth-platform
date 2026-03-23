@@ -2,7 +2,18 @@ const verifierKey = 'eap.oauth.verifier'
 const stateKey = 'eap.oauth.state'
 const tenantKey = 'eap.oauth.tenant'
 
-const backendOrigin = import.meta.env.VITE_BACKEND_ORIGIN ?? 'http://127.0.0.1:8080'
+function resolveBackendOrigin() {
+  const configuredOrigin = import.meta.env.VITE_BACKEND_ORIGIN
+  if (configuredOrigin) {
+    return configuredOrigin
+  }
+  if (typeof window === 'undefined') {
+    return 'http://127.0.0.1:8080'
+  }
+  return `${window.location.protocol}//${window.location.hostname}:8080`
+}
+
+const backendOrigin = resolveBackendOrigin()
 const publicClientId = import.meta.env.VITE_PUBLIC_CLIENT_ID ?? 'eap-frontend-spa'
 
 export function getBackendOrigin() {

@@ -15,7 +15,13 @@ async function ensureCsrfToken() {
   }
   csrfPromise = (async () => {
     const { data } = await http.get<ApiResponse<CsrfTokenResponse>>('/api/auth/csrf')
-    csrfReady = Boolean(data.data?.token)
+    const headerName = data.data?.headerName || 'X-XSRF-TOKEN'
+    const token = data.data?.token || ''
+    if (!token) {
+      throw new Error('CSRF token missing')
+    }
+    http.defaults.headers.common[headerName] = token
+    csrfReady = true
   })()
   try {
     await csrfPromise

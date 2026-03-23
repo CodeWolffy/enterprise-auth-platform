@@ -15,6 +15,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -29,8 +30,11 @@ public class SecurityConfig {
             TenantFilter tenantFilter,
             JwtAuthenticationFilter jwtAuthenticationFilter
     ) throws Exception {
+        CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        CsrfTokenRequestAttributeHandler csrfTokenRequestHandler = new CsrfTokenRequestAttributeHandler();
         http.csrf(csrf -> csrf
-                        .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                        .csrfTokenRepository(csrfTokenRepository)
+                        .csrfTokenRequestHandler(csrfTokenRequestHandler)
                         .ignoringRequestMatchers("/api/auth/login", "/api/auth/refresh"))
                 .cors(Customizer.withDefaults())
                 .formLogin(AbstractHttpConfigurer::disable)
@@ -39,6 +43,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/error",
+                                "/favicon.ico",
                                 "/actuator/health",
                                 "/doc.html",
                                 "/v3/api-docs/**",
@@ -60,7 +65,7 @@ public class SecurityConfig {
                                 "script-src 'self'; " +
                                 "style-src 'self' 'unsafe-inline'; " +
                                 "img-src 'self' data:; " +
-                                "font-src 'self' data:; " +
+                                "font-src 'self' data: https:; " +
                                 "object-src 'none'; " +
                                 "base-uri 'self'; " +
                                 "frame-ancestors 'none'"))

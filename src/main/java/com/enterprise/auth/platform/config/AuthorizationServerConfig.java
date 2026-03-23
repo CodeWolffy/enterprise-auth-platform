@@ -89,7 +89,6 @@ public class AuthorizationServerConfig {
                 .with(authorizationServerConfigurer, authorizationServer -> authorizationServer
                         .authorizationEndpoint(endpoint -> endpoint.consentPage("/oauth2/consent"))
                         .oidc(Customizer.withDefaults()))
-            .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
                 .csrf(csrf -> csrf.ignoringRequestMatchers(csrfIgnoredEndpoints))
                 .headers(this::applySecurityHeaders)
@@ -107,7 +106,6 @@ public class AuthorizationServerConfig {
             AuthenticationFailureHandler oauthLoginFailureHandler
     ) throws Exception {
         http.securityMatcher("/login", "/oauth2/consent")
-                .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/login").permitAll()
                         .anyRequest().authenticated())
@@ -418,7 +416,7 @@ public class AuthorizationServerConfig {
                                 "script-src 'self'; " +
                                 "style-src 'self' 'unsafe-inline'; " +
                                 "img-src 'self' data:; " +
-                                "font-src 'self' data:; " +
+                                "font-src 'self' data: https:; " +
                                 "object-src 'none'; " +
                                 "base-uri 'self'; " +
                                 "frame-ancestors 'none'"))
