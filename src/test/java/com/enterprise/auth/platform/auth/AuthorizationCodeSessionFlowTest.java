@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -103,6 +104,7 @@ class AuthorizationCodeSessionFlowTest {
                 .andExpect(jsonPath("$.data.username").value("admin"));
 
         mockMvc.perform(post("/api/auth/logout")
+                        .with(csrf())
                         .header("Authorization", "Bearer " + tokens.accessToken())
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk());

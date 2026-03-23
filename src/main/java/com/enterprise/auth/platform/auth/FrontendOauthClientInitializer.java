@@ -7,6 +7,7 @@ import com.enterprise.auth.platform.persistence.mapper.SysOauthClientMapper;
 import jakarta.annotation.PostConstruct;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -15,13 +16,16 @@ public class FrontendOauthClientInitializer {
 
     private final SysOauthClientMapper sysOauthClientMapper;
     private final FrontendProperties frontendProperties;
+    private final PasswordEncoder passwordEncoder;
 
     public FrontendOauthClientInitializer(
             SysOauthClientMapper sysOauthClientMapper,
-            FrontendProperties frontendProperties
+            FrontendProperties frontendProperties,
+            PasswordEncoder passwordEncoder
     ) {
         this.sysOauthClientMapper = sysOauthClientMapper;
         this.frontendProperties = frontendProperties;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @PostConstruct
@@ -42,7 +46,7 @@ public class FrontendOauthClientInitializer {
         SysOauthClientEntity entity = existing == null ? new SysOauthClientEntity() : existing;
         entity.setTenantId("platform");
         entity.setClientId(frontendProperties.publicClientId());
-        entity.setClientSecret("");
+        entity.setClientSecret(resolveClientSecret());
         entity.setClientName(StringUtils.hasText(frontendProperties.publicClientName()) ? frontendProperties.publicClientName() : "前端管理台");
         entity.setRedirectUris(frontendProperties.resolvedRedirectUris().stream().collect(Collectors.joining(",")));
         entity.setScopes(frontendProperties.resolvedScopes().stream().collect(Collectors.joining(",")));
@@ -55,5 +59,12 @@ public class FrontendOauthClientInitializer {
             return;
         }
         sysOauthClientMapper.updateById(entity);
+    }
+
+    private String resolveClientSecret() {
+        if (!StringUtils.hasText(frontendProperties.publicClientSecret())) {
+            return "";
+        }
+        return passwordEncoder.encode(frontendProperties.publicClientSecret());
     }
 }

@@ -102,6 +102,7 @@
     </div>
 
     <form method="post" action="/oauth2/authorize">
+      {{csrfHiddenInput}}
       <input type="hidden" name="client_id" value="{{clientIdRaw}}" />
       <input type="hidden" name="state" value="{{state}}" />
       <input type="hidden" name="tenantId" value="{{tenantId}}" />

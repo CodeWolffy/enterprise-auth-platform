@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.auth;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -50,6 +51,7 @@ class OAuthClientControllerTest {
 
         mockMvc.perform(post("/api/oauth-clients")
                         .with(user(principal))
+                        .with(csrf())
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -87,6 +89,7 @@ class OAuthClientControllerTest {
 
         mockMvc.perform(put("/api/oauth-clients/{id}", clientRowId)
                         .with(user(principal))
+                        .with(csrf())
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -106,6 +109,7 @@ class OAuthClientControllerTest {
 
         mockMvc.perform(post("/api/oauth-clients/{id}/rotate-secret", clientRowId)
                         .with(user(principal))
+                        .with(csrf())
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -118,6 +122,7 @@ class OAuthClientControllerTest {
 
         mockMvc.perform(put("/api/oauth-clients/{id}/status", clientRowId)
                         .with(user(principal))
+                        .with(csrf())
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -130,6 +135,7 @@ class OAuthClientControllerTest {
 
         mockMvc.perform(delete("/api/oauth-clients/{id}", clientRowId)
                         .with(user(principal))
+                        .with(csrf())
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));

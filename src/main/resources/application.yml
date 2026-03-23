@@ -55,6 +55,7 @@ app:
       - http://127.0.0.1:5173
       - http://localhost:5173
     public-client-id: eap-frontend-spa
+    public-client-secret: FrontendClientSecret@123
     public-client-name: Frontend Console
     redirect-uris:
       - http://127.0.0.1:5173/auth/callback
@@ -70,6 +71,8 @@ app:
     refresh-token-ttl: 7d
     captcha-ttl: 5m
     expose-captcha-answer: false
+    cookie-secure: false
+    cookie-same-site: Lax
     redis:
       session-enabled: true
       captcha-enabled: true

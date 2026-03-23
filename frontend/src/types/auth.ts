@@ -31,6 +31,18 @@ export interface OAuthTokenResponse {
   scope?: string
 }
 
+export interface CookieSessionResponse {
+  tenantId: string
+  sessionId: string
+  expiresAt: string
+}
+
+export interface CsrfTokenResponse {
+  headerName: string
+  parameterName: string
+  token: string
+}
+
 export interface ClientView {
   id: number
   tenantId: string

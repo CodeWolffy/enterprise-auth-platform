@@ -1,0 +1,15 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+app:
+  frontend:
+    public-client-secret: ${APP_FRONTEND_CLIENT_SECRET}
+  security:
+    jwt-secret: ${APP_SECURITY_JWT_SECRET}
+    cookie-secure: true
+    cookie-same-site: Lax

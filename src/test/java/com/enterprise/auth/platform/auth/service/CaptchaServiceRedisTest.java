@@ -31,7 +31,9 @@ class CaptchaServiceRedisTest {
                 Duration.ofMinutes(30),
                 Duration.ofDays(7),
                 Duration.ofMinutes(5),
-                true
+                true,
+                false,
+                "Lax"
         );
         SecurityRedisProperties redisProperties = new SecurityRedisProperties(true, true, false, "eap:auth:");
 

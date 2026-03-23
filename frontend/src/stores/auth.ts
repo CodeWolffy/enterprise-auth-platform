@@ -2,7 +2,7 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { ElMessage } from 'element-plus'
 import { exchangeAuthorizationCode, fetchPermissionSnapshot, logoutCurrentSession, refreshOauthToken } from '@/api/auth'
-import type { OAuthTokenResponse, PermissionSnapshot } from '@/types/auth'
+import type { CookieSessionResponse, PermissionSnapshot } from '@/types/auth'
 import { createOAuthRedirect } from '@/utils/oauth'
 import { clearDynamicRoutes, registerDynamicRoutes } from '@/router'
 
@@ -28,7 +28,7 @@ export const useAuthStore = defineStore('auth', () => {
   const menuItems = computed(() => snapshot.value?.menus ?? [])
 
   function restore() {
-    const raw = localStorage.getItem(storageKey)
+    const raw = sessionStorage.getItem(storageKey) ?? localStorage.getItem(storageKey)
     if (!raw) {
       return
     }
@@ -39,6 +39,8 @@ export const useAuthStore = defineStore('auth', () => {
     tenantId.value = parsed.tenantId
     snapshot.value = parsed.snapshot
     registerDynamicRoutes(snapshot.value)
+    sessionStorage.setItem(storageKey, raw)
+    localStorage.removeItem(storageKey)
   }
 
   function persist() {
@@ -49,7 +51,7 @@ export const useAuthStore = defineStore('auth', () => {
       tenantId: tenantId.value,
       snapshot: snapshot.value,
     }
-    localStorage.setItem(storageKey, JSON.stringify(payload))
+    sessionStorage.setItem(storageKey, JSON.stringify(payload))
   }
 
   async function startLogin(selectedTenantId: string) {
@@ -76,7 +78,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (!refreshToken.value) {
         throw new Error('missing refresh token')
       }
-      const payload = (await refreshOauthToken(refreshToken.value)) as OAuthTokenResponse
+      const payload = await refreshOauthToken()
       applyTokenPayload(payload, tenantId.value)
 
       if (reloadSnapshot) {
@@ -116,6 +118,7 @@ export const useAuthStore = defineStore('auth', () => {
     expiresAt.value = 0
     tenantId.value = 'platform'
     snapshot.value = null
+    sessionStorage.removeItem(storageKey)
     localStorage.removeItem(storageKey)
     clearDynamicRoutes()
   }
@@ -132,11 +135,12 @@ export const useAuthStore = defineStore('auth', () => {
     ElMessage.success('已退出当前会话')
   }
 
-  function applyTokenPayload(payload: OAuthTokenResponse, resolvedTenantId: string) {
-    accessToken.value = payload.access_token
-    refreshToken.value = payload.refresh_token ?? ''
-    expiresAt.value = Date.now() + payload.expires_in * 1000
-    tenantId.value = resolvedTenantId
+  function applyTokenPayload(payload: CookieSessionResponse, resolvedTenantId: string) {
+    accessToken.value = 'cookie-access'
+    refreshToken.value = 'cookie-refresh'
+    const expires = Date.parse(payload.expiresAt)
+    expiresAt.value = Number.isNaN(expires) ? Date.now() + 5 * 60 * 1000 : expires
+    tenantId.value = payload.tenantId || resolvedTenantId
   }
 
   return {

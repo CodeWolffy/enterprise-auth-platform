@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.tenant;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -97,6 +98,7 @@ class TenantControllerTest {
     void tenantCapabilityOverridesShouldBeQueriedAndUpdated() throws Exception {
         mockMvc.perform(put("/api/tenants/{tenantId}/capability-overrides", TENANT_ID)
                         .with(user(principal("tenant:write")))
+                        .with(csrf())
                         .header("X-Tenant-Id", TENANT_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""

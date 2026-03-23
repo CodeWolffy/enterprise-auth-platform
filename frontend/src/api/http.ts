@@ -8,6 +8,9 @@ let redirectingToLogin = false
 export const http = axios.create({
   baseURL: backendOrigin,
   timeout: 15000,
+  withCredentials: true,
+  xsrfCookieName: 'XSRF-TOKEN',
+  xsrfHeaderName: 'X-XSRF-TOKEN',
 })
 
 function showError(message: string) {
@@ -42,7 +45,6 @@ http.interceptors.request.use(async (config) => {
       redirectToLogin()
       return Promise.reject(new Error('token refresh failed'))
     }
-    config.headers.Authorization = `Bearer ${authStore.accessToken}`
   }
   if (authStore.tenantId) {
     config.headers['X-Tenant-Id'] = authStore.tenantId
@@ -54,11 +56,12 @@ http.interceptors.response.use(
   (response) => response,
   async (error) => {
     const authStore = useAuthStore()
-    if (error.response?.status === 401 && authStore.refreshToken && !error.config.__retry) {
+    const requestUrl = String(error.config?.url ?? '')
+    const canRetryRefresh = !requestUrl.includes('/api/auth/oauth/refresh') && !requestUrl.includes('/api/auth/oauth/exchange')
+    if (error.response?.status === 401 && authStore.accessToken && !error.config.__retry && canRetryRefresh) {
       error.config.__retry = true
       try {
         await authStore.refreshTokens()
-        error.config.headers.Authorization = `Bearer ${authStore.accessToken}`
         return http.request(error.config)
       } catch {
         showError('登录状态已失效，请重新登录')
@@ -69,7 +72,6 @@ http.interceptors.response.use(
     if (error.response?.status === 401 || error.response?.status === 403) {
       showError('登录状态已失效，请重新登录')
       redirectToLogin()
-      // 返回一个永远 pending 的 Promise，打断后续组件层的 Promise 链，防止引起 Unhandled rejection
       return new Promise(() => {})
     }
 

@@ -7,6 +7,7 @@ import com.enterprise.auth.platform.auth.dto.UserSessionResponse;
 import com.enterprise.auth.platform.auth.model.TokenClaims;
 import com.enterprise.auth.platform.auth.model.UserSession;
 import com.enterprise.auth.platform.auth.store.SessionStore;
+import com.enterprise.auth.platform.auth.service.LoginAttemptService.LoginFailureResult;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.config.SecurityProperties;
@@ -17,13 +18,11 @@ import com.enterprise.auth.platform.tenant.TenantContext;
 import com.enterprise.auth.platform.user.model.UserAccount;
 import com.enterprise.auth.platform.user.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.lang.Nullable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -31,9 +30,6 @@ import org.springframework.util.StringUtils;
 
 @Service
 public class AuthService {
-
-    private static final long MAX_LOGIN_FAILURES = 5;
-    private static final Duration LOGIN_FAILURE_WINDOW = Duration.ofMinutes(15);
 
     private final CaptchaService captchaService;
     private final SessionStore sessionStore;
@@ -45,8 +41,8 @@ public class AuthService {
     private final PersistenceProperties persistenceProperties;
     private final SysUserMapper sysUserMapper;
     private final DataScopeService dataScopeService;
-    private final StringRedisTemplate stringRedisTemplate;
     private final AuthorizationSessionService authorizationSessionService;
+    private final LoginAttemptService loginAttemptService;
 
     public AuthService(
             CaptchaService captchaService,
@@ -59,8 +55,8 @@ public class AuthService {
             PersistenceProperties persistenceProperties,
             @Nullable SysUserMapper sysUserMapper,
             DataScopeService dataScopeService,
-            StringRedisTemplate stringRedisTemplate,
-            AuthorizationSessionService authorizationSessionService
+            AuthorizationSessionService authorizationSessionService,
+            LoginAttemptService loginAttemptService
     ) {
         this.captchaService = captchaService;
         this.sessionStore = sessionStore;
@@ -72,8 +68,8 @@ public class AuthService {
         this.persistenceProperties = persistenceProperties;
         this.sysUserMapper = sysUserMapper;
         this.dataScopeService = dataScopeService;
-        this.stringRedisTemplate = stringRedisTemplate;
         this.authorizationSessionService = authorizationSessionService;
+        this.loginAttemptService = loginAttemptService;
     }
 
     public TokenResponse login(LoginRequest request, HttpServletRequest servletRequest) {
@@ -81,23 +77,19 @@ public class AuthService {
         String tenantId = StringUtils.hasText(request.tenantId()) ? request.tenantId() : TenantContext.getTenantId();
         String clientIp = clientIp(servletRequest);
 
-        String lockKey = lockKey(tenantId, request.username());
-        String failKey = failKey(tenantId, request.username());
-
-        if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(lockKey))) {
-            auditService.record("LOGIN_BLOCKED", request.username(), tenantId,
-                    Map.of("reason", "account_locked", "clientIp", clientIp));
+        if (loginAttemptService.isLocked(tenantId, request.username())) {
+            loginAttemptService.recordBlockedAttempt(tenantId, request.username(), clientIp);
             throw new BusinessException("ACCOUNT_LOCKED", "Account is locked. Try again later.");
         }
 
         UserAccount user = userRepository.findByUsername(tenantId, request.username())
                 .orElse(null);
         if (user == null) {
-            throw buildLoginFailure(tenantId, request.username(), failKey, lockKey, "user_not_found", clientIp);
+            throw buildLoginFailure(tenantId, request.username(), "user_not_found", clientIp);
         }
 
         if (!passwordEncoder.matches(request.password(), user.password())) {
-            throw buildLoginFailure(tenantId, request.username(), failKey, lockKey, "bad_credentials", clientIp);
+            throw buildLoginFailure(tenantId, request.username(), "bad_credentials", clientIp);
         }
 
         if (!user.enabled()) {
@@ -106,7 +98,7 @@ public class AuthService {
             throw new BusinessException("USER_DISABLED", "User is disabled");
         }
 
-        stringRedisTemplate.delete(failKey);
+        loginAttemptService.clearFailures(tenantId, request.username());
 
         String sessionId = UUID.randomUUID().toString();
         Instant now = Instant.now();
@@ -150,6 +142,7 @@ public class AuthService {
         UserAccount user = userRepository.findById(claims.userId())
                 .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "User not found"));
 
+        validateSessionSubjectBinding(session, claims, user);
         if (!user.enabled()) {
             authorizationSessionService.revoke(session.sessionId());
             throw new BusinessException("USER_DISABLED", "User disabled");
@@ -223,37 +216,34 @@ public class AuthService {
         return request.getRemoteAddr();
     }
 
-    private String failKey(String tenantId, String username) {
-        return "auth:fail:" + tenantId + ":" + username;
-    }
-
-    private String lockKey(String tenantId, String username) {
-        return "auth:lock:" + tenantId + ":" + username;
-    }
-
     private BusinessException buildLoginFailure(
             String tenantId,
             String username,
-            String failKey,
-            String lockKey,
             String reason,
             String clientIp
     ) {
-        Long fails = stringRedisTemplate.opsForValue().increment(failKey);
-        if (fails != null && fails == 1) {
-            stringRedisTemplate.expire(failKey, LOGIN_FAILURE_WINDOW);
-        }
-
-        if (fails != null && fails >= MAX_LOGIN_FAILURES) {
-            stringRedisTemplate.opsForValue().set(lockKey, "LOCKED", LOGIN_FAILURE_WINDOW);
-            stringRedisTemplate.delete(failKey);
-            auditService.record("ACCOUNT_LOCKED", username, tenantId,
-                    Map.of("reason", "exceed_max_failures", "clientIp", clientIp));
+        LoginFailureResult result = loginAttemptService.recordFailure(tenantId, username, reason, clientIp);
+        if (result.locked()) {
             return new BusinessException("ACCOUNT_LOCKED", "Account is locked. Try again later.");
         }
+        return new BusinessException(
+                "BAD_CREDENTIALS",
+                "Username or password is incorrect, remaining attempts: " + result.remainingAttempts()
+        );
+    }
 
-        auditService.record("LOGIN_FAILED", username, tenantId, Map.of("reason", reason, "clientIp", clientIp));
-        long remaining = Math.max(0, MAX_LOGIN_FAILURES - (fails == null ? 0 : fails));
-        return new BusinessException("BAD_CREDENTIALS", "Username or password is incorrect, remaining attempts: " + remaining);
+    private void validateSessionSubjectBinding(UserSession session, TokenClaims claims, UserAccount user) {
+        boolean mismatch = session.userId() == null
+                || claims.userId() == null
+                || user.id() == null
+                || !session.userId().equals(claims.userId())
+                || !session.userId().equals(user.id())
+                || !StringUtils.hasText(session.username())
+                || !session.username().equals(claims.username())
+                || !session.username().equals(user.username());
+        if (mismatch) {
+            authorizationSessionService.revoke(session.sessionId());
+            throw new BusinessException("SESSION_SUBJECT_MISMATCH", "Session subject mismatch");
+        }
     }
 }

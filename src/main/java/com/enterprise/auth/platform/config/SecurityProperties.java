@@ -9,7 +9,8 @@ public record SecurityProperties(
         Duration accessTokenTtl,
         Duration refreshTokenTtl,
         Duration captchaTtl,
-        boolean exposeCaptchaAnswer
+        boolean exposeCaptchaAnswer,
+        boolean cookieSecure,
+        String cookieSameSite
 ) {
 }
-

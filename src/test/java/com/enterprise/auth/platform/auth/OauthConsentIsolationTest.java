@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -84,6 +85,7 @@ class OauthConsentIsolationTest {
     void revokeShouldRejectCrossTenantConsent() throws Exception {
         mockMvc.perform(delete("/api/auth/consents")
                         .with(user(principal(Set.of("auth:write"))))
+                        .with(csrf())
                         .header("X-Tenant-Id", "platform")
                         .param("registeredClientId", tenantRegisteredClientId)
                         .param("principalName", "tenant-user"))

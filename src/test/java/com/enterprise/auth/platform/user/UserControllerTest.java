@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.user;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -112,6 +113,7 @@ class UserControllerTest {
 
         mockMvc.perform(post("/api/users")
                         .with(user(principal))
+                        .with(csrf())
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -146,6 +148,7 @@ class UserControllerTest {
 
         mockMvc.perform(post("/api/users")
                         .with(user(principal))
+                        .with(csrf())
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""

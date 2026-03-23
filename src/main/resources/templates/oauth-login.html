@@ -173,6 +173,8 @@
       </div>
       {{errorHtml}}
       <form method="post" action="/login">
+        {{csrfHiddenInput}}
+        {{clientIdHiddenInput}}
         <label for="tenantId">
           租户
           <select id="tenantId" name="tenantId">{{tenantOptionsHtml}}</select>

@@ -1,7 +1,10 @@
 package com.enterprise.auth.platform.auth.controller;
 
 import com.enterprise.auth.platform.auth.dto.CaptchaResponse;
+import com.enterprise.auth.platform.auth.dto.CookieSessionResponse;
+import com.enterprise.auth.platform.auth.dto.CsrfTokenResponse;
 import com.enterprise.auth.platform.auth.dto.LoginRequest;
+import com.enterprise.auth.platform.auth.dto.OAuthCodeExchangeRequest;
 import com.enterprise.auth.platform.auth.dto.PermissionSnapshotResponse;
 import com.enterprise.auth.platform.auth.dto.RefreshTokenRequest;
 import com.enterprise.auth.platform.auth.dto.TokenResponse;
@@ -9,6 +12,7 @@ import com.enterprise.auth.platform.auth.dto.UserSessionResponse;
 import com.enterprise.auth.platform.auth.model.TokenClaims;
 import com.enterprise.auth.platform.auth.service.AuthService;
 import com.enterprise.auth.platform.auth.service.CaptchaService;
+import com.enterprise.auth.platform.auth.service.OAuthCookieSessionService;
 import com.enterprise.auth.platform.auth.service.PermissionSnapshotService;
 import com.enterprise.auth.platform.common.api.ApiResponse;
 import com.enterprise.auth.platform.common.exception.BusinessException;
@@ -17,9 +21,11 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -35,15 +41,18 @@ public class AuthController {
     private final CaptchaService captchaService;
     private final AuthService authService;
     private final PermissionSnapshotService permissionSnapshotService;
+    private final OAuthCookieSessionService oauthCookieSessionService;
 
     public AuthController(
             CaptchaService captchaService,
             AuthService authService,
-            PermissionSnapshotService permissionSnapshotService
+            PermissionSnapshotService permissionSnapshotService,
+            OAuthCookieSessionService oauthCookieSessionService
     ) {
         this.captchaService = captchaService;
         this.authService = authService;
         this.permissionSnapshotService = permissionSnapshotService;
+        this.oauthCookieSessionService = oauthCookieSessionService;
     }
 
     @Operation(summary = "获取登录验证码")
@@ -55,6 +64,41 @@ public class AuthController {
                 challenge.expiresAt(),
                 challenge.previewCode()
         ));
+    }
+
+    @Operation(summary = "获取 CSRF Token")
+    @GetMapping("/csrf")
+    public ApiResponse<CsrfTokenResponse> csrf(CsrfToken csrfToken) {
+        return ApiResponse.ok(new CsrfTokenResponse(
+                csrfToken.getHeaderName(),
+                csrfToken.getParameterName(),
+                csrfToken.getToken()
+        ));
+    }
+
+    @Operation(summary = "OAuth 授权码交换并写入安全 Cookie")
+    @PostMapping("/oauth/exchange")
+    public ApiResponse<CookieSessionResponse> oauthExchange(
+            @Valid @RequestBody OAuthCodeExchangeRequest request,
+            HttpServletRequest servletRequest,
+            HttpServletResponse servletResponse
+    ) {
+        return ApiResponse.ok(oauthCookieSessionService.exchangeAuthorizationCode(
+                request.code(),
+                request.codeVerifier(),
+                request.redirectUri(),
+                servletRequest,
+                servletResponse
+        ));
+    }
+
+    @Operation(summary = "使用 Cookie 刷新会话")
+    @PostMapping("/oauth/refresh")
+    public ApiResponse<CookieSessionResponse> oauthRefresh(
+            HttpServletRequest servletRequest,
+            HttpServletResponse servletResponse
+    ) {
+        return ApiResponse.ok(oauthCookieSessionService.refresh(servletRequest, servletResponse));
     }
 
     @Operation(summary = "账号登录")
@@ -71,10 +115,17 @@ public class AuthController {
 
     @Operation(summary = "退出登录")
     @PostMapping("/logout")
-    public ApiResponse<Void> logout(Authentication authentication) {
-        UserAccount user = currentUser(authentication);
-        TokenClaims claims = currentClaims(authentication);
-        authService.logout(claims.sessionId(), user.username(), user.tenantId());
+    public ApiResponse<Void> logout(
+            Authentication authentication,
+            HttpServletRequest servletRequest,
+            HttpServletResponse servletResponse
+    ) {
+        oauthCookieSessionService.clearCookies(servletRequest, servletResponse);
+        if (authentication != null
+                && authentication.getPrincipal() instanceof UserAccount user
+                && authentication.getDetails() instanceof TokenClaims claims) {
+            authService.logout(claims.sessionId(), user.username(), user.tenantId());
+        }
         return ApiResponse.ok();
     }
 
@@ -105,12 +156,5 @@ public class AuthController {
             throw new BusinessException("用户未登录");
         }
         return user;
-    }
-
-    private TokenClaims currentClaims(Authentication authentication) {
-        if (authentication == null || !(authentication.getDetails() instanceof TokenClaims claims)) {
-            throw new BusinessException("缺少会话信息");
-        }
-        return claims;
     }
 }

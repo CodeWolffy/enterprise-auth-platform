@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.audit;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -94,6 +95,7 @@ class AuditControllerTest {
     void shouldCreateAsyncExportTask() throws Exception {
         mockMvc.perform(post("/api/audit/exports")
                         .with(user(principal()))
+                        .with(csrf())
                         .header("X-Tenant-Id", "platform")
                         .param("eventType", EVENT_TYPE)
                         .param("clientIp", "10.10.10.10")
@@ -127,6 +129,7 @@ class AuditControllerTest {
 
         mockMvc.perform(delete("/api/audit/exports/{taskId}", taskId)
                         .with(user(principal()))
+                        .with(csrf())
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").doesNotExist());
@@ -138,6 +141,7 @@ class AuditControllerTest {
 
         mockMvc.perform(delete("/api/audit/exports")
                         .with(user(principal()))
+                        .with(csrf())
                         .header("X-Tenant-Id", "platform")
                         .param("tenantId", "platform")
                         .param("status", "FAILED")
@@ -160,6 +164,7 @@ class AuditControllerTest {
 
         mockMvc.perform(post("/api/audit/exports/{taskId}/archive", singleTaskId)
                         .with(user(principal()))
+                        .with(csrf())
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("ARCHIVED"))
@@ -173,6 +178,7 @@ class AuditControllerTest {
 
         mockMvc.perform(post("/api/audit/exports/archive")
                         .with(user(principal()))
+                        .with(csrf())
                         .header("X-Tenant-Id", "platform")
                         .param("tenantId", "platform")
                         .param("status", "SUCCESS")
@@ -197,6 +203,7 @@ class AuditControllerTest {
 
         mockMvc.perform(post("/api/audit/exports/{taskId}/retry", taskId)
                         .with(user(principal()))
+                        .with(csrf())
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").isNumber())
@@ -214,6 +221,7 @@ class AuditControllerTest {
 
         mockMvc.perform(put("/api/audit/exports/policy")
                         .with(user(principalWithWrite()))
+                        .with(csrf())
                         .header("X-Tenant-Id", "platform")
                         .contentType("application/json")
                         .content("""
@@ -240,6 +248,7 @@ class AuditControllerTest {
 
         mockMvc.perform(post("/api/audit/exports/governance")
                         .with(user(principalWithWrite()))
+                        .with(csrf())
                         .header("X-Tenant-Id", "platform")
                         .param("tenantId", "platform")
                         .param("dryRun", "true"))
@@ -265,6 +274,7 @@ class AuditControllerTest {
 
         mockMvc.perform(post("/api/audit/exports/governance")
                         .with(user(principalWithWrite()))
+                        .with(csrf())
                         .header("X-Tenant-Id", "platform")
                         .param("tenantId", "platform"))
                 .andExpect(status().isOk())

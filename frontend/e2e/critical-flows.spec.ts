@@ -11,7 +11,7 @@ async function loginByCallback(page: Page) {
     window.sessionStorage.setItem('eap.oauth.tenant', 'platform')
   })
 
-  await page.route('**/oauth2/token', async (route) => {
+  await page.route('**/api/auth/csrf', async (route) => {
     await route.fulfill({
       status: 200,
       headers: {
@@ -20,12 +20,51 @@ async function loginByCallback(page: Page) {
         'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS',
       },
       contentType: 'application/json',
-      body: JSON.stringify({
-        access_token: 'callback-token',
-        refresh_token: 'callback-refresh',
-        token_type: 'Bearer',
-        expires_in: 3600,
-      }),
+      body: JSON.stringify(
+        apiEnvelope({
+          headerName: 'X-XSRF-TOKEN',
+          parameterName: '_csrf',
+          token: 'csrf-e2e-token',
+        }),
+      ),
+    })
+  })
+
+  await page.route('**/api/auth/oauth/exchange', async (route) => {
+    await route.fulfill({
+      status: 200,
+      headers: {
+        'access-control-allow-origin': '*',
+        'access-control-allow-headers': '*',
+        'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS',
+      },
+      contentType: 'application/json',
+      body: JSON.stringify(
+        apiEnvelope({
+          tenantId: 'platform',
+          sessionId: 'oauth-session-e2e',
+          expiresAt: '2099-01-01T00:00:00Z',
+        }),
+      ),
+    })
+  })
+
+  await page.route('**/api/auth/oauth/refresh', async (route) => {
+    await route.fulfill({
+      status: 200,
+      headers: {
+        'access-control-allow-origin': '*',
+        'access-control-allow-headers': '*',
+        'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS',
+      },
+      contentType: 'application/json',
+      body: JSON.stringify(
+        apiEnvelope({
+          tenantId: 'platform',
+          sessionId: 'oauth-session-e2e',
+          expiresAt: '2099-01-01T00:00:00Z',
+        }),
+      ),
     })
   })
 
@@ -64,7 +103,7 @@ test.describe('关键流程回归', () => {
     await page.goto('/system/audit')
     await expect(page).toHaveURL(/\/login$/)
     await expect
-      .poll(async () => page.evaluate((key) => window.localStorage.getItem(key), AUTH_STORAGE_KEY))
+      .poll(async () => page.evaluate((key) => window.sessionStorage.getItem(key), AUTH_STORAGE_KEY))
       .toBeNull()
   })
 

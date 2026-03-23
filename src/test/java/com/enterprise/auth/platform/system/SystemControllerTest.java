@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.system;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -150,6 +151,7 @@ class SystemControllerTest {
     void updateHiddenDictShouldBeRejected() throws Exception {
         mockMvc.perform(put("/api/system/dicts/{id}", hiddenDictId)
                         .with(user(principal(Set.of("system:write"))))
+                        .with(csrf())
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -168,6 +170,7 @@ class SystemControllerTest {
     void shouldCreateCategoryOption() throws Exception {
         mockMvc.perform(post("/api/system/categories/dict")
                         .with(user(principal(Set.of("system:write"))))
+                        .with(csrf())
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""

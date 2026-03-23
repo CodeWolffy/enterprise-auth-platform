@@ -7,6 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record FrontendProperties(
         List<String> allowedOrigins,
         String publicClientId,
+        String publicClientSecret,
         String publicClientName,
         List<String> redirectUris,
         List<String> scopes

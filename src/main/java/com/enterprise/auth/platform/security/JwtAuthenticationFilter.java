@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.security;
 
+import com.enterprise.auth.platform.auth.AuthCookieConstants;
 import com.enterprise.auth.platform.auth.model.TokenClaims;
 import com.enterprise.auth.platform.auth.model.UserSession;
 import com.enterprise.auth.platform.auth.service.AuthorizationSessionService;
@@ -12,6 +13,7 @@ import com.enterprise.auth.platform.user.model.UserAccount;
 import com.enterprise.auth.platform.user.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -68,13 +70,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
-        String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
-        if (!StringUtils.hasText(authorization) || !authorization.startsWith("Bearer ")) {
+        String token = resolveBearerToken(request);
+        if (!StringUtils.hasText(token)) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String token = authorization.substring(7);
         try {
             Optional<UsernamePasswordAuthenticationToken> authentication = authenticateCustomToken(request, token);
             if (authentication.isEmpty()) {
@@ -92,6 +93,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private String resolveBearerToken(HttpServletRequest request) {
+        String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
+        if (StringUtils.hasText(authorization) && authorization.startsWith("Bearer ")) {
+            return authorization.substring(7);
+        }
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null || cookies.length == 0) {
+            return null;
+        }
+        for (Cookie cookie : cookies) {
+            if (AuthCookieConstants.ACCESS_TOKEN_COOKIE.equals(cookie.getName()) && StringUtils.hasText(cookie.getValue())) {
+                return cookie.getValue();
+            }
+        }
+        return null;
     }
 
     private Optional<UsernamePasswordAuthenticationToken> authenticateCustomToken(HttpServletRequest request, String token) {
@@ -115,6 +133,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         UserAccount user = userRepository.findById(claims.userId())
                 .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "User not found"));
 
+        validateSessionSubjectBinding(session, claims, user);
         validateTenantBinding(request, claims, user, session.tenantId());
 
         if (!user.enabled()) {
@@ -164,6 +183,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             UserSession session = authorizationSessionService.findOrRestore(claims.sessionId(), user)
                     .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "Session not found"));
+            validateSessionSubjectBinding(session, claims, user);
             validateTenantBinding(request, claims, user, session.tenantId());
             if (!session.active() || Instant.now().isAfter(session.expiresAt())) {
                 authorizationSessionService.revoke(claims.sessionId());
@@ -198,6 +218,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String requestedTenantId = resolveRequestedTenant(request);
         if (StringUtils.hasText(requestedTenantId) && !requestedTenantId.equals(tokenTenantId)) {
             throw new BusinessException("TENANT_MISMATCH", "Tenant context mismatch");
+        }
+    }
+
+    private void validateSessionSubjectBinding(UserSession session, TokenClaims claims, UserAccount user) {
+        boolean mismatch = session.userId() == null
+                || claims.userId() == null
+                || user.id() == null
+                || !session.userId().equals(claims.userId())
+                || !session.userId().equals(user.id())
+                || !StringUtils.hasText(session.username())
+                || !session.username().equals(claims.username())
+                || !session.username().equals(user.username());
+        if (mismatch) {
+            authorizationSessionService.revoke(claims.sessionId());
+            throw new BusinessException("SESSION_SUBJECT_MISMATCH", "Session subject mismatch");
         }
     }
 

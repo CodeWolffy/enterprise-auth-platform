@@ -15,11 +15,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.springframework.http.MediaType;
 import org.springframework.lang.Nullable;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -29,6 +31,15 @@ import org.springframework.web.util.HtmlUtils;
 
 @RestController
 public class LoginPageController {
+
+    private static final Pattern HEX_COLOR_PATTERN =
+            Pattern.compile("^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$");
+    private static final Pattern RGB_COLOR_PATTERN = Pattern.compile(
+            "^rgba?\\(\\s*(?:\\d|[1-9]\\d|1\\d\\d|2[0-4]\\d|25[0-5])\\s*,\\s*"
+                    + "(?:\\d|[1-9]\\d|1\\d\\d|2[0-4]\\d|25[0-5])\\s*,\\s*"
+                    + "(?:\\d|[1-9]\\d|1\\d\\d|2[0-4]\\d|25[0-5])"
+                    + "(?:\\s*,\\s*(?:0(?:\\.\\d+)?|1(?:\\.0+)?|\\.\\d+)\\s*)?\\)$"
+    );
 
     private static final Map<String, String> DEFAULT_SCOPE_DESCRIPTIONS = Map.of(
             "openid", "读取用户基础身份信息，用于建立统一登录会话。",
@@ -65,7 +76,8 @@ public class LoginPageController {
     public String loginPage(
             @RequestParam(name = "tenantId", required = false) String tenantId,
             @RequestParam(name = "client_id", required = false) String clientId,
-            @RequestParam(name = "error", required = false) String error
+            @RequestParam(name = "error", required = false) String error,
+            HttpServletRequest request
     ) {
         TenantOption currentTenant = currentTenant(tenantId);
         RegisteredClient client = findClient(clientId);
@@ -78,13 +90,16 @@ public class LoginPageController {
         model.put("tenantLevel", currentTenant.platformLevel() ? "平台级租户" : "业务租户");
         model.put("clientDisplayName", escape(clientDisplayName));
         model.put("clientId", escape(StringUtils.hasText(clientId) ? clientId : "未指定"));
+        model.put("clientIdRaw", escape(StringUtils.hasText(clientId) ? clientId : ""));
+        model.put("clientIdHiddenInput", StringUtils.hasText(clientId)
+                ? """
+                <input type="hidden" name="client_id" value="%s" />
+                """.formatted(escape(clientId))
+                : "");
         model.put("tenantCardsHtml", tenantCardsHtml());
         model.put("tenantOptionsHtml", tenantOptionsHtml(currentTenant.tenantId()));
-        model.put("errorHtml", error == null ? "" : """
-                <div class="alert">
-                  用户名、密码或租户信息错误，请检查后重新登录。
-                </div>
-                """);
+        model.put("csrfHiddenInput", csrfHiddenInput(request));
+        model.put("errorHtml", errorHtml(error));
         return htmlTemplateRenderer.render("templates/oauth-login.html", model);
     }
 
@@ -119,6 +134,7 @@ public class LoginPageController {
         model.put("clientMode", escape(describeClientMode(client)));
         model.put("state", escape(state == null ? "" : state));
         model.put("tenantId", escape(currentTenant.tenantId()));
+        model.put("csrfHiddenInput", csrfHiddenInput(request));
         model.put("scopeHtml", scopeHtml);
         return htmlTemplateRenderer.render("templates/oauth-consent.html", model);
     }
@@ -278,6 +294,48 @@ public class LoginPageController {
         return HtmlUtils.htmlEscape(value == null ? "" : value);
     }
 
+    private String errorHtml(@Nullable String error) {
+        if (!StringUtils.hasText(error)) {
+            return "";
+        }
+        if ("locked".equalsIgnoreCase(error)) {
+            return """
+                    <div class="alert">
+                      登录失败次数过多，账号已临时锁定，请稍后再试。
+                    </div>
+                    """;
+        }
+        return """
+                <div class="alert">
+                  用户名、密码或租户信息错误，请检查后重新登录。
+                </div>
+                """;
+    }
+
+    private String csrfHiddenInput(HttpServletRequest request) {
+        CsrfToken csrfToken = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
+        if (csrfToken == null) {
+            csrfToken = (CsrfToken) request.getAttribute("_csrf");
+        }
+        if (csrfToken == null || !StringUtils.hasText(csrfToken.getToken())) {
+            return "";
+        }
+        return """
+                <input type="hidden" name="%s" value="%s" />
+                """.formatted(escape(csrfToken.getParameterName()), escape(csrfToken.getToken()));
+    }
+
+    private static String sanitizeCssColor(String value, String fallback) {
+        if (!StringUtils.hasText(value)) {
+            return fallback;
+        }
+        String candidate = value.trim();
+        if (HEX_COLOR_PATTERN.matcher(candidate).matches() || RGB_COLOR_PATTERN.matcher(candidate).matches()) {
+            return candidate;
+        }
+        return fallback;
+    }
+
     private static class TenantOption {
         private final String tenantId;
         private final String tenantName;
@@ -314,17 +372,13 @@ public class LoginPageController {
         }
 
         String brandColor() {
-            if (StringUtils.hasText(brandColor)) {
-                return brandColor;
-            }
-            return platformLevel ? "#0f766e" : "#9a3412";
+            String fallback = platformLevel ? "#0f766e" : "#9a3412";
+            return sanitizeCssColor(brandColor, fallback);
         }
 
         String brandSoftColor() {
-            if (StringUtils.hasText(brandSoftColor)) {
-                return brandSoftColor;
-            }
-            return platformLevel ? "rgba(15,118,110,.18)" : "rgba(154,52,18,.16)";
+            String fallback = platformLevel ? "rgba(15,118,110,.18)" : "rgba(154,52,18,.16)";
+            return sanitizeCssColor(brandSoftColor, fallback);
         }
     }
 }

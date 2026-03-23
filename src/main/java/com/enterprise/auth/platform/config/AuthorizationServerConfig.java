@@ -8,6 +8,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.enterprise.auth.platform.auth.DatabaseRegisteredClientRepository;
 import com.enterprise.auth.platform.auth.service.AuthorizationSessionService;
 import com.enterprise.auth.platform.auth.service.AuditingAuthorizationConsentService;
+import com.enterprise.auth.platform.auth.service.LoginAttemptService;
+import com.enterprise.auth.platform.auth.service.LoginAttemptService.LoginFailureResult;
 import com.enterprise.auth.platform.persistence.mapper.SysOauthClientMapper;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import com.enterprise.auth.platform.tenant.TenantFilter;
@@ -27,14 +29,16 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.util.List;
 import java.util.UUID;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
@@ -55,9 +59,17 @@ import org.springframework.security.oauth2.server.authorization.settings.Authori
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.AuthenticationFailureHandler;
+import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.util.StringUtils;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @Configuration
 public class AuthorizationServerConfig {
@@ -69,13 +81,18 @@ public class AuthorizationServerConfig {
             TenantFilter tenantFilter
     ) throws Exception {
         OAuth2AuthorizationServerConfigurer authorizationServerConfigurer = new OAuth2AuthorizationServerConfigurer();
+        RequestMatcher authorizationEndpointsMatcher = authorizationServerConfigurer.getEndpointsMatcher();
+        RequestMatcher csrfIgnoredEndpoints = request ->
+                authorizationEndpointsMatcher.matches(request)
+                        && !request.getRequestURI().endsWith("/oauth2/authorize");
         http.securityMatcher(authorizationServerConfigurer.getEndpointsMatcher())
                 .with(authorizationServerConfigurer, authorizationServer -> authorizationServer
                         .authorizationEndpoint(endpoint -> endpoint.consentPage("/oauth2/consent"))
                         .oidc(Customizer.withDefaults()))
             .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
-                .csrf(csrf -> csrf.ignoringRequestMatchers(authorizationServerConfigurer.getEndpointsMatcher()))
+                .csrf(csrf -> csrf.ignoringRequestMatchers(csrfIgnoredEndpoints))
+                .headers(this::applySecurityHeaders)
                 .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login")))
                 .addFilterBefore(tenantFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
@@ -85,15 +102,21 @@ public class AuthorizationServerConfig {
     @Order(2)
     public SecurityFilterChain loginSecurityFilterChain(
             HttpSecurity http,
-            TenantFilter tenantFilter
+            TenantFilter tenantFilter,
+            AuthenticationSuccessHandler oauthLoginSuccessHandler,
+            AuthenticationFailureHandler oauthLoginFailureHandler
     ) throws Exception {
         http.securityMatcher("/login", "/oauth2/consent")
-                .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/login").permitAll()
                         .anyRequest().authenticated())
-                .formLogin(form -> form.loginPage("/login").permitAll())
+                .formLogin(form -> form
+                        .loginPage("/login")
+                        .successHandler(oauthLoginSuccessHandler)
+                        .failureHandler(oauthLoginFailureHandler)
+                        .permitAll())
+                .headers(this::applySecurityHeaders)
                 .addFilterBefore(tenantFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
@@ -101,15 +124,56 @@ public class AuthorizationServerConfig {
     @Bean
     public UserDetailsService authorizationServerUserDetailsService(
             UserRepository userRepository,
-            TenantProperties tenantProperties
+            TenantProperties tenantProperties,
+            LoginAttemptService loginAttemptService
     ) {
         return username -> {
             String tenantId = TenantContext.getTenantId();
             if (!StringUtils.hasText(tenantId)) {
                 tenantId = tenantProperties.platformTenantId();
             }
+            if (loginAttemptService.isLocked(tenantId, username)) {
+                loginAttemptService.recordBlockedAttempt(tenantId, username, currentRequestClientIp());
+                throw new LockedException("Account is locked");
+            }
             return userRepository.findByUsername(tenantId, username)
                     .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException(username));
+        };
+    }
+
+    @Bean
+    public AuthenticationSuccessHandler oauthLoginSuccessHandler(
+            LoginAttemptService loginAttemptService,
+            TenantProperties tenantProperties
+    ) {
+        SavedRequestAwareAuthenticationSuccessHandler delegate = new SavedRequestAwareAuthenticationSuccessHandler();
+        return (request, response, authentication) -> {
+            String tenantId = resolveTenantId(request, tenantProperties);
+            String username = authentication == null ? null : authentication.getName();
+            loginAttemptService.clearFailures(tenantId, username);
+            delegate.onAuthenticationSuccess(request, response, authentication);
+        };
+    }
+
+    @Bean
+    public AuthenticationFailureHandler oauthLoginFailureHandler(
+            LoginAttemptService loginAttemptService,
+            TenantProperties tenantProperties
+    ) {
+        return (request, response, exception) -> {
+            String tenantId = resolveTenantId(request, tenantProperties);
+            String username = request.getParameter("username");
+            String clientIp = resolveClientIp(request);
+
+            if (exception instanceof LockedException || loginAttemptService.isLocked(tenantId, username)) {
+                loginAttemptService.recordBlockedAttempt(tenantId, username, clientIp);
+                response.sendRedirect(buildLoginFailureRedirect(request, "locked", tenantId));
+                return;
+            }
+
+            LoginFailureResult result = loginAttemptService.recordFailure(tenantId, username, "bad_credentials", clientIp);
+            String errorCode = result.locked() ? "locked" : "bad_credentials";
+            response.sendRedirect(buildLoginFailureRedirect(request, errorCode, tenantId));
         };
     }
 
@@ -306,6 +370,61 @@ public class AuthorizationServerConfig {
             return user;
         }
         return null;
+    }
+
+    private String resolveTenantId(HttpServletRequest request, TenantProperties tenantProperties) {
+        String tenantId = request.getHeader(tenantProperties.headerName());
+        if (!StringUtils.hasText(tenantId)) {
+            tenantId = request.getParameter("tenantId");
+        }
+        if (!StringUtils.hasText(tenantId)) {
+            tenantId = TenantContext.getTenantId();
+        }
+        return StringUtils.hasText(tenantId) ? tenantId : tenantProperties.platformTenantId();
+    }
+
+    private String buildLoginFailureRedirect(HttpServletRequest request, String errorCode, String tenantId) {
+        UriComponentsBuilder builder = UriComponentsBuilder.fromPath("/login")
+                .queryParam("error", errorCode);
+        if (StringUtils.hasText(tenantId)) {
+            builder.queryParam("tenantId", tenantId);
+        }
+        String clientId = request.getParameter("client_id");
+        if (StringUtils.hasText(clientId)) {
+            builder.queryParam("client_id", clientId);
+        }
+        return builder.build().toUriString();
+    }
+
+    private String currentRequestClientIp() {
+        ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        if (attributes == null) {
+            return "unknown";
+        }
+        return resolveClientIp(attributes.getRequest());
+    }
+
+    private String resolveClientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (StringUtils.hasText(forwarded)) {
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
+    }
+
+    private void applySecurityHeaders(HeadersConfigurer<HttpSecurity> headers) {
+        headers.contentSecurityPolicy(csp -> csp.policyDirectives(
+                        "default-src 'self'; " +
+                                "script-src 'self'; " +
+                                "style-src 'self' 'unsafe-inline'; " +
+                                "img-src 'self' data:; " +
+                                "font-src 'self' data:; " +
+                                "object-src 'none'; " +
+                                "base-uri 'self'; " +
+                                "frame-ancestors 'none'"))
+                .referrerPolicy(policy -> policy.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
+                .frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
+                .permissionsPolicy(permissions -> permissions.policy("geolocation=(), camera=(), microphone=()"));
     }
 
     private RSAKey rsaKey(AuthorizationServerProperties properties) {
