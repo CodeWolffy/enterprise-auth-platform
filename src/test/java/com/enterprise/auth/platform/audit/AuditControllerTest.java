@@ -92,6 +92,18 @@ class AuditControllerTest {
     }
 
     @Test
+    void eventsShouldAcceptLocalDateTimeWithoutTimezone() throws Exception {
+        mockMvc.perform(get("/api/audit/events")
+                        .with(user(principal()))
+                        .header("X-Tenant-Id", "platform")
+                        .param("eventType", EVENT_TYPE)
+                        .param("occurredFrom", "2026-03-01T00:00:00")
+                        .param("occurredTo", "2026-03-31T23:59:59"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
     void shouldCreateAsyncExportTask() throws Exception {
         mockMvc.perform(post("/api/audit/exports")
                         .with(user(principal()))

@@ -102,7 +102,7 @@
         <el-table-column v-if="auditTablePrefs.visibleColumnMap.clientIp" column-key="clientIp" prop="clientIp" label="客户端 IP" min-width="140" :width="auditTablePrefs.getColumnWidth('clientIp')" />
         <el-table-column v-if="auditTablePrefs.visibleColumnMap.occurredAt" column-key="occurredAt" label="发生时间" min-width="180" :width="auditTablePrefs.getColumnWidth('occurredAt')">
           <template #default="{ row }">
-            {{ row.occurredAt ? row.occurredAt.replace('T', ' ').replace('Z', '') : '-' }}
+            {{ formatDateTime(row.occurredAt) }}
           </template>
         </el-table-column>
         <el-table-column v-if="auditTablePrefs.visibleColumnMap.details" column-key="details" label="事件明细" min-width="220" :width="auditTablePrefs.getColumnWidth('details')">
@@ -268,8 +268,16 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column v-if="exportTablePrefs.visibleColumnMap.requestedAt" column-key="requestedAt" prop="requestedAt" label="发起时间" min-width="180" :width="exportTablePrefs.getColumnWidth('requestedAt')" />
-        <el-table-column v-if="exportTablePrefs.visibleColumnMap.completedAt" column-key="completedAt" prop="completedAt" label="完成时间" min-width="180" :width="exportTablePrefs.getColumnWidth('completedAt')" />
+        <el-table-column v-if="exportTablePrefs.visibleColumnMap.requestedAt" column-key="requestedAt" label="发起时间" min-width="180" :width="exportTablePrefs.getColumnWidth('requestedAt')">
+          <template #default="{ row }">
+            {{ formatDateTime(row.requestedAt) }}
+          </template>
+        </el-table-column>
+        <el-table-column v-if="exportTablePrefs.visibleColumnMap.completedAt" column-key="completedAt" label="完成时间" min-width="180" :width="exportTablePrefs.getColumnWidth('completedAt')">
+          <template #default="{ row }">
+            {{ formatDateTime(row.completedAt) }}
+          </template>
+        </el-table-column>
         <el-table-column v-if="exportTablePrefs.visibleColumnMap.errorMessage" column-key="errorMessage" prop="errorMessage" label="失败原因" min-width="180" show-overflow-tooltip :width="exportTablePrefs.getColumnWidth('errorMessage')" />
         <el-table-column v-if="exportTablePrefs.visibleColumnMap.actions" column-key="actions" fixed="right" label="操作" width="340" :min-width="240" :resizable="true">
           <template #default="{ row }">
@@ -305,9 +313,9 @@
           <el-descriptions-item label="发起人">{{ detailTask.operator }}</el-descriptions-item>
           <el-descriptions-item label="记录数">{{ detailTask.recordCount }}</el-descriptions-item>
           <el-descriptions-item label="进度">{{ detailTask.progressPercent }}% / {{ detailTask.progressStage }}</el-descriptions-item>
-          <el-descriptions-item label="发起时间">{{ detailTask.requestedAt || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="完成时间">{{ detailTask.completedAt || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="到期时间">{{ detailTask.expiresAt || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="发起时间">{{ formatDateTime(detailTask.requestedAt) }}</el-descriptions-item>
+          <el-descriptions-item label="完成时间">{{ formatDateTime(detailTask.completedAt) }}</el-descriptions-item>
+          <el-descriptions-item label="到期时间">{{ formatDateTime(detailTask.expiresAt) }}</el-descriptions-item>
           <el-descriptions-item label="失败原因">{{ detailTask.errorMessage || '无' }}</el-descriptions-item>
         </el-descriptions>
 
@@ -333,6 +341,7 @@ import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AdvancedSearch from '@/components/AdvancedSearch.vue'
 import { useTablePreferences } from '@/composables/useTablePreferences'
+import { formatDateTime } from '@/utils/datetime'
 import {
   archiveAuditExportTask,
   archiveAuditExportTasks,
@@ -668,7 +677,7 @@ function daysUntil(isoText: string) {
 }
 
 function formatTime(isoText: string) {
-  return isoText.replace('T', ' ')
+  return formatDateTime(isoText)
 }
 
 function openTaskDetail(task: AuditExportTask) {

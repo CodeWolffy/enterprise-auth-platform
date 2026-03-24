@@ -6,6 +6,7 @@ import AdvancedSearch from '@/components/AdvancedSearch.vue'
 import { useTablePreferences } from '@/composables/useTablePreferences'
 import { queryConsents, revokeConsent } from '@/api/authConsents'
 import type { ConsentView } from '@/api/authConsents'
+import { formatDateTime } from '@/utils/datetime'
 
 const route = useRoute()
 const router = useRouter()
@@ -231,8 +232,8 @@ void load()
           <template #default="{ row }">
             <div class="client-cell">
               <small>租户：{{ row.tenantId }}</small>
-              <small>最近授权：{{ row.lastGrantedAt || '-' }}</small>
-              <small>最近撤销：{{ row.lastRevokedAt || '-' }}</small>
+              <small>最近授权：{{ formatDateTime(row.lastGrantedAt) }}</small>
+              <small>最近撤销：{{ formatDateTime(row.lastRevokedAt) }}</small>
               <small>关联审计：{{ row.auditEventCount }}</small>
             </div>
           </template>

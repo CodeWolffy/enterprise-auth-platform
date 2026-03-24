@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.csrf.CsrfException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -31,7 +32,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({
             MethodArgumentNotValidException.class,
             BindException.class,
-            ConstraintViolationException.class
+            ConstraintViolationException.class,
+            MethodArgumentTypeMismatchException.class
     })
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Void> handleValidation(Exception exception) {
@@ -74,6 +76,10 @@ public class GlobalExceptionHandler {
                     .map(violation -> violation.getMessage())
                     .findFirst()
                     .orElse("请求参数校验失败");
+        }
+        if (exception instanceof MethodArgumentTypeMismatchException mismatchException) {
+            String parameter = mismatchException.getName();
+            return parameter + ":参数格式不正确";
         }
         return "请求参数校验失败";
     }

@@ -1,0 +1,43 @@
+package com.enterprise.auth.platform.common.web;
+
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeParseException;
+import org.springframework.core.convert.converter.Converter;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+
+@Component
+public class StringToInstantConverter implements Converter<String, Instant> {
+
+    @Override
+    public Instant convert(String source) {
+        if (!StringUtils.hasText(source)) {
+            return null;
+        }
+        String text = source.trim();
+
+        try {
+            return Instant.parse(text);
+        } catch (DateTimeParseException ignored) {
+            // fallback below
+        }
+
+        try {
+            return OffsetDateTime.parse(text).toInstant();
+        } catch (DateTimeParseException ignored) {
+            // fallback below
+        }
+
+        String normalized = text.replace(' ', 'T');
+        try {
+            LocalDateTime localDateTime = LocalDateTime.parse(normalized);
+            return localDateTime.atZone(ZoneId.systemDefault()).toInstant();
+        } catch (DateTimeParseException ex) {
+            throw new IllegalArgumentException("Invalid datetime format: " + source, ex);
+        }
+    }
+}
+

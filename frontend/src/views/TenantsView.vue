@@ -143,7 +143,7 @@
       </div>
 
       <el-timeline v-if="historySummary.recentTimeline.length">
-        <el-timeline-item v-for="item in historySummary.recentTimeline" :key="item.id" :timestamp="item.occurredAt || '-'" placement="top">
+        <el-timeline-item v-for="item in historySummary.recentTimeline" :key="item.id" :timestamp="formatDateTime(item.occurredAt)" placement="top">
           <div class="timeline-item"><strong>{{ item.summary }}</strong><span>{{ item.impactSummary || '该变更会影响当前租户的套餐、能力或运营说明。' }}</span></div>
         </el-timeline-item>
       </el-timeline>
@@ -154,7 +154,11 @@
         <el-table-column prop="summary" label="摘要" min-width="220" />
         <el-table-column prop="impactSummary" label="影响说明" min-width="280" />
         <el-table-column prop="operator" label="操作人" min-width="120" />
-        <el-table-column prop="occurredAt" label="时间" min-width="180" />
+        <el-table-column label="时间" min-width="180">
+          <template #default="{ row }">
+            {{ formatDateTime(row.occurredAt) }}
+          </template>
+        </el-table-column>
       </el-table>
 
       <div class="pagination-wrap">
@@ -215,6 +219,7 @@ import { createTenant, deleteTenant, queryTenantCapabilityOverrides, queryTenant
 import { queryTenantCapabilities, queryTenantPackages } from '@/api/tenantCatalog'
 import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { TenantCapabilityOverrideItemView, TenantCapabilityOverrideView, TenantCapabilityView, TenantChangeView, TenantHistorySummaryView, TenantPackageView, TenantView } from '@/types/auth'
+import { formatDateTime } from '@/utils/datetime'
 
 type OverrideRow = TenantCapabilityOverrideItemView & { overrideMode: 'inherit' | 'enable' | 'disable' }
 const tenants = ref<TenantView[]>([])

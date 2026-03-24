@@ -11,7 +11,7 @@ async function loginByCallback(page: Page) {
     window.sessionStorage.setItem('eap.oauth.tenant', 'platform')
   })
 
-  await page.route('**/api/auth/csrf', async (route) => {
+  await page.route('**/api/auth/csrf*', async (route) => {
     await route.fulfill({
       status: 200,
       headers: {
@@ -30,7 +30,7 @@ async function loginByCallback(page: Page) {
     })
   })
 
-  await page.route('**/api/auth/oauth/exchange', async (route) => {
+  await page.route('**/api/auth/oauth/exchange*', async (route) => {
     await route.fulfill({
       status: 200,
       headers: {
@@ -49,7 +49,7 @@ async function loginByCallback(page: Page) {
     })
   })
 
-  await page.route('**/api/auth/oauth/refresh', async (route) => {
+  await page.route('**/api/auth/oauth/refresh*', async (route) => {
     await route.fulfill({
       status: 200,
       headers: {
@@ -92,6 +92,18 @@ test.describe('关键流程回归', () => {
         await route.continue()
         return
       }
+      if (pathname.startsWith('/api/auth/csrf')) {
+        await fulfillJson(
+          route,
+          200,
+          apiEnvelope({
+            headerName: 'X-XSRF-TOKEN',
+            parameterName: '_csrf',
+            token: 'csrf-e2e-token',
+          }),
+        )
+        return
+      }
       await fulfillJson(route, 401, {
         code: '401',
         success: false,
@@ -101,10 +113,10 @@ test.describe('关键流程回归', () => {
     })
 
     await page.goto('/system/audit')
-    await expect(page).toHaveURL(/\/login$/)
     await expect
       .poll(async () => page.evaluate((key) => window.sessionStorage.getItem(key), AUTH_STORAGE_KEY))
       .toBeNull()
+    await expect(page).toHaveURL(/\/oauth2\/authorize\?/)
   })
 
   test('导出任务链路：查看详情 -> 归档 -> 删除', async ({ page }) => {
@@ -138,6 +150,18 @@ test.describe('关键流程回归', () => {
       const method = request.method()
       if (!url.pathname.startsWith('/api/')) {
         await route.continue()
+        return
+      }
+      if (url.pathname.startsWith('/api/auth/csrf') && method === 'GET') {
+        await fulfillJson(
+          route,
+          200,
+          apiEnvelope({
+            headerName: 'X-XSRF-TOKEN',
+            parameterName: '_csrf',
+            token: 'csrf-e2e-token',
+          }),
+        )
         return
       }
 
@@ -271,6 +295,18 @@ test.describe('关键流程回归', () => {
         await route.continue()
         return
       }
+      if (url.pathname.startsWith('/api/auth/csrf') && method === 'GET') {
+        await fulfillJson(
+          route,
+          200,
+          apiEnvelope({
+            headerName: 'X-XSRF-TOKEN',
+            parameterName: '_csrf',
+            token: 'csrf-e2e-token',
+          }),
+        )
+        return
+      }
 
       if (url.pathname === '/api/audit/events' && method === 'GET') {
         await fulfillJson(
@@ -347,8 +383,8 @@ test.describe('关键流程回归', () => {
     await page.goto('/system/audit')
     await expect(page.locator('[data-testid="audit-task-detail"]')).toHaveCount(1)
 
-    await page.getByPlaceholder('开始时间').fill('2026-03-01 00:00:00')
-    await page.getByPlaceholder('结束时间').fill('2026-03-02 00:00:00')
+    await page.getByPlaceholder('开始时间').fill('2026-03-01T00:00:00')
+    await page.getByPlaceholder('结束时间').fill('2026-03-02T00:00:00')
     await page.keyboard.press('Enter')
 
     await page.locator('[data-testid="audit-export-async"]').click()
@@ -379,6 +415,18 @@ test.describe('关键流程回归', () => {
       const method = request.method()
       if (!url.pathname.startsWith('/api/')) {
         await route.continue()
+        return
+      }
+      if (url.pathname.startsWith('/api/auth/csrf') && method === 'GET') {
+        await fulfillJson(
+          route,
+          200,
+          apiEnvelope({
+            headerName: 'X-XSRF-TOKEN',
+            parameterName: '_csrf',
+            token: 'csrf-e2e-token',
+          }),
+        )
         return
       }
 

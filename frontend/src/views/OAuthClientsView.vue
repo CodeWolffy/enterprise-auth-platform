@@ -160,7 +160,7 @@
         <div class="guide-block drawer-section drawer-section--history">
           <div class="panel-head"><div><span class="eyebrow">History</span><h3>状态历史</h3></div></div>
           <el-timeline v-if="detail.statusHistory?.length">
-            <el-timeline-item v-for="item in detail.statusHistory" :key="`${item.eventType}-${item.occurredAt}-${item.operator}`" :timestamp="item.occurredAt || '-'" placement="top">
+            <el-timeline-item v-for="item in detail.statusHistory" :key="`${item.eventType}-${item.occurredAt}-${item.operator}`" :timestamp="formatDateTime(item.occurredAt)" placement="top">
               <div class="history-item"><strong>{{ item.summary }}</strong><span>操作人：{{ item.operator || '-' }}</span></div>
             </el-timeline-item>
           </el-timeline>
@@ -184,6 +184,7 @@ import { createClient, deleteClient, queryClientDetail, queryClients, rotateClie
 import { queryOauthScopes } from '@/api/oauthScopes'
 import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { ClientView, OAuthScopeView } from '@/types/auth'
+import { formatDateTime } from '@/utils/datetime'
 
 const router = useRouter()
 const clients = ref<ClientView[]>([])

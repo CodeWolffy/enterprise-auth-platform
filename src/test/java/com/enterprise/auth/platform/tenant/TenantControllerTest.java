@@ -95,6 +95,17 @@ class TenantControllerTest {
     }
 
     @Test
+    void tenantHistoryShouldAcceptLocalDateTimeWithoutTimezone() throws Exception {
+        mockMvc.perform(get("/api/tenants/{tenantId}/history", TENANT_ID)
+                        .with(user(principal("tenant:read")))
+                        .header("X-Tenant-Id", TENANT_ID)
+                        .param("occurredFrom", "2026-03-01T00:00:00")
+                        .param("occurredTo", "2026-03-31T23:59:59"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
     void tenantCapabilityOverridesShouldBeQueriedAndUpdated() throws Exception {
         mockMvc.perform(put("/api/tenants/{tenantId}/capability-overrides", TENANT_ID)
                         .with(user(principal("tenant:write")))

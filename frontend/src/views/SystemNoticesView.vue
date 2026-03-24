@@ -138,11 +138,14 @@
         <el-table-column
           v-if="noticeTablePrefs.visibleColumnMap.publishTime"
           column-key="publishTime"
-          prop="publishTime"
           label="发布时间"
           min-width="180"
           :width="noticeTablePrefs.getColumnWidth('publishTime')"
-        />
+        >
+          <template #default="{ row }">
+            {{ formatDateTime(row.publishTime) }}
+          </template>
+        </el-table-column>
         <el-table-column
           v-if="noticeTablePrefs.visibleColumnMap.createdBy"
           column-key="createdBy"
@@ -188,7 +191,7 @@
           <el-descriptions-item label="标题" :span="2">{{ detailItem.noticeTitle }}</el-descriptions-item>
           <el-descriptions-item label="发布状态">{{ detailItem.published ? '已发布' : '草稿' }}</el-descriptions-item>
           <el-descriptions-item label="工作流状态">{{ detailItem.workflowStatus }}</el-descriptions-item>
-          <el-descriptions-item label="发布时间">{{ detailItem.publishTime || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="发布时间">{{ formatDateTime(detailItem.publishTime) }}</el-descriptions-item>
           <el-descriptions-item label="创建人">{{ detailItem.createdBy }}</el-descriptions-item>
           <el-descriptions-item label="ID">{{ detailItem.id }}</el-descriptions-item>
           <el-descriptions-item label="公告内容" :span="2">{{ detailItem.noticeContent }}</el-descriptions-item>
@@ -227,6 +230,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { createNotice, deleteNotice, queryNotices, updateNotice } from '@/api/system'
 import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { NoticeView } from '@/types/auth'
+import { formatDateTime } from '@/utils/datetime'
 
 const notices = ref<NoticeView[]>([])
 const loading = ref(false)

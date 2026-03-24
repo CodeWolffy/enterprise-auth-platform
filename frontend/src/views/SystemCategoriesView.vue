@@ -166,7 +166,11 @@
           <el-table v-else :data="analysis.recentAudits" stripe>
             <el-table-column prop="eventType" label="事件类型" min-width="180" />
             <el-table-column prop="operator" label="操作人" min-width="120" />
-            <el-table-column prop="occurredAt" label="发生时间" min-width="180" />
+            <el-table-column label="发生时间" min-width="180">
+              <template #default="{ row }">
+                {{ formatDateTime(row.occurredAt) }}
+              </template>
+            </el-table-column>
             <el-table-column label="审计负载" min-width="260">
               <template #default="{ row }">
                 <pre class="payload-pre">{{ row.payloadJson }}</pre>
@@ -186,6 +190,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { createCategoryOption, deleteCategoryOption, queryCategoryAnalysis, queryCategoryOptions, updateCategoryOption } from '@/api/system'
 import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { CategoryAnalysis, CategoryOption } from '@/types/auth'
+import { formatDateTime } from '@/utils/datetime'
 import { BarChart } from 'echarts/charts'
 import { GridComponent, TooltipComponent } from 'echarts/components'
 import { getInstanceByDom, init, use } from 'echarts/core'
