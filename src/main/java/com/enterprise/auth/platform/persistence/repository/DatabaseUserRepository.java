@@ -60,7 +60,7 @@ public class DatabaseUserRepository implements UserRepository {
     }
 
     @Override
-    @Cacheable(value = "auth:principal", key = "'username:' + #tenantId + ':' + #username", unless = "#result == null")
+    @Cacheable(value = "auth:principal", key = "'username:' + #tenantId + ':' + #username", unless = "#result == null || #result.isEmpty()")
     public Optional<UserAccount> findByUsername(String tenantId, String username) {
         if (!databaseEnabled()) {
             throw new IllegalStateException("当前未开启数据库能力，暂不支持用户信息查询");
@@ -74,7 +74,7 @@ public class DatabaseUserRepository implements UserRepository {
     }
 
     @Override
-    @Cacheable(value = "auth:principal", key = "'id:' + #id", unless = "#result == null")
+    @Cacheable(value = "auth:principal", key = "'id:' + #id", unless = "#result == null || #result.isEmpty()")
     public Optional<UserAccount> findById(Long id) {
         if (!databaseEnabled()) {
             throw new IllegalStateException("当前未开启数据库能力，暂不支持用户信息查询");
