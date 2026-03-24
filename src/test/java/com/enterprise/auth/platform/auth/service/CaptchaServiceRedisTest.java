@@ -35,17 +35,17 @@ class CaptchaServiceRedisTest {
                 false,
                 "Lax"
         );
-        SecurityRedisProperties redisProperties = new SecurityRedisProperties(true, true, false, "eap:auth:");
+        SecurityRedisProperties redisProperties = new SecurityRedisProperties(true, true, false, "eap:auth:", "v2");
 
         CaptchaService captchaService = new CaptchaService(securityProperties, redisProperties, redisTemplate, null);
 
         CaptchaService.CaptchaChallenge challenge = captchaService.create();
 
         ArgumentCaptor<String> answerCaptor = ArgumentCaptor.forClass(String.class);
-        verify(valueOperations).set(eq("eap:auth:captcha:" + challenge.captchaId()), answerCaptor.capture(), eq(Duration.ofMinutes(5)));
+        verify(valueOperations).set(eq("eap:auth:v2:captcha:id:" + challenge.captchaId()), answerCaptor.capture(), eq(Duration.ofMinutes(5)));
         assertThat(challenge.previewCode()).isEqualTo(answerCaptor.getValue());
 
-        when(valueOperations.getAndDelete("eap:auth:captcha:" + challenge.captchaId())).thenReturn(challenge.previewCode());
+        when(valueOperations.getAndDelete("eap:auth:v2:captcha:id:" + challenge.captchaId())).thenReturn(challenge.previewCode());
         captchaService.validate(challenge.captchaId(), challenge.previewCode());
 
         when(valueOperations.getAndDelete(any())).thenReturn(null);

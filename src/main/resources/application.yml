@@ -76,6 +76,7 @@ app:
       captcha-enabled: true
       redisson-enabled: true
       key-prefix: "eap:auth:"
+      namespace-version: "v2"
   tenant:
     header-name: X-Tenant-Id
     platform-tenant-id: platform
@@ -87,7 +88,8 @@ app:
   persistence:
     database-enabled: true
   cache:
-    key-prefix: "eap:cache:v2:"
+    key-prefix: "eap:cache:"
+    namespace-version: "v4"
     default-ttl: 10m
     auth-principal-ttl: 15m
     system-dicts-ttl: 30m

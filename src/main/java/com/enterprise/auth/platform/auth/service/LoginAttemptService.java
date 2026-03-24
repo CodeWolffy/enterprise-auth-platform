@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.auth.service;
 
 import com.enterprise.auth.platform.audit.service.AuditService;
+import com.enterprise.auth.platform.config.SecurityRedisProperties;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Map;
@@ -15,10 +16,16 @@ public class LoginAttemptService {
     private static final Duration LOGIN_FAILURE_WINDOW = Duration.ofMinutes(15);
 
     private final StringRedisTemplate stringRedisTemplate;
+    private final SecurityRedisProperties redisProperties;
     private final AuditService auditService;
 
-    public LoginAttemptService(StringRedisTemplate stringRedisTemplate, AuditService auditService) {
+    public LoginAttemptService(
+            StringRedisTemplate stringRedisTemplate,
+            SecurityRedisProperties redisProperties,
+            AuditService auditService
+    ) {
         this.stringRedisTemplate = stringRedisTemplate;
+        this.redisProperties = redisProperties;
         this.auditService = auditService;
     }
 
@@ -54,14 +61,23 @@ public class LoginAttemptService {
 
     public void clearFailures(String tenantId, String username) {
         stringRedisTemplate.delete(failKey(tenantId, username));
+        stringRedisTemplate.delete(lockKey(tenantId, username));
     }
 
     private String failKey(String tenantId, String username) {
-        return "auth:fail:" + normalizeKeyPart(tenantId) + ":" + normalizeKeyPart(username);
+        return redisProperties.resolvedNamespacePrefix()
+                + "login:failure:"
+                + normalizeKeyPart(tenantId)
+                + ":"
+                + normalizeKeyPart(username);
     }
 
     private String lockKey(String tenantId, String username) {
-        return "auth:lock:" + normalizeKeyPart(tenantId) + ":" + normalizeKeyPart(username);
+        return redisProperties.resolvedNamespacePrefix()
+                + "login:lock:"
+                + normalizeKeyPart(tenantId)
+                + ":"
+                + normalizeKeyPart(username);
     }
 
     private String normalizeKeyPart(String value) {

@@ -36,7 +36,7 @@ class RedisSessionStoreTest {
         RedisSessionStore store = new RedisSessionStore(
                 redisTemplate,
                 objectMapper,
-                new SecurityRedisProperties(true, true, false, "eap:auth:"),
+                new SecurityRedisProperties(true, true, false, "eap:auth:", "v2"),
                 null
         );
 
@@ -55,8 +55,8 @@ class RedisSessionStoreTest {
 
         store.save(session);
 
-        verify(valueOperations).set(eq("eap:auth:session:s-1"), eq("payload"), any(Duration.class));
-        verify(zSetOperations).add(eq("eap:auth:user-sessions:1"), eq("s-1"), any(Double.class));
+        verify(valueOperations).set(eq("eap:auth:v2:session:by-id:s-1"), eq("payload"), any(Duration.class));
+        verify(zSetOperations).add(eq("eap:auth:v2:session:user-index:1"), eq("s-1"), any(Double.class));
     }
 
     @Test
@@ -70,7 +70,7 @@ class RedisSessionStoreTest {
 
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(redisTemplate.opsForZSet()).thenReturn(zSetOperations);
-        when(valueOperations.get("eap:auth:session:s-1")).thenReturn("payload");
+        when(valueOperations.get("eap:auth:v2:session:by-id:s-1")).thenReturn("payload");
 
         UserSession active = new UserSession(
                 "s-1",
@@ -91,7 +91,7 @@ class RedisSessionStoreTest {
         RedisSessionStore store = new RedisSessionStore(
                 redisTemplate,
                 objectMapper,
-                new SecurityRedisProperties(true, true, false, "eap:auth:"),
+                new SecurityRedisProperties(true, true, false, "eap:auth:", "v2"),
                 null
         );
 

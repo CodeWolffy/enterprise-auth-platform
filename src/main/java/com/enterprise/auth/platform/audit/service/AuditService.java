@@ -19,8 +19,6 @@ import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.stream.Stream;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -30,7 +28,6 @@ public class AuditService {
 
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() { };
 
-    private final CopyOnWriteArrayList<AuditEvent> events = new CopyOnWriteArrayList<>();
     private final PersistenceProperties persistenceProperties;
     private final SysAuditLogMapper sysAuditLogMapper;
     private final ObjectMapper objectMapper;
@@ -49,31 +46,20 @@ public class AuditService {
     }
 
     public void record(String type, String operator, String tenantId, Map<String, Object> details) {
-        Instant now = Instant.now();
-        String resolvedTenantId = StringUtils.hasText(tenantId) ? tenantId : "platform";
-        Map<String, Object> enrichedDetails = enrichDetails(details);
-        AuditEvent event = new AuditEvent(
-                type,
-                operator,
-                resolvedTenantId,
-                stringValue(enrichedDetails.get("requestId")),
-                stringValue(enrichedDetails.get("clientIp")),
-                now,
-                enrichedDetails
-        );
-        events.add(0, event);
-
         if (!databaseEnabled()) {
             return;
         }
+        Instant now = Instant.now();
+        String resolvedTenantId = StringUtils.hasText(tenantId) ? tenantId : "platform";
+        Map<String, Object> enrichedDetails = enrichDetails(details);
 
         SysAuditLogEntity entity = new SysAuditLogEntity();
         entity.setTenantId(resolvedTenantId);
         entity.setEventType(type);
         entity.setOperator(operator);
         entity.setOccurredAt(LocalDateTime.ofInstant(now, ZoneId.systemDefault()));
-        entity.setRequestId(event.requestId());
-        entity.setClientIp(event.clientIp());
+        entity.setRequestId(stringValue(enrichedDetails.get("requestId")));
+        entity.setClientIp(stringValue(enrichedDetails.get("clientIp")));
         entity.setPayloadJson(toJson(enrichedDetails));
         sysAuditLogMapper.insert(entity);
     }
@@ -84,7 +70,7 @@ public class AuditService {
 
     public AuditPage query(AuditQuery query) {
         if (!databaseEnabled()) {
-            return queryInMemory(query);
+            throw new BusinessException("当前未启用数据库审计存储");
         }
         return queryInDatabase(query);
     }
@@ -158,41 +144,6 @@ public class AuditService {
                 .map(this::toEvent)
                 .toList();
         return new AuditPage(total, page, size, records);
-    }
-
-    private AuditPage queryInMemory(AuditQuery query) {
-        int page = query.normalizedPage();
-        int size = query.normalizedSize();
-        Stream<AuditEvent> stream = events.stream();
-        if (StringUtils.hasText(query.tenantId())) {
-            stream = stream.filter(item -> query.tenantId().equals(item.tenantId()));
-        }
-        if (StringUtils.hasText(query.eventType())) {
-            stream = stream.filter(item -> query.eventType().equals(item.type()));
-        }
-        if (StringUtils.hasText(query.operator())) {
-            stream = stream.filter(item -> item.operator() != null && item.operator().contains(query.operator()));
-        }
-        if (StringUtils.hasText(query.requestId())) {
-            stream = stream.filter(item -> query.requestId().equals(item.requestId()));
-        }
-        if (StringUtils.hasText(query.clientIp())) {
-            stream = stream.filter(item -> query.clientIp().equals(item.clientIp()));
-        }
-        var visibleUsernames = dataScopeService.visibleUsernames(queryTenantId(query));
-        if (visibleUsernames.isPresent()) {
-            stream = stream.filter(item -> visibleUsernames.get().contains(item.operator()));
-        }
-        if (query.occurredFrom() != null) {
-            stream = stream.filter(item -> !item.occurredAt().isBefore(query.occurredFrom()));
-        }
-        if (query.occurredTo() != null) {
-            stream = stream.filter(item -> !item.occurredAt().isAfter(query.occurredTo()));
-        }
-        List<AuditEvent> filtered = stream.toList();
-        int fromIndex = Math.min((page - 1) * size, filtered.size());
-        int toIndex = Math.min(fromIndex + size, filtered.size());
-        return new AuditPage(filtered.size(), page, size, filtered.subList(fromIndex, toIndex));
     }
 
     private Map<String, Object> enrichDetails(Map<String, Object> details) {

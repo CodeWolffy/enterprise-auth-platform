@@ -6,8 +6,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record SecurityRedisProperties(
         boolean sessionEnabled,
         boolean captchaEnabled,
-    boolean redissonEnabled,
-        String keyPrefix
+        boolean redissonEnabled,
+        String keyPrefix,
+        String namespaceVersion
 ) {
 
     public String resolvedKeyPrefix() {
@@ -15,5 +16,16 @@ public record SecurityRedisProperties(
             return "eap:auth:";
         }
         return keyPrefix.endsWith(":") ? keyPrefix : keyPrefix + ":";
+    }
+
+    public String resolvedNamespaceVersion() {
+        if (namespaceVersion == null || namespaceVersion.isBlank()) {
+            return "v1";
+        }
+        return namespaceVersion.trim();
+    }
+
+    public String resolvedNamespacePrefix() {
+        return resolvedKeyPrefix() + resolvedNamespaceVersion() + ":";
     }
 }

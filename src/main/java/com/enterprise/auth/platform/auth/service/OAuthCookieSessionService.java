@@ -6,8 +6,8 @@ import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.config.AuthorizationServerProperties;
 import com.enterprise.auth.platform.config.FrontendProperties;
 import com.enterprise.auth.platform.config.SecurityProperties;
-import com.enterprise.auth.platform.tenant.TenantProperties;
 import com.enterprise.auth.platform.security.UserAccountJwtConverter;
+import com.enterprise.auth.platform.tenant.TenantProperties;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
@@ -138,11 +138,13 @@ public class OAuthCookieSessionService {
             Instant expiresAt = Instant.now().plusSeconds(expiresIn);
             return new TokenPayload(accessToken, refreshToken, expiresIn, claims.tenantId(), claims.sessionId(), expiresAt);
         } catch (RestClientResponseException ex) {
-            throw new BusinessException("TOKEN_EXCHANGE_FAILED", "令牌交换失败");
+            String responseBody = ex.getResponseBodyAsString();
+            String detail = StringUtils.hasText(responseBody) ? responseBody : ex.getStatusText();
+            throw new BusinessException("TOKEN_EXCHANGE_FAILED", "令牌交换失败: " + detail);
         } catch (BusinessException ex) {
             throw ex;
         } catch (Exception ex) {
-            throw new BusinessException("TOKEN_EXCHANGE_FAILED", "令牌交换失败");
+            throw new BusinessException("TOKEN_EXCHANGE_FAILED", "令牌交换失败: " + ex.getClass().getSimpleName());
         }
     }
 

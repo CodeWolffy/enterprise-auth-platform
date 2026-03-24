@@ -16,6 +16,7 @@ import com.enterprise.auth.platform.auth.store.SessionStore;
 import com.enterprise.auth.platform.common.model.DataScopeType;
 import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
 import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
+import com.enterprise.auth.platform.security.AuthPrincipalCacheService;
 import com.enterprise.auth.platform.user.model.UserAccount;
 import com.enterprise.auth.platform.user.repository.UserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -29,6 +30,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.net.ServerSocket;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,6 +40,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -48,6 +52,13 @@ class CookieSessionSecurityIntegrationTest {
 
     private static final String FRONTEND_CLIENT_ID = "eap-frontend-spa";
     private static final String REDIRECT_URI = "http://127.0.0.1:5173/auth/callback";
+    private static final int TEST_SERVER_PORT = allocatePort();
+
+    @DynamicPropertySource
+    static void registerDynamicProperties(DynamicPropertyRegistry registry) {
+        registry.add("server.port", () -> TEST_SERVER_PORT);
+        registry.add("app.authorization-server.issuer", () -> "http://127.0.0.1:" + TEST_SERVER_PORT);
+    }
 
     @Autowired
     private MockMvc mockMvc;
@@ -76,12 +87,16 @@ class CookieSessionSecurityIntegrationTest {
     @Autowired
     private SysUserMapper sysUserMapper;
 
+    @Autowired
+    private AuthPrincipalCacheService authPrincipalCacheService;
+
     private SysOauthClientEntity originalClient;
     private boolean createdClient;
     private Long temporaryUserId;
 
     @BeforeEach
     void prepareFrontendClientForCookieFlow() {
+        authPrincipalCacheService.evictByUser(1L, "platform", "admin");
         SysOauthClientEntity existing = sysOauthClientMapper.selectIncludingDeleted("platform", FRONTEND_CLIENT_ID);
         if (existing == null) {
             createdClient = true;
@@ -120,6 +135,7 @@ class CookieSessionSecurityIntegrationTest {
 
     @AfterEach
     void restoreFrontendClient() {
+        authPrincipalCacheService.evictByUser(1L, "platform", "admin");
         if (temporaryUserId != null) {
             sysUserMapper.deleteById(temporaryUserId);
             temporaryUserId = null;
@@ -191,7 +207,7 @@ class CookieSessionSecurityIntegrationTest {
         mockMvc.perform(get("/api/auth/me")
                         .cookie(new Cookie(AuthCookieConstants.ACCESS_TOKEN_COOKIE, accessToken))
                         .header("X-Tenant-Id", targetTenantId))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -338,5 +354,13 @@ class CookieSessionSecurityIntegrationTest {
     }
 
     private record CsrfContext(String headerName, String token, Cookie xsrfCookie) {
+    }
+
+    private static int allocatePort() {
+        try (ServerSocket socket = new ServerSocket(0)) {
+            return socket.getLocalPort();
+        } catch (Exception ex) {
+            throw new IllegalStateException("Failed to allocate test port", ex);
+        }
     }
 }

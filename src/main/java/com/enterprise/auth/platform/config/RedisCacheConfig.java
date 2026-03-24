@@ -26,7 +26,7 @@ public class RedisCacheConfig {
         return RedisCacheConfiguration.defaultCacheConfig()
                 .entryTtl(cacheProperties.resolvedDefaultTtl())
                 .disableCachingNullValues()
-                .computePrefixWith(cacheName -> cacheProperties.resolvedKeyPrefix() + cacheName + "::")
+                .computePrefixWith(cacheName -> cacheProperties.resolvedNamespacePrefix() + cacheName + "::")
                 .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(keySerializer))
                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(valueSerializer));
     }

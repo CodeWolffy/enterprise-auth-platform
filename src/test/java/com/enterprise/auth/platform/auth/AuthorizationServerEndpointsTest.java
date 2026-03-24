@@ -190,8 +190,8 @@ class AuthorizationServerEndpointsTest {
     void lockKeyShouldUseExpectedWindowTtl() throws Exception {
         String username = "ttl-" + UUID.randomUUID();
         String normalizedUsername = username.toLowerCase(Locale.ROOT);
-        String failKey = "auth:fail:platform:" + normalizedUsername;
-        String lockKey = "auth:lock:platform:" + normalizedUsername;
+        String failKey = "eap:auth:v2:login:failure:platform:" + normalizedUsername;
+        String lockKey = "eap:auth:v2:login:lock:platform:" + normalizedUsername;
         stringRedisTemplate.delete(failKey);
         stringRedisTemplate.delete(lockKey);
 

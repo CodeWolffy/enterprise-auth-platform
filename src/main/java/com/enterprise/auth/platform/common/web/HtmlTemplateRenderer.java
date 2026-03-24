@@ -4,17 +4,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
 @Component
 public class HtmlTemplateRenderer {
 
-    private final Map<String, String> cache = new ConcurrentHashMap<>();
-
     public String render(String templatePath, Map<String, String> values) {
-        String template = cache.computeIfAbsent(templatePath, this::loadTemplate);
+        String template = loadTemplate(templatePath);
         String rendered = template;
         for (Map.Entry<String, String> entry : values.entrySet()) {
             rendered = rendered.replace("{{" + entry.getKey() + "}}", entry.getValue());

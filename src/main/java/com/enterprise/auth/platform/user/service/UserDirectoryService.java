@@ -1,7 +1,9 @@
 package com.enterprise.auth.platform.user.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.model.DataScopeType;
+import com.enterprise.auth.platform.common.model.PageResult;
 import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.persistence.entity.SysPermissionEntity;
 import com.enterprise.auth.platform.persistence.entity.SysRoleEntity;
@@ -15,9 +17,7 @@ import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysUserRoleMapper;
 import com.enterprise.auth.platform.security.DataScopeService;
 import com.enterprise.auth.platform.tenant.TenantContext;
-import com.enterprise.auth.platform.common.model.PageResult;
 import com.enterprise.auth.platform.user.model.UserSummary;
-import com.enterprise.auth.platform.user.repository.UserRepository;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +30,6 @@ import org.springframework.util.StringUtils;
 @Service
 public class UserDirectoryService {
 
-    private final UserRepository userRepository;
     private final PersistenceProperties persistenceProperties;
     private final SysUserMapper sysUserMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
@@ -40,7 +39,6 @@ public class UserDirectoryService {
     private final DataScopeService dataScopeService;
 
     public UserDirectoryService(
-            UserRepository userRepository,
             PersistenceProperties persistenceProperties,
             @Nullable SysUserMapper sysUserMapper,
             @Nullable SysUserRoleMapper sysUserRoleMapper,
@@ -49,7 +47,6 @@ public class UserDirectoryService {
             @Nullable SysPermissionMapper sysPermissionMapper,
             DataScopeService dataScopeService
     ) {
-        this.userRepository = userRepository;
         this.persistenceProperties = persistenceProperties;
         this.sysUserMapper = sysUserMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
@@ -64,34 +61,8 @@ public class UserDirectoryService {
     }
 
     public PageResult<UserSummary> listUsers(String username, String mobile, String email, Boolean enabled, int page, int size) {
+        requireDatabaseMode();
         String tenantId = currentTenantId();
-        // 默认模式仍然走内存目录，但同样要按当前租户过滤，避免演示数据串租户。
-        if (!persistenceProperties.databaseEnabled() || sysUserMapper == null) {
-            List<UserSummary> all = userRepository.findAll().stream()
-                    .filter(user -> tenantId.equals(user.tenantId()))
-                    .filter(user -> !StringUtils.hasText(username) || (user.username() != null && user.username().contains(username)))
-                    .filter(user -> enabled == null || user.enabled() == enabled)
-                    .map(user -> new UserSummary(
-                            user.id(),
-                            user.tenantId(),
-                            user.username(),
-                            user.username(),
-                            null,
-                            null,
-                            null,
-                            user.enabled(),
-                            user.roles(),
-                            user.permissions(),
-                            user.dataScopeType()
-                    ))
-                    .toList();
-            int total = all.size();
-            int fromIndex = (page - 1) * size;
-            if (fromIndex >= total) {
-                return PageResult.of(total, page, size, List.of());
-            }
-            return PageResult.of(total, page, size, all.subList(fromIndex, Math.min(fromIndex + size, total)));
-        }
 
         LambdaQueryWrapper<SysUserEntity> query = new LambdaQueryWrapper<SysUserEntity>()
                 .eq(SysUserEntity::getTenantId, tenantId)
@@ -222,5 +193,16 @@ public class UserDirectoryService {
     private String currentTenantId() {
         String tenantId = TenantContext.getTenantId();
         return StringUtils.hasText(tenantId) ? tenantId : "platform";
+    }
+
+    private void requireDatabaseMode() {
+        if (!persistenceProperties.databaseEnabled()
+                || sysUserMapper == null
+                || sysUserRoleMapper == null
+                || sysRoleMapper == null
+                || sysRolePermissionMapper == null
+                || sysPermissionMapper == null) {
+            throw new BusinessException("当前仅支持数据库模式用户目录查询");
+        }
     }
 }

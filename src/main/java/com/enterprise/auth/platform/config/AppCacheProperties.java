@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "app.cache")
 public record AppCacheProperties(
         String keyPrefix,
+        String namespaceVersion,
         Duration defaultTtl,
         Duration authPrincipalTtl,
         Duration systemDictsTtl,
@@ -19,6 +20,17 @@ public record AppCacheProperties(
             return "eap:cache:";
         }
         return keyPrefix.endsWith(":") ? keyPrefix : keyPrefix + ":";
+    }
+
+    public String resolvedNamespaceVersion() {
+        if (namespaceVersion == null || namespaceVersion.isBlank()) {
+            return "v1";
+        }
+        return namespaceVersion.trim();
+    }
+
+    public String resolvedNamespacePrefix() {
+        return resolvedKeyPrefix() + resolvedNamespaceVersion() + ":";
     }
 
     public Duration resolvedDefaultTtl() {
