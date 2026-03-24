@@ -3,12 +3,12 @@ package com.enterprise.auth.platform.persistence.repository;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.model.DataScopeType;
 import com.enterprise.auth.platform.config.PersistenceProperties;
+import com.enterprise.auth.platform.persistence.entity.SysConfigEntity;
 import com.enterprise.auth.platform.persistence.entity.SysPermissionEntity;
 import com.enterprise.auth.platform.persistence.entity.SysRoleEntity;
 import com.enterprise.auth.platform.persistence.entity.SysRolePermissionEntity;
 import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
 import com.enterprise.auth.platform.persistence.entity.SysUserRoleEntity;
-import com.enterprise.auth.platform.persistence.entity.SysConfigEntity;
 import com.enterprise.auth.platform.persistence.mapper.SysConfigMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysPermissionMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysRoleMapper;
@@ -16,7 +16,6 @@ import com.enterprise.auth.platform.persistence.mapper.SysRolePermissionMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysUserRoleMapper;
 import com.enterprise.auth.platform.user.model.UserAccount;
-import com.enterprise.auth.platform.user.repository.InMemoryUserRepository;
 import com.enterprise.auth.platform.user.repository.UserRepository;
 import java.time.LocalDateTime;
 import java.util.HashSet;
@@ -24,6 +23,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.annotation.Primary;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Repository;
@@ -39,7 +40,6 @@ public class DatabaseUserRepository implements UserRepository {
     private final SysRolePermissionMapper sysRolePermissionMapper;
     private final SysPermissionMapper sysPermissionMapper;
     private final SysConfigMapper sysConfigMapper;
-    private final InMemoryUserRepository fallbackRepository;
 
     public DatabaseUserRepository(
             PersistenceProperties persistenceProperties,
@@ -48,8 +48,7 @@ public class DatabaseUserRepository implements UserRepository {
             @Nullable SysRoleMapper sysRoleMapper,
             @Nullable SysRolePermissionMapper sysRolePermissionMapper,
             @Nullable SysPermissionMapper sysPermissionMapper,
-            @Nullable SysConfigMapper sysConfigMapper,
-            InMemoryUserRepository fallbackRepository
+            @Nullable SysConfigMapper sysConfigMapper
     ) {
         this.persistenceProperties = persistenceProperties;
         this.sysUserMapper = sysUserMapper;
@@ -58,13 +57,13 @@ public class DatabaseUserRepository implements UserRepository {
         this.sysRolePermissionMapper = sysRolePermissionMapper;
         this.sysPermissionMapper = sysPermissionMapper;
         this.sysConfigMapper = sysConfigMapper;
-        this.fallbackRepository = fallbackRepository;
     }
 
     @Override
+    @Cacheable(value = "auth:principal", key = "'username:' + #tenantId + ':' + #username", unless = "#result == null")
     public Optional<UserAccount> findByUsername(String tenantId, String username) {
         if (!databaseEnabled()) {
-            return fallbackRepository.findByUsername(tenantId, username);
+            throw new IllegalStateException("当前未开启数据库能力，暂不支持用户信息查询");
         }
         SysUserEntity entity = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>()
                 .eq(SysUserEntity::getTenantId, tenantId)
@@ -75,9 +74,10 @@ public class DatabaseUserRepository implements UserRepository {
     }
 
     @Override
+    @Cacheable(value = "auth:principal", key = "'id:' + #id", unless = "#result == null")
     public Optional<UserAccount> findById(Long id) {
         if (!databaseEnabled()) {
-            return fallbackRepository.findById(id);
+            throw new IllegalStateException("当前未开启数据库能力，暂不支持用户信息查询");
         }
         SysUserEntity entity = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>()
                 .eq(SysUserEntity::getId, id)
@@ -89,7 +89,7 @@ public class DatabaseUserRepository implements UserRepository {
     @Override
     public List<UserAccount> findAll() {
         if (!databaseEnabled()) {
-            return fallbackRepository.findAll();
+            throw new IllegalStateException("当前未开启数据库能力，暂不支持用户信息查询");
         }
         return sysUserMapper.selectList(new LambdaQueryWrapper<SysUserEntity>()
                         .eq(SysUserEntity::getDeleted, 0)
@@ -100,10 +100,10 @@ public class DatabaseUserRepository implements UserRepository {
     }
 
     @Override
+    @CacheEvict(value = "auth:principal", allEntries = true)
     public void incrementSessionVersion(Long userId) {
         if (!databaseEnabled()) {
-            fallbackRepository.incrementSessionVersion(userId);
-            return;
+            throw new IllegalStateException("当前未开启数据库能力，暂不支持用户信息查询");
         }
         SysUserEntity entity = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>()
                 .eq(SysUserEntity::getId, userId)

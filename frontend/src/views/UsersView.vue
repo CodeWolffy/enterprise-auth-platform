@@ -434,7 +434,7 @@ async function submitUser() {
     password: userForm.password || undefined,
     deptId: userForm.deptId,
     enabled: userForm.enabled,
-    roleCodes: [],
+    roleCodes: undefined,
   }
 
   if (editingUserId.value) {

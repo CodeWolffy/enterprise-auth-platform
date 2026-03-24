@@ -13,11 +13,20 @@ import org.springframework.security.config.annotation.web.configurers.HeadersCon
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.security.web.csrf.XorCsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
+import org.springframework.web.filter.OncePerRequestFilter;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 
 @Configuration
 @EnableMethodSecurity
@@ -32,6 +41,9 @@ public class SecurityConfig {
     ) throws Exception {
         CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         CsrfTokenRequestAttributeHandler csrfTokenRequestHandler = new CsrfTokenRequestAttributeHandler();
+        // 设置为 null 以支持 SPA 模式，确保令牌在每个请求中被解析
+        csrfTokenRequestHandler.setCsrfRequestAttributeName(null);
+
         http.csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository)
                         .csrfTokenRequestHandler(csrfTokenRequestHandler)
@@ -59,8 +71,26 @@ public class SecurityConfig {
                         .anyRequest().authenticated())
                 .headers(headers -> applySecurityHeaders(headers))
                 .addFilterBefore(tenantFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(jwtAuthenticationFilter, TenantFilter.class);
+                .addFilterAfter(jwtAuthenticationFilter, TenantFilter.class)
+                .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class);
         return http.build();
+    }
+
+    /**
+     * 实现单页应用（SPA）的 CSRF 令牌读取滤器。
+     * 借由此 Filter 在响应中确保设置了 XSRF-TOKEN cookie。
+     */
+    private static final class CsrfCookieFilter extends OncePerRequestFilter {
+        @Override
+        protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+                throws ServletException, IOException {
+            CsrfToken csrfToken = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
+            if (csrfToken != null) {
+                // 强制触发令牌读取，从而让 Cookie 请求存储库将其写入响应
+                csrfToken.getToken();
+            }
+            filterChain.doFilter(request, response);
+        }
     }
 
     private void applySecurityHeaders(HeadersConfigurer<HttpSecurity> headers) {

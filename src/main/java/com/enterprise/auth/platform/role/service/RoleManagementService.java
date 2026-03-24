@@ -30,6 +30,9 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 @Service
 public class RoleManagementService {
@@ -89,6 +92,7 @@ public class RoleManagementService {
     }
 
     @Transactional
+    @CacheEvict(value = "auth:principal", allEntries = true)
     public CatalogService.RoleView update(Long roleId, UpdateRoleRequest request) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -104,6 +108,7 @@ public class RoleManagementService {
     }
 
     @Transactional
+    @CacheEvict(value = "auth:principal", allEntries = true)
     public List<CatalogService.PermissionView> assignPermissions(Long roleId, Set<String> permissionCodes) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -152,6 +157,7 @@ public class RoleManagementService {
     }
 
     @Transactional
+    @CacheEvict(value = "auth:principal", allEntries = true)
     public void delete(Long roleId) {
         requireDatabaseMode();
         String tenantId = currentTenantId();

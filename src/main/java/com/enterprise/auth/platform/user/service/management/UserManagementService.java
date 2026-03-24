@@ -28,6 +28,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 @Service
 public class UserManagementService {
@@ -93,6 +96,7 @@ public class UserManagementService {
     }
 
     @Transactional
+    @CacheEvict(value = "auth:principal", allEntries = true)
     public UserSummary update(Long userId, UpdateUserRequest request) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -122,6 +126,7 @@ public class UserManagementService {
     }
 
     @Transactional
+    @CacheEvict(value = "auth:principal", allEntries = true)
     public UserSummary assignRoles(Long userId, Set<String> roleCodes) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -158,6 +163,7 @@ public class UserManagementService {
     }
 
     @Transactional
+    @CacheEvict(value = "auth:users", allEntries = true)
     public void delete(Long userId) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
