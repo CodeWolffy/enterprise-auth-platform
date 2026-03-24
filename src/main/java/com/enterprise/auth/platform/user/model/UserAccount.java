@@ -1,6 +1,8 @@
 package com.enterprise.auth.platform.user.model;
 
 import com.enterprise.auth.platform.common.model.DataScopeType;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.HashSet;
 import java.util.Collection;
 import java.util.Set;
@@ -9,6 +11,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record UserAccount(
         Long id,
         String tenantId,
@@ -39,6 +42,7 @@ public record UserAccount(
     }
 
     @Override
+    @JsonIgnore
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return Stream.concat(
                 roles.stream().map(role -> new SimpleGrantedAuthority("ROLE_" + role)),
@@ -47,16 +51,19 @@ public record UserAccount(
     }
 
     @Override
+    @JsonIgnore
     public boolean isAccountNonExpired() {
         return enabled;
     }
 
     @Override
+    @JsonIgnore
     public boolean isAccountNonLocked() {
         return enabled;
     }
 
     @Override
+    @JsonIgnore
     public boolean isCredentialsNonExpired() {
         return enabled;
     }

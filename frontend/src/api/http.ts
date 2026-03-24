@@ -1,6 +1,7 @@
-import axios from 'axios'
+﻿import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import { redirectToAuthorizationPage } from '@/utils/authRedirect'
 import type { ApiResponse, CsrfTokenResponse } from '@/types/auth'
 
 function resolveBackendOrigin() {
@@ -15,7 +16,6 @@ function resolveBackendOrigin() {
 }
 
 const backendOrigin = resolveBackendOrigin()
-let redirectingToLogin = false
 let csrfReady = false
 let csrfPromise: Promise<void> | null = null
 
@@ -57,14 +57,11 @@ function showError(message: string) {
   })
 }
 
-function redirectToLogin() {
+async function redirectToLogin() {
   const authStore = useAuthStore()
+  const tenantId = authStore.operatorTenantId || authStore.tenantId || 'platform'
   authStore.clearSession()
-  if (window.location.pathname === '/login' || redirectingToLogin) {
-    return
-  }
-  redirectingToLogin = true
-  window.location.href = '/login'
+  await redirectToAuthorizationPage(tenantId)
 }
 
 function responseCodeOf(error: any): string | null {
@@ -143,8 +140,8 @@ http.interceptors.request.use(async (config) => {
         await authStore.refreshTokens()
       }
     } catch {
-      showError('登录状态已失效，请重新登录')
-      redirectToLogin()
+      showError('Login expired, please sign in again')
+      await redirectToLogin()
       return Promise.reject(new Error('token refresh failed'))
     }
   }
@@ -176,8 +173,8 @@ http.interceptors.response.use(
         await authStore.refreshTokens()
         return http.request(error.config)
       } catch {
-        showError('登录状态已失效，请重新登录')
-        redirectToLogin()
+        showError('Login expired, please sign in again')
+        await redirectToLogin()
         return Promise.reject(error)
       }
     }
@@ -187,8 +184,8 @@ http.interceptors.response.use(
       return Promise.reject(error)
     }
     if (authFailure) {
-      showError('登录状态已失效，请重新登录')
-      redirectToLogin()
+      showError('Login expired, please sign in again')
+      await redirectToLogin()
       return new Promise(() => {})
     }
 
@@ -205,11 +202,12 @@ http.interceptors.response.use(
     }
 
     if (error.response?.status === 403) {
-      showError(error.response?.data?.message ?? '您没有权限执行当前操作')
-      return Promise.reject(error)
+      showError(error.response?.data?.message ?? 'No permission')
+      await redirectToLogin()
+      return new Promise(() => {})
     }
 
-    const message = error.response?.data?.message ?? '请求失败，请稍后重试'
+    const message = error.response?.data?.message ?? 'Request failed, please retry later'
     showError(message)
     return Promise.reject(error)
   },

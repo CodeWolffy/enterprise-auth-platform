@@ -5,7 +5,6 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -14,6 +13,7 @@ import com.enterprise.auth.platform.persistence.entity.SysOauthClientEntity;
 import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
 import com.enterprise.auth.platform.persistence.mapper.SysOauthClientMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
+import com.enterprise.auth.platform.security.AuthPrincipalCacheService;
 import com.enterprise.auth.platform.user.model.UserAccount;
 import com.enterprise.auth.platform.user.repository.UserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -57,6 +57,9 @@ class AuthorizationCodeSessionFlowTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private AuthPrincipalCacheService authPrincipalCacheService;
+
     private Integer originalSessionVersion;
 
     @BeforeEach
@@ -80,6 +83,7 @@ class AuthorizationCodeSessionFlowTest {
 
         SysUserEntity admin = loadAdminEntity();
         originalSessionVersion = admin.getSessionVersion();
+        authPrincipalCacheService.evictByUser(admin.getId(), admin.getTenantId(), admin.getUsername());
     }
 
     @AfterEach
@@ -91,6 +95,7 @@ class AuthorizationCodeSessionFlowTest {
             admin.setEnabled(1);
             admin.setUpdatedBy("test");
             sysUserMapper.updateById(admin);
+            authPrincipalCacheService.evictByUser(admin.getId(), admin.getTenantId(), admin.getUsername());
         }
     }
 
@@ -113,7 +118,7 @@ class AuthorizationCodeSessionFlowTest {
         mockMvc.perform(get("/api/auth/me")
                         .header("Authorization", "Bearer " + tokens.accessToken())
                         .header("X-Tenant-Id", "platform"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
 
         mockMvc.perform(post("/oauth2/token")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
@@ -151,7 +156,7 @@ class AuthorizationCodeSessionFlowTest {
         mockMvc.perform(get("/api/auth/me")
                         .header("Authorization", "Bearer " + tokens.accessToken())
                         .header("X-Tenant-Id", "platform"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
 
         mockMvc.perform(post("/oauth2/token")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
@@ -185,7 +190,7 @@ class AuthorizationCodeSessionFlowTest {
         mockMvc.perform(get("/api/auth/me")
                         .header("Authorization", "Bearer " + tokens.accessToken())
                         .header("X-Tenant-Id", "platform"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
 
         mockMvc.perform(post("/oauth2/token")
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
@@ -198,13 +203,13 @@ class AuthorizationCodeSessionFlowTest {
     }
 
     @Test
-    void forgedTenantHeaderShouldBeRejectedForAccessToken() throws Exception {
+    void platformAdminTokenShouldAllowTenantSwitch() throws Exception {
         OAuthTokens tokens = issueTokens();
 
         mockMvc.perform(get("/api/auth/me")
                         .header("Authorization", "Bearer " + tokens.accessToken())
                         .header("X-Tenant-Id", "tenant-a"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
     }
 
     private OAuthTokens issueTokens() throws Exception {

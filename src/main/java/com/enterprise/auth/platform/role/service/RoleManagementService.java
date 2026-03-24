@@ -11,14 +11,17 @@ import com.enterprise.auth.platform.persistence.entity.SysPermissionEntity;
 import com.enterprise.auth.platform.persistence.entity.SysRoleDeptScopeEntity;
 import com.enterprise.auth.platform.persistence.entity.SysRoleEntity;
 import com.enterprise.auth.platform.persistence.entity.SysRolePermissionEntity;
+import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
 import com.enterprise.auth.platform.persistence.entity.SysUserRoleEntity;
 import com.enterprise.auth.platform.persistence.mapper.SysDeptMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysPermissionMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysRoleDeptScopeMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysRoleMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysRolePermissionMapper;
+import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysUserRoleMapper;
 import com.enterprise.auth.platform.role.dto.CreateRoleRequest;
+import com.enterprise.auth.platform.security.AuthPrincipalCacheService;
 import com.enterprise.auth.platform.role.dto.UpdateRoleRequest;
 import com.enterprise.auth.platform.security.SecuritySupport;
 import com.enterprise.auth.platform.tenant.TenantContext;
@@ -26,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,9 +43,11 @@ public class RoleManagementService {
     private final SysRolePermissionMapper sysRolePermissionMapper;
     private final SysPermissionMapper sysPermissionMapper;
     private final SysDeptMapper sysDeptMapper;
+    private final SysUserMapper sysUserMapper;
     private final SysRoleDeptScopeMapper sysRoleDeptScopeMapper;
     private final CatalogService catalogService;
     private final AuditService auditService;
+    private final AuthPrincipalCacheService authPrincipalCacheService;
 
     public RoleManagementService(
             PersistenceProperties persistenceProperties,
@@ -52,9 +56,11 @@ public class RoleManagementService {
             @Nullable SysRolePermissionMapper sysRolePermissionMapper,
             @Nullable SysPermissionMapper sysPermissionMapper,
             @Nullable SysDeptMapper sysDeptMapper,
+            @Nullable SysUserMapper sysUserMapper,
             @Nullable SysRoleDeptScopeMapper sysRoleDeptScopeMapper,
             CatalogService catalogService,
-            AuditService auditService
+            AuditService auditService,
+            AuthPrincipalCacheService authPrincipalCacheService
     ) {
         this.persistenceProperties = persistenceProperties;
         this.sysRoleMapper = sysRoleMapper;
@@ -62,9 +68,11 @@ public class RoleManagementService {
         this.sysRolePermissionMapper = sysRolePermissionMapper;
         this.sysPermissionMapper = sysPermissionMapper;
         this.sysDeptMapper = sysDeptMapper;
+        this.sysUserMapper = sysUserMapper;
         this.sysRoleDeptScopeMapper = sysRoleDeptScopeMapper;
         this.catalogService = catalogService;
         this.auditService = auditService;
+        this.authPrincipalCacheService = authPrincipalCacheService;
     }
 
     @Transactional
@@ -90,7 +98,6 @@ public class RoleManagementService {
     }
 
     @Transactional
-    @CacheEvict(value = "auth:principal", allEntries = true)
     public CatalogService.RoleView update(Long roleId, UpdateRoleRequest request) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -100,13 +107,13 @@ public class RoleManagementService {
         entity.setDataScopeType(request.dataScopeType().name());
         sysRoleMapper.updateById(entity);
         saveCustomDeptIds(tenantId, entity.getId(), request.dataScopeType(), request.customDeptIds());
+        evictPrincipalsByRole(tenantId, roleId);
 
         auditService.record("ROLE_UPDATED", SecuritySupport.currentOperator(), tenantId, Map.of("roleId", entity.getId(), "roleCode", entity.getRoleCode()));
         return catalogService.role(entity.getRoleCode());
     }
 
     @Transactional
-    @CacheEvict(value = "auth:principal", allEntries = true)
     public List<CatalogService.PermissionView> assignPermissions(Long roleId, Set<String> permissionCodes) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -127,6 +134,7 @@ public class RoleManagementService {
         }
 
         sysRoleMapper.updateById(entity);
+        evictPrincipalsByRole(tenantId, roleId);
         auditService.record("ROLE_PERMISSION_ASSIGNED", operator, tenantId, Map.of("roleId", entity.getId(), "roleCode", entity.getRoleCode(), "permissionCodes", permissionCodes));
         return catalogService.permissionsByCodes(permissionCodes);
     }
@@ -155,7 +163,6 @@ public class RoleManagementService {
     }
 
     @Transactional
-    @CacheEvict(value = "auth:principal", allEntries = true)
     public void delete(Long roleId) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -173,7 +180,35 @@ public class RoleManagementService {
                 .eq(SysRolePermissionEntity::getRoleId, roleId));
         deleteCustomDeptIds(tenantId, entity.getId());
         sysRoleMapper.deleteById(entity.getId());
+        evictPrincipalsByRole(tenantId, roleId);
         auditService.record("ROLE_DELETED", operator, tenantId, Map.of("roleId", roleId, "roleCode", entity.getRoleCode()));
+    }
+
+    private void evictPrincipalsByRole(String tenantId, Long roleId) {
+        List<Long> userIds = sysUserRoleMapper.selectList(new LambdaQueryWrapper<SysUserRoleEntity>()
+                        .eq(SysUserRoleEntity::getTenantId, tenantId)
+                        .eq(SysUserRoleEntity::getRoleId, roleId))
+                .stream()
+                .map(SysUserRoleEntity::getUserId)
+                .distinct()
+                .toList();
+        if (userIds.isEmpty()) {
+            return;
+        }
+        if (sysUserMapper == null) {
+            authPrincipalCacheService.evictAll();
+            return;
+        }
+        List<SysUserEntity> users = sysUserMapper.selectList(new LambdaQueryWrapper<SysUserEntity>()
+                .eq(SysUserEntity::getTenantId, tenantId)
+                .eq(SysUserEntity::getDeleted, 0)
+                .in(SysUserEntity::getId, userIds));
+        if (users.isEmpty()) {
+            return;
+        }
+        for (SysUserEntity user : users) {
+            authPrincipalCacheService.evictByUser(user.getId(), user.getTenantId(), user.getUsername());
+        }
     }
 
     private List<SysPermissionEntity> loadPermissions(String tenantId, Set<String> permissionCodes) {

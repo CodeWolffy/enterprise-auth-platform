@@ -11,6 +11,7 @@ import com.enterprise.auth.platform.persistence.entity.SysUserRoleEntity;
 import com.enterprise.auth.platform.persistence.mapper.SysRoleMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysUserRoleMapper;
+import com.enterprise.auth.platform.security.AuthPrincipalCacheService;
 import com.enterprise.auth.platform.security.DataScopeService;
 import com.enterprise.auth.platform.security.SecuritySupport;
 import com.enterprise.auth.platform.tenant.TenantContext;
@@ -24,7 +25,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.lang.Nullable;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +42,7 @@ public class UserManagementService {
     private final CatalogService catalogService;
     private final AuditService auditService;
     private final DataScopeService dataScopeService;
+    private final AuthPrincipalCacheService authPrincipalCacheService;
 
     public UserManagementService(
             PersistenceProperties persistenceProperties,
@@ -52,7 +53,8 @@ public class UserManagementService {
             UserDirectoryService userDirectoryService,
             CatalogService catalogService,
             AuditService auditService,
-            DataScopeService dataScopeService
+            DataScopeService dataScopeService,
+            AuthPrincipalCacheService authPrincipalCacheService
     ) {
         this.persistenceProperties = persistenceProperties;
         this.sysUserMapper = sysUserMapper;
@@ -63,10 +65,10 @@ public class UserManagementService {
         this.catalogService = catalogService;
         this.auditService = auditService;
         this.dataScopeService = dataScopeService;
+        this.authPrincipalCacheService = authPrincipalCacheService;
     }
 
     @Transactional
-    @CacheEvict(value = "auth:principal", allEntries = true)
     public UserSummary create(CreateUserRequest request) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -90,12 +92,12 @@ public class UserManagementService {
         sysUserMapper.insert(entity);
 
         syncUserRoles(tenantId, entity.getId(), request.roleCodes());
+        authPrincipalCacheService.evictByUser(entity.getId(), tenantId, entity.getUsername());
         auditService.record("USER_CREATED", operator, tenantId, Map.of("userId", entity.getId(), "username", entity.getUsername()));
         return loadSummary(entity.getId());
     }
 
     @Transactional
-    @CacheEvict(value = "auth:principal", allEntries = true)
     public UserSummary update(Long userId, UpdateUserRequest request) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -120,18 +122,19 @@ public class UserManagementService {
         if (request.roleCodes() != null) {
             syncUserRoles(tenantId, entity.getId(), request.roleCodes());
         }
+        authPrincipalCacheService.evictByUser(entity.getId(), tenantId, entity.getUsername());
         auditService.record("USER_UPDATED", operator, tenantId, Map.of("userId", entity.getId(), "username", entity.getUsername()));
         return loadSummary(entity.getId());
     }
 
     @Transactional
-    @CacheEvict(value = "auth:principal", allEntries = true)
     public UserSummary assignRoles(Long userId, Set<String> roleCodes) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
-        getUser(userId, tenantId);
+        SysUserEntity entity = getUser(userId, tenantId);
         syncUserRoles(tenantId, userId, roleCodes);
+        authPrincipalCacheService.evictByUser(entity.getId(), tenantId, entity.getUsername());
         auditService.record("USER_ROLE_ASSIGNED", operator, tenantId, Map.of("userId", userId, "roleCodes", roleCodes));
         return loadSummary(userId);
     }
@@ -162,7 +165,6 @@ public class UserManagementService {
     }
 
     @Transactional
-    @CacheEvict(value = "auth:principal", allEntries = true)
     public void delete(Long userId) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -175,6 +177,7 @@ public class UserManagementService {
         entity.setEnabled(0);
         sysUserMapper.updateById(entity);
         sysUserMapper.deleteById(entity.getId());
+        authPrincipalCacheService.evictByUser(entity.getId(), tenantId, entity.getUsername());
         auditService.record("USER_DELETED", operator, tenantId, Map.of("userId", userId, "username", entity.getUsername()));
     }
 

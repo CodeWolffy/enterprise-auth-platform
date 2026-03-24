@@ -124,6 +124,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 writeAuthFailure(response, ex);
                 return;
             }
+        } catch (Exception ex) {
+            log.error("[AUTH-DIAG] Unexpected token handling error for {} {}: {}",
+                    request.getMethod(), request.getRequestURI(), ex.getMessage(), ex);
+            SecurityContextHolder.clearContext();
+            if (!isTokenFailureBypassEndpoint(request)) {
+                writeAuthFailure(response, new BusinessException("INVALID_TOKEN", "Invalid access token"));
+                return;
+            }
         }
 
         filterChain.doFilter(request, response);

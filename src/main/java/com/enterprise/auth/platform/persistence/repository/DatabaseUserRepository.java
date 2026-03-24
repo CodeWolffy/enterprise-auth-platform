@@ -15,6 +15,7 @@ import com.enterprise.auth.platform.persistence.mapper.SysRoleMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysRolePermissionMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysUserRoleMapper;
+import com.enterprise.auth.platform.security.AuthPrincipalCacheService;
 import com.enterprise.auth.platform.user.model.UserAccount;
 import com.enterprise.auth.platform.user.repository.UserRepository;
 import java.time.LocalDateTime;
@@ -23,7 +24,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.annotation.Primary;
 import org.springframework.lang.Nullable;
@@ -40,6 +40,7 @@ public class DatabaseUserRepository implements UserRepository {
     private final SysRolePermissionMapper sysRolePermissionMapper;
     private final SysPermissionMapper sysPermissionMapper;
     private final SysConfigMapper sysConfigMapper;
+    private final AuthPrincipalCacheService authPrincipalCacheService;
 
     public DatabaseUserRepository(
             PersistenceProperties persistenceProperties,
@@ -48,7 +49,8 @@ public class DatabaseUserRepository implements UserRepository {
             @Nullable SysRoleMapper sysRoleMapper,
             @Nullable SysRolePermissionMapper sysRolePermissionMapper,
             @Nullable SysPermissionMapper sysPermissionMapper,
-            @Nullable SysConfigMapper sysConfigMapper
+            @Nullable SysConfigMapper sysConfigMapper,
+            AuthPrincipalCacheService authPrincipalCacheService
     ) {
         this.persistenceProperties = persistenceProperties;
         this.sysUserMapper = sysUserMapper;
@@ -57,10 +59,11 @@ public class DatabaseUserRepository implements UserRepository {
         this.sysRolePermissionMapper = sysRolePermissionMapper;
         this.sysPermissionMapper = sysPermissionMapper;
         this.sysConfigMapper = sysConfigMapper;
+        this.authPrincipalCacheService = authPrincipalCacheService;
     }
 
     @Override
-    @Cacheable(value = "auth:principal", key = "'username:' + #tenantId + ':' + #username", unless = "#result == null || #result.isEmpty()")
+    @Cacheable(value = "auth:principal", key = "T(com.enterprise.auth.platform.security.AuthPrincipalCacheService).usernameKey(#tenantId, #username)", unless = "#result == null")
     public Optional<UserAccount> findByUsername(String tenantId, String username) {
         if (!databaseEnabled()) {
             throw new IllegalStateException("当前未开启数据库能力，暂不支持用户信息查询");
@@ -74,7 +77,7 @@ public class DatabaseUserRepository implements UserRepository {
     }
 
     @Override
-    @Cacheable(value = "auth:principal", key = "'id:' + #id", unless = "#result == null || #result.isEmpty()")
+    @Cacheable(value = "auth:principal", key = "T(com.enterprise.auth.platform.security.AuthPrincipalCacheService).idKey(#id)", unless = "#result == null")
     public Optional<UserAccount> findById(Long id) {
         if (!databaseEnabled()) {
             throw new IllegalStateException("当前未开启数据库能力，暂不支持用户信息查询");
@@ -100,7 +103,6 @@ public class DatabaseUserRepository implements UserRepository {
     }
 
     @Override
-    @CacheEvict(value = "auth:principal", allEntries = true)
     public void incrementSessionVersion(Long userId) {
         if (!databaseEnabled()) {
             throw new IllegalStateException("当前未开启数据库能力，暂不支持用户信息查询");
@@ -116,6 +118,7 @@ public class DatabaseUserRepository implements UserRepository {
         entity.setUpdatedBy(entity.getUsername());
         entity.setPasswordUpdatedAt(LocalDateTime.now());
         sysUserMapper.updateById(entity);
+        authPrincipalCacheService.evictByUser(entity.getId(), entity.getTenantId(), entity.getUsername());
     }
 
     private UserAccount toUserAccount(SysUserEntity user) {

@@ -86,6 +86,14 @@ app:
       - sys_tenant
   persistence:
     database-enabled: true
+  cache:
+    key-prefix: "eap:cache:v2:"
+    default-ttl: 10m
+    auth-principal-ttl: 15m
+    system-dicts-ttl: 30m
+    system-configs-ttl: 30m
+    system-categories-all-ttl: 60m
+    system-categories-target-ttl: 60m
   features:
     gateway-enabled: false
     nacos-enabled: false

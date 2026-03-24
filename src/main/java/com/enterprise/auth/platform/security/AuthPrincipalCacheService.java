@@ -1,0 +1,46 @@
+package com.enterprise.auth.platform.security;
+
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+
+@Component
+public class AuthPrincipalCacheService {
+
+    public static final String CACHE_NAME = "auth:principal";
+
+    private final CacheManager cacheManager;
+
+    public AuthPrincipalCacheService(CacheManager cacheManager) {
+        this.cacheManager = cacheManager;
+    }
+
+    public static String usernameKey(String tenantId, String username) {
+        return "username:" + tenantId + ":" + username;
+    }
+
+    public static String idKey(Long userId) {
+        return "id:" + userId;
+    }
+
+    public void evictByUser(Long userId, String tenantId, String username) {
+        Cache cache = cacheManager.getCache(CACHE_NAME);
+        if (cache == null) {
+            return;
+        }
+        if (userId != null) {
+            cache.evict(idKey(userId));
+        }
+        if (StringUtils.hasText(tenantId) && StringUtils.hasText(username)) {
+            cache.evict(usernameKey(tenantId, username));
+        }
+    }
+
+    public void evictAll() {
+        Cache cache = cacheManager.getCache(CACHE_NAME);
+        if (cache != null) {
+            cache.clear();
+        }
+    }
+}
