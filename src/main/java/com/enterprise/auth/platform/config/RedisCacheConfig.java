@@ -49,7 +49,7 @@ public class RedisCacheConfig {
         return new CacheErrorHandler() {
             @Override
             public void handleCacheGetError(RuntimeException exception, Cache cache, Object key) {
-                log.warn("Cache get failed, fallback to DB. cache={}, key={}, error={}",
+                log.warn("缓存获取失败，回退到数据库。cache={}, key={}, error={}",
                         cache == null ? "unknown" : cache.getName(),
                         key,
                         exception.getMessage());
@@ -57,7 +57,7 @@ public class RedisCacheConfig {
 
             @Override
             public void handleCachePutError(RuntimeException exception, Cache cache, Object key, Object value) {
-                log.warn("Cache put failed. cache={}, key={}, error={}",
+                log.warn("缓存写入失败。cache={}, key={}, error={}",
                         cache == null ? "unknown" : cache.getName(),
                         key,
                         exception.getMessage());
@@ -65,7 +65,7 @@ public class RedisCacheConfig {
 
             @Override
             public void handleCacheEvictError(RuntimeException exception, Cache cache, Object key) {
-                log.warn("Cache evict failed. cache={}, key={}, error={}",
+                log.warn("缓存删除失败。cache={}, key={}, error={}",
                         cache == null ? "unknown" : cache.getName(),
                         key,
                         exception.getMessage());
@@ -73,7 +73,7 @@ public class RedisCacheConfig {
 
             @Override
             public void handleCacheClearError(RuntimeException exception, Cache cache) {
-                log.warn("Cache clear failed. cache={}, error={}",
+                log.warn("缓存清空失败。cache={}, error={}",
                         cache == null ? "unknown" : cache.getName(),
                         exception.getMessage());
             }

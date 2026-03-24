@@ -129,7 +129,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     request.getMethod(), request.getRequestURI(), ex.getMessage(), ex);
             SecurityContextHolder.clearContext();
             if (!isTokenFailureBypassEndpoint(request)) {
-                writeAuthFailure(response, new BusinessException("INVALID_TOKEN", "Invalid access token"));
+                writeAuthFailure(response, new BusinessException("INVALID_TOKEN", "无效的访问令牌"));
                 return;
             }
         }
@@ -223,7 +223,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             Jwt jwt = authorizationServerJwtDecoder.decode(token);
             if (!userAccountJwtConverter.supports(jwt)) {
-                log.debug("Authorization server jwt ignored: unsupported claims set");
+                log.debug("授权服务器 JWT 已忽略：不支持的声明集");
                 return Optional.empty();
             }
 

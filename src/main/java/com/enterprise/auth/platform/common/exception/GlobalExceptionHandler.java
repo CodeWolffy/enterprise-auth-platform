@@ -41,11 +41,11 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ApiResponse<Void> handleDenied(AccessDeniedException exception, HttpServletRequest request) {
         if (exception instanceof CsrfException) {
-            log.warn("CSRF validation failed for {} {}: {}", request.getMethod(), request.getRequestURI(), exception.getMessage());
+            log.warn("CSRF 校验失败 {} {}: {}", request.getMethod(), request.getRequestURI(), exception.getMessage());
             // 返回不带 code 的响应，触发前端 http.ts 拦截器中的 CSRF 重试逻辑
             return ApiResponse.fail(null, "CSRF 令牌不匹配或缺失");
         }
-        log.warn("Access denied for {} {}: {}", request.getMethod(), request.getRequestURI(), exception.getMessage());
+        log.warn("访问被拒绝 {} {}: {}", request.getMethod(), request.getRequestURI(), exception.getMessage());
         return ApiResponse.fail("ACCESS_DENIED", "无权访问此资源");
     }
 
@@ -58,7 +58,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResponse<Void> handleUnexpected(Exception exception) {
-        log.error("Unhandled server exception", exception);
+        log.error("未处理的服务器异常", exception);
         return ApiResponse.fail("INTERNAL_ERROR", "服务器内部错误");
     }
 

@@ -55,7 +55,7 @@ public class RedisSessionStore implements SessionStore {
                 extendIndexTtlRedisson(userSessions, ttl);
                 return;
             } catch (Exception ex) {
-                throw new IllegalStateException("Failed to save session via Redisson", ex);
+                throw new IllegalStateException("通过 Redisson 保存会话失败", ex);
             }
         }
 
@@ -64,7 +64,7 @@ public class RedisSessionStore implements SessionStore {
             redisTemplate.opsForZSet().add(userSessionsKey, session.sessionId(), session.issuedAt().toEpochMilli());
             extendIndexTtlRedisTemplate(userSessionsKey, ttl);
         } catch (Exception ex) {
-            throw new IllegalStateException("Failed to save session via RedisTemplate", ex);
+            throw new IllegalStateException("通过 RedisTemplate 保存会话失败", ex);
         }
     }
 
@@ -78,13 +78,13 @@ public class RedisSessionStore implements SessionStore {
                 RBucket<String> sessionBucket = redissonClient.getBucket(sessionKey);
                 payload = sessionBucket.get();
             } catch (Exception ex) {
-                throw new IllegalStateException("Failed to fetch session via Redisson", ex);
+                throw new IllegalStateException("通过 Redisson 获取会话失败", ex);
             }
         } else {
             try {
                 payload = redisTemplate.opsForValue().get(sessionKey);
             } catch (Exception ex) {
-                throw new IllegalStateException("Failed to fetch session via RedisTemplate", ex);
+                throw new IllegalStateException("通过 RedisTemplate 获取会话失败", ex);
             }
         }
 
@@ -113,14 +113,14 @@ public class RedisSessionStore implements SessionStore {
                     sessionIds = sessionIds.subList(0, MAX_USER_SESSIONS);
                 }
             } catch (Exception ex) {
-                throw new IllegalStateException("Failed to fetch user sessions via Redisson", ex);
+                throw new IllegalStateException("通过 Redisson 获取用户会话列表失败", ex);
             }
         } else {
             try {
                 var result = redisTemplate.opsForZSet().reverseRange(userSessionsKey, 0, MAX_USER_SESSIONS - 1);
                 sessionIds = result == null ? List.of() : new ArrayList<>(result);
             } catch (Exception ex) {
-                throw new IllegalStateException("Failed to fetch user sessions via RedisTemplate", ex);
+                throw new IllegalStateException("通过 RedisTemplate 获取用户会话列表失败", ex);
             }
         }
 
@@ -176,7 +176,7 @@ public class RedisSessionStore implements SessionStore {
         try {
             return objectMapper.writeValueAsString(session);
         } catch (Exception ex) {
-            throw new IllegalStateException("Failed to serialize session", ex);
+            throw new IllegalStateException("会话序列化失败", ex);
         }
     }
 
@@ -184,7 +184,7 @@ public class RedisSessionStore implements SessionStore {
         try {
             return objectMapper.readValue(payload, UserSession.class);
         } catch (Exception ex) {
-            throw new IllegalStateException("Failed to deserialize session", ex);
+            throw new IllegalStateException("会话反序列化失败", ex);
         }
     }
 
@@ -194,13 +194,13 @@ public class RedisSessionStore implements SessionStore {
                 redissonClient.getBucket(key).delete();
                 return;
             } catch (Exception ex) {
-                throw new IllegalStateException("Failed to delete invalid session key via Redisson", ex);
+                throw new IllegalStateException("通过 Redisson 删除无效会话键失败", ex);
             }
         }
         try {
             redisTemplate.delete(key);
         } catch (Exception ex) {
-            throw new IllegalStateException("Failed to delete invalid session key via RedisTemplate", ex);
+            throw new IllegalStateException("通过 RedisTemplate 删除无效会话键失败", ex);
         }
     }
 
@@ -210,13 +210,13 @@ public class RedisSessionStore implements SessionStore {
                 redissonClient.getScoredSortedSet(userSessionsKey).removeAll(staleIds);
                 return;
             } catch (Exception ex) {
-                throw new IllegalStateException("Failed to cleanup stale user session index via Redisson", ex);
+                throw new IllegalStateException("通过 Redisson 清理过期用户会话索引失败", ex);
             }
         }
         try {
             redisTemplate.opsForZSet().remove(userSessionsKey, staleIds.toArray());
         } catch (Exception ex) {
-            throw new IllegalStateException("Failed to cleanup stale user session index via RedisTemplate", ex);
+            throw new IllegalStateException("通过 RedisTemplate 清理过期用户会话索引失败", ex);
         }
     }
 
