@@ -51,7 +51,7 @@ public class MybatisPlusConfig {
 				}
 			}));
 		}
-		// Keep pagination as the last inner interceptor so count/page SQL is built from the final rewritten statement.
+		// 分页拦截器放在最后，确保 count/page SQL 基于最终重写后的语句构建。
 		interceptor.addInnerInterceptor(new PaginationInnerInterceptor(com.baomidou.mybatisplus.annotation.DbType.MYSQL));
 		return interceptor;
 	}

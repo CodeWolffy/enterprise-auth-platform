@@ -104,7 +104,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
             if (authentication.isEmpty()) {
                 if (!isTokenFailureBypassEndpoint(request)) {
-                    writeAuthFailure(response, new BusinessException("INVALID_TOKEN", "Invalid access token"));
+                    writeAuthFailure(response, new BusinessException("INVALID_TOKEN", "无效的访问令牌"));
                     return;
                 }
                 filterChain.doFilter(request, response);
@@ -175,13 +175,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         if (!"access".equals(claims.tokenType())) {
-            throw new BusinessException("ACCESS_TOKEN_TYPE_INVALID", "Invalid access token type");
+            throw new BusinessException("ACCESS_TOKEN_TYPE_INVALID", "访问令牌类型无效");
         }
 
         UserSession session = sessionStore.findBySessionId(claims.sessionId())
-                .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "Session not found"));
+                .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "会话不存在"));
         if (!session.active() || Instant.now().isAfter(session.expiresAt())) {
-            throw new BusinessException("SESSION_EXPIRED", "Session expired");
+            throw new BusinessException("SESSION_EXPIRED", "会话已过期");
         }
 
         UserAccount user = loadUserByTokenTenant(claims);
@@ -191,10 +191,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if (!user.enabled()) {
             authorizationSessionService.revoke(claims.sessionId());
-            throw new BusinessException("USER_DISABLED", "User disabled");
+            throw new BusinessException("USER_DISABLED", "用户已禁用");
         }
         if (user.sessionVersion() != claims.sessionVersion()) {
-            throw new BusinessException("TOKEN_VERSION_MISMATCH", "Token version invalid");
+            throw new BusinessException("TOKEN_VERSION_MISMATCH", "令牌版本无效");
         }
 
         UsernamePasswordAuthenticationToken authentication =
@@ -221,26 +221,26 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             TokenClaims claims = userAccountJwtConverter.toClaims(jwt);
             if (!"access".equals(claims.tokenType())) {
-                throw new BusinessException("ACCESS_TOKEN_TYPE_INVALID", "Invalid access token type");
+                throw new BusinessException("ACCESS_TOKEN_TYPE_INVALID", "访问令牌类型无效");
             }
 
             UserAccount user = loadUserByTokenTenant(claims);
             if (!user.enabled()) {
                 authorizationSessionService.revoke(claims.sessionId());
-                throw new BusinessException("USER_DISABLED", "User disabled");
+                throw new BusinessException("USER_DISABLED", "用户已禁用");
             }
             if (user.sessionVersion() != claims.sessionVersion()) {
                 authorizationSessionService.revoke(claims.sessionId());
-                throw new BusinessException("TOKEN_VERSION_MISMATCH", "Token version invalid");
+                throw new BusinessException("TOKEN_VERSION_MISMATCH", "令牌版本无效");
             }
 
             UserSession session = authorizationSessionService.findOrRestore(claims.sessionId(), user)
-                    .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "Session not found"));
+                    .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "会话不存在"));
             validateSessionSubjectBinding(session, claims, user);
             validateTenantBinding(request, claims, user, session.tenantId());
             if (!session.active() || Instant.now().isAfter(session.expiresAt())) {
                 authorizationSessionService.revoke(claims.sessionId());
-                throw new BusinessException("SESSION_EXPIRED", "Session expired");
+                throw new BusinessException("SESSION_EXPIRED", "会话已过期");
             }
 
             UsernamePasswordAuthenticationToken authentication =
@@ -265,7 +265,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 || !tokenTenantId.equals(user.tenantId())
                 || !tokenTenantId.equals(sessionTenantId)) {
             authorizationSessionService.revoke(claims.sessionId());
-            throw new BusinessException("TENANT_MISMATCH", "Tenant context mismatch");
+            throw new BusinessException("TENANT_MISMATCH", "租户上下文不匹配");
         }
 
         String requestedTenantId = resolveRequestedTenant(request);
@@ -276,7 +276,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
         if (!platformAdminSupport.canSwitchTenant(user, requestedTenantId)) {
-            throw new BusinessException("TENANT_MISMATCH", "Tenant context mismatch");
+            throw new BusinessException("TENANT_MISMATCH", "租户上下文不匹配");
         }
     }
 
@@ -291,13 +291,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 || !session.username().equals(user.username());
         if (mismatch) {
             authorizationSessionService.revoke(claims.sessionId());
-            throw new BusinessException("SESSION_SUBJECT_MISMATCH", "Session subject mismatch");
+            throw new BusinessException("SESSION_SUBJECT_MISMATCH", "会话主体不匹配");
         }
     }
 
     private UserAccount loadUserByTokenTenant(TokenClaims claims) {
         return runInTokenTenant(claims.tenantId(), () -> userRepository.findById(claims.userId())
-                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "User not found")));
+                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "用户不存在")));
     }
 
     private <T> T runInTokenTenant(String tenantId, Supplier<T> action) {

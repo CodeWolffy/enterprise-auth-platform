@@ -43,23 +43,23 @@ public class GlobalExceptionHandler {
         if (exception instanceof CsrfException) {
             log.warn("CSRF validation failed for {} {}: {}", request.getMethod(), request.getRequestURI(), exception.getMessage());
             // 返回不带 code 的响应，触发前端 http.ts 拦截器中的 CSRF 重试逻辑
-            return ApiResponse.fail(null, "CSRF token mismatch or missing");
+            return ApiResponse.fail(null, "CSRF 令牌不匹配或缺失");
         }
         log.warn("Access denied for {} {}: {}", request.getMethod(), request.getRequestURI(), exception.getMessage());
-        return ApiResponse.fail("ACCESS_DENIED", "No permission to access this resource");
+        return ApiResponse.fail("ACCESS_DENIED", "无权访问此资源");
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ApiResponse<Void> handleNotFound(NoResourceFoundException exception) {
-        return ApiResponse.fail("RESOURCE_NOT_FOUND", "Resource not found");
+        return ApiResponse.fail("RESOURCE_NOT_FOUND", "资源不存在");
     }
 
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResponse<Void> handleUnexpected(Exception exception) {
         log.error("Unhandled server exception", exception);
-        return ApiResponse.fail("INTERNAL_ERROR", "Internal server error");
+        return ApiResponse.fail("INTERNAL_ERROR", "服务器内部错误");
     }
 
     private String validationMessage(Exception exception) {
@@ -73,14 +73,14 @@ public class GlobalExceptionHandler {
             return constraintViolationException.getConstraintViolations().stream()
                     .map(violation -> violation.getMessage())
                     .findFirst()
-                    .orElse("Request parameter validation failed");
+                    .orElse("请求参数校验失败");
         }
-        return "Request parameter validation failed";
+        return "请求参数校验失败";
     }
 
     private String fieldErrors(List<FieldError> fieldErrors) {
         if (fieldErrors == null || fieldErrors.isEmpty()) {
-            return "Request parameter validation failed";
+            return "请求参数校验失败";
         }
         return fieldErrors.stream()
                 .map(error -> error.getField() + ":" + error.getDefaultMessage())

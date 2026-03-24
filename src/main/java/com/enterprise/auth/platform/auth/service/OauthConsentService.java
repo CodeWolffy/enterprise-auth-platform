@@ -100,7 +100,7 @@ public class OauthConsentService {
                 .eq(SysOauthClientEntity::getDeleted, 0)
                 .last("limit 1"));
         if (client == null) {
-            throw new BusinessException("ACCESS_DENIED", "No permission to revoke this consent record");
+            throw new BusinessException("ACCESS_DENIED", "无权撤销此授权记录");
         }
 
         org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsent consent =

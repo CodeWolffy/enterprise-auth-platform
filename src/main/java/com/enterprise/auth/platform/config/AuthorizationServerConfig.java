@@ -132,7 +132,7 @@ public class AuthorizationServerConfig {
             }
             if (loginAttemptService.isLocked(tenantId, username)) {
                 loginAttemptService.recordBlockedAttempt(tenantId, username, currentRequestClientIp());
-                throw new LockedException("Account is locked");
+                throw new LockedException("账户已锁定");
             }
             return userRepository.findByUsername(tenantId, username)
                     .orElseThrow(() -> new org.springframework.security.core.userdetails.UsernameNotFoundException(username));
@@ -230,7 +230,7 @@ public class AuthorizationServerConfig {
         objectMapper.addMixIn(Double.class, TrustedValueMixin.class);
         objectMapper.addMixIn(Float.class, TrustedValueMixin.class);
 
-        // Compatibility for previously serialized rows that captured JDK immutable collection impl classes.
+        // 兼容之前序列化的行，这些行捕获了 JDK 不可变集合实现类。
         String[] legacySetImplNames = {
                 "java.util.ImmutableCollections$SetN",
                 "java.util.ImmutableCollections$Set12"
@@ -240,7 +240,7 @@ public class AuthorizationServerConfig {
                 Class<?> implClass = Class.forName(className);
                 objectMapper.addMixIn(implClass, TrustedValueMixin.class);
             } catch (ClassNotFoundException ignored) {
-                // Different JDK may not expose all immutable implementation variants.
+                // 不同 JDK 版本可能不会暴露所有不可变实现变体。
             }
         }
     }
@@ -448,7 +448,7 @@ public class AuthorizationServerConfig {
             Files.writeString(jwkPath, rsaKey.toJSONString(), StandardCharsets.UTF_8);
             return rsaKey;
         } catch (Exception ex) {
-            throw new IllegalStateException("Failed to initialize authorization server RSA key", ex);
+            throw new IllegalStateException("授权服务器 RSA 密钥初始化失败", ex);
         }
     }
 }

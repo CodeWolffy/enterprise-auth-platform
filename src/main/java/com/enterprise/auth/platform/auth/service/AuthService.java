@@ -79,7 +79,7 @@ public class AuthService {
 
         if (loginAttemptService.isLocked(tenantId, request.username())) {
             loginAttemptService.recordBlockedAttempt(tenantId, request.username(), clientIp);
-            throw new BusinessException("ACCOUNT_LOCKED", "Account is locked. Try again later.");
+            throw new BusinessException("ACCOUNT_LOCKED", "账户已锁定，请稍后再试");
         }
 
         UserAccount user = userRepository.findByUsername(tenantId, request.username())
@@ -95,7 +95,7 @@ public class AuthService {
         if (!user.enabled()) {
             auditService.record("LOGIN_FAILED", user.username(), tenantId,
                     Map.of("reason", "disabled", "clientIp", clientIp));
-            throw new BusinessException("USER_DISABLED", "User is disabled");
+            throw new BusinessException("USER_DISABLED", "用户已禁用");
         }
 
         loginAttemptService.clearFailures(tenantId, request.username());
@@ -126,34 +126,34 @@ public class AuthService {
         try {
             claims = jwtService.decode(refreshToken);
         } catch (Exception ex) {
-            throw new BusinessException("INVALID_TOKEN", "Invalid refresh token");
+            throw new BusinessException("INVALID_TOKEN", "无效的刷新令牌");
         }
 
         if (!"refresh".equals(claims.tokenType())) {
-            throw new BusinessException("INVALID_TOKEN", "Invalid refresh token type");
+            throw new BusinessException("INVALID_TOKEN", "刷新令牌类型无效");
         }
 
         UserSession session = sessionStore.findBySessionId(claims.sessionId())
-                .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "Session not found"));
+                .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "会话不存在"));
         if (!session.active() || Instant.now().isAfter(session.expiresAt())) {
-            throw new BusinessException("SESSION_EXPIRED", "Session expired");
+            throw new BusinessException("SESSION_EXPIRED", "会话已过期");
         }
 
         UserAccount user = userRepository.findById(claims.userId())
-                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "User not found"));
+                .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "用户不存在"));
 
         validateSessionSubjectBinding(session, claims, user);
         if (!user.enabled()) {
             authorizationSessionService.revoke(session.sessionId());
-            throw new BusinessException("USER_DISABLED", "User disabled");
+            throw new BusinessException("USER_DISABLED", "用户已禁用");
         }
         if (user.sessionVersion() != claims.sessionVersion()) {
             authorizationSessionService.revoke(session.sessionId());
-            throw new BusinessException("TOKEN_VERSION_MISMATCH", "Token version invalid");
+            throw new BusinessException("TOKEN_VERSION_MISMATCH", "令牌版本无效");
         }
         if (!user.tenantId().equals(session.tenantId()) || !user.tenantId().equals(claims.tenantId())) {
             authorizationSessionService.revoke(session.sessionId());
-            throw new BusinessException("TENANT_MISMATCH", "Tenant context mismatch");
+            throw new BusinessException("TENANT_MISMATCH", "租户上下文不匹配");
         }
 
         sessionStore.touch(session.sessionId());
@@ -171,13 +171,13 @@ public class AuthService {
 
     public void forceOffline(UserAccount currentUser, String sessionId) {
         AuthorizationSessionService.SessionDescriptor session = authorizationSessionService.findSessionDescriptor(sessionId)
-                .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "Session not found"));
+                .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "会话不存在"));
         boolean sameOwner = currentUser.id().equals(session.userId());
         boolean canManage = currentUser.permissions().contains("session:write");
         boolean sameTenant = currentUser.tenantId().equals(session.tenantId());
         boolean visibleTarget = dataScopeService.canAccessUser(currentUser.tenantId(), session.userId());
         if (!sameOwner && (!canManage || !sameTenant || !visibleTarget)) {
-            throw new BusinessException("ACCESS_DENIED", "No permission to operate this session");
+            throw new BusinessException("ACCESS_DENIED", "无权操作此会话");
         }
         authorizationSessionService.revoke(sessionId);
         auditService.record("SESSION_FORCED_OFFLINE", currentUser.username(), currentUser.tenantId(),
@@ -224,11 +224,11 @@ public class AuthService {
     ) {
         LoginFailureResult result = loginAttemptService.recordFailure(tenantId, username, reason, clientIp);
         if (result.locked()) {
-            return new BusinessException("ACCOUNT_LOCKED", "Account is locked. Try again later.");
+            return new BusinessException("ACCOUNT_LOCKED", "账户已锁定，请稍后再试");
         }
         return new BusinessException(
                 "BAD_CREDENTIALS",
-                "Username or password is incorrect, remaining attempts: " + result.remainingAttempts()
+                "用户名或密码错误，剩余尝试次数：" + result.remainingAttempts()
         );
     }
 
@@ -243,7 +243,7 @@ public class AuthService {
                 || !session.username().equals(user.username());
         if (mismatch) {
             authorizationSessionService.revoke(session.sessionId());
-            throw new BusinessException("SESSION_SUBJECT_MISMATCH", "Session subject mismatch");
+            throw new BusinessException("SESSION_SUBJECT_MISMATCH", "会话主体不匹配");
         }
     }
 }

@@ -97,7 +97,7 @@ public class AuditExportTaskService {
     public ExportTaskView archive(Long taskId) {
         SysAuditExportTaskEntity entity = getTask(taskId);
         if ("PENDING".equals(entity.getStatus()) || "RUNNING".equals(entity.getStatus())) {
-            throw new BusinessException("Cannot archive export task while it is running");
+            throw new BusinessException("导出任务仍在运行中，无法归档");
         }
         if ("ARCHIVED".equals(entity.getStatus())) {
             return toView(entity, policy(entity.getTenantId()));
@@ -141,7 +141,7 @@ public class AuditExportTaskService {
     public DownloadFile download(Long taskId) {
         SysAuditExportTaskEntity entity = getTask(taskId);
         if (!"SUCCESS".equals(entity.getStatus()) || entity.getFileContent() == null) {
-            throw new BusinessException("Export file is not ready or has been archived");
+            throw new BusinessException("导出文件尚未就绪或已归档");
         }
         return new DownloadFile(entity.getFileName(), entity.getFileContent());
     }
@@ -159,7 +159,7 @@ public class AuditExportTaskService {
     @Transactional
     public int cleanup(String tenantId, String status, Instant completedBefore) {
         if (completedBefore == null) {
-            throw new BusinessException("completedBefore is required for cleanup");
+            throw new BusinessException("清理操作需要指定 completedBefore 参数");
         }
         LambdaQueryWrapper<SysAuditExportTaskEntity> query = new LambdaQueryWrapper<SysAuditExportTaskEntity>()
                 .eq(StringUtils.hasText(tenantId), SysAuditExportTaskEntity::getTenantId, tenantId)
@@ -184,7 +184,7 @@ public class AuditExportTaskService {
     @Transactional
     public int archiveCompleted(String tenantId, String status, Instant completedBefore) {
         if (completedBefore == null) {
-            throw new BusinessException("completedBefore is required for batch archive");
+            throw new BusinessException("批量归档操作需要指定 completedBefore 参数");
         }
         LambdaQueryWrapper<SysAuditExportTaskEntity> query = new LambdaQueryWrapper<SysAuditExportTaskEntity>()
                 .eq(StringUtils.hasText(tenantId), SysAuditExportTaskEntity::getTenantId, tenantId)
@@ -452,7 +452,7 @@ public class AuditExportTaskService {
     private SysAuditExportTaskEntity getTask(Long taskId) {
         SysAuditExportTaskEntity entity = sysAuditExportTaskMapper.selectById(taskId);
         if (entity == null) {
-            throw new BusinessException("Export task not found");
+            throw new BusinessException("导出任务不存在");
         }
         return entity;
     }
@@ -472,7 +472,7 @@ public class AuditExportTaskService {
                     2000
             );
         } catch (Exception ex) {
-            throw new BusinessException("閻庣數鍘ч崵顓熺鐠囨彃顫ら柡灞诲劥椤曟寮堕垾鍙夘偨閻熸瑱绲鹃悗鑺ュ緞鏉堫偉袝");
+            throw new BusinessException("审计导出任务处理失败，请稍后重试");
         }
     }
 
@@ -512,12 +512,12 @@ public class AuditExportTaskService {
             default -> 0;
         };
         String progressStage = switch (entity.getStatus()) {
-            case "PENDING" -> "Waiting";
-            case "RUNNING" -> "Generating file";
-            case "SUCCESS" -> "Completed";
-            case "FAILED" -> "Failed";
-            case "ARCHIVED" -> "Archived";
-            default -> "Unknown";
+            case "PENDING" -> "等待中";
+            case "RUNNING" -> "生成文件中";
+            case "SUCCESS" -> "已完成";
+            case "FAILED" -> "失败";
+            case "ARCHIVED" -> "已归档";
+            default -> "未知";
         };
         Instant expiresAt = entity.getCompletedAt() == null
                 ? null
@@ -550,16 +550,16 @@ public class AuditExportTaskService {
             boolean retentionExpired
     ) {
         return switch (entity.getStatus()) {
-            case "PENDING" -> "Task is pending. Export file will be retained for " + policy.retentionDays() + " days after completion.";
-            case "RUNNING" -> "Task is running. Export file will be retained for " + policy.retentionDays() + " days after completion.";
+            case "PENDING" -> "任务等待中，导出文件将在完成后保留" + policy.retentionDays() + "天。";
+            case "RUNNING" -> "任务执行中，导出文件将在完成后保留" + policy.retentionDays() + "天。";
             case "FAILED" -> expiresAt == null
-                    ? "Task failed. You can adjust the query and retry export."
-                    : "Failed task metadata is retained until " + expiresAt + ".";
-            case "ARCHIVED" -> "Export result has been archived. Metadata is retained for audit tracking.";
+                    ? "任务失败，可调整查询条件后重新导出。"
+                    : "失败任务元数据将保留至 " + expiresAt + "。";
+            case "ARCHIVED" -> "导出结果已归档，元数据保留用于审计追踪。";
             case "SUCCESS" -> retentionExpired
-                    ? "Export file has exceeded retention. Archive or clean up promptly."
-                    : "Export file is retained until " + expiresAt + ".";
-            default -> "Manage this task according to current retention policy.";
+                    ? "导出文件已超过保留期限，请及时归档或清理。"
+                    : "导出文件将保留至 " + expiresAt + "。";
+            default -> "请根据当前保留策略管理此任务。";
         };
     }
 
@@ -585,52 +585,52 @@ public class AuditExportTaskService {
         return Instant.parse(String.valueOf(value));
     }
 
-    @Schema(description = "Audit export task view")
+    @Schema(description = "审计导出任务视图")
     public record ExportTaskView(
-            @Schema(description = "Task ID") Long id,
-            @Schema(description = "Tenant ID") String tenantId,
-            @Schema(description = "Operator") String operator,
-            @Schema(description = "Task status") String status,
-            @Schema(description = "Whether archived") Boolean archived,
-            @Schema(description = "Whether archivable") Boolean archivable,
-            @Schema(description = "File name") String fileName,
-            @Schema(description = "Record count") Integer recordCount,
-            @Schema(description = "Progress percentage") Integer progressPercent,
-            @Schema(description = "Progress stage") String progressStage,
-            @Schema(description = "Whether retention expired") Boolean retentionExpired,
-            @Schema(description = "Retention summary") String retentionSummary,
-            @Schema(description = "Expires at") Instant expiresAt,
-            @Schema(description = "Requested at") Instant requestedAt,
-            @Schema(description = "Completed at") Instant completedAt,
-            @Schema(description = "Error message") String errorMessage
+            @Schema(description = "任务 ID") Long id,
+            @Schema(description = "租户 ID") String tenantId,
+            @Schema(description = "操作人") String operator,
+            @Schema(description = "任务状态") String status,
+            @Schema(description = "是否已归档") Boolean archived,
+            @Schema(description = "是否可归档") Boolean archivable,
+            @Schema(description = "文件名") String fileName,
+            @Schema(description = "记录数") Integer recordCount,
+            @Schema(description = "进度百分比") Integer progressPercent,
+            @Schema(description = "进度阶段") String progressStage,
+            @Schema(description = "保留期是否过期") Boolean retentionExpired,
+            @Schema(description = "保留期摘要") String retentionSummary,
+            @Schema(description = "过期时间") Instant expiresAt,
+            @Schema(description = "请求时间") Instant requestedAt,
+            @Schema(description = "完成时间") Instant completedAt,
+            @Schema(description = "错误消息") String errorMessage
     ) {
     }
 
     public record DownloadFile(String fileName, byte[] content) {
     }
 
-    @Schema(description = "Audit export retention policy")
+    @Schema(description = "审计导出保留策略")
     public record ExportPolicy(
-            @Schema(description = "Retention days") Integer retentionDays,
-            @Schema(description = "Maximum tasks") Integer maxTasks
+            @Schema(description = "保留天数") Integer retentionDays,
+            @Schema(description = "最大任务数") Integer maxTasks
     ) {
     }
 
-    @Schema(description = "Audit export governance execution result")
+    @Schema(description = "审计导出治理执行结果")
     public record GovernanceResult(
-            @Schema(description = "Tenant ID") String tenantId,
-            @Schema(description = "Whether no task to process") Boolean noData,
-            @Schema(description = "Whether dry run") Boolean dryRun,
-            @Schema(description = "Retention days") Integer retentionDays,
-            @Schema(description = "Maximum tasks") Integer maxTasks,
-            @Schema(description = "Retention cutoff") Instant retentionCutoff,
-            @Schema(description = "Scanned completed tasks") Integer scannedTasks,
-            @Schema(description = "Planned archive count") Integer plannedArchiveCount,
-            @Schema(description = "Planned delete count") Integer plannedDeleteCount,
-            @Schema(description = "Archived count") Integer archivedCount,
-            @Schema(description = "Deleted count") Integer deletedCount,
-            @Schema(description = "Archived task ID samples") List<Long> archivedSampleIds,
-            @Schema(description = "Deleted task ID samples") List<Long> deletedSampleIds
+            @Schema(description = "租户 ID") String tenantId,
+            @Schema(description = "是否无任务可处理") Boolean noData,
+            @Schema(description = "是否为试运行") Boolean dryRun,
+            @Schema(description = "保留天数") Integer retentionDays,
+            @Schema(description = "最大任务数") Integer maxTasks,
+            @Schema(description = "保留截止时间") Instant retentionCutoff,
+            @Schema(description = "已扫描的完成任务数") Integer scannedTasks,
+            @Schema(description = "计划归档数") Integer plannedArchiveCount,
+            @Schema(description = "计划删除数") Integer plannedDeleteCount,
+            @Schema(description = "已归档数") Integer archivedCount,
+            @Schema(description = "已删除数") Integer deletedCount,
+            @Schema(description = "归档任务 ID 样本") List<Long> archivedSampleIds,
+            @Schema(description = "删除任务 ID 样本") List<Long> deletedSampleIds
     ) {
     }
 }

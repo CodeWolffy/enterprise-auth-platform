@@ -808,13 +808,13 @@ public class TenantManagementService {
             return;
         }
         if (!currentTenantId().equals(tenantId)) {
-            throw new BusinessException("ACCESS_DENIED", "No permission to access this tenant");
+            throw new BusinessException("ACCESS_DENIED", "无权访问此租户");
         }
     }
 
     private void requirePlatformSuperAdmin() {
         if (!isPlatformSuperAdmin()) {
-            throw new BusinessException("ACCESS_DENIED", "Platform super admin required");
+            throw new BusinessException("ACCESS_DENIED", "需要平台超级管理员权限");
         }
     }
 

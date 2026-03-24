@@ -85,7 +85,7 @@ public class OAuthCookieSessionService {
     public CookieSessionResponse refresh(HttpServletRequest request, HttpServletResponse response) {
         String refreshToken = readCookie(request, AuthCookieConstants.REFRESH_TOKEN_COOKIE);
         if (!StringUtils.hasText(refreshToken)) {
-            throw new BusinessException("INVALID_TOKEN", "Refresh token is missing");
+            throw new BusinessException("INVALID_TOKEN", "刷新令牌缺失");
         }
         LinkedMultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("grant_type", "refresh_token");
@@ -124,25 +124,25 @@ public class OAuthCookieSessionService {
                     .retrieve()
                     .body(String.class);
             if (!StringUtils.hasText(body)) {
-                throw new BusinessException("TOKEN_EXCHANGE_FAILED", "Token endpoint returned empty body");
+                throw new BusinessException("TOKEN_EXCHANGE_FAILED", "令牌端点返回空响应");
             }
             JsonNode node = objectMapper.readTree(body);
             String accessToken = node.path("access_token").asText(null);
             String refreshToken = node.path("refresh_token").asText(null);
             long expiresIn = node.path("expires_in").asLong(0L);
             if (!StringUtils.hasText(accessToken) || !StringUtils.hasText(refreshToken) || expiresIn <= 0) {
-                throw new BusinessException("TOKEN_EXCHANGE_FAILED", "Token endpoint response is invalid");
+                throw new BusinessException("TOKEN_EXCHANGE_FAILED", "令牌端点响应无效");
             }
             Jwt jwt = authorizationServerJwtDecoder.decode(accessToken);
             var claims = userAccountJwtConverter.toClaims(jwt);
             Instant expiresAt = Instant.now().plusSeconds(expiresIn);
             return new TokenPayload(accessToken, refreshToken, expiresIn, claims.tenantId(), claims.sessionId(), expiresAt);
         } catch (RestClientResponseException ex) {
-            throw new BusinessException("TOKEN_EXCHANGE_FAILED", "Token exchange failed");
+            throw new BusinessException("TOKEN_EXCHANGE_FAILED", "令牌交换失败");
         } catch (BusinessException ex) {
             throw ex;
         } catch (Exception ex) {
-            throw new BusinessException("TOKEN_EXCHANGE_FAILED", "Token exchange failed");
+            throw new BusinessException("TOKEN_EXCHANGE_FAILED", "令牌交换失败");
         }
     }
 
@@ -205,10 +205,10 @@ public class OAuthCookieSessionService {
 
     private void validateRedirectUri(String redirectUri) {
         if (!StringUtils.hasText(redirectUri)) {
-            throw new BusinessException("INVALID_REDIRECT_URI", "Redirect URI is required");
+            throw new BusinessException("INVALID_REDIRECT_URI", "重定向 URI 不能为空");
         }
         if (!frontendProperties.resolvedRedirectUris().contains(redirectUri)) {
-            throw new BusinessException("INVALID_REDIRECT_URI", "Redirect URI is not allowed");
+            throw new BusinessException("INVALID_REDIRECT_URI", "重定向 URI 不在允许列表中");
         }
     }
 
