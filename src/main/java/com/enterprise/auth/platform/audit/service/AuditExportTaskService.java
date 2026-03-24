@@ -28,9 +28,15 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 import com.alibaba.excel.EasyExcel;
@@ -40,6 +46,7 @@ import com.enterprise.auth.platform.audit.model.AuditExportVO;
 
 @Service
 public class AuditExportTaskService {
+    private static final Logger log = LoggerFactory.getLogger(AuditExportTaskService.class);
 
     private final SysAuditExportTaskMapper sysAuditExportTaskMapper;
     private final SysAuditExportPolicyMapper sysAuditExportPolicyMapper;
@@ -78,8 +85,29 @@ public class AuditExportTaskService {
                 "fileName", entity.getFileName()
         ));
         Long taskId = entity.getId();
-        auditExportExecutor.execute(() -> processTask(taskId, query));
+        submitTaskAfterCommit(taskId, query);
         return toView(entity, policy(entity.getTenantId()));
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void recoverPendingTasksOnStartup() {
+        List<SysAuditExportTaskEntity> recoverableTasks = sysAuditExportTaskMapper.selectList(
+                new LambdaQueryWrapper<SysAuditExportTaskEntity>()
+                        .in(SysAuditExportTaskEntity::getStatus, List.of("PENDING", "RUNNING"))
+                        .orderByAsc(SysAuditExportTaskEntity::getRequestedAt)
+                        .orderByAsc(SysAuditExportTaskEntity::getId)
+        );
+        if (recoverableTasks.isEmpty()) {
+            return;
+        }
+        log.warn("recover {} audit export task(s) on startup", recoverableTasks.size());
+        for (SysAuditExportTaskEntity task : recoverableTasks) {
+            try {
+                submitTask(task.getId(), parseQuery(task));
+            } catch (Exception ex) {
+                markTaskFailed(task.getId(), "启动补偿重试失败: " + safeErrorMessage(ex));
+            }
+        }
     }
 
     @Transactional
@@ -447,6 +475,52 @@ public class AuditExportTaskService {
                     "reason", ex.getMessage() == null ? "" : ex.getMessage()
             ));
         }
+    }
+
+    private void submitTaskAfterCommit(Long taskId, AuditQuery query) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()
+                && TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    submitTask(taskId, query);
+                }
+            });
+            return;
+        }
+        submitTask(taskId, query);
+    }
+
+    private void submitTask(Long taskId, AuditQuery query) {
+        try {
+            auditExportExecutor.execute(() -> processTask(taskId, query));
+        } catch (Exception ex) {
+            log.error("submit audit export task failed, taskId={}", taskId, ex);
+            markTaskFailed(taskId, "任务投递失败: " + safeErrorMessage(ex));
+        }
+    }
+
+    private void markTaskFailed(Long taskId, String errorMessage) {
+        SysAuditExportTaskEntity entity = sysAuditExportTaskMapper.selectById(taskId);
+        if (entity == null) {
+            return;
+        }
+        if (!"PENDING".equals(entity.getStatus()) && !"RUNNING".equals(entity.getStatus())) {
+            return;
+        }
+        entity.setStatus("FAILED");
+        entity.setErrorMessage(errorMessage);
+        entity.setCompletedAt(LocalDateTime.now());
+        sysAuditExportTaskMapper.updateById(entity);
+        auditService.record("AUDIT_EXPORT_TASK_FAILED", entity.getOperator(), entity.getTenantId(), Map.of(
+                "taskId", taskId,
+                "errorMessage", errorMessage
+        ));
+    }
+
+    private String safeErrorMessage(Exception ex) {
+        String message = ex.getMessage();
+        return StringUtils.hasText(message) ? message : ex.getClass().getSimpleName();
     }
 
     private SysAuditExportTaskEntity getTask(Long taskId) {
