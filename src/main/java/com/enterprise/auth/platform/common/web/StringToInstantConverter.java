@@ -22,13 +22,13 @@ public class StringToInstantConverter implements Converter<String, Instant> {
         try {
             return Instant.parse(text);
         } catch (DateTimeParseException ignored) {
-            // fallback below
+            // 回退到以下处理
         }
 
         try {
             return OffsetDateTime.parse(text).toInstant();
         } catch (DateTimeParseException ignored) {
-            // fallback below
+            // 回退到以下处理
         }
 
         String normalized = text.replace(' ', 'T');
@@ -36,7 +36,7 @@ public class StringToInstantConverter implements Converter<String, Instant> {
             LocalDateTime localDateTime = LocalDateTime.parse(normalized);
             return localDateTime.atZone(ZoneId.systemDefault()).toInstant();
         } catch (DateTimeParseException ex) {
-            throw new IllegalArgumentException("Invalid datetime format: " + source, ex);
+            throw new IllegalArgumentException("无效的日期时间格式：" + source, ex);
         }
     }
 }

@@ -100,7 +100,7 @@ public class AuditExportTaskService {
         if (recoverableTasks.isEmpty()) {
             return;
         }
-        log.warn("recover {} audit export task(s) on startup", recoverableTasks.size());
+        log.warn("启动时恢复 {} 个审计导出任务", recoverableTasks.size());
         for (SysAuditExportTaskEntity task : recoverableTasks) {
             try {
                 submitTask(task.getId(), parseQuery(task));
@@ -495,7 +495,7 @@ public class AuditExportTaskService {
         try {
             auditExportExecutor.execute(() -> processTask(taskId, query));
         } catch (Exception ex) {
-            log.error("submit audit export task failed, taskId={}", taskId, ex);
+            log.error("审计导出任务投递失败，taskId={}", taskId, ex);
             markTaskFailed(taskId, "任务投递失败: " + safeErrorMessage(ex));
         }
     }

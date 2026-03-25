@@ -83,24 +83,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         String token = resolveBearerToken(request);
         if (!StringUtils.hasText(token)) {
-            log.warn("[AUTH-DIAG] No token found for {} {}", request.getMethod(), request.getRequestURI());
+            log.warn("[AUTH-DIAG] 未找到令牌：{} {}", request.getMethod(), request.getRequestURI());
             filterChain.doFilter(request, response);
             return;
         }
-        log.warn("[AUTH-DIAG] Token found for {} {}, length={}", request.getMethod(), request.getRequestURI(), token.length());
+        log.warn("[AUTH-DIAG] 找到令牌：{} {}，长度={}", request.getMethod(), request.getRequestURI(), token.length());
 
         try {
             Optional<UsernamePasswordAuthenticationToken> authentication = authenticateCustomToken(request, token);
             if (authentication.isEmpty()) {
-                log.warn("[AUTH-DIAG] Custom token auth returned empty for {} {}", request.getMethod(), request.getRequestURI());
+                log.warn("[AUTH-DIAG] 自定义令牌认证返回空：{} {}", request.getMethod(), request.getRequestURI());
                 authentication = authenticateAuthorizationServerToken(request, token);
                 if (authentication.isEmpty()) {
-                    log.warn("[AUTH-DIAG] AuthServer token auth also returned empty for {} {}", request.getMethod(), request.getRequestURI());
+                    log.warn("[AUTH-DIAG] 授权服务器令牌认证也返回空：{} {}", request.getMethod(), request.getRequestURI());
                 } else {
-                    log.warn("[AUTH-DIAG] AuthServer token auth SUCCEEDED for {} {}", request.getMethod(), request.getRequestURI());
+                    log.warn("[AUTH-DIAG] 授权服务器令牌认证成功：{} {}", request.getMethod(), request.getRequestURI());
                 }
             } else {
-                log.warn("[AUTH-DIAG] Custom token auth SUCCEEDED for {} {}", request.getMethod(), request.getRequestURI());
+                log.warn("[AUTH-DIAG] 自定义令牌认证成功：{} {}", request.getMethod(), request.getRequestURI());
             }
             if (authentication.isEmpty()) {
                 if (!isTokenFailureBypassEndpoint(request)) {
@@ -118,14 +118,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
             });
         } catch (BusinessException ex) {
-            log.warn("[AUTH-DIAG] Reject token for {} {}, code={}, message={}", request.getMethod(), request.getRequestURI(), ex.code(), ex.getMessage());
+            log.warn("[AUTH-DIAG] 拒绝令牌：{} {}，code={}，message={}", request.getMethod(), request.getRequestURI(), ex.code(), ex.getMessage());
             SecurityContextHolder.clearContext();
             if (!isTokenFailureBypassEndpoint(request)) {
                 writeAuthFailure(response, ex);
                 return;
             }
         } catch (Exception ex) {
-            log.error("[AUTH-DIAG] Unexpected token handling error for {} {}: {}",
+            log.error("[AUTH-DIAG] 令牌处理异常：{} {}，{}",
                     request.getMethod(), request.getRequestURI(), ex.getMessage(), ex);
             SecurityContextHolder.clearContext();
             if (!isTokenFailureBypassEndpoint(request)) {
@@ -257,7 +257,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             authorizationSessionService.touch(claims.sessionId());
             return Optional.of(authentication);
         } catch (JwtException | IllegalArgumentException | ClassCastException ex) {
-            log.warn("[AUTH-DIAG] AuthServer JWT decode failed: {} - {}", ex.getClass().getSimpleName(), ex.getMessage());
+            log.warn("[AUTH-DIAG] 授权服务器 JWT 解码失败：{} - {}", ex.getClass().getSimpleName(), ex.getMessage());
             return Optional.empty();
         }
     }
