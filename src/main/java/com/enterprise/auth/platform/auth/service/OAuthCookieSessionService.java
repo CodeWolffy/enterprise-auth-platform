@@ -77,7 +77,6 @@ public class OAuthCookieSessionService {
         params.add("redirect_uri", redirectUri);
         params.add("code", code);
         params.add("code_verifier", codeVerifier);
-        params.add("tenantId", resolveTenantId(request));
         TokenPayload tokenPayload = requestToken(params, request);
         writeTokenCookies(tokenPayload, request, response);
         return toSessionResponse(tokenPayload);
@@ -93,7 +92,6 @@ public class OAuthCookieSessionService {
         params.add("client_id", frontendProperties.publicClientId());
         maybeAddClientSecret(params);
         params.add("refresh_token", refreshToken);
-        params.add("tenantId", resolveTenantId(request));
         TokenPayload tokenPayload = requestToken(params, request);
         writeTokenCookies(tokenPayload, request, response);
         return toSessionResponse(tokenPayload);
@@ -213,14 +211,6 @@ public class OAuthCookieSessionService {
         if (!frontendProperties.resolvedRedirectUris().contains(redirectUri)) {
             throw new BusinessException("INVALID_REDIRECT_URI", "重定向 URI 不在允许列表中");
         }
-    }
-
-    private String resolveTenantId(HttpServletRequest request) {
-        String tenantId = request.getHeader(tenantProperties.headerName());
-        if (!StringUtils.hasText(tenantId)) {
-            tenantId = request.getParameter("tenantId");
-        }
-        return StringUtils.hasText(tenantId) ? tenantId : tenantProperties.platformTenantId();
     }
 
     private record TokenPayload(

@@ -166,6 +166,41 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.message").exists());
     }
 
+            @Test
+            void createShouldRejectGlobalDuplicateUsernameAcrossTenants() throws Exception {
+            UserAccount principal = new UserAccount(
+                scopeUserId,
+                "tenant-a",
+                SCOPE_USER,
+                passwordEncoder.encode("UserTest@123"),
+                true,
+                Set.of(),
+                Set.of("user:write"),
+                Set.of(),
+                DataScopeType.DEPT,
+                1
+            );
+
+            mockMvc.perform(post("/api/users")
+                    .with(user(principal))
+                    .with(csrf())
+                    .header("X-Tenant-Id", "tenant-a")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""
+                        {
+                          "username": "admin",
+                          "displayName": "重复用户名用户",
+                          "password": "UserTest@123",
+                          "deptId": 2,
+                          "enabled": true,
+                          "roleCodes": []
+                        }
+                        """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"))
+                .andExpect(jsonPath("$.message").value("用户名已存在"));
+            }
+
     @Test
     void listShouldReturnAccessDeniedCodeWhenAuthorityMissing() throws Exception {
         UserAccount principal = new UserAccount(

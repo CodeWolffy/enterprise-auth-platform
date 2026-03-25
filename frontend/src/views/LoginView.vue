@@ -17,7 +17,7 @@
     <section class="auth-panel auth-panel--form">
       <span class="eyebrow">Tenant Access</span>
       <h2>{{ oauthContextReady ? '登录并继续授权' : '开始 OAuth2 登录' }}</h2>
-      <p>{{ oauthContextReady ? '请输入账号密码，登录成功后将自动继续授权流程。' : '选择租户后，将跳转到后端统一认证中心继续完成授权。' }}</p>
+      <p>{{ oauthContextReady ? '请输入账号密码，系统将自动匹配所属租户并继续授权流程。' : '点击后将跳转到后端统一认证中心继续完成授权。' }}</p>
 
       <el-alert
         v-if="loginErrorMessage"
@@ -29,12 +29,6 @@
       />
 
       <el-form label-position="top" @submit.prevent="handleLogin">
-        <el-form-item label="租户编码" :error="tenantError">
-          <el-select v-model="tenantId" placeholder="请选择租户" data-testid="login-tenant-select" @change="onTenantChanged">
-            <el-option v-for="item in tenants" :key="item.id" :label="item.label" :value="item.id" />
-          </el-select>
-        </el-form-item>
-
         <el-form-item v-if="oauthContextReady" label="用户名" :error="usernameError">
           <el-input v-model="username" placeholder="请输入用户名" autocomplete="username" />
         </el-form-item>
@@ -49,9 +43,6 @@
             @keyup.enter="handleLogin"
           />
         </el-form-item>
-
-        <div class="tenant-tip">{{ selectedTenantTip }}</div>
-
         <div class="auth-actions">
           <el-button type="primary" size="large" :loading="loading" data-testid="login-submit" native-type="submit">
             {{ oauthContextReady ? '登录并继续授权' : '跳转统一认证中心' }}
@@ -67,29 +58,20 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { getBackendOrigin } from '@/utils/oauth'
 
-const storageKey = 'eap.login.tenant'
-
 const authStore = useAuthStore()
 const route = useRoute()
-const tenantId = ref('')
 const username = ref('')
 const password = ref('')
 const loading = ref(false)
-const tenantError = ref('')
 const usernameError = ref('')
 const passwordError = ref('')
 
 const backendOrigin = getBackendOrigin()
-
-const tenants = [
-  { id: 'platform', label: '平台租户 (platform)', tip: '平台级租户，可管理全局配置与跨租户能力。' },
-  { id: 'tenant-a', label: '租户 A (tenant-a)', tip: '业务租户，按租户隔离访问权限与数据。' },
-]
 
 const loginErrorMessage = computed(() => {
   const code = String(route.query.error ?? '').trim().toLowerCase()
@@ -105,11 +87,6 @@ const loginErrorMessage = computed(() => {
   return `登录失败：${code}`
 })
 
-const selectedTenantTip = computed(() => {
-  const selected = tenants.find((item) => item.id === tenantId.value)
-  return selected?.tip ?? '请选择正确租户，避免进入错误的隔离空间。'
-})
-
 const oauthContextReady = computed(() => {
   const hasResponseType = String(route.query.response_type ?? '').toLowerCase() === 'code'
   const hasClientId = String(route.query.client_id ?? '').trim().length > 0
@@ -117,38 +94,15 @@ const oauthContextReady = computed(() => {
   return hasResponseType && hasClientId && hasState
 })
 
-onMounted(() => {
-  const tenantFromQuery = String(route.query.tenantId ?? '').trim()
-  const tenantFromStorage = sessionStorage.getItem(storageKey) ?? localStorage.getItem(storageKey) ?? ''
-  tenantId.value = resolveTenant(tenantFromQuery || tenantFromStorage || 'platform')
-})
-
-function resolveTenant(value: string) {
-  return tenants.some((item) => item.id === value) ? value : 'platform'
-}
-
-function onTenantChanged(value: string) {
-  tenantError.value = ''
-  sessionStorage.setItem(storageKey, value)
-}
-
 function resetCredentialErrors() {
   usernameError.value = ''
   passwordError.value = ''
 }
 
 async function handleLogin() {
-  if (!tenantId.value) {
-    tenantError.value = '请选择租户'
-    return
-  }
-
   resetCredentialErrors()
-  tenantError.value = ''
   loading.value = true
   try {
-    localStorage.setItem(storageKey, tenantId.value)
-
     if (oauthContextReady.value) {
       if (!username.value.trim()) {
         usernameError.value = '请输入用户名'
@@ -162,7 +116,7 @@ async function handleLogin() {
       return
     }
 
-    await authStore.startLogin(tenantId.value)
+    await authStore.startLogin()
   } finally {
     loading.value = false
   }
@@ -173,7 +127,6 @@ function submitBackendLoginForm() {
   form.method = 'post'
   form.action = `${backendOrigin}/login`
 
-  appendHidden(form, 'tenantId', tenantId.value)
   appendHidden(form, 'username', username.value.trim())
   appendHidden(form, 'password', password.value)
 
@@ -247,13 +200,6 @@ function appendHidden(form: HTMLFormElement, name: string, value: string) {
 
 .auth-alert {
   margin-bottom: 4px;
-}
-
-.tenant-tip {
-  margin-top: -6px;
-  margin-bottom: 12px;
-  color: #5f6e85;
-  font-size: 13px;
 }
 
 .auth-actions :deep(.el-button) {

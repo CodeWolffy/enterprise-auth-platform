@@ -28,12 +28,16 @@ export function getRedirectUri() {
   return `${window.location.origin}/auth/callback`
 }
 
-export async function createOAuthRedirect(tenantId: string) {
+export async function createOAuthRedirect(tenantId?: string) {
   const state = randomString(24)
   const verifier = randomString(64)
   sessionStorage.setItem(verifierKey, verifier)
   sessionStorage.setItem(stateKey, state)
-  sessionStorage.setItem(tenantKey, tenantId)
+  if (tenantId && tenantId.trim()) {
+    sessionStorage.setItem(tenantKey, tenantId)
+  } else {
+    sessionStorage.removeItem(tenantKey)
+  }
   const challenge = await createCodeChallenge(verifier)
   const url = new URL('/oauth2/authorize', backendOrigin)
   url.searchParams.set('response_type', 'code')
@@ -43,14 +47,16 @@ export async function createOAuthRedirect(tenantId: string) {
   url.searchParams.set('state', state)
   url.searchParams.set('code_challenge', challenge)
   url.searchParams.set('code_challenge_method', 'S256')
-  url.searchParams.set('tenantId', tenantId)
+  if (tenantId && tenantId.trim()) {
+    url.searchParams.set('tenantId', tenantId)
+  }
   return url.toString()
 }
 
 export function consumeOAuthContext() {
   const verifier = sessionStorage.getItem(verifierKey)
   const state = sessionStorage.getItem(stateKey)
-  const tenantId = sessionStorage.getItem(tenantKey) ?? 'platform'
+  const tenantId = sessionStorage.getItem(tenantKey) || undefined
   sessionStorage.removeItem(verifierKey)
   sessionStorage.removeItem(stateKey)
   sessionStorage.removeItem(tenantKey)

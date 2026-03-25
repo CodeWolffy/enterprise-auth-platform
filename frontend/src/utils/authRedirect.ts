@@ -7,9 +7,8 @@ export async function redirectToAuthorizationPage(tenantId?: string) {
     return
   }
   redirecting = true
-  const targetTenant = tenantId && tenantId.trim() ? tenantId.trim() : 'platform'
   try {
-    const authorizeUrl = await createOAuthRedirect(targetTenant)
+    const authorizeUrl = await createOAuthRedirect(tenantId)
     window.location.href = authorizeUrl
   } catch {
     window.location.href = '/login'

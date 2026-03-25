@@ -29,6 +29,7 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Supplier;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
@@ -41,6 +42,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
@@ -73,6 +75,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 @Configuration
 public class AuthorizationServerConfig {
+
+    private static final String RESOLVED_TENANT_ATTR = "resolvedTenantId";
 
     @Bean
     @Order(1)
@@ -109,6 +113,7 @@ public class AuthorizationServerConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/login").permitAll()
                         .anyRequest().authenticated())
+            .cors(Customizer.withDefaults())
             .csrf(csrf -> csrf.ignoringRequestMatchers("/login"))
                 .formLogin(form -> form
                         .loginPage("/login")
@@ -124,12 +129,19 @@ public class AuthorizationServerConfig {
     public UserDetailsService authorizationServerUserDetailsService(
             UserRepository userRepository,
             TenantProperties tenantProperties,
-            LoginAttemptService loginAttemptService
+            LoginAttemptService loginAttemptService,
+            PasswordEncoder passwordEncoder,
+            JdbcTemplate jdbcTemplate
     ) {
         return username -> {
-            String tenantId = TenantContext.getTenantId();
-            if (!StringUtils.hasText(tenantId)) {
-                tenantId = tenantProperties.platformTenantId();
+            HttpServletRequest request = currentRequest();
+            String tenantId = resolveTenantId(request, tenantProperties);
+            if (!hasExplicitTenant(request)) {
+                tenantId = autoResolveTenantIdByCredentials(request, username, tenantProperties, passwordEncoder, jdbcTemplate);
+            }
+            TenantContext.setTenantId(tenantId);
+            if (request != null) {
+                request.setAttribute(RESOLVED_TENANT_ATTR, tenantId);
             }
             if (loginAttemptService.isLocked(tenantId, username)) {
                 loginAttemptService.recordBlockedAttempt(tenantId, username, currentRequestClientIp());
@@ -329,8 +341,8 @@ public class AuthorizationServerConfig {
         if (snapshotUser == null) {
             return null;
         }
-        UserAccount currentUser = userRepository.findById(snapshotUser.id())
-                .orElseThrow(() -> invalidGrant("user_not_found", authorizationId, authorizationSessionService));
+        UserAccount currentUser = runInTenantContext(snapshotUser.tenantId(), () -> userRepository.findById(snapshotUser.id())
+                .orElseThrow(() -> invalidGrant("user_not_found", authorizationId, authorizationSessionService)));
         if (!currentUser.enabled()) {
             throw invalidGrant("user_disabled", authorizationId, authorizationSessionService);
         }
@@ -338,6 +350,27 @@ public class AuthorizationServerConfig {
             throw invalidGrant("session_version_changed", authorizationId, authorizationSessionService);
         }
         return currentUser;
+    }
+
+    private <T> T runInTenantContext(String tenantId, Supplier<T> action) {
+        if (!StringUtils.hasText(tenantId)) {
+            return action.get();
+        }
+        String currentTenantId = TenantContext.getTenantId();
+        boolean switched = !tenantId.equals(currentTenantId);
+        if (!switched) {
+            return action.get();
+        }
+        TenantContext.setTenantId(tenantId);
+        try {
+            return action.get();
+        } finally {
+            if (StringUtils.hasText(currentTenantId)) {
+                TenantContext.setTenantId(currentTenantId);
+            } else {
+                TenantContext.clear();
+            }
+        }
     }
 
     private OAuth2AuthenticationException invalidGrant(
@@ -373,6 +406,14 @@ public class AuthorizationServerConfig {
     }
 
     private String resolveTenantId(HttpServletRequest request, TenantProperties tenantProperties) {
+        if (request == null) {
+            String current = TenantContext.getTenantId();
+            return StringUtils.hasText(current) ? current : tenantProperties.platformTenantId();
+        }
+        Object resolved = request.getAttribute(RESOLVED_TENANT_ATTR);
+        if (resolved instanceof String value && StringUtils.hasText(value)) {
+            return value;
+        }
         String tenantId = request.getHeader(tenantProperties.headerName());
         if (!StringUtils.hasText(tenantId)) {
             tenantId = request.getParameter("tenantId");
@@ -381,6 +422,51 @@ public class AuthorizationServerConfig {
             tenantId = TenantContext.getTenantId();
         }
         return StringUtils.hasText(tenantId) ? tenantId : tenantProperties.platformTenantId();
+    }
+
+    private boolean hasExplicitTenant(HttpServletRequest request) {
+        return request != null && StringUtils.hasText(request.getParameter("tenantId"));
+    }
+
+    private String autoResolveTenantIdByCredentials(
+            HttpServletRequest request,
+            String username,
+            TenantProperties tenantProperties,
+            PasswordEncoder passwordEncoder,
+            JdbcTemplate jdbcTemplate
+    ) {
+        if (!StringUtils.hasText(username) || jdbcTemplate == null) {
+            return tenantProperties.platformTenantId();
+        }
+
+        List<LoginTenantCandidate> candidates = jdbcTemplate.query(
+                "SELECT tenant_id, password_hash FROM sys_user WHERE username = ? AND deleted = 0 ORDER BY id ASC",
+                (rs, rowNum) -> new LoginTenantCandidate(rs.getString("tenant_id"), rs.getString("password_hash")),
+                username
+        );
+        if (candidates.isEmpty()) {
+            return tenantProperties.platformTenantId();
+        }
+        if (candidates.size() == 1) {
+            return candidates.get(0).tenantId();
+        }
+
+        String rawPassword = request == null ? null : request.getParameter("password");
+        if (!StringUtils.hasText(rawPassword)) {
+            return tenantProperties.platformTenantId();
+        }
+
+        List<LoginTenantCandidate> matched = candidates.stream()
+                .filter(item -> StringUtils.hasText(item.passwordHash()))
+                .filter(item -> passwordEncoder.matches(rawPassword, item.passwordHash()))
+                .toList();
+        if (matched.size() == 1) {
+            return matched.get(0).tenantId();
+        }
+        return tenantProperties.platformTenantId();
+    }
+
+    private record LoginTenantCandidate(String tenantId, String passwordHash) {
     }
 
     private String buildLoginFailureRedirect(HttpServletRequest request, String errorCode, String tenantId) {
@@ -402,6 +488,14 @@ public class AuthorizationServerConfig {
             return "unknown";
         }
         return resolveClientIp(attributes.getRequest());
+    }
+
+    private HttpServletRequest currentRequest() {
+        ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        if (attributes == null) {
+            return null;
+        }
+        return attributes.getRequest();
     }
 
     private String resolveClientIp(HttpServletRequest request) {

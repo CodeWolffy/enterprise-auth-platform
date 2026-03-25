@@ -47,7 +47,8 @@ function backToLogin() {
 }
 
 function goDashboard() {
-  router.replace('/dashboard')
+  const target = authStore.menuItems[0]?.path || '/dashboard'
+  router.replace(target)
 }
 
 onMounted(async () => {
@@ -72,9 +73,16 @@ onMounted(async () => {
 
   try {
     await authStore.finishLogin(code, state)
+    const target = authStore.menuItems[0]?.path
+    if (!target) {
+      status.value = 'error'
+      message.value = '当前账号暂无可访问菜单，请联系管理员分配权限。'
+      setTimeout(() => router.replace('/login'), 1500)
+      return
+    }
     status.value = 'success'
     message.value = '授权成功，正在进入控制台。'
-    setTimeout(() => router.replace('/dashboard'), 600)
+    setTimeout(() => router.replace(target), 600)
   } catch (err) {
     status.value = 'error'
     message.value = err instanceof Error ? err.message : '登录失败，请重新尝试。'

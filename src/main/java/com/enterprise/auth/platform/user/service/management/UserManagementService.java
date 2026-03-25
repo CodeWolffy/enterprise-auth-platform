@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.lang.Nullable;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +44,7 @@ public class UserManagementService {
     private final AuditService auditService;
     private final DataScopeService dataScopeService;
     private final AuthPrincipalCacheService authPrincipalCacheService;
+    private final JdbcTemplate jdbcTemplate;
 
     public UserManagementService(
             PersistenceProperties persistenceProperties,
@@ -54,7 +56,8 @@ public class UserManagementService {
             CatalogService catalogService,
             AuditService auditService,
             DataScopeService dataScopeService,
-            AuthPrincipalCacheService authPrincipalCacheService
+                AuthPrincipalCacheService authPrincipalCacheService,
+                @Nullable JdbcTemplate jdbcTemplate
     ) {
         this.persistenceProperties = persistenceProperties;
         this.sysUserMapper = sysUserMapper;
@@ -66,6 +69,7 @@ public class UserManagementService {
         this.auditService = auditService;
         this.dataScopeService = dataScopeService;
         this.authPrincipalCacheService = authPrincipalCacheService;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Transactional
@@ -73,7 +77,7 @@ public class UserManagementService {
         requireDatabaseMode();
         String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
-        if (existsUsername(tenantId, request.username())) {
+        if (existsUsernameGlobally(request.username())) {
             throw new BusinessException("用户名已存在");
         }
         validateDeptAccess(tenantId, request.deptId());
@@ -227,9 +231,16 @@ public class UserManagementService {
         }
     }
 
-    private boolean existsUsername(String tenantId, String username) {
+    private boolean existsUsernameGlobally(String username) {
+        if (jdbcTemplate != null) {
+            Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(1) FROM sys_user WHERE username = ? AND deleted = 0",
+                    Integer.class,
+                    username
+            );
+            return count != null && count > 0;
+        }
         return sysUserMapper.selectCount(new LambdaQueryWrapper<SysUserEntity>()
-                .eq(SysUserEntity::getTenantId, tenantId)
                 .eq(SysUserEntity::getUsername, username)
                 .eq(SysUserEntity::getDeleted, 0)) > 0;
     }

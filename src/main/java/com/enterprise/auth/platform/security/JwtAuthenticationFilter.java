@@ -83,7 +83,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         String token = resolveBearerToken(request);
         if (!StringUtils.hasText(token)) {
-            log.warn("[AUTH-DIAG] 未找到令牌：{} {}", request.getMethod(), request.getRequestURI());
+            if (shouldLogMissingToken(request)) {
+                log.warn("[AUTH-DIAG] 未找到令牌：{} {}", request.getMethod(), request.getRequestURI());
+            }
             filterChain.doFilter(request, response);
             return;
         }
@@ -336,5 +338,28 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             tenantId = request.getParameter(TENANT_ID_PARAM);
         }
         return tenantId;
+    }
+
+    private boolean shouldLogMissingToken(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        if (!StringUtils.hasText(uri)) {
+            return false;
+        }
+        if ("/".equals(uri)
+                || "/favicon.ico".equals(uri)
+                || "/login".equals(uri)
+                || "/oauth2/consent".equals(uri)
+                || uri.startsWith("/.well-known/")) {
+            return false;
+        }
+        if ("/api/auth/csrf".equals(uri)
+                || "/api/auth/captcha".equals(uri)
+                || "/api/auth/login".equals(uri)
+                || "/api/auth/refresh".equals(uri)
+                || "/api/auth/oauth/exchange".equals(uri)
+                || "/api/auth/oauth/refresh".equals(uri)) {
+            return false;
+        }
+        return uri.startsWith("/api/");
     }
 }

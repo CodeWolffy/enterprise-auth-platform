@@ -93,6 +93,26 @@ class UserManagementServiceTest {
                 .hasMessageContaining("用户");
     }
 
+    @Test
+    void shouldRejectCreatingUserWhenUsernameAlreadyExistsInAnotherTenant() {
+        TenantContext.setTenantId("tenant-a");
+        Long scopeUserId = ensureUser(SCOPE_USER, 2L);
+        authenticateScopedUser(scopeUserId, "user:write");
+
+        assertThatThrownBy(() -> userManagementService.create(new CreateUserRequest(
+                "admin",
+                "重复用户名用户",
+                null,
+                null,
+                "UserTest@123",
+                2L,
+                true,
+                Set.of()
+        )))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("用户名已存在");
+    }
+
     private Long ensureUser(String username, Long deptId) {
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username = ?", "tenant-a", username);
         SysUserEntity entity = new SysUserEntity();

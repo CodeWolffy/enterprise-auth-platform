@@ -17,6 +17,10 @@
 - [ ] JDBC URL 已包含 `serverTimezone=UTC`
 - [ ] `spring.datasource.username` / `spring.datasource.password` 已配置到部署环境
 - [ ] 初始化脚本已执行（`src/main/resources/database/enterprise_auth_platform.sql`）
+- [ ] 已执行用户名全局唯一迁移（历史库必做）：
+	- `SELECT username, COUNT(*) cnt FROM sys_user WHERE deleted = 0 GROUP BY username HAVING cnt > 1;` 结果应为空
+	- `ALTER TABLE sys_user DROP INDEX uk_sys_user_tenant_username;`
+	- `ALTER TABLE sys_user ADD UNIQUE INDEX uk_sys_user_username (username);`
 - [ ] 数据库时区已核对：`SHOW VARIABLES LIKE 'time_zone';`、`SHOW VARIABLES LIKE 'system_time_zone';`
 - [ ] 查看数据库记录时，若需北京时间显示，已在会话执行：`SET time_zone = '+08:00';`
 - [ ] 连接池参数符合环境容量（并发、连接数、超时）

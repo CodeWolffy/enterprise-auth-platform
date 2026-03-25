@@ -160,6 +160,11 @@ function isAllowedRoute(snapshot: PermissionSnapshot | null, path: string) {
   return false
 }
 
+function resolveFirstAllowedPath(snapshot: PermissionSnapshot | null) {
+  const firstMenuPath = snapshot?.menus?.[0]?.path
+  return firstMenuPath && firstMenuPath.startsWith('/') ? firstMenuPath : null
+}
+
 const router = createRouter({
   history: createWebHistory(),
   routes: [...PUBLIC_ROUTES, SHELL_ROUTE],
@@ -211,8 +216,11 @@ router.beforeEach(async (to) => {
   }
 
   if (to.path !== '/' && !isAllowedRoute(authStore.snapshot, to.path)) {
-    authStore.clearSession()
-    await redirectToAuthorizationPage(tenantId)
+    const fallbackPath = resolveFirstAllowedPath(authStore.snapshot)
+    if (fallbackPath && fallbackPath !== to.path) {
+      return fallbackPath
+    }
+    ElMessage.error('当前账号暂无该页面访问权限')
     return false
   }
 

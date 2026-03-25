@@ -41,6 +41,17 @@ export async function exchangeAuthorizationCode(code: string, state: string) {
     throw new Error('授权状态校验失败，请重新登录')
   }
   await ensureCsrfToken()
+  const requestConfig = context.tenantId
+    ? {
+        headers: {
+          'X-Tenant-Id': context.tenantId,
+        },
+        params: {
+          tenantId: context.tenantId,
+        },
+      }
+    : undefined
+
   const { data } = await http.post<ApiResponse<CookieSessionResponse>>(
     '/api/auth/oauth/exchange',
     {
@@ -48,16 +59,9 @@ export async function exchangeAuthorizationCode(code: string, state: string) {
       codeVerifier: context.verifier,
       redirectUri: getRedirectUri(),
     },
-    {
-      headers: {
-        'X-Tenant-Id': context.tenantId,
-      },
-      params: {
-        tenantId: context.tenantId,
-      },
-    },
+    requestConfig,
   )
-  return { payload: data.data, tenantId: data.data.tenantId || context.tenantId }
+  return { payload: data.data, tenantId: data.data.tenantId || context.tenantId || 'platform' }
 }
 
 export async function refreshOauthToken() {

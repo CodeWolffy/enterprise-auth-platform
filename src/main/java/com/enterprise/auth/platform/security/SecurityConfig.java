@@ -55,6 +55,9 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
+                        "/",
+                        "/favicon.ico",
+                        "/.well-known/**",
                                 "/error",
                                 "/actuator/health",
                                 "/doc.html",

@@ -94,7 +94,7 @@ class AuthorizationServerEndpointsTest {
     }
 
     @Test
-    void shouldExposeTenantAwareLoginPageWithCsrfField() throws Exception {
+    void shouldExposeFrontendLoginRedirectPage() throws Exception {
         mockMvc.perform(get("/login").param("tenantId", "tenant-a").param("client_id", "eap-web"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith("text/html"))
@@ -102,14 +102,14 @@ class AuthorizationServerEndpointsTest {
                         .contains("default-src 'self'"))
                 .andExpect(result -> assertThat(result.getResponse().getHeader("X-Frame-Options")).isEqualTo("DENY"))
                 .andExpect(result -> assertThat(result.getResponse().getHeader("Referrer-Policy")).isEqualTo("no-referrer"))
-                .andExpect(content().string(Matchers.containsString("name=\"_csrf\"")))
-                .andExpect(content().string(Matchers.containsString("name=\"tenantId\"")))
-                .andExpect(content().string(Matchers.containsString("tenant-a")))
-                .andExpect(content().string(Matchers.containsString("eap-web")));
+            .andExpect(content().string(Matchers.containsString("http-equiv=\"refresh\"")))
+            .andExpect(content().string(Matchers.containsString("/login")))
+            .andExpect(content().string(Matchers.containsString("tenantId=tenant-a")))
+            .andExpect(content().string(Matchers.containsString("client_id=eap-web")));
     }
 
     @Test
-    void shouldExposeConsentPageWithCsrfField() throws Exception {
+    void shouldExposeConsentPageAsFrontendRedirectAndEncodeScope() throws Exception {
         UserAccount principal = new UserAccount(
                 1L,
                 "platform",
@@ -131,10 +131,9 @@ class AuthorizationServerEndpointsTest {
                         .param("tenantId", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith("text/html"))
-                .andExpect(content().string(Matchers.containsString("name=\"_csrf\"")))
-                .andExpect(content().string(Matchers.containsString("name=\"client_id\"")))
-                .andExpect(content().string(Matchers.containsString("value=\"eap-web\"")))
-                .andExpect(content().string(Matchers.containsString("name=\"scope\"")));
+                .andExpect(content().string(Matchers.containsString("/auth/consent")))
+                .andExpect(content().string(Matchers.containsString("client_id=eap-web")))
+                .andExpect(content().string(Matchers.containsString("scope=openid%20profile%20api.read")));
     }
 
     @Test

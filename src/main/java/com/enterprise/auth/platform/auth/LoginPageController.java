@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.Set;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatus;
 import org.springframework.lang.Nullable;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
@@ -30,6 +31,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -84,6 +86,18 @@ public class LoginPageController {
             HttpServletRequest request
     ) {
         return browserRedirectHtml(requireFrontendLoginUrl(request));
+    }
+
+    @GetMapping(value = "/", produces = MediaType.TEXT_HTML_VALUE)
+    @ResponseBody
+    public String rootPage(HttpServletRequest request) {
+        return browserRedirectHtml(requireFrontendUiUrl(request, "/login"));
+    }
+
+    @GetMapping("/favicon.ico")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void favicon() {
+        // Explicitly return 204 to avoid repeated browser favicon probing on backend origin.
     }
 
     @GetMapping(value = "/oauth2/consent", params = "format=json")
@@ -150,7 +164,7 @@ public class LoginPageController {
                 builder.queryParam(key, value);
             }
         });
-        return builder.build(true).toUriString();
+        return builder.build().encode().toUriString();
     }
 
     private String requireFrontendUiUrl(HttpServletRequest request, String path) {
@@ -165,7 +179,7 @@ public class LoginPageController {
         String loginUrl = requireFrontendUiUrl(request, "/login");
         UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(loginUrl);
         appendAuthorizeContextFromSavedRequest(builder, request);
-        return builder.build(true).toUriString();
+        return builder.build().encode().toUriString();
     }
 
     private void appendAuthorizeContextFromSavedRequest(UriComponentsBuilder builder, HttpServletRequest request) {

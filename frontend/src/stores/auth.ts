@@ -60,8 +60,8 @@ export const useAuthStore = defineStore('auth', () => {
     sessionStorage.setItem(storageKey, JSON.stringify(payload))
   }
 
-  async function startLogin(selectedTenantId: string) {
-    const target = await createOAuthRedirect(selectedTenantId)
+  async function startLogin() {
+    const target = await createOAuthRedirect()
     window.location.href = target
   }
 

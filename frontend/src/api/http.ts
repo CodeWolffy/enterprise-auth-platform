@@ -92,6 +92,10 @@ function isAuthEndpoint(url: string) {
     || url.includes('/api/auth/refresh')
 }
 
+function isTenantHeaderBypassEndpoint(url: string) {
+  return isAuthEndpoint(url) || url.includes('/oauth2/')
+}
+
 function shouldEnsureCsrf(method: string | undefined, url: string) {
   const normalized = (method ?? 'get').toLowerCase()
   if (normalized === 'get' || normalized === 'head' || normalized === 'options') {
@@ -145,7 +149,7 @@ http.interceptors.request.use(async (config) => {
       return Promise.reject(new Error('token refresh failed'))
     }
   }
-  if (authStore.tenantId) {
+  if (authStore.tenantId && !isTenantHeaderBypassEndpoint(requestUrl)) {
     const currentTenantHeader = typeof config.headers?.get === 'function'
       ? config.headers.get('X-Tenant-Id')
       : config.headers?.['X-Tenant-Id']

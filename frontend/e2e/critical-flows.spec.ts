@@ -77,6 +77,31 @@ async function loginByCallback(page: Page) {
 }
 
 test.describe('关键流程回归', () => {
+  test('前端登录页：携带 OAuth 参数时展示账号密码并提交 /login', async ({ page }) => {
+    let loginPayload = ''
+
+    await page.route('**/login', async (route) => {
+      loginPayload = route.request().postData() ?? ''
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/html',
+        body: '<html><body>ok</body></html>',
+      })
+    })
+
+    await page.goto('/login?response_type=code&client_id=eap-frontend-spa&state=state-e2e&tenantId=platform')
+    await expect(page.getByRole('heading', { level: 2, name: '登录并继续授权' })).toBeVisible()
+
+    await page.getByPlaceholder('请输入用户名').fill('admin')
+    await page.getByPlaceholder('请输入密码').fill('password-123')
+    await page.locator('[data-testid="login-submit"]').click()
+
+    await expect.poll(() => loginPayload).toContain('tenantId=platform')
+    await expect.poll(() => loginPayload).toContain('username=admin')
+    await expect.poll(() => loginPayload).toContain('password=password-123')
+    await expect.poll(() => loginPayload).toContain('client_id=eap-frontend-spa')
+  })
+
   test('登录回调流程：成功换 token 后进入控制台', async ({ page }) => {
     await loginByCallback(page)
     await expect(page.locator('[data-testid="logout-button"]')).toBeVisible()
