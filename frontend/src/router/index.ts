@@ -18,6 +18,12 @@ const PUBLIC_ROUTES: RouteRecordRaw[] = [
     component: () => import('@/views/AuthCallbackView.vue'),
     meta: { public: true, title: 'Authorization Callback' },
   },
+  {
+    path: '/auth/consent',
+    name: 'consent-ui',
+    component: () => import('@/views/AuthConsentView.vue'),
+    meta: { public: true, title: 'Authorization Consent' },
+  },
 ]
 
 const DYNAMIC_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = {

@@ -38,6 +38,7 @@ class AuthorizationCodeSessionFlowTest {
     private static final String CLIENT_ID = "eap-session-flow-test";
     private static final String CLIENT_SECRET = "SessionFlowSecret@123";
     private static final String REDIRECT_URI = "http://127.0.0.1:5173/auth/callback";
+        private static final String ALLOWED_ORIGIN = "http://127.0.0.1:5173";
 
     @Autowired
     private MockMvc mockMvc;
@@ -111,6 +112,7 @@ class AuthorizationCodeSessionFlowTest {
 
         mockMvc.perform(post("/api/auth/logout")
                         .with(csrf())
+                        .header("Origin", ALLOWED_ORIGIN)
                         .header("Authorization", "Bearer " + tokens.accessToken())
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk());

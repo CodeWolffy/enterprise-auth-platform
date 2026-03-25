@@ -10,6 +10,7 @@ import com.enterprise.auth.platform.auth.dto.RefreshTokenRequest;
 import com.enterprise.auth.platform.auth.dto.TokenResponse;
 import com.enterprise.auth.platform.auth.dto.UserSessionResponse;
 import com.enterprise.auth.platform.auth.model.TokenClaims;
+import com.enterprise.auth.platform.auth.security.TrustedRequestOriginValidator;
 import com.enterprise.auth.platform.auth.service.AuthService;
 import com.enterprise.auth.platform.auth.service.CaptchaService;
 import com.enterprise.auth.platform.auth.service.OAuthCookieSessionService;
@@ -43,17 +44,20 @@ public class AuthController {
     private final AuthService authService;
     private final PermissionSnapshotService permissionSnapshotService;
     private final OAuthCookieSessionService oauthCookieSessionService;
+    private final TrustedRequestOriginValidator trustedRequestOriginValidator;
 
     public AuthController(
             CaptchaService captchaService,
             AuthService authService,
             PermissionSnapshotService permissionSnapshotService,
-            OAuthCookieSessionService oauthCookieSessionService
+            OAuthCookieSessionService oauthCookieSessionService,
+            TrustedRequestOriginValidator trustedRequestOriginValidator
     ) {
         this.captchaService = captchaService;
         this.authService = authService;
         this.permissionSnapshotService = permissionSnapshotService;
         this.oauthCookieSessionService = oauthCookieSessionService;
+        this.trustedRequestOriginValidator = trustedRequestOriginValidator;
     }
 
     @Operation(summary = "获取登录验证码")
@@ -84,6 +88,7 @@ public class AuthController {
             HttpServletRequest servletRequest,
             HttpServletResponse servletResponse
     ) {
+        trustedRequestOriginValidator.requireTrustedBrowserOrigin(servletRequest);
         return ApiResponse.ok(oauthCookieSessionService.exchangeAuthorizationCode(
                 request.code(),
                 request.codeVerifier(),
@@ -99,6 +104,7 @@ public class AuthController {
             HttpServletRequest servletRequest,
             HttpServletResponse servletResponse
     ) {
+        trustedRequestOriginValidator.requireTrustedBrowserOrigin(servletRequest);
         return ApiResponse.ok(oauthCookieSessionService.refresh(servletRequest, servletResponse));
     }
 
@@ -121,6 +127,7 @@ public class AuthController {
             HttpServletRequest servletRequest,
             HttpServletResponse servletResponse
     ) {
+        trustedRequestOriginValidator.requireTrustedBrowserOrigin(servletRequest);
         oauthCookieSessionService.clearCookies(servletRequest, servletResponse);
         if (authentication != null
                 && authentication.getPrincipal() instanceof UserAccount user

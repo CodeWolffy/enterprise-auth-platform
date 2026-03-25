@@ -8,8 +8,13 @@ spring:
 
 app:
   frontend:
+    allowed-origins:
+      - ${APP_FRONTEND_ALLOWED_ORIGIN}
+    redirect-uris:
+      - ${APP_FRONTEND_REDIRECT_URI}
     public-client-secret: ${APP_FRONTEND_CLIENT_SECRET}
   security:
     jwt-secret: ${APP_SECURITY_JWT_SECRET}
+    expose-captcha-answer: false
     cookie-secure: true
-    cookie-same-site: Lax
+    cookie-same-site: ${APP_SECURITY_COOKIE_SAME_SITE:Lax}

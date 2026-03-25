@@ -109,6 +109,7 @@ public class AuthorizationServerConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/login").permitAll()
                         .anyRequest().authenticated())
+            .csrf(csrf -> csrf.ignoringRequestMatchers("/login"))
                 .formLogin(form -> form
                         .loginPage("/login")
                         .successHandler(oauthLoginSuccessHandler)

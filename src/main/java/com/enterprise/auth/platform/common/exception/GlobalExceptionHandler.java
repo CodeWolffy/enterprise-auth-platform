@@ -1,8 +1,11 @@
 package com.enterprise.auth.platform.common.exception;
 
+import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.common.api.ApiResponse;
+import com.enterprise.auth.platform.tenant.TenantContext;
 import jakarta.validation.ConstraintViolationException;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,10 +21,17 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import jakarta.servlet.http.HttpServletRequest;
+import java.security.Principal;
+import org.springframework.util.StringUtils;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private final AuditService auditService;
+
+    public GlobalExceptionHandler(AuditService auditService) {
+        this.auditService = auditService;
+    }
 
     @ExceptionHandler(BusinessException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
@@ -42,6 +52,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ApiResponse<Void> handleDenied(AccessDeniedException exception, HttpServletRequest request) {
+        recordSecurityDenyEvent(exception, request);
         if (exception instanceof CsrfException) {
             log.warn("CSRF 校验失败 {} {}: {}", request.getMethod(), request.getRequestURI(), exception.getMessage());
             // 返回不带 code 的响应，触发前端 http.ts 拦截器中的 CSRF 重试逻辑
@@ -91,5 +102,24 @@ public class GlobalExceptionHandler {
         return fieldErrors.stream()
                 .map(error -> error.getField() + ":" + error.getDefaultMessage())
                 .collect(Collectors.joining("; "));
+    }
+
+    private void recordSecurityDenyEvent(AccessDeniedException exception, HttpServletRequest request) {
+        try {
+            Principal principal = request.getUserPrincipal();
+            String operator = principal == null ? "anonymous" : principal.getName();
+            String tenantId = StringUtils.hasText(TenantContext.getTenantId()) ? TenantContext.getTenantId() : "platform";
+            Map<String, Object> payload = Map.of(
+                    "method", request.getMethod(),
+                    "path", request.getRequestURI(),
+                    "reason", exception instanceof CsrfException ? "csrf_failed" : "access_denied",
+                    "origin", String.valueOf(request.getHeader("Origin")),
+                    "referer", String.valueOf(request.getHeader("Referer")),
+                    "userAgent", String.valueOf(request.getHeader("User-Agent"))
+            );
+            auditService.record("SECURITY_ACCESS_DENIED", operator, tenantId, payload);
+        } catch (Exception ignored) {
+            // Keep exception handling resilient even when audit storage is unavailable.
+        }
     }
 }

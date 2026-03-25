@@ -48,9 +48,7 @@ public class SecurityConfig {
                         .csrfTokenRequestHandler(csrfTokenRequestHandler)
                         .ignoringRequestMatchers(
                                 "/api/auth/login",
-                                "/api/auth/refresh",
-                                "/api/auth/oauth/exchange",
-                                "/api/auth/oauth/refresh"))
+                "/api/auth/refresh"))
                 .cors(Customizer.withDefaults())
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
@@ -58,7 +56,6 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/error",
-                                "/favicon.ico",
                                 "/actuator/health",
                                 "/doc.html",
                                 "/v3/api-docs/**",

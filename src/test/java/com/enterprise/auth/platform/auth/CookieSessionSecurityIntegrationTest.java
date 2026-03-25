@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -52,6 +53,7 @@ class CookieSessionSecurityIntegrationTest {
 
     private static final String FRONTEND_CLIENT_ID = "eap-frontend-spa";
     private static final String REDIRECT_URI = "http://127.0.0.1:5173/auth/callback";
+    private static final String ALLOWED_ORIGIN = "http://127.0.0.1:5173";
     private static final int TEST_SERVER_PORT = allocatePort();
 
     @DynamicPropertySource
@@ -154,6 +156,8 @@ class CookieSessionSecurityIntegrationTest {
         OAuthTokens tokens = issueFrontendTokens();
 
         MvcResult refreshResult = mockMvc.perform(post("/api/auth/oauth/refresh")
+                        .with(csrf())
+                        .header("Origin", ALLOWED_ORIGIN)
                         .cookie(new Cookie(AuthCookieConstants.REFRESH_TOKEN_COOKIE, tokens.refreshToken())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.tenantId").value("platform"))
@@ -169,6 +173,18 @@ class CookieSessionSecurityIntegrationTest {
                 .contains(AuthCookieConstants.REFRESH_TOKEN_COOKIE + "=")
                 .contains("HttpOnly")
                 .contains("SameSite=Lax"));
+    }
+
+    @Test
+    void oauthCookieRefreshShouldRejectUntrustedOrigin() throws Exception {
+        OAuthTokens tokens = issueFrontendTokens();
+
+        mockMvc.perform(post("/api/auth/oauth/refresh")
+                        .with(csrf())
+                        .header("Origin", "http://malicious.example")
+                        .cookie(new Cookie(AuthCookieConstants.REFRESH_TOKEN_COOKIE, tokens.refreshToken())))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
 
     @Test
