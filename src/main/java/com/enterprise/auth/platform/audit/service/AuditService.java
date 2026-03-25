@@ -5,6 +5,7 @@ import com.enterprise.auth.platform.audit.model.AuditEvent;
 import com.enterprise.auth.platform.audit.model.AuditPage;
 import com.enterprise.auth.platform.audit.model.AuditQuery;
 import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.common.web.RequestContext;
 import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.persistence.entity.SysAuditLogEntity;
@@ -13,9 +14,7 @@ import com.enterprise.auth.platform.security.DataScopeService;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +26,7 @@ import org.springframework.util.StringUtils;
 public class AuditService {
 
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() { };
+    private static final long MAX_EXPORT_RANGE_MS = Duration.ofDays(31).toMillis();
 
     private final PersistenceProperties persistenceProperties;
     private final SysAuditLogMapper sysAuditLogMapper;
@@ -49,7 +49,6 @@ public class AuditService {
         if (!databaseEnabled()) {
             return;
         }
-        Instant now = Instant.now();
         String resolvedTenantId = StringUtils.hasText(tenantId) ? tenantId : "platform";
         Map<String, Object> enrichedDetails = enrichDetails(details);
 
@@ -57,7 +56,7 @@ public class AuditService {
         entity.setTenantId(resolvedTenantId);
         entity.setEventType(type);
         entity.setOperator(operator);
-        entity.setOccurredAt(LocalDateTime.ofInstant(now, ZoneId.systemDefault()));
+        entity.setOccurredAt(TimeSupport.utcNowDateTime());
         entity.setRequestId(stringValue(enrichedDetails.get("requestId")));
         entity.setClientIp(stringValue(enrichedDetails.get("clientIp")));
         entity.setPayloadJson(toJson(enrichedDetails));
@@ -72,6 +71,7 @@ public class AuditService {
         if (!databaseEnabled()) {
             throw new BusinessException("当前未启用数据库审计存储");
         }
+        validateQueryRange(query);
         return queryInDatabase(query);
     }
 
@@ -83,8 +83,8 @@ public class AuditService {
                 query.operator(),
                 query.requestId(),
                 query.clientIp(),
-                query.occurredFrom(),
-                query.occurredTo(),
+                query.fromEpochMs(),
+                query.toEpochMs(),
                 1,
                 2000
         );
@@ -92,15 +92,21 @@ public class AuditService {
     }
 
     public void validateExportQuery(AuditQuery query) {
-        if (query.occurredFrom() == null || query.occurredTo() == null) {
+        if (query.fromEpochMs() == null || query.toEpochMs() == null) {
             throw new BusinessException("导出审计记录必须指定开始和结束时间");
         }
-        if (query.occurredTo().isBefore(query.occurredFrom())) {
-            throw new BusinessException("审计导出结束时间不能早于开始时间");
+        validateQueryRange(query);
+    }
+
+    private void validateQueryRange(AuditQuery query) {
+        if (query.fromEpochMs() == null || query.toEpochMs() == null) {
+            return;
         }
-        long days = java.time.Duration.between(query.occurredFrom(), query.occurredTo()).toDays();
-        if (days > 31) {
-            throw new BusinessException("审计导出时间范围不能超过 31 天");
+        if (query.fromEpochMs() >= query.toEpochMs()) {
+            throw new BusinessException("查询开始时间必须小于结束时间");
+        }
+        if (query.toEpochMs() - query.fromEpochMs() > MAX_EXPORT_RANGE_MS) {
+            throw new BusinessException("审计查询时间范围不能超过 31 天");
         }
     }
 
@@ -128,11 +134,11 @@ public class AuditService {
                 wrapper.in(SysAuditLogEntity::getOperator, visibleUsers);
             }
         });
-        if (query.occurredFrom() != null) {
-            wrapper.ge(SysAuditLogEntity::getOccurredAt, LocalDateTime.ofInstant(query.occurredFrom(), ZoneId.systemDefault()));
+        if (query.fromEpochMs() != null) {
+            wrapper.ge(SysAuditLogEntity::getOccurredAt, TimeSupport.localDateTimeFromEpochMilli(query.fromEpochMs()));
         }
-        if (query.occurredTo() != null) {
-            wrapper.le(SysAuditLogEntity::getOccurredAt, LocalDateTime.ofInstant(query.occurredTo(), ZoneId.systemDefault()));
+        if (query.toEpochMs() != null) {
+            wrapper.lt(SysAuditLogEntity::getOccurredAt, TimeSupport.localDateTimeFromEpochMilli(query.toEpochMs()));
         }
         wrapper.orderByDesc(SysAuditLogEntity::getOccurredAt).orderByDesc(SysAuditLogEntity::getId);
 
@@ -163,7 +169,7 @@ public class AuditService {
                 entity.getTenantId(),
                 entity.getRequestId(),
                 entity.getClientIp(),
-                entity.getOccurredAt().atZone(ZoneId.systemDefault()).toInstant(),
+                TimeSupport.toEpochMilli(entity.getOccurredAt()),
                 parsePayload(entity.getPayloadJson())
         );
     }

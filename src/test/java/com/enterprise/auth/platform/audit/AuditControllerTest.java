@@ -30,6 +30,8 @@ class AuditControllerTest {
     private static final String EVENT_TYPE = "AUDIT_EXPORT_UT";
     private static final String REQUEST_ID_VISIBLE = "audit-export-visible";
     private static final String REQUEST_ID_HIDDEN = "audit-export-hidden";
+    private static final long ONE_HOUR_MS = 3600_000L;
+    private static final long ONE_DAY_MS = 24 * ONE_HOUR_MS;
 
     @Autowired
     private MockMvc mockMvc;
@@ -77,13 +79,14 @@ class AuditControllerTest {
 
     @Test
     void exportShouldSupportClientIpFilter() throws Exception {
+                long now = System.currentTimeMillis();
                 mockMvc.perform(get("/api/audit/events/export")
                                 .with(user(principal()))
                                 .header("X-Tenant-Id", "platform")
                                 .param("eventType", EVENT_TYPE)
                                 .param("clientIp", "10.10.10.10")
-                                .param("occurredFrom", java.time.Instant.now().minusSeconds(3600).toString())
-                                .param("occurredTo", java.time.Instant.now().plusSeconds(3600).toString()))
+                                .param("fromEpochMs", String.valueOf(now - ONE_HOUR_MS))
+                                .param("toEpochMs", String.valueOf(now + ONE_HOUR_MS)))
                         .andExpect(status().isOk())
                         .andExpect(content().contentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                         .andExpect(result -> org.junit.jupiter.api.Assertions.assertTrue(
@@ -92,27 +95,27 @@ class AuditControllerTest {
     }
 
     @Test
-    void eventsShouldAcceptLocalDateTimeWithoutTimezone() throws Exception {
+    void eventsShouldRejectLocalDateTimeWithoutTimezone() throws Exception {
         mockMvc.perform(get("/api/audit/events")
                         .with(user(principal()))
                         .header("X-Tenant-Id", "platform")
                         .param("eventType", EVENT_TYPE)
-                        .param("occurredFrom", "2026-03-01T00:00:00")
-                        .param("occurredTo", "2026-03-31T23:59:59"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
+                        .param("fromEpochMs", "2026-03-01T00:00:00")
+                        .param("toEpochMs", "2026-03-31T23:59:59"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
     void shouldCreateAsyncExportTask() throws Exception {
+        long now = System.currentTimeMillis();
         mockMvc.perform(post("/api/audit/exports")
                         .with(user(principal()))
                         .with(csrf())
                         .header("X-Tenant-Id", "platform")
                         .param("eventType", EVENT_TYPE)
                         .param("clientIp", "10.10.10.10")
-                        .param("occurredFrom", java.time.Instant.now().minusSeconds(3600).toString())
-                        .param("occurredTo", java.time.Instant.now().plusSeconds(3600).toString()))
+                        .param("fromEpochMs", String.valueOf(now - ONE_HOUR_MS))
+                        .param("toEpochMs", String.valueOf(now + ONE_HOUR_MS)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").exists())
                 .andExpect(jsonPath("$.data.status").isNotEmpty())
@@ -157,7 +160,7 @@ class AuditControllerTest {
                         .header("X-Tenant-Id", "platform")
                         .param("tenantId", "platform")
                         .param("status", "FAILED")
-                        .param("completedBefore", java.time.Instant.now().minusSeconds(24 * 3600).toString()))
+                        .param("completedBeforeEpochMs", String.valueOf(System.currentTimeMillis() - ONE_DAY_MS)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value(1));
     }
@@ -194,7 +197,7 @@ class AuditControllerTest {
                         .header("X-Tenant-Id", "platform")
                         .param("tenantId", "platform")
                         .param("status", "SUCCESS")
-                        .param("completedBefore", java.time.Instant.now().minusSeconds(24 * 3600).toString()))
+                        .param("completedBeforeEpochMs", String.valueOf(System.currentTimeMillis() - ONE_DAY_MS)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)));
     }
@@ -204,7 +207,7 @@ class AuditControllerTest {
         jdbcTemplate.update(
                 "INSERT INTO sys_audit_export_task(tenant_id, operator, status, file_name, query_json, record_count, requested_at, completed_at, error_message) VALUES(?,?,?,?,?,?,NOW(),NOW(),?)",
                 "platform", "admin", "FAILED", "audit-retry-ut.csv",
-                "{\"tenantId\":\"platform\",\"eventType\":\"AUDIT_EXPORT_UT\",\"clientIp\":\"10.10.10.10\",\"occurredFrom\":\"2026-03-20T00:00:00Z\",\"occurredTo\":\"2026-03-21T00:00:00Z\"}",
+                "{\"tenantId\":\"platform\",\"eventType\":\"AUDIT_EXPORT_UT\",\"clientIp\":\"10.10.10.10\",\"fromEpochMs\":1742428800000,\"toEpochMs\":1742515200000}",
                 0, "mock failed"
         );
         Long taskId = jdbcTemplate.queryForObject(

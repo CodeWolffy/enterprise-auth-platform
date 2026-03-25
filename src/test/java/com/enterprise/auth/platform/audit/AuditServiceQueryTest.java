@@ -9,7 +9,6 @@ import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
 import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import com.enterprise.auth.platform.user.model.UserAccount;
-import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
@@ -52,7 +51,7 @@ class AuditServiceQueryTest {
     void shouldFilterByOperatorEventTypeAndTimeRange() throws InterruptedException {
         auditService.record("USER_CREATED", "alice", "platform", Map.of("bizId", "u-1"));
         Thread.sleep(1100L);
-        Instant from = Instant.now();
+        Long fromEpochMs = System.currentTimeMillis();
         Thread.sleep(1100L);
         auditService.record("USER_UPDATED", "alice", "platform", Map.of("bizId", "u-2"));
         auditService.record("USER_UPDATED", "bob", "platform", Map.of("bizId", "u-3"));
@@ -63,7 +62,7 @@ class AuditServiceQueryTest {
                 "alice",
                 null,
                 null,
-                from,
+                fromEpochMs,
                 null,
                 1,
                 20

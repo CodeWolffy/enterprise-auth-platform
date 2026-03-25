@@ -9,6 +9,7 @@ import com.enterprise.auth.platform.auth.model.UserSession;
 import com.enterprise.auth.platform.auth.store.SessionStore;
 import com.enterprise.auth.platform.auth.service.LoginAttemptService.LoginFailureResult;
 import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.config.SecurityProperties;
 import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
@@ -189,7 +190,7 @@ public class AuthService {
                 jwtService.issueAccessToken(user, sessionId),
                 jwtService.issueRefreshToken(user, sessionId),
                 "Bearer",
-                Instant.now().plus(securityProperties.accessTokenTtl()),
+                TimeSupport.toEpochMilli(Instant.now().plus(securityProperties.accessTokenTtl())),
                 sessionId
         );
     }
@@ -202,7 +203,7 @@ public class AuthService {
         if (entity == null || (entity.getDeleted() != null && entity.getDeleted() == 1)) {
             return;
         }
-        entity.setLastLoginAt(LocalDateTime.now());
+        entity.setLastLoginAt(TimeSupport.utcNowDateTime());
         entity.setLastLoginIp(clientIp);
         entity.setUpdatedBy(entity.getUsername());
         sysUserMapper.updateById(entity);

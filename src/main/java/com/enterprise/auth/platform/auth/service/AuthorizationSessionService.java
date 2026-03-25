@@ -3,6 +3,7 @@ package com.enterprise.auth.platform.auth.service;
 import com.enterprise.auth.platform.auth.dto.UserSessionResponse;
 import com.enterprise.auth.platform.auth.model.UserSession;
 import com.enterprise.auth.platform.auth.store.SessionStore;
+import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.common.web.RequestContext;
 import com.enterprise.auth.platform.config.SecurityProperties;
 import com.enterprise.auth.platform.user.model.UserAccount;
@@ -221,18 +222,23 @@ public class AuthorizationSessionService {
         if (!currentUser.id().equals(session.userId()) || !currentUser.tenantId().equals(session.tenantId())) {
             return Optional.empty();
         }
-        Instant issuedAt = resolveIssuedAt(authorization, existing == null ? Instant.now() : existing.issuedAt());
-        Instant expiresAt = resolveExpiresAt(authorization, existing == null ? issuedAt.plus(securityProperties.refreshTokenTtl()) : existing.expiresAt());
-        Instant lastAccessAt = existing == null ? issuedAt : existing.lastAccessAt();
+        Instant issuedAt = resolveIssuedAt(authorization, existing == null ? Instant.now() : TimeSupport.fromEpochMilli(existing.issuedAt()));
+        Instant expiresAt = resolveExpiresAt(
+                authorization,
+                existing == null
+                        ? issuedAt.plus(securityProperties.refreshTokenTtl())
+                        : TimeSupport.fromEpochMilli(existing.expiresAt())
+        );
+        Instant lastAccessAt = existing == null ? issuedAt : TimeSupport.fromEpochMilli(existing.lastAccessAt());
         return Optional.of(new UserSessionResponse(
                 authorization.getId(),
                 session.username(),
                 session.tenantId(),
                 existing == null ? RequestContext.getClientIp() : existing.clientIp(),
                 existing == null ? "unknown" : existing.device(),
-                issuedAt,
-                expiresAt,
-                lastAccessAt == null ? issuedAt : lastAccessAt,
+                TimeSupport.toEpochMilli(issuedAt),
+                TimeSupport.toEpochMilli(expiresAt),
+                TimeSupport.toEpochMilli(lastAccessAt == null ? issuedAt : lastAccessAt),
                 session.active()
         ));
     }
@@ -279,9 +285,9 @@ public class AuthorizationSessionService {
                 session.tenantId(),
                 session.clientIp(),
                 session.device(),
-                session.issuedAt(),
-                session.expiresAt(),
-                session.lastAccessAt(),
+                TimeSupport.toEpochMilli(session.issuedAt()),
+                TimeSupport.toEpochMilli(session.expiresAt()),
+                TimeSupport.toEpochMilli(session.lastAccessAt()),
                 session.active()
         );
     }

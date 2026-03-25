@@ -208,7 +208,7 @@
           <el-input v-model="form.noticeContent" type="textarea" :rows="5" />
         </el-form-item>
         <el-form-item label="发布时间">
-          <el-date-picker v-model="form.publishTime" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" />
+          <el-date-picker v-model="form.publishTime" type="datetime" />
         </el-form-item>
         <el-form-item label="是否发布">
           <el-switch v-model="form.published" inline-prompt active-text="发布" inactive-text="草稿" />
@@ -230,7 +230,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { createNotice, deleteNotice, queryNotices, updateNotice } from '@/api/system'
 import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { NoticeView } from '@/types/auth'
-import { formatDateTime } from '@/utils/datetime'
+import { formatDateTime, toDate, toEpochMs } from '@/utils/datetime'
 
 const notices = ref<NoticeView[]>([])
 const loading = ref(false)
@@ -263,7 +263,7 @@ const form = reactive({
   noticeTitle: '',
   noticeContent: '',
   published: false,
-  publishTime: '',
+  publishTime: null as Date | null,
 })
 
 const rules = reactive<FormRules>({
@@ -337,7 +337,7 @@ function openNotice(row?: NoticeView) {
     noticeTitle: row?.noticeTitle ?? '',
     noticeContent: row?.noticeContent ?? '',
     published: row?.published ?? false,
-    publishTime: row?.publishTime ?? '',
+    publishTime: toDate(row?.publishTime),
   })
   visible.value = true
 }
@@ -347,11 +347,17 @@ async function submit() {
     return
   }
   await formRef.value.validate()
+  const payload = {
+    noticeTitle: form.noticeTitle,
+    noticeContent: form.noticeContent,
+    published: form.published,
+    publishTime: toEpochMs(form.publishTime),
+  }
   if (editingId.value) {
-    await updateNotice(editingId.value, form)
+    await updateNotice(editingId.value, payload)
     ElMessage.success('公告已更新')
   } else {
-    await createNotice(form)
+    await createNotice(payload)
     ElMessage.success('公告已创建')
   }
   visible.value = false

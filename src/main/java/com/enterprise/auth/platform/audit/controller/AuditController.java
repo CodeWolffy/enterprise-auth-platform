@@ -1,25 +1,25 @@
 package com.enterprise.auth.platform.audit.controller;
 
+import com.alibaba.excel.EasyExcel;
 import com.enterprise.auth.platform.audit.dto.AuditExportPolicyRequest;
 import com.enterprise.auth.platform.audit.model.AuditEvent;
+import com.enterprise.auth.platform.audit.model.AuditExportVO;
 import com.enterprise.auth.platform.audit.model.AuditPage;
 import com.enterprise.auth.platform.audit.model.AuditQuery;
 import com.enterprise.auth.platform.audit.service.AuditExportTaskService;
 import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.common.api.ApiResponse;
 import com.enterprise.auth.platform.common.model.PageResult;
+import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.security.SecuritySupport;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import java.nio.charset.StandardCharsets;
+import java.io.ByteArrayOutputStream;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
-import java.io.ByteArrayOutputStream;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -35,13 +35,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.alibaba.excel.EasyExcel;
-import com.enterprise.auth.platform.audit.model.AuditExportVO;
-
 @Tag(name = "安全审计")
 @RestController
 @RequestMapping("/api/audit")
 public class AuditController {
+
+    private static final DateTimeFormatter EXPORT_FORMATTER = DateTimeFormatter.ISO_INSTANT;
 
     private final AuditService auditService;
     private final AuditExportTaskService auditExportTaskService;
@@ -60,19 +59,13 @@ public class AuditController {
             @Parameter(description = "操作人") @RequestParam(required = false) String operator,
             @Parameter(description = "请求 ID") @RequestParam(required = false) String requestId,
             @Parameter(description = "客户端 IP") @RequestParam(required = false) String clientIp,
-            @Parameter(description = "发生开始时间，ISO-8601 格式")
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            Instant occurredFrom,
-            @Parameter(description = "发生结束时间，ISO-8601 格式")
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            Instant occurredTo,
+            @Parameter(description = "开始时间，epoch 毫秒，含边界") @RequestParam(required = false) Long fromEpochMs,
+            @Parameter(description = "结束时间，epoch 毫秒，不含边界") @RequestParam(required = false) Long toEpochMs,
             @Parameter(description = "页码，从 1 开始") @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "每页数量") @RequestParam(defaultValue = "20") int size
     ) {
         return ApiResponse.ok(auditService.query(buildQuery(
-                tenantId, eventType, operator, requestId, clientIp, occurredFrom, occurredTo, page, size
+                tenantId, eventType, operator, requestId, clientIp, fromEpochMs, toEpochMs, page, size
         )));
     }
 
@@ -85,10 +78,10 @@ public class AuditController {
             @RequestParam(required = false) String operator,
             @RequestParam(required = false) String requestId,
             @RequestParam(required = false) String clientIp,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant occurredFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant occurredTo
+            @RequestParam(required = false) Long fromEpochMs,
+            @RequestParam(required = false) Long toEpochMs
     ) {
-        AuditQuery query = buildQuery(tenantId, eventType, operator, requestId, clientIp, occurredFrom, occurredTo, 1, 2000);
+        AuditQuery query = buildQuery(tenantId, eventType, operator, requestId, clientIp, fromEpochMs, toEpochMs, 1, 2000);
         List<AuditEvent> records = auditService.export(query);
         auditService.record(
                 "AUDIT_EXPORTED",
@@ -99,20 +92,19 @@ public class AuditController {
                         "operator", operator == null ? "" : operator,
                         "clientIp", clientIp == null ? "" : clientIp,
                         "requestId", requestId == null ? "" : requestId,
-                        "occurredFrom", String.valueOf(occurredFrom),
-                        "occurredTo", String.valueOf(occurredTo),
+                        "fromEpochMs", fromEpochMs == null ? "" : fromEpochMs,
+                        "toEpochMs", toEpochMs == null ? "" : toEpochMs,
                         "recordCount", records.size()
                 )
         );
-        
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
+
         List<AuditExportVO> voList = records.stream().map(event -> new AuditExportVO(
                 event.type(),
                 event.operator(),
                 event.tenantId(),
                 event.requestId(),
                 event.clientIp(),
-                event.occurredAt() != null ? formatter.format(event.occurredAt()) : "",
+                event.occurredAt() == null ? "" : EXPORT_FORMATTER.format(Instant.ofEpochMilli(event.occurredAt())),
                 event.details() == null ? "{}" : event.details().toString()
         )).toList();
 
@@ -134,11 +126,11 @@ public class AuditController {
             @RequestParam(required = false) String operator,
             @RequestParam(required = false) String requestId,
             @RequestParam(required = false) String clientIp,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant occurredFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant occurredTo
+            @RequestParam(required = false) Long fromEpochMs,
+            @RequestParam(required = false) Long toEpochMs
     ) {
         return ApiResponse.ok(auditExportTaskService.create(buildQuery(
-                tenantId, eventType, operator, requestId, clientIp, occurredFrom, occurredTo, 1, 2000
+                tenantId, eventType, operator, requestId, clientIp, fromEpochMs, toEpochMs, 1, 2000
         )));
     }
 
@@ -174,7 +166,7 @@ public class AuditController {
         return ApiResponse.ok(auditExportTaskService.updatePolicy(tenantId, request));
     }
 
-    @Operation(summary = "按策略执行审计导出自动治理")
+    @Operation(summary = "按策略执行审计导出治理")
     @PostMapping("/exports/governance")
     @PreAuthorize("hasAuthority('audit:write')")
     public ApiResponse<AuditExportTaskService.GovernanceResult> governExportTasks(
@@ -208,9 +200,9 @@ public class AuditController {
     public ApiResponse<Integer> archiveExportTasks(
             @RequestParam(required = false) String tenantId,
             @RequestParam(required = false) String status,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant completedBefore
+            @RequestParam Long completedBeforeEpochMs
     ) {
-        return ApiResponse.ok(auditExportTaskService.archiveCompleted(tenantId, status, completedBefore));
+        return ApiResponse.ok(auditExportTaskService.archiveCompleted(tenantId, status, completedBeforeEpochMs));
     }
 
     @Operation(summary = "删除异步审计导出任务")
@@ -234,9 +226,9 @@ public class AuditController {
     public ApiResponse<Integer> cleanupExportTasks(
             @RequestParam(required = false) String tenantId,
             @RequestParam(required = false) String status,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant completedBefore
+            @RequestParam Long completedBeforeEpochMs
     ) {
-        return ApiResponse.ok(auditExportTaskService.cleanup(tenantId, status, completedBefore));
+        return ApiResponse.ok(auditExportTaskService.cleanup(tenantId, status, completedBeforeEpochMs));
     }
 
     private AuditQuery buildQuery(
@@ -245,11 +237,11 @@ public class AuditController {
             String operator,
             String requestId,
             String clientIp,
-            Instant occurredFrom,
-            Instant occurredTo,
+            Long fromEpochMs,
+            Long toEpochMs,
             int page,
             int size
     ) {
-        return new AuditQuery(tenantId, eventType, operator, requestId, clientIp, occurredFrom, occurredTo, page, size);
+        return new AuditQuery(tenantId, eventType, operator, requestId, clientIp, fromEpochMs, toEpochMs, page, size);
     }
 }

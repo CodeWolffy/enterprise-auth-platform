@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.auth.dto.OauthScopeCrudRequest;
 import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.persistence.entity.SysOauthClientEntity;
 import com.enterprise.auth.platform.persistence.entity.SysOauthScopeEntity;
@@ -12,7 +13,6 @@ import com.enterprise.auth.platform.persistence.mapper.SysOauthScopeMapper;
 import com.enterprise.auth.platform.security.SecuritySupport;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -187,7 +187,7 @@ public class OAuthScopeManagementService {
                 entity.getVisibleInConsent() == null || entity.getVisibleInConsent() == 1,
                 entity.getSortOrder(),
                 entity.getEnabled() == null || entity.getEnabled() == 1,
-                entity.getUpdatedAt() == null ? entity.getCreatedAt() : entity.getUpdatedAt(),
+                TimeSupport.toEpochMilli(entity.getUpdatedAt() == null ? entity.getCreatedAt() : entity.getUpdatedAt()),
                 referencedClientCount,
                 referencedClientIds
         );
@@ -253,7 +253,7 @@ public class OAuthScopeManagementService {
             @Schema(description = "是否在同意页展示") boolean visibleInConsent,
             @Schema(description = "排序值") Integer sortOrder,
             @Schema(description = "是否启用") boolean enabled,
-            @Schema(description = "更新时间") LocalDateTime updatedAt,
+            @Schema(description = "更新时间") Long updatedAt,
             @Schema(description = "引用该作用域的客户端数量") int referencedClientCount,
             @Schema(description = "引用该作用域的客户端示例（最多 5 条）") List<String> referencedClientIds
     ) {

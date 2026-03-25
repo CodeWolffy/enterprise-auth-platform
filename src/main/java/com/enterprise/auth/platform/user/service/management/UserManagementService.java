@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.catalog.CatalogService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.persistence.entity.SysRoleEntity;
 import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
@@ -19,7 +20,6 @@ import com.enterprise.auth.platform.user.dto.CreateUserRequest;
 import com.enterprise.auth.platform.user.dto.UpdateUserRequest;
 import com.enterprise.auth.platform.user.model.UserSummary;
 import com.enterprise.auth.platform.user.service.UserDirectoryService;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -88,7 +88,7 @@ public class UserManagementService {
         entity.setPasswordHash(passwordEncoder.encode(request.password()));
         entity.setEnabled(Boolean.FALSE.equals(request.enabled()) ? 0 : 1);
         entity.setSessionVersion(1);
-        entity.setPasswordUpdatedAt(LocalDateTime.now());
+        entity.setPasswordUpdatedAt(TimeSupport.utcNowDateTime());
         sysUserMapper.insert(entity);
 
         syncUserRoles(tenantId, entity.getId(), request.roleCodes());
@@ -115,7 +115,7 @@ public class UserManagementService {
         if (StringUtils.hasText(request.password())) {
             entity.setPasswordHash(passwordEncoder.encode(request.password()));
             entity.setSessionVersion((entity.getSessionVersion() == null ? 1 : entity.getSessionVersion()) + 1);
-            entity.setPasswordUpdatedAt(LocalDateTime.now());
+            entity.setPasswordUpdatedAt(TimeSupport.utcNowDateTime());
         }
         sysUserMapper.updateById(entity);
 

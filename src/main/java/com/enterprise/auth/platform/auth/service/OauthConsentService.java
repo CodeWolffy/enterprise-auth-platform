@@ -16,6 +16,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -172,7 +173,7 @@ public class OauthConsentService {
             count++;
             Instant occurredAt = event.getOccurredAt() == null
                     ? null
-                    : event.getOccurredAt().atZone(ZoneId.systemDefault()).toInstant();
+                    : event.getOccurredAt().atZone(ZoneOffset.UTC).toInstant();
             if ("OAUTH_CONSENT_GRANTED".equals(event.getEventType()) && lastGrantedAt == null) {
                 lastGrantedAt = occurredAt;
             }

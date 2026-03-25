@@ -7,6 +7,7 @@ import com.enterprise.auth.platform.audit.model.AuditPage;
 import com.enterprise.auth.platform.audit.model.AuditQuery;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.model.PageResult;
+import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.persistence.entity.SysAuditExportPolicyEntity;
 import com.enterprise.auth.platform.persistence.entity.SysAuditExportTaskEntity;
 import com.enterprise.auth.platform.persistence.mapper.SysAuditExportPolicyMapper;
@@ -19,7 +20,6 @@ import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -47,6 +47,7 @@ import com.enterprise.auth.platform.audit.model.AuditExportVO;
 @Service
 public class AuditExportTaskService {
     private static final Logger log = LoggerFactory.getLogger(AuditExportTaskService.class);
+    private static final DateTimeFormatter EXPORT_FORMATTER = DateTimeFormatter.ISO_INSTANT;
 
     private final SysAuditExportTaskMapper sysAuditExportTaskMapper;
     private final SysAuditExportPolicyMapper sysAuditExportPolicyMapper;
@@ -76,7 +77,7 @@ public class AuditExportTaskService {
         entity.setOperator(SecuritySupport.currentOperator());
         entity.setStatus("PENDING");
         entity.setFileName("audit-export-" + System.currentTimeMillis() + ".xlsx");
-        entity.setRequestedAt(LocalDateTime.now());
+        entity.setRequestedAt(TimeSupport.utcNowDateTime());
         entity.setQueryJson(toJson(queryPayload(query)));
         entity.setRecordCount(0);
         sysAuditExportTaskMapper.insert(entity);
@@ -133,7 +134,7 @@ public class AuditExportTaskService {
         entity.setFileContent(null);
         entity.setStatus("ARCHIVED");
         if (entity.getCompletedAt() == null) {
-            entity.setCompletedAt(LocalDateTime.now());
+            entity.setCompletedAt(TimeSupport.utcNowDateTime());
         }
         sysAuditExportTaskMapper.updateById(entity);
         auditService.record("AUDIT_EXPORT_TASK_ARCHIVED", SecuritySupport.currentOperator(), entity.getTenantId(), Map.of(
@@ -185,14 +186,14 @@ public class AuditExportTaskService {
     }
 
     @Transactional
-    public int cleanup(String tenantId, String status, Instant completedBefore) {
-        if (completedBefore == null) {
+    public int cleanup(String tenantId, String status, Long completedBeforeEpochMs) {
+        if (completedBeforeEpochMs == null) {
             throw new BusinessException("清理操作需要指定 completedBefore 参数");
         }
         LambdaQueryWrapper<SysAuditExportTaskEntity> query = new LambdaQueryWrapper<SysAuditExportTaskEntity>()
                 .eq(StringUtils.hasText(tenantId), SysAuditExportTaskEntity::getTenantId, tenantId)
                 .eq(StringUtils.hasText(status), SysAuditExportTaskEntity::getStatus, status)
-                .le(SysAuditExportTaskEntity::getCompletedAt, LocalDateTime.ofInstant(completedBefore, ZoneId.systemDefault()));
+                .lt(SysAuditExportTaskEntity::getCompletedAt, TimeSupport.localDateTimeFromEpochMilli(completedBeforeEpochMs));
         List<SysAuditExportTaskEntity> tasks = sysAuditExportTaskMapper.selectList(query);
         if (tasks.isEmpty()) {
             return 0;
@@ -203,15 +204,15 @@ public class AuditExportTaskService {
         )), Map.of(
                 "tenantId", tenantId == null ? "" : tenantId,
                 "status", status == null ? "" : status,
-                "completedBefore", completedBefore.toString(),
+                "completedBeforeEpochMs", completedBeforeEpochMs,
                 "affected", affected
         ));
         return affected;
     }
 
     @Transactional
-    public int archiveCompleted(String tenantId, String status, Instant completedBefore) {
-        if (completedBefore == null) {
+    public int archiveCompleted(String tenantId, String status, Long completedBeforeEpochMs) {
+        if (completedBeforeEpochMs == null) {
             throw new BusinessException("批量归档操作需要指定 completedBefore 参数");
         }
         LambdaQueryWrapper<SysAuditExportTaskEntity> query = new LambdaQueryWrapper<SysAuditExportTaskEntity>()
@@ -219,7 +220,7 @@ public class AuditExportTaskService {
                 .eq(StringUtils.hasText(status), SysAuditExportTaskEntity::getStatus, status)
                 .ne(SysAuditExportTaskEntity::getStatus, "ARCHIVED")
                 .isNotNull(SysAuditExportTaskEntity::getCompletedAt)
-                .le(SysAuditExportTaskEntity::getCompletedAt, LocalDateTime.ofInstant(completedBefore, ZoneId.systemDefault()));
+                .lt(SysAuditExportTaskEntity::getCompletedAt, TimeSupport.localDateTimeFromEpochMilli(completedBeforeEpochMs));
         List<SysAuditExportTaskEntity> tasks = sysAuditExportTaskMapper.selectList(query);
         if (tasks.isEmpty()) {
             return 0;
@@ -232,7 +233,7 @@ public class AuditExportTaskService {
             entity.setFileContent(null);
             entity.setStatus("ARCHIVED");
             if (entity.getCompletedAt() == null) {
-                entity.setCompletedAt(LocalDateTime.now());
+                entity.setCompletedAt(TimeSupport.utcNowDateTime());
             }
             affected += sysAuditExportTaskMapper.updateById(entity);
         }
@@ -241,7 +242,7 @@ public class AuditExportTaskService {
         )), Map.of(
                 "tenantId", tenantId == null ? "" : tenantId,
                 "status", status == null ? "" : status,
-                "completedBefore", completedBefore.toString(),
+                "completedBeforeEpochMs", completedBeforeEpochMs,
                 "affected", affected
         ));
         return affected;
@@ -294,7 +295,7 @@ public class AuditExportTaskService {
         ExportPolicy currentPolicy = policy(resolvedTenantId);
         int retentionDays = Math.max(1, currentPolicy.retentionDays());
         int maxTasks = Math.max(1, currentPolicy.maxTasks());
-        LocalDateTime retentionCutoff = LocalDateTime.now().minusDays(retentionDays);
+        LocalDateTime retentionCutoff = TimeSupport.utcNowDateTime().minusDays(retentionDays);
 
         List<SysAuditExportTaskEntity> completedTasks = sysAuditExportTaskMapper.selectList(
                 new LambdaQueryWrapper<SysAuditExportTaskEntity>()
@@ -307,7 +308,7 @@ public class AuditExportTaskService {
         );
         if (completedTasks.isEmpty()) {
             return new GovernanceResult(
-                    resolvedTenantId, true, dryRun, retentionDays, maxTasks, retentionCutoff.atZone(ZoneId.systemDefault()).toInstant(),
+                    resolvedTenantId, true, dryRun, retentionDays, maxTasks, TimeSupport.toEpochMilli(retentionCutoff),
                     0, 0, 0, 0, 0, List.of(), List.of()
             );
         }
@@ -358,7 +359,7 @@ public class AuditExportTaskService {
                 task.setFileContent(null);
                 task.setStatus("ARCHIVED");
                 if (task.getCompletedAt() == null) {
-                    task.setCompletedAt(LocalDateTime.now());
+                    task.setCompletedAt(TimeSupport.utcNowDateTime());
                 }
                 archivedCount += sysAuditExportTaskMapper.updateById(task);
             }
@@ -383,7 +384,7 @@ public class AuditExportTaskService {
                 dryRun,
                 retentionDays,
                 maxTasks,
-                retentionCutoff.atZone(ZoneId.systemDefault()).toInstant(),
+                TimeSupport.toEpochMilli(retentionCutoff),
                 completedTasks.size(),
                 archiveIds.size(),
                 deleteIds.size(),
@@ -412,12 +413,10 @@ public class AuditExportTaskService {
                 int pageSize = 10000;
                 long total = -1;
                 int currentPage = 1;
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
-
                 while (total == -1 || totalRead < total) {
                     AuditQuery pageQuery = new AuditQuery(
                             query.tenantId(), query.eventType(), query.operator(), query.requestId(), query.clientIp(),
-                            query.occurredFrom(), query.occurredTo(), currentPage, pageSize
+                            query.fromEpochMs(), query.toEpochMs(), currentPage, pageSize
                     );
                     AuditPage pageResult = auditService.query(pageQuery);
                     if (total == -1) total = pageResult.total();
@@ -428,7 +427,7 @@ public class AuditExportTaskService {
                             event.tenantId(),
                             event.requestId(),
                             event.clientIp(),
-                            event.occurredAt() != null ? formatter.format(event.occurredAt()) : "",
+                            formatEpochMs(event.occurredAt()),
                             toJson(event.details())
                     )).toList();
 
@@ -445,7 +444,7 @@ public class AuditExportTaskService {
             entity.setRecordCount((int) totalRead);
             entity.setFileContent(outputStream.toByteArray());
             entity.setStatus("SUCCESS");
-            entity.setCompletedAt(LocalDateTime.now());
+            entity.setCompletedAt(TimeSupport.utcNowDateTime());
             sysAuditExportTaskMapper.updateById(entity);
             auditService.record("AUDIT_EXPORT_TASK_COMPLETED", entity.getOperator(), entity.getTenantId(), Map.of(
                     "taskId", entity.getId(),
@@ -455,7 +454,7 @@ public class AuditExportTaskService {
         } catch (Exception ex) {
             entity.setStatus("FAILED");
             entity.setErrorMessage(ex.getMessage());
-            entity.setCompletedAt(LocalDateTime.now());
+            entity.setCompletedAt(TimeSupport.utcNowDateTime());
             sysAuditExportTaskMapper.updateById(entity);
             auditService.record("AUDIT_EXPORT_TASK_FAILED", entity.getOperator(), entity.getTenantId(), Map.of(
                     "taskId", entity.getId(),
@@ -510,7 +509,7 @@ public class AuditExportTaskService {
         }
         entity.setStatus("FAILED");
         entity.setErrorMessage(errorMessage);
-        entity.setCompletedAt(LocalDateTime.now());
+        entity.setCompletedAt(TimeSupport.utcNowDateTime());
         sysAuditExportTaskMapper.updateById(entity);
         auditService.record("AUDIT_EXPORT_TASK_FAILED", entity.getOperator(), entity.getTenantId(), Map.of(
                 "taskId", taskId,
@@ -540,8 +539,8 @@ public class AuditExportTaskService {
                     stringValue(payload.get("operator")),
                     stringValue(payload.get("requestId")),
                     stringValue(payload.get("clientIp")),
-                    parseInstant(payload.get("occurredFrom")),
-                    parseInstant(payload.get("occurredTo")),
+                    parseEpochMilli(payload.get("fromEpochMs"), payload.get("occurredFrom")),
+                    parseEpochMilli(payload.get("toEpochMs"), payload.get("occurredTo")),
                     1,
                     2000
             );
@@ -565,12 +564,12 @@ public class AuditExportTaskService {
         payload.put("operator", query.operator());
         payload.put("requestId", query.requestId());
         payload.put("clientIp", query.clientIp());
-        payload.put("occurredFrom", query.occurredFrom() == null ? null : String.valueOf(query.occurredFrom()));
-        payload.put("occurredTo", query.occurredTo() == null ? null : String.valueOf(query.occurredTo()));
+        payload.put("fromEpochMs", query.fromEpochMs());
+        payload.put("toEpochMs", query.toEpochMs());
         return payload;
     }
 
-    private String toJson(Map<String, Object> payload) {
+    private String toJson(Object payload) {
         try {
             return objectMapper.writeValueAsString(payload);
         } catch (Exception ex) {
@@ -593,10 +592,10 @@ public class AuditExportTaskService {
             case "ARCHIVED" -> "已归档";
             default -> "未知";
         };
-        Instant expiresAt = entity.getCompletedAt() == null
+        Long expiresAt = entity.getCompletedAt() == null
                 ? null
-                : entity.getCompletedAt().plusDays(policy.retentionDays()).atZone(ZoneId.systemDefault()).toInstant();
-        boolean retentionExpired = expiresAt != null && expiresAt.isBefore(Instant.now());
+                : TimeSupport.toEpochMilli(entity.getCompletedAt().plusDays(policy.retentionDays()));
+        boolean retentionExpired = expiresAt != null && expiresAt < Instant.now().toEpochMilli();
         return new ExportTaskView(
                 entity.getId(),
                 entity.getTenantId(),
@@ -611,8 +610,8 @@ public class AuditExportTaskService {
                 retentionExpired,
                 buildRetentionSummary(entity, policy, expiresAt, retentionExpired),
                 expiresAt,
-                entity.getRequestedAt() == null ? null : entity.getRequestedAt().atZone(ZoneId.systemDefault()).toInstant(),
-                entity.getCompletedAt() == null ? null : entity.getCompletedAt().atZone(ZoneId.systemDefault()).toInstant(),
+                TimeSupport.toEpochMilli(entity.getRequestedAt()),
+                TimeSupport.toEpochMilli(entity.getCompletedAt()),
                 entity.getErrorMessage()
         );
     }
@@ -620,7 +619,7 @@ public class AuditExportTaskService {
     private String buildRetentionSummary(
             SysAuditExportTaskEntity entity,
             ExportPolicy policy,
-            Instant expiresAt,
+            Long expiresAt,
             boolean retentionExpired
     ) {
         return switch (entity.getStatus()) {
@@ -628,11 +627,11 @@ public class AuditExportTaskService {
             case "RUNNING" -> "任务执行中，导出文件将在完成后保留" + policy.retentionDays() + "天。";
             case "FAILED" -> expiresAt == null
                     ? "任务失败，可调整查询条件后重新导出。"
-                    : "失败任务元数据将保留至 " + expiresAt + "。";
+                    : "失败任务元数据将保留至 " + formatEpochMs(expiresAt) + "。";
             case "ARCHIVED" -> "导出结果已归档，元数据保留用于审计追踪。";
             case "SUCCESS" -> retentionExpired
                     ? "导出文件已超过保留期限，请及时归档或清理。"
-                    : "导出文件将保留至 " + expiresAt + "。";
+                    : "导出文件将保留至 " + formatEpochMs(expiresAt) + "。";
             default -> "请根据当前保留策略管理此任务。";
         };
     }
@@ -652,11 +651,22 @@ public class AuditExportTaskService {
         return value == null ? null : String.valueOf(value);
     }
 
-    private Instant parseInstant(Object value) {
-        if (value == null || !StringUtils.hasText(String.valueOf(value))) {
+    private Long parseEpochMilli(Object primaryValue, Object legacyInstantValue) {
+        if (primaryValue != null && StringUtils.hasText(String.valueOf(primaryValue))) {
+            try {
+                return Long.parseLong(String.valueOf(primaryValue));
+            } catch (NumberFormatException ignored) {
+                // fallback to legacy format
+            }
+        }
+        if (legacyInstantValue == null || !StringUtils.hasText(String.valueOf(legacyInstantValue))) {
             return null;
         }
-        return Instant.parse(String.valueOf(value));
+        return Instant.parse(String.valueOf(legacyInstantValue)).toEpochMilli();
+    }
+
+    private String formatEpochMs(Long epochMs) {
+        return epochMs == null ? "" : EXPORT_FORMATTER.format(Instant.ofEpochMilli(epochMs));
     }
 
     @Schema(description = "审计导出任务视图")
@@ -673,9 +683,9 @@ public class AuditExportTaskService {
             @Schema(description = "进度阶段") String progressStage,
             @Schema(description = "保留期是否过期") Boolean retentionExpired,
             @Schema(description = "保留期摘要") String retentionSummary,
-            @Schema(description = "过期时间") Instant expiresAt,
-            @Schema(description = "请求时间") Instant requestedAt,
-            @Schema(description = "完成时间") Instant completedAt,
+            @Schema(description = "过期时间") Long expiresAt,
+            @Schema(description = "请求时间") Long requestedAt,
+            @Schema(description = "完成时间") Long completedAt,
             @Schema(description = "错误消息") String errorMessage
     ) {
     }
@@ -697,7 +707,7 @@ public class AuditExportTaskService {
             @Schema(description = "是否为试运行") Boolean dryRun,
             @Schema(description = "保留天数") Integer retentionDays,
             @Schema(description = "最大任务数") Integer maxTasks,
-            @Schema(description = "保留截止时间") Instant retentionCutoff,
+            @Schema(description = "保留截止时间") Long retentionCutoff,
             @Schema(description = "已扫描的完成任务数") Integer scannedTasks,
             @Schema(description = "计划归档数") Integer plannedArchiveCount,
             @Schema(description = "计划删除数") Integer plannedDeleteCount,

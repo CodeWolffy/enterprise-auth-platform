@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.model.DataScopeType;
 import com.enterprise.auth.platform.common.model.MenuItem;
+import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.persistence.entity.SysDeptEntity;
 import com.enterprise.auth.platform.persistence.entity.SysPermissionEntity;
@@ -26,7 +27,6 @@ import com.enterprise.auth.platform.persistence.mapper.SysTenantPackageMapper;
 import com.enterprise.auth.platform.security.DataScopeService;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -164,7 +164,7 @@ public class CatalogService {
                                 tenant.getTenantName(),
                                 tenant.getPlatformLevel() != null && tenant.getPlatformLevel() == 1,
                                 tenant.getTenantStatus(),
-                                tenant.getExpireAt(),
+                                TimeSupport.toEpochMilli(tenant.getExpireAt()),
                                 profile.packageCode(),
                                 profile.packageName(),
                                 profile.userQuota(),
@@ -416,7 +416,7 @@ public class CatalogService {
             @Schema(description = "租户名称") String name,
             @Schema(description = "是否平台级租户") boolean platformLevel,
             @Schema(description = "租户状态") Integer tenantStatus,
-            @Schema(description = "到期时间") LocalDateTime expireAt,
+            @Schema(description = "到期时间") Long expireAt,
             @Schema(description = "套餐编码") String packageCode,
             @Schema(description = "套餐名称") String packageName,
             @Schema(description = "用户配额") Integer userQuota,

@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.persistence.repository;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.common.model.DataScopeType;
 import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.persistence.entity.SysConfigEntity;
@@ -18,7 +19,6 @@ import com.enterprise.auth.platform.persistence.mapper.SysUserRoleMapper;
 import com.enterprise.auth.platform.security.AuthPrincipalCacheService;
 import com.enterprise.auth.platform.user.model.UserAccount;
 import com.enterprise.auth.platform.user.repository.UserRepository;
-import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -116,7 +116,7 @@ public class DatabaseUserRepository implements UserRepository {
         }
         entity.setSessionVersion((entity.getSessionVersion() == null ? 1 : entity.getSessionVersion()) + 1);
         entity.setUpdatedBy(entity.getUsername());
-        entity.setPasswordUpdatedAt(LocalDateTime.now());
+        entity.setPasswordUpdatedAt(TimeSupport.utcNowDateTime());
         sysUserMapper.updateById(entity);
         authPrincipalCacheService.evictByUser(entity.getId(), entity.getTenantId(), entity.getUsername());
     }

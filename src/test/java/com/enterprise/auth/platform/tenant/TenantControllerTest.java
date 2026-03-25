@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.tenant;
 
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -25,6 +25,9 @@ import org.springframework.test.web.servlet.MockMvc;
 class TenantControllerTest {
 
     private static final String TENANT_ID = "tenant-a";
+    private static final String STATUS_SUMMARY = "历史筛选-状态";
+    private static final String PACKAGE_SUMMARY = "历史筛选-套餐";
+    private static final long SEVEN_DAYS_MS = 7L * 24 * 3600 * 1000;
 
     @Autowired
     private MockMvc mockMvc;
@@ -34,26 +37,34 @@ class TenantControllerTest {
 
     @BeforeEach
     void setUp() {
-        jdbcTemplate.update("DELETE FROM sys_tenant_change_log WHERE tenant_id = ? AND summary IN (?, ?)",
-                TENANT_ID, "历史筛选-状态", "历史筛选-套餐");
-        jdbcTemplate.update("DELETE FROM sys_tenant_capability_override WHERE tenant_id = ? AND capability_code IN (?, ?)",
-                TENANT_ID, "audit", "notice");
+        jdbcTemplate.update(
+                "DELETE FROM sys_tenant_change_log WHERE tenant_id = ? AND summary IN (?, ?)",
+                TENANT_ID, STATUS_SUMMARY, PACKAGE_SUMMARY
+        );
+        jdbcTemplate.update(
+                "DELETE FROM sys_tenant_capability_override WHERE tenant_id = ? AND capability_code IN (?, ?)",
+                TENANT_ID, "audit", "notice"
+        );
         jdbcTemplate.update(
                 "INSERT INTO sys_tenant_change_log(tenant_id, change_type, field_key, old_value, new_value, summary, operator, occurred_at) VALUES(?,?,?,?,?,?,?,DATE_SUB(NOW(), INTERVAL 2 DAY))",
-                TENANT_ID, "STATUS", "tenantStatus", "0", "1", "历史筛选-状态", "tester"
+                TENANT_ID, "STATUS", "tenantStatus", "0", "1", STATUS_SUMMARY, "tester"
         );
         jdbcTemplate.update(
                 "INSERT INTO sys_tenant_change_log(tenant_id, change_type, field_key, old_value, new_value, summary, operator, occurred_at) VALUES(?,?,?,?,?,?,?,NOW())",
-                TENANT_ID, "PACKAGE", "packageCode", "basic", "pro", "历史筛选-套餐", "another"
+                TENANT_ID, "PACKAGE", "packageCode", "basic", "pro", PACKAGE_SUMMARY, "another"
         );
     }
 
     @AfterEach
     void tearDown() {
-        jdbcTemplate.update("DELETE FROM sys_tenant_change_log WHERE tenant_id = ? AND summary IN (?, ?)",
-                TENANT_ID, "历史筛选-状态", "历史筛选-套餐");
-        jdbcTemplate.update("DELETE FROM sys_tenant_capability_override WHERE tenant_id = ? AND capability_code IN (?, ?)",
-                TENANT_ID, "audit", "notice");
+        jdbcTemplate.update(
+                "DELETE FROM sys_tenant_change_log WHERE tenant_id = ? AND summary IN (?, ?)",
+                TENANT_ID, STATUS_SUMMARY, PACKAGE_SUMMARY
+        );
+        jdbcTemplate.update(
+                "DELETE FROM sys_tenant_capability_override WHERE tenant_id = ? AND capability_code IN (?, ?)",
+                TENANT_ID, "audit", "notice"
+        );
     }
 
     @Test
@@ -67,26 +78,28 @@ class TenantControllerTest {
 
     @Test
     void tenantHistoryShouldSupportFilters() throws Exception {
+        long now = System.currentTimeMillis();
         mockMvc.perform(get("/api/tenants/{tenantId}/history", TENANT_ID)
                         .with(user(principal("tenant:read")))
                         .header("X-Tenant-Id", TENANT_ID)
                         .param("changeType", "STATUS")
                         .param("operator", "test")
-                        .param("occurredFrom", java.time.Instant.now().minusSeconds(7 * 24 * 3600).toString())
-                        .param("occurredTo", java.time.Instant.now().toString()))
+                        .param("fromEpochMs", String.valueOf(now - SEVEN_DAYS_MS))
+                        .param("toEpochMs", String.valueOf(now)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.records[0].changeType").value("STATUS"))
-                .andExpect(jsonPath("$.data.records[0].summary").value("历史筛选-状态"))
+                .andExpect(jsonPath("$.data.records[0].summary").value(STATUS_SUMMARY))
                 .andExpect(jsonPath("$.data.records[0].impactSummary").isNotEmpty());
     }
 
     @Test
     void tenantHistorySummaryShouldReturnTrajectoryOverview() throws Exception {
+        long now = System.currentTimeMillis();
         mockMvc.perform(get("/api/tenants/{tenantId}/history/summary", TENANT_ID)
                         .with(user(principal("tenant:read")))
                         .header("X-Tenant-Id", TENANT_ID)
-                        .param("occurredFrom", java.time.Instant.now().minusSeconds(7 * 24 * 3600).toString())
-                        .param("occurredTo", java.time.Instant.now().toString()))
+                        .param("fromEpochMs", String.valueOf(now - SEVEN_DAYS_MS))
+                        .param("toEpochMs", String.valueOf(now)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.tenantId").value(TENANT_ID))
                 .andExpect(jsonPath("$.data.totalChanges").isNumber())
@@ -95,14 +108,13 @@ class TenantControllerTest {
     }
 
     @Test
-    void tenantHistoryShouldAcceptLocalDateTimeWithoutTimezone() throws Exception {
+    void tenantHistoryShouldRejectLocalDateTimeWithoutTimezone() throws Exception {
         mockMvc.perform(get("/api/tenants/{tenantId}/history", TENANT_ID)
                         .with(user(principal("tenant:read")))
                         .header("X-Tenant-Id", TENANT_ID)
-                        .param("occurredFrom", "2026-03-01T00:00:00")
-                        .param("occurredTo", "2026-03-31T23:59:59"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
+                        .param("fromEpochMs", "2026-03-01T00:00:00")
+                        .param("toEpochMs", "2026-03-31T23:59:59"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

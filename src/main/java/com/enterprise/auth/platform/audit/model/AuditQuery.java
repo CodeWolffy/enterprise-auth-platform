@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.audit.model;
 
+import com.enterprise.auth.platform.common.time.TimeSupport;
 import java.time.Instant;
 
 public record AuditQuery(
@@ -8,8 +9,8 @@ public record AuditQuery(
         String operator,
         String requestId,
         String clientIp,
-        Instant occurredFrom,
-        Instant occurredTo,
+        Long fromEpochMs,
+        Long toEpochMs,
         int page,
         int size
 ) {
@@ -19,5 +20,13 @@ public record AuditQuery(
 
     public int normalizedSize() {
         return Math.min(Math.max(size, 1), 100);
+    }
+
+    public Instant fromInstant() {
+        return TimeSupport.fromEpochMilli(fromEpochMs);
+    }
+
+    public Instant toInstant() {
+        return TimeSupport.fromEpochMilli(toEpochMs);
     }
 }

@@ -5,6 +5,7 @@ import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.catalog.CatalogService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.model.PageResult;
+import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.persistence.entity.SysDeptEntity;
 import com.enterprise.auth.platform.persistence.entity.SysRoleEntity;
@@ -32,7 +33,6 @@ import com.enterprise.auth.platform.tenant.dto.UpdateTenantCapabilityOverridesRe
 import com.enterprise.auth.platform.tenant.dto.UpdateTenantRequest;
 import com.enterprise.auth.platform.user.model.UserAccount;
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -106,7 +106,7 @@ public class TenantManagementService {
         entity.setTenantName(request.tenantName());
         entity.setPlatformLevel(request.platformLevel() ? 1 : 0);
         entity.setTenantStatus(request.tenantStatus() == null ? 1 : request.tenantStatus());
-        entity.setExpireAt(request.expireAt());
+        entity.setExpireAt(TimeSupport.localDateTimeFromEpochMilli(request.expireAt()));
         entity.setPackageCode(request.packageCode());
         entity.setLifecycleNote(request.lifecycleNote());
         sysTenantMapper.insert(entity);
@@ -137,7 +137,7 @@ public class TenantManagementService {
         if (request.tenantStatus() != null) {
             entity.setTenantStatus(request.tenantStatus());
         }
-        entity.setExpireAt(request.expireAt());
+        entity.setExpireAt(TimeSupport.localDateTimeFromEpochMilli(request.expireAt()));
         entity.setPackageCode(request.packageCode());
         entity.setLifecycleNote(request.lifecycleNote());
         sysTenantMapper.updateById(entity);
@@ -231,8 +231,8 @@ public class TenantManagementService {
             String changeType,
             String fieldKey,
             String operator,
-            java.time.Instant occurredFrom,
-            java.time.Instant occurredTo,
+            Long fromEpochMs,
+            Long toEpochMs,
             int page,
             int size
     ) {
@@ -241,7 +241,7 @@ public class TenantManagementService {
         int safePage = Math.max(page, 1);
         int safeSize = Math.max(size, 1);
         LambdaQueryWrapper<SysTenantChangeLogEntity> query = buildHistoryQuery(
-                tenantId, changeType, fieldKey, operator, occurredFrom, occurredTo
+                tenantId, changeType, fieldKey, operator, fromEpochMs, toEpochMs
         ).orderByDesc(SysTenantChangeLogEntity::getOccurredAt)
                 .orderByDesc(SysTenantChangeLogEntity::getId);
         long total = sysTenantChangeLogMapper.selectCount(query);
@@ -261,7 +261,7 @@ public class TenantManagementService {
                         item.getSummary(),
                         buildImpactSummary(item),
                         item.getOperator(),
-                        item.getOccurredAt() == null ? null : item.getOccurredAt().atZone(ZoneId.systemDefault()).toInstant()
+                        TimeSupport.toEpochMilli(item.getOccurredAt())
                 ))
                 .toList();
         return PageResult.of(total, safePage, safeSize, records);
@@ -272,13 +272,13 @@ public class TenantManagementService {
             String changeType,
             String fieldKey,
             String operator,
-            java.time.Instant occurredFrom,
-            java.time.Instant occurredTo
+            Long fromEpochMs,
+            Long toEpochMs
     ) {
         requireDatabaseMode();
         ensureTenantReadable(tenantId);
         List<SysTenantChangeLogEntity> records = sysTenantChangeLogMapper.selectList(
-                buildHistoryQuery(tenantId, changeType, fieldKey, operator, occurredFrom, occurredTo)
+                buildHistoryQuery(tenantId, changeType, fieldKey, operator, fromEpochMs, toEpochMs)
                         .orderByDesc(SysTenantChangeLogEntity::getOccurredAt)
                         .orderByDesc(SysTenantChangeLogEntity::getId)
         );
@@ -298,7 +298,7 @@ public class TenantManagementService {
                         item.getSummary(),
                         buildImpactSummary(item),
                         item.getOperator(),
-                        item.getOccurredAt() == null ? null : item.getOccurredAt().atZone(ZoneId.systemDefault()).toInstant()
+                        TimeSupport.toEpochMilli(item.getOccurredAt())
                 ))
                 .toList();
         Map<String, Long> affectedFieldCounts = records.stream()
@@ -389,18 +389,18 @@ public class TenantManagementService {
             String changeType,
             String fieldKey,
             String operator,
-            java.time.Instant occurredFrom,
-            java.time.Instant occurredTo
+            Long fromEpochMs,
+            Long toEpochMs
     ) {
         return new LambdaQueryWrapper<SysTenantChangeLogEntity>()
                 .eq(SysTenantChangeLogEntity::getTenantId, tenantId)
                 .eq(StringUtils.hasText(changeType), SysTenantChangeLogEntity::getChangeType, changeType)
                 .eq(StringUtils.hasText(fieldKey), SysTenantChangeLogEntity::getFieldKey, fieldKey)
                 .like(StringUtils.hasText(operator), SysTenantChangeLogEntity::getOperator, operator)
-                .ge(occurredFrom != null, SysTenantChangeLogEntity::getOccurredAt,
-                        occurredFrom == null ? null : java.time.LocalDateTime.ofInstant(occurredFrom, ZoneId.systemDefault()))
-                .le(occurredTo != null, SysTenantChangeLogEntity::getOccurredAt,
-                        occurredTo == null ? null : java.time.LocalDateTime.ofInstant(occurredTo, ZoneId.systemDefault()));
+                .ge(fromEpochMs != null, SysTenantChangeLogEntity::getOccurredAt,
+                        fromEpochMs == null ? null : TimeSupport.localDateTimeFromEpochMilli(fromEpochMs))
+                .lt(toEpochMs != null, SysTenantChangeLogEntity::getOccurredAt,
+                        toEpochMs == null ? null : TimeSupport.localDateTimeFromEpochMilli(toEpochMs));
     }
 
     private void saveTenantProfile(
@@ -508,7 +508,7 @@ public class TenantManagementService {
                 tenant.getTenantName(),
                 tenant.getPlatformLevel() != null && tenant.getPlatformLevel() == 1,
                 tenant.getTenantStatus(),
-                tenant.getExpireAt(),
+                TimeSupport.toEpochMilli(tenant.getExpireAt()),
                 profile.packageCode(),
                 profile.packageName(),
                 profile.userQuota(),
@@ -863,7 +863,7 @@ public class TenantManagementService {
         entity.setNewValue(trimToNull(newValue));
         entity.setSummary(summary);
         entity.setOperator(operator);
-        entity.setOccurredAt(java.time.LocalDateTime.now());
+        entity.setOccurredAt(TimeSupport.utcNowDateTime());
         sysTenantChangeLogMapper.insert(entity);
     }
 
@@ -915,7 +915,7 @@ public class TenantManagementService {
             @Schema(description = "变更摘要") String summary,
             @Schema(description = "影响说明") String impactSummary,
             @Schema(description = "操作人") String operator,
-            @Schema(description = "变更时间") java.time.Instant occurredAt
+            @Schema(description = "变更时间") Long occurredAt
     ) {
     }
 

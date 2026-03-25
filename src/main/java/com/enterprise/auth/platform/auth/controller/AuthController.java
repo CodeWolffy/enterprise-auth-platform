@@ -16,6 +16,7 @@ import com.enterprise.auth.platform.auth.service.OAuthCookieSessionService;
 import com.enterprise.auth.platform.auth.service.PermissionSnapshotService;
 import com.enterprise.auth.platform.common.api.ApiResponse;
 import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.user.model.UserAccount;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -61,7 +62,7 @@ public class AuthController {
         CaptchaService.CaptchaChallenge challenge = captchaService.create();
         return ApiResponse.ok(new CaptchaResponse(
                 challenge.captchaId(),
-                challenge.expiresAt(),
+                TimeSupport.toEpochMilli(challenge.expiresAt()),
                 challenge.previewCode()
         ));
     }

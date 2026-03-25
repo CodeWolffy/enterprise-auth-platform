@@ -36,7 +36,7 @@ export interface OAuthTokenResponse {
 export interface CookieSessionResponse {
   tenantId: string
   sessionId: string
-  expiresAt: string
+  expiresAt: number
 }
 
 export interface CsrfTokenResponse {
@@ -63,8 +63,8 @@ export interface ClientView {
   integrationGuidance?: ClientIntegrationGuidanceView | null
   issuedClientSecret?: string | null
   statusHistory?: ClientStatusHistoryView[]
-  createdAt?: string
-  updatedAt?: string
+  createdAt?: number
+  updatedAt?: number
 }
 
 export interface ClientScopeDetailView {
@@ -88,7 +88,7 @@ export interface ClientStatusHistoryView {
   eventType: string
   summary: string
   operator?: string | null
-  occurredAt?: string | null
+  occurredAt?: number | null
   payload?: Record<string, unknown>
 }
 
@@ -102,7 +102,7 @@ export interface OAuthScopeView {
   visibleInConsent: boolean
   sortOrder?: number | null
   enabled: boolean
-  updatedAt?: string | null
+  updatedAt?: number | null
   referencedClientCount?: number
   referencedClientIds?: string[]
 }
@@ -160,7 +160,7 @@ export interface TenantView {
   name: string
   platformLevel: boolean
   tenantStatus: number
-  expireAt?: string | null
+  expireAt?: number | null
   packageCode?: string | null
   packageName?: string | null
   userQuota?: number | null
@@ -200,7 +200,7 @@ export interface TenantChangeView {
   summary: string
   impactSummary?: string | null
   operator: string
-  occurredAt?: string | null
+  occurredAt?: number | null
 }
 
 export interface TenantHistorySummaryView {
@@ -223,7 +223,7 @@ export interface TenantPackageView {
   packageDesc?: string | null
   enabled: boolean
   capabilityCodes: string[]
-  updatedAt?: string | null
+  updatedAt?: number | null
   referencedTenantCount?: number
   referencedTenantIds?: string[]
 }
@@ -235,7 +235,7 @@ export interface TenantCapabilityView {
   capabilityDesc?: string | null
   sortOrder?: number | null
   enabled: boolean
-  updatedAt?: string | null
+  updatedAt?: number | null
   referencedPackageCount?: number
   referencedPackageCodes?: string[]
   referencedTenantCount?: number
@@ -252,7 +252,7 @@ export interface CategoryOption {
 export interface CategoryAuditView {
   eventType: string
   operator: string
-  occurredAt?: string | null
+  occurredAt?: number | null
   payloadJson: string
 }
 
@@ -290,7 +290,7 @@ export interface NoticeView {
   noticeTitle: string
   noticeContent: string
   published: boolean
-  publishTime?: string | null
+  publishTime?: number | null
   workflowStatus: string
   createdBy: string
 }
@@ -301,7 +301,7 @@ export interface AuditEvent {
   tenantId: string
   requestId?: string | null
   clientIp?: string | null
-  occurredAt: string
+  occurredAt: number
   details: Record<string, unknown>
 }
 
@@ -325,9 +325,9 @@ export interface AuditExportTask {
   progressStage: string
   retentionExpired: boolean
   retentionSummary?: string | null
-  expiresAt?: string | null
-  requestedAt?: string | null
-  completedAt?: string | null
+  expiresAt?: number | null
+  requestedAt?: number | null
+  completedAt?: number | null
   errorMessage?: string | null
 }
 

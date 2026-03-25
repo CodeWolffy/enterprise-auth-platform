@@ -6,6 +6,7 @@ import com.enterprise.auth.platform.auth.dto.CreateOauthClientRequest;
 import com.enterprise.auth.platform.auth.dto.RotateOauthClientSecretRequest;
 import com.enterprise.auth.platform.auth.dto.UpdateOauthClientRequest;
 import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.persistence.entity.SysOauthClientEntity;
 import com.enterprise.auth.platform.persistence.entity.SysOauthClientHistoryEntity;
@@ -17,8 +18,6 @@ import com.enterprise.auth.platform.security.SecuritySupport;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -291,8 +290,8 @@ public class OAuthClientManagementService {
                 detailMode ? buildIntegrationGuidance(entity, scopeDetails) : null,
                 issuedClientSecret,
                 detailMode ? buildStatusHistory(entity) : List.of(),
-                entity.getCreatedAt(),
-                entity.getUpdatedAt()
+                TimeSupport.toEpochMilli(entity.getCreatedAt()),
+                TimeSupport.toEpochMilli(entity.getUpdatedAt())
         );
     }
 
@@ -408,7 +407,7 @@ public class OAuthClientManagementService {
                 entity.getEventType(),
                 entity.getSummary(),
                 entity.getOperator(),
-                entity.getOccurredAt() == null ? null : entity.getOccurredAt().atZone(ZoneId.systemDefault()).toInstant(),
+                TimeSupport.toEpochMilli(entity.getOccurredAt()),
                 payload
         );
     }
@@ -435,7 +434,7 @@ public class OAuthClientManagementService {
         entity.setSummary(summary);
         entity.setPayloadJson(writePayload(payload));
         entity.setOperator(SecuritySupport.currentOperator());
-        entity.setOccurredAt(LocalDateTime.now());
+        entity.setOccurredAt(TimeSupport.utcNowDateTime());
         sysOauthClientHistoryMapper.insert(entity);
     }
 
@@ -509,8 +508,8 @@ public class OAuthClientManagementService {
             @Schema(description = "接入建议") OAuthClientIntegrationGuidanceView integrationGuidance,
             @Schema(description = "本次返回的原始密钥，仅在创建或轮换时返回") String issuedClientSecret,
             @Schema(description = "最近客户端状态历史") List<OAuthClientStatusHistoryView> statusHistory,
-            @Schema(description = "创建时间") LocalDateTime createdAt,
-            @Schema(description = "更新时间") LocalDateTime updatedAt
+            @Schema(description = "创建时间") Long createdAt,
+            @Schema(description = "更新时间") Long updatedAt
     ) {
     }
 
@@ -540,7 +539,7 @@ public class OAuthClientManagementService {
             @Schema(description = "事件类型") String eventType,
             @Schema(description = "事件摘要") String summary,
             @Schema(description = "操作人") String operator,
-            @Schema(description = "发生时间") java.time.Instant occurredAt,
+            @Schema(description = "发生时间") Long occurredAt,
             @Schema(description = "事件负载") Map<String, Object> payload
     ) {
     }

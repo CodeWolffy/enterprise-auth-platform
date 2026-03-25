@@ -56,8 +56,8 @@ export interface TenantHistoryQueryParams {
   changeType?: string
   fieldKey?: string
   operator?: string
-  occurredFrom?: string
-  occurredTo?: string
+  fromEpochMs?: number
+  toEpochMs?: number
   page?: number
   size?: number
 }
@@ -221,8 +221,8 @@ export interface AuditQueryParams {
   operator?: string
   requestId?: string
   clientIp?: string
-  occurredFrom?: string
-  occurredTo?: string
+  fromEpochMs?: number
+  toEpochMs?: number
   page?: number
   size?: number
 }
@@ -284,12 +284,12 @@ export async function archiveAuditExportTask(taskId: number) {
   return data.data
 }
 
-export async function archiveAuditExportTasks(params: { tenantId?: string; status?: string; completedBefore: string }) {
+export async function archiveAuditExportTasks(params: { tenantId?: string; status?: string; completedBeforeEpochMs: number }) {
   const { data } = await http.post<ApiResponse<number>>('/api/audit/exports/archive', null, { params })
   return data.data
 }
 
-export async function cleanupAuditExportTasks(params: { tenantId?: string; status?: string; completedBefore: string }) {
+export async function cleanupAuditExportTasks(params: { tenantId?: string; status?: string; completedBeforeEpochMs: number }) {
   const { data } = await http.delete<ApiResponse<number>>('/api/audit/exports', { params })
   return data.data
 }

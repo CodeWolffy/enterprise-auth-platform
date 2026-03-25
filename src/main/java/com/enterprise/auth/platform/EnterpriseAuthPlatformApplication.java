@@ -8,6 +8,7 @@ import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.config.SecurityRedisProperties;
 import com.enterprise.auth.platform.config.SecurityProperties;
 import com.enterprise.auth.platform.tenant.TenantProperties;
+import java.util.TimeZone;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
@@ -28,6 +29,7 @@ import org.springframework.cache.annotation.EnableCaching;
 public class EnterpriseAuthPlatformApplication {
 
     public static void main(String[] args) {
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
         SpringApplication.run(EnterpriseAuthPlatformApplication.class, args);
     }
 }

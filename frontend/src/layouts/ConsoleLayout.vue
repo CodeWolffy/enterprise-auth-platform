@@ -73,6 +73,7 @@ import AppNav from '@/components/AppNav.vue'
 import { useAuthStore } from '@/stores/auth'
 import { querySessions, forceOffline } from '@/api/auth'
 import { useTheme } from '@/composables/useTheme'
+import { formatDateTime } from '@/utils/datetime'
 
 const route = useRoute()
 const router = useRouter()
@@ -115,15 +116,8 @@ function handleThemeChange(color: string | null) {
   setBrandColor(color)
 }
 
-function formatSessionTime(isoText?: string) {
-  if (!isoText) {
-    return '-'
-  }
-  const value = new Date(isoText)
-  if (Number.isNaN(value.getTime())) {
-    return isoText
-  }
-  return value.toLocaleString('zh-CN', { hour12: false })
+function formatSessionTime(epochMs?: number | null) {
+  return formatDateTime(epochMs)
 }
 
 function formatDevice(raw?: string) {

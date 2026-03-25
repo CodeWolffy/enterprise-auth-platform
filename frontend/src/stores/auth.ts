@@ -170,8 +170,7 @@ export const useAuthStore = defineStore('auth', () => {
   function applyTokenPayload(payload: CookieSessionResponse, resolvedTenantId: string) {
     accessToken.value = 'cookie-access'
     refreshToken.value = 'cookie-refresh'
-    const expires = Date.parse(payload.expiresAt)
-    expiresAt.value = Number.isNaN(expires) ? Date.now() + 5 * 60 * 1000 : expires
+    expiresAt.value = Number.isFinite(payload.expiresAt) ? payload.expiresAt : Date.now() + 5 * 60 * 1000
     operatorTenantId.value = payload.tenantId || resolvedTenantId
     if (!tenantId.value) {
       tenantId.value = operatorTenantId.value

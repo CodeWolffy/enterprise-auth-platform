@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.model.PageResult;
+import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.persistence.entity.SysCategoryRuleEntity;
 import com.enterprise.auth.platform.persistence.entity.SysConfigEntity;
@@ -24,7 +25,7 @@ import com.enterprise.auth.platform.system.dto.DictCrudRequest;
 import com.enterprise.auth.platform.system.dto.NoticeCrudRequest;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -312,7 +313,7 @@ public class SystemManagementService {
         entity.setNoticeTitle(request.noticeTitle());
         entity.setNoticeContent(request.noticeContent());
         entity.setPublished(Boolean.TRUE.equals(request.published()) ? 1 : 0);
-        entity.setPublishTime(request.publishTime());
+        entity.setPublishTime(TimeSupport.localDateTimeFromEpochMilli(request.publishTime()));
         sysNoticeMapper.insert(entity);
         auditService.record("NOTICE_CREATED", operator, tenantId, Map.of("noticeId", entity.getId(), "workflowStatus", workflowStatus(entity)));
         return toNoticeView(entity);
@@ -326,7 +327,7 @@ public class SystemManagementService {
         entity.setNoticeTitle(request.noticeTitle());
         entity.setNoticeContent(request.noticeContent());
         entity.setPublished(Boolean.TRUE.equals(request.published()) ? 1 : 0);
-        entity.setPublishTime(request.publishTime());
+        entity.setPublishTime(TimeSupport.localDateTimeFromEpochMilli(request.publishTime()));
         sysNoticeMapper.updateById(entity);
         auditService.record("NOTICE_UPDATED", SecuritySupport.currentOperator(), tenantId, Map.of("noticeId", id, "workflowStatus", workflowStatus(entity)));
         return toNoticeView(entity);
@@ -369,7 +370,7 @@ public class SystemManagementService {
                 entity.getNoticeTitle(),
                 entity.getNoticeContent(),
                 entity.getPublished() != null && entity.getPublished() == 1,
-                entity.getPublishTime(),
+                TimeSupport.toEpochMilli(entity.getPublishTime()),
                 workflowStatus(entity),
                 entity.getCreatedBy()
         );
@@ -435,12 +436,12 @@ public class SystemManagementService {
         } else if ("SCHEDULED".equalsIgnoreCase(workflowStatus)) {
             query.eq(SysNoticeEntity::getPublished, 1)
                     .isNotNull(SysNoticeEntity::getPublishTime)
-                    .gt(SysNoticeEntity::getPublishTime, LocalDateTime.now());
+                    .gt(SysNoticeEntity::getPublishTime, TimeSupport.utcNowDateTime());
         } else if ("PUBLISHED".equalsIgnoreCase(workflowStatus)) {
             query.eq(SysNoticeEntity::getPublished, 1)
                     .and(wrapper -> wrapper.isNull(SysNoticeEntity::getPublishTime)
                             .or()
-                            .le(SysNoticeEntity::getPublishTime, LocalDateTime.now()));
+                            .le(SysNoticeEntity::getPublishTime, TimeSupport.utcNowDateTime()));
         }
         applyCreatorScope(query, visibleCreators, SysNoticeEntity::getCreatedBy);
         return query;
@@ -603,7 +604,7 @@ public class SystemManagementService {
                 .map(item -> new CategoryAuditView(
                         item.getEventType(),
                         item.getOperator(),
-                        item.getOccurredAt(),
+                        TimeSupport.toEpochMilli(item.getOccurredAt()),
                         item.getPayloadJson()
                 ))
                 .toList();
@@ -614,7 +615,7 @@ public class SystemManagementService {
         Map<java.time.LocalDate, Long> counts = audits.stream()
                 .filter(item -> item.occurredAt() != null)
                 .collect(java.util.stream.Collectors.groupingBy(
-                        item -> item.occurredAt().toLocalDate(),
+                        item -> Instant.ofEpochMilli(item.occurredAt()).atZone(TimeSupport.UTC).toLocalDate(),
                         LinkedHashMap::new,
                         java.util.stream.Collectors.counting()
                 ));
@@ -697,7 +698,7 @@ public class SystemManagementService {
         if (!published) {
             return "DRAFT";
         }
-        if (entity.getPublishTime() != null && entity.getPublishTime().isAfter(LocalDateTime.now())) {
+        if (entity.getPublishTime() != null && entity.getPublishTime().isAfter(TimeSupport.utcNowDateTime())) {
             return "SCHEDULED";
         }
         return "PUBLISHED";
@@ -851,7 +852,7 @@ public class SystemManagementService {
             @Schema(description = "公告标题") String noticeTitle,
             @Schema(description = "公告内容") String noticeContent,
             @Schema(description = "是否发布") boolean published,
-            @Schema(description = "发布时间") LocalDateTime publishTime,
+            @Schema(description = "发布时间") Long publishTime,
             @Schema(description = "工作流状态") String workflowStatus,
             @Schema(description = "创建人") String createdBy
     ) implements Serializable {
@@ -904,7 +905,7 @@ public class SystemManagementService {
     public record CategoryAuditView(
             @Schema(description = "事件类型") String eventType,
             @Schema(description = "操作人") String operator,
-            @Schema(description = "发生时间") LocalDateTime occurredAt,
+            @Schema(description = "发生时间") Long occurredAt,
             @Schema(description = "审计负载") String payloadJson
     ) implements Serializable {
         private static final long serialVersionUID = 1L;

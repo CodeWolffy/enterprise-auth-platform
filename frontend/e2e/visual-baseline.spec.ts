@@ -99,7 +99,7 @@ async function mockApis(page: Page) {
             {
               eventType: 'CATEGORY_UPDATED',
               operator: 'admin',
-              occurredAt: '2026-03-21T10:00:00',
+              occurredAt: 1774087200000,
               payloadJson: '{"field":"matchers"}',
             },
           ],
@@ -165,7 +165,7 @@ async function mockApis(page: Page) {
               noticeTitle: 'maintenance',
               noticeContent: 'night maintenance',
               published: true,
-              publishTime: '2026-03-20T09:00:00',
+              publishTime: 1773997200000,
               workflowStatus: 'PUBLISHED',
               createdBy: 'admin',
             },

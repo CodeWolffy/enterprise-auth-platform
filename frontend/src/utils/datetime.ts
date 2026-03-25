@@ -1,29 +1,52 @@
-function pad(value: number) {
-  return String(value).padStart(2, '0')
-}
+const formatterCache = new Map<string, Intl.DateTimeFormat>()
 
-function parseDateTime(raw: string) {
-  const normalized = raw.trim().replace(' ', 'T')
-  const parsed = new Date(normalized)
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed
+function getFormatter(timeZone?: string) {
+  const key = timeZone || 'local'
+  let formatter = formatterCache.get(key)
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('zh-CN', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    })
+    formatterCache.set(key, formatter)
   }
-  return null
+  return formatter
 }
 
-export function formatDateTime(value?: string | null, placeholder = '-') {
-  if (!value) {
+function normalizeParts(parts: Intl.DateTimeFormatPart[]) {
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}:${values.second}`
+}
+
+export function formatDateTime(value?: number | null, placeholder = '-', timeZone?: string) {
+  if (value == null || !Number.isFinite(value)) {
     return placeholder
   }
-  const date = parseDateTime(value)
-  if (!date) {
-    return value
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return placeholder
   }
-  const year = date.getFullYear()
-  const month = pad(date.getMonth() + 1)
-  const day = pad(date.getDate())
-  const hour = pad(date.getHours())
-  const minute = pad(date.getMinutes())
-  const second = pad(date.getSeconds())
-  return `${year}-${month}-${day} ${hour}:${minute}:${second}`
+  return normalizeParts(getFormatter(timeZone).formatToParts(date))
+}
+
+export function toDate(value?: number | null) {
+  if (value == null || !Number.isFinite(value)) {
+    return null
+  }
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+export function toEpochMs(value?: Date | null) {
+  if (!(value instanceof Date)) {
+    return null
+  }
+  const epochMs = value.getTime()
+  return Number.isFinite(epochMs) ? epochMs : null
 }

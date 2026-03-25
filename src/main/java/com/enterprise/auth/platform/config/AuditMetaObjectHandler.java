@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.config;
 
 import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
+import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.security.SecuritySupport;
 import java.time.LocalDateTime;
 import org.apache.ibatis.reflection.MetaObject;
@@ -12,7 +13,7 @@ public class AuditMetaObjectHandler implements MetaObjectHandler {
     @Override
     public void insertFill(MetaObject metaObject) {
         String operator = SecuritySupport.currentOperator();
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = TimeSupport.utcNowDateTime();
 
         strictInsertFill(metaObject, "createdBy", String.class, operator);
         strictInsertFill(metaObject, "updatedBy", String.class, operator);
@@ -28,6 +29,6 @@ public class AuditMetaObjectHandler implements MetaObjectHandler {
     @Override
     public void updateFill(MetaObject metaObject) {
         strictUpdateFill(metaObject, "updatedBy", String.class, SecuritySupport.currentOperator());
-        strictUpdateFill(metaObject, "updatedAt", LocalDateTime.class, LocalDateTime.now());
+        strictUpdateFill(metaObject, "updatedAt", LocalDateTime.class, TimeSupport.utcNowDateTime());
     }
 }

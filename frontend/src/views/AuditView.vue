@@ -58,7 +58,6 @@
             range-separator="至"
             start-placeholder="开始时间"
             end-placeholder="结束时间"
-            value-format="YYYY-MM-DDTHH:mm:ss"
             data-testid="audit-date-range"
             clearable
           />
@@ -191,7 +190,6 @@
           <el-date-picker
             v-model="cleanupCompletedBefore"
             type="datetime"
-            value-format="YYYY-MM-DDTHH:mm:ss"
             placeholder="用于归档或清理"
             clearable
           />
@@ -368,7 +366,7 @@ const query = reactive({
   size: 20,
 })
 
-const dateRange = ref<[string, string] | null>(null)
+const dateRange = ref<[Date, Date] | null>(null)
 
 const page = ref<AuditPage>({
   total: 0,
@@ -392,7 +390,7 @@ const exportQuery = reactive({
   size: 10,
 })
 
-const cleanupCompletedBefore = ref<string | null>(null)
+const cleanupCompletedBefore = ref<Date | null>(null)
 const taskDetailVisible = ref(false)
 const detailTask = ref<AuditExportTask | null>(null)
 
@@ -575,7 +573,7 @@ async function archiveExportTasksByFilter() {
   const affected = await archiveAuditExportTasks({
     tenantId: exportQuery.tenantId || undefined,
     status: exportQuery.status || undefined,
-    completedBefore: cleanupCompletedBefore.value,
+    completedBeforeEpochMs: cleanupCompletedBefore.value.getTime(),
   })
   ElMessage.success(`已归档 ${affected} 条导出任务`)
   exportQuery.page = 1
@@ -591,7 +589,7 @@ async function cleanupExportTasks() {
   const affected = await cleanupAuditExportTasks({
     tenantId: exportQuery.tenantId || undefined,
     status: exportQuery.status || undefined,
-    completedBefore: cleanupCompletedBefore.value,
+    completedBeforeEpochMs: cleanupCompletedBefore.value.getTime(),
   })
   ElMessage.success(`已清理 ${affected} 条导出任务`)
   exportQuery.page = 1
@@ -610,8 +608,8 @@ function currentQueryParams() {
     operator: query.operator || undefined,
     requestId: query.requestId || undefined,
     clientIp: query.clientIp || undefined,
-    occurredFrom: dateRange.value?.[0] || undefined,
-    occurredTo: dateRange.value?.[1] || undefined,
+    fromEpochMs: dateRange.value?.[0]?.getTime(),
+    toEpochMs: dateRange.value?.[1]?.getTime(),
   }
 }
 
@@ -667,17 +665,16 @@ function expiryHint(task: AuditExportTask) {
   return task.retentionSummary || '任务完成后将按当前保留策略自动进入到期窗口。'
 }
 
-function daysUntil(isoText: string) {
-  const target = Date.parse(isoText)
-  if (Number.isNaN(target)) {
+function daysUntil(epochMs: number) {
+  if (!Number.isFinite(epochMs)) {
     return null
   }
-  const diff = target - Date.now()
+  const diff = epochMs - Date.now()
   return Math.ceil(diff / (24 * 60 * 60 * 1000))
 }
 
-function formatTime(isoText: string) {
-  return formatDateTime(isoText)
+function formatTime(epochMs: number) {
+  return formatDateTime(epochMs)
 }
 
 function openTaskDetail(task: AuditExportTask) {

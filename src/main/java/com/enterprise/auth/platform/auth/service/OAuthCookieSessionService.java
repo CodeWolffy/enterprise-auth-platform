@@ -3,6 +3,7 @@ package com.enterprise.auth.platform.auth.service;
 import com.enterprise.auth.platform.auth.AuthCookieConstants;
 import com.enterprise.auth.platform.auth.dto.CookieSessionResponse;
 import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.config.AuthorizationServerProperties;
 import com.enterprise.auth.platform.config.FrontendProperties;
 import com.enterprise.auth.platform.config.SecurityProperties;
@@ -149,7 +150,7 @@ public class OAuthCookieSessionService {
     }
 
     private CookieSessionResponse toSessionResponse(TokenPayload payload) {
-        return new CookieSessionResponse(payload.tenantId(), payload.sessionId(), payload.expiresAt());
+        return new CookieSessionResponse(payload.tenantId(), payload.sessionId(), TimeSupport.toEpochMilli(payload.expiresAt()));
     }
 
     private void writeTokenCookies(TokenPayload tokenPayload, HttpServletRequest request, HttpServletResponse response) {

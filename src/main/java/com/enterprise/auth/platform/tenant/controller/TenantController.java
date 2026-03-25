@@ -12,9 +12,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.time.Instant;
 import java.util.Map;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,7 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "租户管理")
+@Tag(name = "Tenant Management")
 @RestController
 @RequestMapping("/api/tenants")
 public class TenantController {
@@ -39,122 +37,110 @@ public class TenantController {
         this.tenantManagementService = tenantManagementService;
     }
 
-    @Operation(summary = "查询租户列表")
+    @Operation(summary = "List tenants")
     @GetMapping
     @PreAuthorize("hasAuthority('tenant:read')")
     public ApiResponse<PageResult<CatalogService.TenantView>> list(
-            @Parameter(description = "关键字，匹配租户编码或名称") @RequestParam(required = false) String keyword,
-            @Parameter(description = "是否平台级租户") @RequestParam(required = false) Boolean platformLevel,
-            @Parameter(description = "租户状态，1 启用，0 禁用") @RequestParam(required = false) Integer tenantStatus,
-            @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
-            @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") int size
+            @Parameter(description = "Keyword matched against tenant code or name") @RequestParam(required = false) String keyword,
+            @Parameter(description = "Whether the tenant is platform level") @RequestParam(required = false) Boolean platformLevel,
+            @Parameter(description = "Tenant status: 1 enabled, 0 disabled") @RequestParam(required = false) Integer tenantStatus,
+            @Parameter(description = "Page number") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Page size") @RequestParam(defaultValue = "10") int size
     ) {
         return ApiResponse.ok(tenantManagementService.page(keyword, platformLevel, tenantStatus, page, size));
     }
 
-    @Operation(summary = "查询租户变更历史")
+    @Operation(summary = "List tenant change history")
     @GetMapping("/{tenantId}/history")
     @PreAuthorize("hasAuthority('tenant:read')")
     public ApiResponse<PageResult<TenantManagementService.TenantChangeView>> history(
-            @Parameter(description = "租户编码") @PathVariable String tenantId,
-            @Parameter(description = "变更类型") @RequestParam(required = false) String changeType,
-            @Parameter(description = "字段键") @RequestParam(required = false) String fieldKey,
-            @Parameter(description = "操作人") @RequestParam(required = false) String operator,
-            @Parameter(description = "开始时间，ISO-8601 格式")
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            Instant occurredFrom,
-            @Parameter(description = "结束时间，ISO-8601 格式")
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            Instant occurredTo,
-            @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
-            @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") int size
+            @Parameter(description = "Tenant id") @PathVariable String tenantId,
+            @Parameter(description = "Change type") @RequestParam(required = false) String changeType,
+            @Parameter(description = "Field key") @RequestParam(required = false) String fieldKey,
+            @Parameter(description = "Operator") @RequestParam(required = false) String operator,
+            @Parameter(description = "Inclusive lower bound, unix epoch milliseconds") @RequestParam(required = false) Long fromEpochMs,
+            @Parameter(description = "Exclusive upper bound, unix epoch milliseconds") @RequestParam(required = false) Long toEpochMs,
+            @Parameter(description = "Page number") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Page size") @RequestParam(defaultValue = "10") int size
     ) {
         return ApiResponse.ok(tenantManagementService.history(
                 tenantId,
                 changeType,
                 fieldKey,
                 operator,
-                occurredFrom,
-                occurredTo,
+                fromEpochMs,
+                toEpochMs,
                 page,
                 size
         ));
     }
 
-    @Operation(summary = "查询租户变更历史摘要")
+    @Operation(summary = "Get tenant change history summary")
     @GetMapping("/{tenantId}/history/summary")
     @PreAuthorize("hasAuthority('tenant:read')")
     public ApiResponse<TenantManagementService.TenantHistorySummaryView> historySummary(
-            @Parameter(description = "租户编码") @PathVariable String tenantId,
-            @Parameter(description = "变更类型") @RequestParam(required = false) String changeType,
-            @Parameter(description = "字段键") @RequestParam(required = false) String fieldKey,
-            @Parameter(description = "操作人") @RequestParam(required = false) String operator,
-            @Parameter(description = "开始时间，ISO-8601 格式")
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            Instant occurredFrom,
-            @Parameter(description = "结束时间，ISO-8601 格式")
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-            Instant occurredTo
+            @Parameter(description = "Tenant id") @PathVariable String tenantId,
+            @Parameter(description = "Change type") @RequestParam(required = false) String changeType,
+            @Parameter(description = "Field key") @RequestParam(required = false) String fieldKey,
+            @Parameter(description = "Operator") @RequestParam(required = false) String operator,
+            @Parameter(description = "Inclusive lower bound, unix epoch milliseconds") @RequestParam(required = false) Long fromEpochMs,
+            @Parameter(description = "Exclusive upper bound, unix epoch milliseconds") @RequestParam(required = false) Long toEpochMs
     ) {
         return ApiResponse.ok(tenantManagementService.historySummary(
                 tenantId,
                 changeType,
                 fieldKey,
                 operator,
-                occurredFrom,
-                occurredTo
+                fromEpochMs,
+                toEpochMs
         ));
     }
 
-    @Operation(summary = "查询租户能力覆盖")
+    @Operation(summary = "Get tenant capability overrides")
     @GetMapping("/{tenantId}/capability-overrides")
     @PreAuthorize("hasAuthority('tenant:read')")
     public ApiResponse<TenantManagementService.TenantCapabilityOverrideView> capabilityOverrides(
-            @Parameter(description = "租户编码") @PathVariable String tenantId
+            @Parameter(description = "Tenant id") @PathVariable String tenantId
     ) {
         return ApiResponse.ok(tenantManagementService.capabilityOverrides(tenantId));
     }
 
-    @Operation(summary = "更新租户能力覆盖")
+    @Operation(summary = "Update tenant capability overrides")
     @PutMapping("/{tenantId}/capability-overrides")
     @PreAuthorize("hasAuthority('tenant:write')")
     public ApiResponse<TenantManagementService.TenantCapabilityOverrideView> updateCapabilityOverrides(
-            @Parameter(description = "租户编码") @PathVariable String tenantId,
+            @Parameter(description = "Tenant id") @PathVariable String tenantId,
             @Valid @RequestBody UpdateTenantCapabilityOverridesRequest request
     ) {
         return ApiResponse.ok(tenantManagementService.updateCapabilityOverrides(tenantId, request));
     }
 
-    @Operation(summary = "新增租户")
+    @Operation(summary = "Create tenant")
     @PostMapping
     @PreAuthorize("hasAuthority('tenant:write')")
     public ApiResponse<CatalogService.TenantView> create(@Valid @RequestBody CreateTenantRequest request) {
         return ApiResponse.ok(tenantManagementService.create(request));
     }
 
-    @Operation(summary = "修改租户")
+    @Operation(summary = "Update tenant")
     @PutMapping("/{tenantId}")
     @PreAuthorize("hasAuthority('tenant:write')")
     public ApiResponse<CatalogService.TenantView> update(
-            @Parameter(description = "租户编码") @PathVariable String tenantId,
+            @Parameter(description = "Tenant id") @PathVariable String tenantId,
             @Valid @RequestBody UpdateTenantRequest request
     ) {
         return ApiResponse.ok(tenantManagementService.update(tenantId, request));
     }
 
-    @Operation(summary = "删除租户")
+    @Operation(summary = "Delete tenant")
     @DeleteMapping("/{tenantId}")
     @PreAuthorize("hasAuthority('tenant:write')")
-    public ApiResponse<Void> delete(@Parameter(description = "租户编码") @PathVariable String tenantId) {
+    public ApiResponse<Void> delete(@Parameter(description = "Tenant id") @PathVariable String tenantId) {
         tenantManagementService.delete(tenantId);
         return ApiResponse.ok();
     }
 
-    @Operation(summary = "获取当前租户上下文")
+    @Operation(summary = "Get current tenant context")
     @GetMapping("/current")
     public ApiResponse<Map<String, String>> current() {
         return ApiResponse.ok(Map.of("tenantId", TenantContext.getTenantId()));

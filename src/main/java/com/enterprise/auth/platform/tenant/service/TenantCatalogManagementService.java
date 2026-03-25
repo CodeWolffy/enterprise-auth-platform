@@ -3,6 +3,7 @@ package com.enterprise.auth.platform.tenant.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.persistence.entity.SysTenantCapabilityEntity;
 import com.enterprise.auth.platform.persistence.entity.SysTenantCapabilityOverrideEntity;
@@ -19,7 +20,6 @@ import com.enterprise.auth.platform.tenant.TenantContext;
 import com.enterprise.auth.platform.tenant.dto.TenantCapabilityCrudRequest;
 import com.enterprise.auth.platform.tenant.dto.TenantPackageCrudRequest;
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -550,7 +550,7 @@ public class TenantCatalogManagementService {
                 entity.getPackageDesc(),
                 entity.getEnabled() == null || entity.getEnabled() == 1,
                 capabilityCodes,
-                entity.getUpdatedAt() == null ? entity.getCreatedAt() : entity.getUpdatedAt(),
+                TimeSupport.toEpochMilli(entity.getUpdatedAt() == null ? entity.getCreatedAt() : entity.getUpdatedAt()),
                 referencedTenantCount,
                 referencedTenantIds
         );
@@ -569,7 +569,7 @@ public class TenantCatalogManagementService {
                 entity.getCapabilityDesc(),
                 entity.getSortOrder(),
                 entity.getEnabled() == null || entity.getEnabled() == 1,
-                entity.getUpdatedAt() == null ? entity.getCreatedAt() : entity.getUpdatedAt(),
+                TimeSupport.toEpochMilli(entity.getUpdatedAt() == null ? entity.getCreatedAt() : entity.getUpdatedAt()),
                 referencedPackageCount,
                 referencedPackageCodes,
                 referencedTenantCount,
@@ -601,7 +601,7 @@ public class TenantCatalogManagementService {
             @Schema(description = "套餐说明") String packageDesc,
             @Schema(description = "是否启用") boolean enabled,
             @Schema(description = "能力编码集合") List<String> capabilityCodes,
-            @Schema(description = "更新时间") LocalDateTime updatedAt,
+            @Schema(description = "更新时间") Long updatedAt,
             @Schema(description = "引用该套餐的租户数量") int referencedTenantCount,
             @Schema(description = "引用该套餐的租户示例（最多 5 条）") List<String> referencedTenantIds
     ) {
@@ -615,7 +615,7 @@ public class TenantCatalogManagementService {
             @Schema(description = "能力说明") String capabilityDesc,
             @Schema(description = "排序值") Integer sortOrder,
             @Schema(description = "是否启用") boolean enabled,
-            @Schema(description = "更新时间") LocalDateTime updatedAt,
+            @Schema(description = "更新时间") Long updatedAt,
             @Schema(description = "引用该能力的套餐数量") int referencedPackageCount,
             @Schema(description = "引用该能力的套餐示例（最多 5 条）") List<String> referencedPackageCodes,
             @Schema(description = "通过套餐覆盖到的租户数量") int referencedTenantCount,

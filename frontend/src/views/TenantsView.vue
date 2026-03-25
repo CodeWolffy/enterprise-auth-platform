@@ -78,16 +78,61 @@
         :class="`table-density-${tenantTablePrefs.density}`"
         @header-dragend="onTenantHeaderDragEnd"
       >
-        <el-table-column v-if="tenantTablePrefs.visibleColumnMap.tenantId" column-key="tenantId" prop="tenantId" label="租户编码" min-width="140" :width="tenantTablePrefs.getColumnWidth('tenantId')" />
-        <el-table-column v-if="tenantTablePrefs.visibleColumnMap.name" column-key="name" prop="name" label="租户名称" min-width="160" :width="tenantTablePrefs.getColumnWidth('name')" />
-        <el-table-column v-if="tenantTablePrefs.visibleColumnMap.level" column-key="level" label="级别" min-width="100" :width="tenantTablePrefs.getColumnWidth('level')">
-          <template #default="{ row }"><el-tag :type="row.platformLevel ? 'danger' : 'success'">{{ row.platformLevel ? '平台级' : '业务级' }}</el-tag></template>
+        <el-table-column
+          v-if="tenantTablePrefs.visibleColumnMap.tenantId"
+          column-key="tenantId"
+          prop="tenantId"
+          label="租户编码"
+          min-width="140"
+          :width="tenantTablePrefs.getColumnWidth('tenantId')"
+        />
+        <el-table-column
+          v-if="tenantTablePrefs.visibleColumnMap.name"
+          column-key="name"
+          prop="name"
+          label="租户名称"
+          min-width="160"
+          :width="tenantTablePrefs.getColumnWidth('name')"
+        />
+        <el-table-column
+          v-if="tenantTablePrefs.visibleColumnMap.level"
+          column-key="level"
+          label="级别"
+          min-width="100"
+          :width="tenantTablePrefs.getColumnWidth('level')"
+        >
+          <template #default="{ row }">
+            <el-tag :type="row.platformLevel ? 'danger' : 'success'">{{ row.platformLevel ? '平台级' : '业务级' }}</el-tag>
+          </template>
         </el-table-column>
-        <el-table-column v-if="tenantTablePrefs.visibleColumnMap.status" column-key="status" label="状态" min-width="90" :width="tenantTablePrefs.getColumnWidth('status')">
-          <template #default="{ row }"><el-tag :type="row.tenantStatus === 1 ? 'success' : 'info'">{{ row.tenantStatus === 1 ? '启用' : '禁用' }}</el-tag></template>
+        <el-table-column
+          v-if="tenantTablePrefs.visibleColumnMap.status"
+          column-key="status"
+          label="状态"
+          min-width="90"
+          :width="tenantTablePrefs.getColumnWidth('status')"
+        >
+          <template #default="{ row }">
+            <el-tag :type="row.tenantStatus === 1 ? 'success' : 'info'">{{ row.tenantStatus === 1 ? '启用' : '禁用' }}</el-tag>
+          </template>
         </el-table-column>
-        <el-table-column v-if="tenantTablePrefs.visibleColumnMap.package" column-key="package" label="套餐" min-width="180" :width="tenantTablePrefs.getColumnWidth('package')"><template #default="{ row }">{{ row.packageName || row.packageCode || '-' }}</template></el-table-column>
-        <el-table-column v-if="tenantTablePrefs.visibleColumnMap.actions" column-key="actions" fixed="right" label="操作" width="340" :min-width="220">
+        <el-table-column
+          v-if="tenantTablePrefs.visibleColumnMap.package"
+          column-key="package"
+          label="套餐"
+          min-width="180"
+          :width="tenantTablePrefs.getColumnWidth('package')"
+        >
+          <template #default="{ row }">{{ row.packageName || row.packageCode || '-' }}</template>
+        </el-table-column>
+        <el-table-column
+          v-if="tenantTablePrefs.visibleColumnMap.actions"
+          column-key="actions"
+          fixed="right"
+          label="操作"
+          width="340"
+          :min-width="220"
+        >
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button link type="primary" @click="openHistory(row)">变更历史</el-button>
@@ -99,7 +144,15 @@
       </el-table>
 
       <div class="pagination-wrap">
-        <el-pagination v-model:current-page="page" v-model:page-size="size" :page-sizes="[10,20,50]" layout="total, sizes, prev, pager, next" :total="total" @size-change="handleSizeChange" @current-change="handleCurrentChange" />
+        <el-pagination
+          v-model:current-page="page"
+          v-model:page-size="size"
+          :page-sizes="[10, 20, 50]"
+          layout="total, sizes, prev, pager, next"
+          :total="total"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
       </div>
     </section>
 
@@ -109,6 +162,8 @@
         <el-descriptions-item label="租户名称">{{ detailTenant.name }}</el-descriptions-item>
         <el-descriptions-item label="套餐">{{ detailTenant.packageName || detailTenant.packageCode || '未设置' }}</el-descriptions-item>
         <el-descriptions-item label="状态">{{ detailTenant.tenantStatus === 1 ? '启用' : '禁用' }}</el-descriptions-item>
+        <el-descriptions-item label="到期时间">{{ formatDateTime(detailTenant.expireAt) }}</el-descriptions-item>
+        <el-descriptions-item label="生效能力数">{{ detailTenant.capabilityCodes?.length ?? 0 }}</el-descriptions-item>
         <el-descriptions-item label="能力集合" :span="2">{{ (detailTenant.capabilityCodes || []).join('、') || '未配置' }}</el-descriptions-item>
         <el-descriptions-item label="运营备注" :span="2">{{ detailTenant.lifecycleNote || '未填写' }}</el-descriptions-item>
       </el-descriptions>
@@ -128,7 +183,16 @@
         </el-form-item>
         <el-form-item label="字段"><el-input v-model="historyQuery.fieldKey" placeholder="按字段键筛选" clearable /></el-form-item>
         <el-form-item label="操作人"><el-input v-model="historyQuery.operator" placeholder="按操作人筛选" clearable /></el-form-item>
-        <el-form-item label="时间范围"><el-date-picker v-model="historyDateRange" type="datetimerange" range-separator="至" start-placeholder="开始时间" end-placeholder="结束时间" value-format="YYYY-MM-DDTHH:mm:ss" clearable /></el-form-item>
+        <el-form-item label="时间范围">
+          <el-date-picker
+            v-model="historyDateRange"
+            type="datetimerange"
+            range-separator="至"
+            start-placeholder="开始时间"
+            end-placeholder="结束时间"
+            clearable
+          />
+        </el-form-item>
       </AdvancedSearch>
 
       <div class="history-insight">
@@ -144,7 +208,10 @@
 
       <el-timeline v-if="historySummary.recentTimeline.length">
         <el-timeline-item v-for="item in historySummary.recentTimeline" :key="item.id" :timestamp="formatDateTime(item.occurredAt)" placement="top">
-          <div class="timeline-item"><strong>{{ item.summary }}</strong><span>{{ item.impactSummary || '该变更会影响当前租户的套餐、能力或运营说明。' }}</span></div>
+          <div class="timeline-item">
+            <strong>{{ item.summary }}</strong>
+            <span>{{ item.impactSummary || '该变更会影响当前租户的套餐、能力或运营说明。' }}</span>
+          </div>
         </el-timeline-item>
       </el-timeline>
 
@@ -162,7 +229,15 @@
       </el-table>
 
       <div class="pagination-wrap">
-        <el-pagination v-model:current-page="historyPage" v-model:page-size="historySize" :page-sizes="[10,20,50]" layout="total, sizes, prev, pager, next" :total="historyTotal" @size-change="handleHistorySizeChange" @current-change="handleHistoryPageChange" />
+        <el-pagination
+          v-model:current-page="historyPage"
+          v-model:page-size="historySize"
+          :page-sizes="[10, 20, 50]"
+          layout="total, sizes, prev, pager, next"
+          :total="historyTotal"
+          @size-change="handleHistorySizeChange"
+          @current-change="handleHistoryPageChange"
+        />
       </div>
     </el-drawer>
 
@@ -183,10 +258,30 @@
         <el-table :data="overrideForm" stripe>
           <el-table-column prop="capabilityCode" label="能力编码" min-width="150" />
           <el-table-column prop="capabilityName" label="能力名称" min-width="160" />
-          <el-table-column label="套餐默认" min-width="100"><template #default="{ row }"><el-tag :type="row.packageEnabled ? 'success' : 'info'" effect="plain">{{ row.packageEnabled ? '启用' : '关闭' }}</el-tag></template></el-table-column>
-          <el-table-column label="覆盖策略" min-width="160"><template #default="{ row }"><el-select v-model="row.overrideMode" style="width: 120px"><el-option label="继承" value="inherit" /><el-option label="启用" value="enable" /><el-option label="禁用" value="disable" /></el-select></template></el-table-column>
-          <el-table-column label="说明覆盖" min-width="260"><template #default="{ row }"><el-input v-model="row.capabilityDescOverride" type="textarea" :rows="2" maxlength="200" show-word-limit placeholder="留空则沿用平台能力说明" /></template></el-table-column>
-          <el-table-column fixed="right" label="操作" width="120"><template #default="{ $index }"><el-button link type="primary" @click="restoreRowOverride($index)">恢复默认</el-button></template></el-table-column>
+          <el-table-column label="套餐默认" min-width="100">
+            <template #default="{ row }">
+              <el-tag :type="row.packageEnabled ? 'success' : 'info'" effect="plain">{{ row.packageEnabled ? '启用' : '关闭' }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="覆盖策略" min-width="160">
+            <template #default="{ row }">
+              <el-select v-model="row.overrideMode" style="width: 120px">
+                <el-option label="继承" value="inherit" />
+                <el-option label="启用" value="enable" />
+                <el-option label="禁用" value="disable" />
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column label="说明覆盖" min-width="260">
+            <template #default="{ row }">
+              <el-input v-model="row.capabilityDescOverride" type="textarea" :rows="2" maxlength="200" show-word-limit placeholder="留空则沿用平台能力说明" />
+            </template>
+          </el-table-column>
+          <el-table-column fixed="right" label="操作" width="120">
+            <template #default="{ $index }">
+              <el-button link type="primary" @click="restoreRowOverride($index)">恢复默认</el-button>
+            </template>
+          </el-table-column>
         </el-table>
       </template>
     </el-drawer>
@@ -197,7 +292,7 @@
         <el-form-item label="租户名称" prop="tenantName"><el-input v-model="form.tenantName" /></el-form-item>
         <el-form-item label="租户级别"><el-switch v-model="form.platformLevel" inline-prompt active-text="平台级" inactive-text="业务级" /></el-form-item>
         <el-form-item label="租户状态" prop="tenantStatus"><el-select v-model="form.tenantStatus" style="width: 100%"><el-option label="启用" :value="1" /><el-option label="禁用" :value="0" /></el-select></el-form-item>
-        <el-form-item label="到期时间"><el-date-picker v-model="form.expireAt" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" style="width: 100%" /></el-form-item>
+        <el-form-item label="到期时间"><el-date-picker v-model="form.expireAt" type="datetime" style="width: 100%" /></el-form-item>
         <el-form-item label="套餐"><el-select v-model="form.packageCode" filterable clearable style="width: 100%" @change="syncPackage"><el-option v-for="item in packageOptions" :key="item.packageCode" :label="`${item.packageName} (${item.packageCode})`" :value="item.packageCode" /></el-select></el-form-item>
         <el-form-item label="套餐名称"><el-input v-model="form.packageName" /></el-form-item>
         <el-form-item label="用户配额"><el-input-number v-model="form.userQuota" :min="0" style="width: 100%" /></el-form-item>
@@ -215,13 +310,31 @@ import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AdvancedSearch from '@/components/AdvancedSearch.vue'
 import type { FormInstance, FormRules } from 'element-plus'
-import { createTenant, deleteTenant, queryTenantCapabilityOverrides, queryTenantHistory, queryTenantHistorySummary, queryTenants, updateTenant, updateTenantCapabilityOverrides } from '@/api/platform'
+import {
+  createTenant,
+  deleteTenant,
+  queryTenantCapabilityOverrides,
+  queryTenantHistory,
+  queryTenantHistorySummary,
+  queryTenants,
+  updateTenant,
+  updateTenantCapabilityOverrides,
+} from '@/api/platform'
 import { queryTenantCapabilities, queryTenantPackages } from '@/api/tenantCatalog'
 import { useTablePreferences } from '@/composables/useTablePreferences'
-import type { TenantCapabilityOverrideItemView, TenantCapabilityOverrideView, TenantCapabilityView, TenantChangeView, TenantHistorySummaryView, TenantPackageView, TenantView } from '@/types/auth'
-import { formatDateTime } from '@/utils/datetime'
+import type {
+  TenantCapabilityOverrideItemView,
+  TenantCapabilityOverrideView,
+  TenantCapabilityView,
+  TenantChangeView,
+  TenantHistorySummaryView,
+  TenantPackageView,
+  TenantView,
+} from '@/types/auth'
+import { formatDateTime, toDate, toEpochMs } from '@/utils/datetime'
 
 type OverrideRow = TenantCapabilityOverrideItemView & { overrideMode: 'inherit' | 'enable' | 'disable' }
+
 const tenants = ref<TenantView[]>([])
 const packageOptions = ref<TenantPackageView[]>([])
 const capabilityOptions = ref<TenantCapabilityView[]>([])
@@ -238,12 +351,21 @@ const overrideTenantId = ref<string | null>(null)
 const overrideBundle = ref<TenantCapabilityOverrideView | null>(null)
 const overrideForm = ref<OverrideRow[]>([])
 const historyRecords = ref<TenantChangeView[]>([])
-const historySummary = ref<TenantHistorySummaryView>({ tenantId: '', totalChanges: 0, packageChanges: 0, capabilityChanges: 0, statusChanges: 0, profileChanges: 0, affectedFieldCounts: {}, recentTimeline: [] })
+const historySummary = ref<TenantHistorySummaryView>({
+  tenantId: '',
+  totalChanges: 0,
+  packageChanges: 0,
+  capabilityChanges: 0,
+  statusChanges: 0,
+  profileChanges: 0,
+  affectedFieldCounts: {},
+  recentTimeline: [],
+})
 const historyPage = ref(1)
 const historySize = ref(10)
 const historyTotal = ref(0)
 const historyQuery = reactive({ changeType: '', fieldKey: '', operator: '' })
-const historyDateRange = ref<[string, string] | null>(null)
+const historyDateRange = ref<[Date, Date] | null>(null)
 const keyword = ref('')
 const platformFilter = ref('')
 const statusFilter = ref('')
@@ -251,8 +373,27 @@ const page = ref(1)
 const size = ref(10)
 const total = ref(0)
 const formRef = ref<FormInstance>()
-const form = reactive({ tenantId: '', tenantName: '', platformLevel: false, tenantStatus: 1, expireAt: '', packageCode: '', packageName: '', userQuota: undefined as number | undefined, storageQuotaGb: undefined as number | undefined, capabilityCodes: [] as string[], lifecycleNote: '' })
-const tenantRules = reactive<FormRules>({ tenantId: [{ required: true, message: '请输入租户编码', trigger: 'blur' }, { pattern: /^[a-zA-Z0-9:_-]{2,64}$/, message: '租户编码仅支持字母、数字、:、_、-', trigger: 'blur' }], tenantName: [{ required: true, message: '请输入租户名称', trigger: 'blur' }], tenantStatus: [{ required: true, message: '请选择租户状态', trigger: 'change' }] })
+const form = reactive({
+  tenantId: '',
+  tenantName: '',
+  platformLevel: false,
+  tenantStatus: 1,
+  expireAt: null as Date | null,
+  packageCode: '',
+  packageName: '',
+  userQuota: undefined as number | undefined,
+  storageQuotaGb: undefined as number | undefined,
+  capabilityCodes: [] as string[],
+  lifecycleNote: '',
+})
+const tenantRules = reactive<FormRules>({
+  tenantId: [
+    { required: true, message: '请输入租户编码', trigger: 'blur' },
+    { pattern: /^[a-zA-Z0-9:_-]{2,64}$/, message: '租户编码仅支持字母、数字、:、_、-', trigger: 'blur' },
+  ],
+  tenantName: [{ required: true, message: '请输入租户名称', trigger: 'blur' }],
+  tenantStatus: [{ required: true, message: '请选择租户状态', trigger: 'change' }],
+})
 
 const tenantTablePrefs = useTablePreferences('table:tenants', [
   { key: 'tenantId', label: '租户编码', width: 160 },
@@ -265,35 +406,259 @@ const tenantTablePrefs = useTablePreferences('table:tenants', [
 
 const overrideChangedCount = computed(() => overrideForm.value.filter((item) => item.overrideMode !== 'inherit').length)
 const descriptionChangedCount = computed(() => overrideForm.value.filter((item) => Boolean(item.capabilityDescOverride?.trim())).length)
-const overrideSummaryText = computed(() => { const parts = []; if (overrideChangedCount.value) parts.push(`${overrideChangedCount.value} 项策略覆盖`); if (descriptionChangedCount.value) parts.push(`${descriptionChangedCount.value} 项说明改写`); return parts.length ? parts.join('；') : '当前完全继承套餐默认能力。' })
+const overrideSummaryText = computed(() => {
+  const parts: string[] = []
+  if (overrideChangedCount.value) {
+    parts.push(`${overrideChangedCount.value} 项策略覆盖`)
+  }
+  if (descriptionChangedCount.value) {
+    parts.push(`${descriptionChangedCount.value} 项说明改写`)
+  }
+  return parts.length ? parts.join('；') : '当前完全继承套餐默认能力。'
+})
 const enabledTenantCount = computed(() => tenants.value.filter((item) => item.tenantStatus === 1).length)
 const platformTenantCount = computed(() => tenants.value.filter((item) => item.platformLevel).length)
 
 void bootstrap()
-async function bootstrap() { await Promise.all([load(), loadCatalog()]) }
-async function loadCatalog() { const [packages, capabilities] = await Promise.all([queryTenantPackages(), queryTenantCapabilities()]); packageOptions.value = packages; capabilityOptions.value = capabilities }
-async function load() { loading.value = true; try { const result = await queryTenants({ keyword: keyword.value || undefined, platformLevel: platformFilter.value ? platformFilter.value === 'platform' : undefined, tenantStatus: statusFilter.value === '' ? undefined : Number(statusFilter.value), page: page.value, size: size.value }); tenants.value = result.records; total.value = result.total } finally { loading.value = false } }
-function handleSearch() { page.value = 1; void load() }
-function resetSearch() { keyword.value = ''; platformFilter.value = ''; statusFilter.value = ''; page.value = 1; void load() }
-function handleSizeChange(value: number) { size.value = value; page.value = 1; void load() }
-function handleCurrentChange(value: number) { page.value = value; void load() }
-function openTenant(row?: TenantView) { editingTenantId.value = row?.tenantId ?? null; Object.assign(form, { tenantId: row?.tenantId ?? '', tenantName: row?.name ?? '', platformLevel: row?.platformLevel ?? false, tenantStatus: row?.tenantStatus ?? 1, expireAt: row?.expireAt ?? '', packageCode: row?.packageCode ?? '', packageName: row?.packageName ?? '', userQuota: row?.userQuota ?? undefined, storageQuotaGb: row?.storageQuotaGb ?? undefined, capabilityCodes: [...(row?.capabilityCodes ?? [])], lifecycleNote: row?.lifecycleNote ?? '' }); visible.value = true }
-function syncPackage(packageCode?: string) { const selected = packageOptions.value.find((item) => item.packageCode === packageCode); if (!selected) return; form.packageName = selected.packageName; form.userQuota = selected.userQuota ?? undefined; form.storageQuotaGb = selected.storageQuotaGb ?? undefined; form.capabilityCodes = [...selected.capabilityCodes] }
-function openDetail(row: TenantView) { detailTenant.value = row; detailVisible.value = true }
-async function openHistory(row: TenantView) { historyTenantId.value = row.tenantId; historyPage.value = 1; historyVisible.value = true; await Promise.all([loadHistory(), loadHistorySummary()]) }
-async function openOverrides(row: TenantView) { overrideTenantId.value = row.tenantId; overrideVisible.value = true; const bundle = await queryTenantCapabilityOverrides(row.tenantId); overrideBundle.value = bundle; overrideForm.value = bundle.overrides.map((item) => ({ ...item, overrideMode: item.overrideEnabled == null ? 'inherit' : item.overrideEnabled ? 'enable' : 'disable' })) }
-function restoreRowOverride(index: number) { const current = overrideForm.value[index]; if (!current) return; current.overrideMode = 'inherit'; current.capabilityDescOverride = '' }
-function restoreAllOverrides() { overrideForm.value = overrideForm.value.map((item) => ({ ...item, overrideMode: 'inherit', capabilityDescOverride: '' })) }
-async function submitOverrides() { if (!overrideTenantId.value) return; overrideSaving.value = true; try { const payload = { overrides: overrideForm.value.map((item) => ({ capabilityCode: item.capabilityCode, enabled: item.overrideMode === 'inherit' ? null : item.overrideMode === 'enable', capabilityDescOverride: item.capabilityDescOverride?.trim() || null })).filter((item) => item.enabled !== null || item.capabilityDescOverride) }; const bundle = await updateTenantCapabilityOverrides(overrideTenantId.value, payload); overrideBundle.value = bundle; overrideForm.value = bundle.overrides.map((item) => ({ ...item, overrideMode: item.overrideEnabled == null ? 'inherit' : item.overrideEnabled ? 'enable' : 'disable' })); ElMessage.success('租户能力覆盖已更新'); await load() } finally { overrideSaving.value = false } }
-function historyParams() { return { changeType: historyQuery.changeType || undefined, fieldKey: historyQuery.fieldKey || undefined, operator: historyQuery.operator || undefined, occurredFrom: historyDateRange.value?.[0] || undefined, occurredTo: historyDateRange.value?.[1] || undefined } }
-async function loadHistory() { if (!historyTenantId.value) return; const result = await queryTenantHistory(historyTenantId.value, { ...historyParams(), page: historyPage.value, size: historySize.value }); historyRecords.value = result.records; historyTotal.value = result.total }
-async function loadHistorySummary() { if (!historyTenantId.value) return; historySummary.value = await queryTenantHistorySummary(historyTenantId.value, historyParams()) }
-async function applyHistorySearch() { historyPage.value = 1; await Promise.all([loadHistory(), loadHistorySummary()]) }
-async function resetHistorySearch() { historyQuery.changeType = ''; historyQuery.fieldKey = ''; historyQuery.operator = ''; historyDateRange.value = null; historyPage.value = 1; await Promise.all([loadHistory(), loadHistorySummary()]) }
-async function handleHistoryPageChange(value: number) { historyPage.value = value; await loadHistory() }
-async function handleHistorySizeChange(value: number) { historySize.value = value; historyPage.value = 1; await loadHistory() }
-async function submit() { if (!formRef.value) return; await formRef.value.validate(); const payload = { tenantId: form.tenantId, tenantName: form.tenantName, platformLevel: form.platformLevel, tenantStatus: form.tenantStatus, expireAt: form.expireAt || null, packageCode: form.packageCode || null, packageName: form.packageName || null, userQuota: form.userQuota ?? null, storageQuotaGb: form.storageQuotaGb ?? null, capabilityCodes: form.capabilityCodes, lifecycleNote: form.lifecycleNote || null }; if (editingTenantId.value) { await updateTenant(editingTenantId.value, payload); ElMessage.success('租户已更新') } else { await createTenant(payload); ElMessage.success('租户已创建') } visible.value = false; await load() }
-async function removeTenant(tenantId: string) { await ElMessageBox.confirm('删除租户后，相关租户数据将无法继续访问，是否继续？', '删除确认', { type: 'warning' }); await deleteTenant(tenantId); ElMessage.success('租户已删除'); await load() }
+
+async function bootstrap() {
+  await Promise.all([load(), loadCatalog()])
+}
+
+async function loadCatalog() {
+  const [packages, capabilities] = await Promise.all([queryTenantPackages(), queryTenantCapabilities()])
+  packageOptions.value = packages
+  capabilityOptions.value = capabilities
+}
+
+async function load() {
+  loading.value = true
+  try {
+    const result = await queryTenants({
+      keyword: keyword.value || undefined,
+      platformLevel: platformFilter.value ? platformFilter.value === 'platform' : undefined,
+      tenantStatus: statusFilter.value === '' ? undefined : Number(statusFilter.value),
+      page: page.value,
+      size: size.value,
+    })
+    tenants.value = result.records
+    total.value = result.total
+  } finally {
+    loading.value = false
+  }
+}
+
+function handleSearch() {
+  page.value = 1
+  void load()
+}
+
+function resetSearch() {
+  keyword.value = ''
+  platformFilter.value = ''
+  statusFilter.value = ''
+  page.value = 1
+  void load()
+}
+
+function handleSizeChange(value: number) {
+  size.value = value
+  page.value = 1
+  void load()
+}
+
+function handleCurrentChange(value: number) {
+  page.value = value
+  void load()
+}
+
+function openTenant(row?: TenantView) {
+  editingTenantId.value = row?.tenantId ?? null
+  Object.assign(form, {
+    tenantId: row?.tenantId ?? '',
+    tenantName: row?.name ?? '',
+    platformLevel: row?.platformLevel ?? false,
+    tenantStatus: row?.tenantStatus ?? 1,
+    expireAt: toDate(row?.expireAt),
+    packageCode: row?.packageCode ?? '',
+    packageName: row?.packageName ?? '',
+    userQuota: row?.userQuota ?? undefined,
+    storageQuotaGb: row?.storageQuotaGb ?? undefined,
+    capabilityCodes: [...(row?.capabilityCodes ?? [])],
+    lifecycleNote: row?.lifecycleNote ?? '',
+  })
+  visible.value = true
+}
+
+function syncPackage(packageCode?: string) {
+  const selected = packageOptions.value.find((item) => item.packageCode === packageCode)
+  if (!selected) {
+    return
+  }
+  form.packageName = selected.packageName
+  form.userQuota = selected.userQuota ?? undefined
+  form.storageQuotaGb = selected.storageQuotaGb ?? undefined
+  form.capabilityCodes = [...selected.capabilityCodes]
+}
+
+function openDetail(row: TenantView) {
+  detailTenant.value = row
+  detailVisible.value = true
+}
+
+async function openHistory(row: TenantView) {
+  historyTenantId.value = row.tenantId
+  historyPage.value = 1
+  historyVisible.value = true
+  await Promise.all([loadHistory(), loadHistorySummary()])
+}
+
+async function openOverrides(row: TenantView) {
+  overrideTenantId.value = row.tenantId
+  overrideVisible.value = true
+  const bundle = await queryTenantCapabilityOverrides(row.tenantId)
+  overrideBundle.value = bundle
+  overrideForm.value = bundle.overrides.map((item) => ({
+    ...item,
+    overrideMode: item.overrideEnabled == null ? 'inherit' : item.overrideEnabled ? 'enable' : 'disable',
+  }))
+}
+
+function restoreRowOverride(index: number) {
+  const current = overrideForm.value[index]
+  if (!current) {
+    return
+  }
+  current.overrideMode = 'inherit'
+  current.capabilityDescOverride = ''
+}
+
+function restoreAllOverrides() {
+  overrideForm.value = overrideForm.value.map((item) => ({
+    ...item,
+    overrideMode: 'inherit',
+    capabilityDescOverride: '',
+  }))
+}
+
+async function submitOverrides() {
+  if (!overrideTenantId.value) {
+    return
+  }
+  overrideSaving.value = true
+  try {
+    const payload = {
+      overrides: overrideForm.value
+        .map((item) => ({
+          capabilityCode: item.capabilityCode,
+          enabled: item.overrideMode === 'inherit' ? null : item.overrideMode === 'enable',
+          capabilityDescOverride: item.capabilityDescOverride?.trim() || null,
+        }))
+        .filter((item) => item.enabled !== null || item.capabilityDescOverride),
+    }
+    const bundle = await updateTenantCapabilityOverrides(overrideTenantId.value, payload)
+    overrideBundle.value = bundle
+    overrideForm.value = bundle.overrides.map((item) => ({
+      ...item,
+      overrideMode: item.overrideEnabled == null ? 'inherit' : item.overrideEnabled ? 'enable' : 'disable',
+    }))
+    ElMessage.success('租户能力覆盖已更新')
+    await load()
+  } finally {
+    overrideSaving.value = false
+  }
+}
+
+function historyParams() {
+  return {
+    changeType: historyQuery.changeType || undefined,
+    fieldKey: historyQuery.fieldKey || undefined,
+    operator: historyQuery.operator || undefined,
+    fromEpochMs: toEpochMs(historyDateRange.value?.[0]),
+    toEpochMs: toEpochMs(historyDateRange.value?.[1]),
+  }
+}
+
+async function loadHistory() {
+  if (!historyTenantId.value) {
+    return
+  }
+  const result = await queryTenantHistory(historyTenantId.value, {
+    ...historyParams(),
+    page: historyPage.value,
+    size: historySize.value,
+  })
+  historyRecords.value = result.records
+  historyTotal.value = result.total
+}
+
+async function loadHistorySummary() {
+  if (!historyTenantId.value) {
+    return
+  }
+  historySummary.value = await queryTenantHistorySummary(historyTenantId.value, historyParams())
+}
+
+async function applyHistorySearch() {
+  historyPage.value = 1
+  await Promise.all([loadHistory(), loadHistorySummary()])
+}
+
+async function resetHistorySearch() {
+  historyQuery.changeType = ''
+  historyQuery.fieldKey = ''
+  historyQuery.operator = ''
+  historyDateRange.value = null
+  historyPage.value = 1
+  await Promise.all([loadHistory(), loadHistorySummary()])
+}
+
+async function handleHistoryPageChange(value: number) {
+  historyPage.value = value
+  await loadHistory()
+}
+
+async function handleHistorySizeChange(value: number) {
+  historySize.value = value
+  historyPage.value = 1
+  await loadHistory()
+}
+
+async function submit() {
+  if (!formRef.value) {
+    return
+  }
+  await formRef.value.validate()
+  const payload = {
+    tenantId: form.tenantId,
+    tenantName: form.tenantName,
+    platformLevel: form.platformLevel,
+    tenantStatus: form.tenantStatus,
+    expireAt: toEpochMs(form.expireAt),
+    packageCode: form.packageCode || null,
+    packageName: form.packageName || null,
+    userQuota: form.userQuota ?? null,
+    storageQuotaGb: form.storageQuotaGb ?? null,
+    capabilityCodes: form.capabilityCodes,
+    lifecycleNote: form.lifecycleNote || null,
+  }
+  if (editingTenantId.value) {
+    await updateTenant(editingTenantId.value, payload)
+    ElMessage.success('租户已更新')
+  } else {
+    await createTenant(payload)
+    ElMessage.success('租户已创建')
+  }
+  visible.value = false
+  await load()
+}
+
+async function removeTenant(tenantId: string) {
+  await ElMessageBox.confirm('删除租户后，相关租户数据将无法继续访问，是否继续？', '删除确认', { type: 'warning' })
+  await deleteTenant(tenantId)
+  ElMessage.success('租户已删除')
+  await load()
+}
 
 function onTenantHeaderDragEnd(newWidth: number, _oldWidth: number, column: { property?: string; columnKey?: string }) {
   const key = String(column.columnKey || column.property || '')
