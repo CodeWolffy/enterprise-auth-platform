@@ -14,8 +14,11 @@
 - [ ] 数据库已创建：`enterprise_auth_platform`
 - [ ] 应用账号具备最小必要权限（DDL/DML 按实际策略配置）
 - [ ] `spring.datasource.url` 指向目标库（含字符集与时区参数）
+- [ ] JDBC URL 已包含 `serverTimezone=UTC`
 - [ ] `spring.datasource.username` / `spring.datasource.password` 已配置到部署环境
 - [ ] 初始化脚本已执行（`src/main/resources/database/enterprise_auth_platform.sql`）
+- [ ] 数据库时区已核对：`SHOW VARIABLES LIKE 'time_zone';`、`SHOW VARIABLES LIKE 'system_time_zone';`
+- [ ] 查看数据库记录时，若需北京时间显示，已在会话执行：`SET time_zone = '+08:00';`
 - [ ] 连接池参数符合环境容量（并发、连接数、超时）
 
 ## 3. Redis
@@ -70,3 +73,9 @@
 - [ ] 认证失败率、接口 4xx/5xx 比例在预期范围
 - [ ] Redis key 增长与过期行为正常
 - [ ] 核心页面与关键 API 延迟在 SLO 范围内
+
+## 10. 数据库客户端查看规范（推荐）
+
+- [ ] 已准备运维 SQL 模板：`src/main/resources/database/timezone_check_and_view.sql`
+- [ ] Navicat / DBeaver 连接已配置“会话初始化 SQL”：`SET time_zone = '+08:00';`
+- [ ] 团队约定：应用写入与存储保持 UTC，不在数据库做全量 `+8h` 数据修正

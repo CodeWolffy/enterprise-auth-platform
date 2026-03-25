@@ -16,6 +16,8 @@
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
+SET @OLD_TIME_ZONE = @@TIME_ZONE;
+SET TIME_ZONE = '+00:00';
 
 -- ----------------------------
 -- Table structure for oauth2_authorization
@@ -758,3 +760,4 @@ INSERT INTO `sys_user_role` VALUES (1, 'platform', 1, 1, '2026-03-20 00:09:53', 
 INSERT INTO `sys_user_role` VALUES (2, 'tenant-a', 2, 2, '2026-03-20 00:09:53', NULL, NULL, '2026-03-20 00:09:55');
 
 SET FOREIGN_KEY_CHECKS = 1;
+SET TIME_ZONE = @OLD_TIME_ZONE;
