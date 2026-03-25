@@ -161,12 +161,14 @@ public class DataScopeService {
     }
 
     public boolean canAccessCreatedBy(String tenantId, String createdBy) {
+        Optional<Set<String>> visibleUsernames = visibleUsernames(tenantId);
+        if (visibleUsernames.isEmpty()) {
+            return true;
+        }
         if (!StringUtils.hasText(createdBy)) {
             return false;
         }
-        return visibleUsernames(tenantId)
-                .map(usernames -> usernames.contains(createdBy))
-                .orElse(true);
+        return visibleUsernames.get().contains(createdBy);
     }
 
     private ScopeContext buildContext(String tenantId, UserAccount principal) {

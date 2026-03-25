@@ -318,21 +318,25 @@ async function submit() {
   if (!formRef.value) {
     return
   }
-  await formRef.value.validate()
-  const payload = {
-    dictType: form.dictType.trim(),
-    dictCode: form.dictCode.trim(),
-    dictValue: form.dictValue.trim(),
+  try {
+    await formRef.value.validate()
+    const payload = {
+      dictType: form.dictType.trim(),
+      dictCode: form.dictCode.trim(),
+      dictValue: form.dictValue.trim(),
+    }
+    if (editingId.value !== null) {
+      await updateDict(editingId.value, payload)
+      ElMessage.success('字典项已更新')
+    } else {
+      await createDict(payload)
+      ElMessage.success('字典项已创建')
+    }
+    visible.value = false
+    await load()
+  } catch {
+    // Error message is handled by the unified http interceptor.
   }
-  if (editingId.value !== null) {
-    await updateDict(editingId.value, payload)
-    ElMessage.success('字典项已更新')
-  } else {
-    await createDict(payload)
-    ElMessage.success('字典项已创建')
-  }
-  visible.value = false
-  await load()
 }
 
 async function removeDict(id: number) {

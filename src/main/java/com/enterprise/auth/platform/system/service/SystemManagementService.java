@@ -633,11 +633,19 @@ public class SystemManagementService {
     }
 
     public String generateCacheKey(Object... params) {
-        StringBuilder key = new StringBuilder(currentTenantId());
+        StringBuilder key = new StringBuilder(currentTenantId())
+                .append(':')
+                .append(currentScopeCacheKey());
         for (Object param : params) {
             key.append(':').append(param == null ? "" : param);
         }
         return key.toString();
+    }
+
+    private String currentScopeCacheKey() {
+        return dataScopeService.currentUser()
+                .map(user -> user.username() + "|" + user.dataScopeType() + "|" + user.customDeptIds().stream().sorted().toList())
+                .orElse("anonymous");
     }
 
     private SFunction<SysDictEntity, ?> resolveDictSort(String sortBy) {

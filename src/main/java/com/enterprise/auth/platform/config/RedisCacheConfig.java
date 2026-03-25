@@ -2,6 +2,7 @@ package com.enterprise.auth.platform.config;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.Cache;
 import org.springframework.cache.interceptor.CacheErrorHandler;
 import org.springframework.boot.autoconfigure.cache.RedisCacheManagerBuilderCustomizer;
@@ -13,7 +14,7 @@ import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 @Configuration
-public class RedisCacheConfig {
+public class RedisCacheConfig implements CachingConfigurer {
     private static final Logger log = LoggerFactory.getLogger(RedisCacheConfig.class);
 
 
@@ -45,7 +46,8 @@ public class RedisCacheConfig {
     }
 
     @Bean
-    public CacheErrorHandler cacheErrorHandler() {
+    @Override
+    public CacheErrorHandler errorHandler() {
         return new CacheErrorHandler() {
             @Override
             public void handleCacheGetError(RuntimeException exception, Cache cache, Object key) {
@@ -53,6 +55,16 @@ public class RedisCacheConfig {
                         cache == null ? "unknown" : cache.getName(),
                         key,
                         exception.getMessage());
+                if (cache != null && key != null) {
+                    try {
+                        cache.evict(key);
+                    } catch (RuntimeException evictEx) {
+                        log.warn("缓存坏键清理失败。cache={}, key={}, error={}",
+                                cache.getName(),
+                                key,
+                                evictEx.getMessage());
+                    }
+                }
             }
 
             @Override
