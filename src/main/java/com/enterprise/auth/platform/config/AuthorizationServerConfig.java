@@ -518,7 +518,7 @@ public class AuthorizationServerConfig {
                                 "frame-ancestors 'none'"))
                 .referrerPolicy(policy -> policy.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
                 .frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
-                .permissionsPolicy(permissions -> permissions.policy("geolocation=(), camera=(), microphone=()"));
+                .permissionsPolicyHeader(permissions -> permissions.policy("geolocation=(), camera=(), microphone=()"));
     }
 
     private RSAKey rsaKey(AuthorizationServerProperties properties) {
