@@ -23,7 +23,7 @@
 	- `ALTER TABLE sys_user ADD UNIQUE INDEX uk_sys_user_username (username);`
 - [ ] 数据库时区已核对：`SHOW VARIABLES LIKE 'time_zone';`、`SHOW VARIABLES LIKE 'system_time_zone';`
 - [ ] 查看数据库记录时，若需北京时间显示，已在会话执行：`SET time_zone = '+08:00';`
-- [ ] 连接池参数符合环境容量（并发、连接数、超时）
+- [ ] HikariCP 连接池参数符合环境容量（并发、连接数、超时、池名）
 
 ## 3. Redis
 

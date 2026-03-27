@@ -5,10 +5,27 @@ spring:
   application:
     name: enterprise-auth-platform
   datasource:
-    url: jdbc:mysql://127.0.0.1:3306/enterprise_auth_platform?createDatabaseIfNotExist=true&useUnicode=true&characterEncoding=utf8&serverTimezone=UTC
+    url: jdbc:mysql://127.0.0.1:3306/enterprise_auth_platform?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
     username: root
     password: 123456
     driver-class-name: com.mysql.cj.jdbc.Driver
+    type: com.zaxxer.hikari.HikariDataSource
+    hikari:
+      # 连接池名称（JMX/日志识别用）
+      pool-name: EnterpriseAuthHikariCP
+      # 最小空闲连接数（保底连接，避免频繁创建）
+      minimum-idle: 5
+      # 最大连接数（连接池上限，含空闲+使用中）
+      maximum-pool-size: 20
+      # 获取连接超时（默认30秒，超时报错）
+      connection-timeout: 30000
+      # 连接检测超时（默认5秒，需小于connection-timeout）
+      validation-timeout: 5000
+      # 空闲连接回收时间（默认10分钟，低于MySQL wait_timeout）
+      idle-timeout: 600000
+      # 连接最大存活时间（默认30分钟，强制刷新防老化）
+      max-lifetime: 1800000
+
   boot:
     admin:
       client:
