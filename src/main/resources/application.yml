@@ -110,6 +110,36 @@ app:
     max-attempts-per-user-ip: 10
     max-attempts-per-ip: 40
     attempt-window: 10m
+  rate-limit:
+    enabled: true
+    default-capacity: 20
+    default-refill-tokens: 20
+    default-refill-duration: 1m
+    rules:
+      login:
+        capacity: 5
+        refill-tokens: 5
+        refill-duration: 60s
+      captcha:
+        capacity: 10
+        refill-tokens: 10
+        refill-duration: 60s
+      refresh:
+        capacity: 10
+        refill-tokens: 10
+        refill-duration: 60s
+      oauth:
+        capacity: 5
+        refill-tokens: 5
+        refill-duration: 60s
+      rotate-secret:
+        capacity: 3
+        refill-tokens: 3
+        refill-duration: 300s
+      export:
+        capacity: 5
+        refill-tokens: 5
+        refill-duration: 60s
   cache:
     key-prefix: "eap:cache:"
     namespace-version: "v4"

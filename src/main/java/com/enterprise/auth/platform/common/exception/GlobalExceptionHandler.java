@@ -2,6 +2,7 @@ package com.enterprise.auth.platform.common.exception;
 
 import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.common.api.ApiResponse;
+import com.enterprise.auth.platform.common.web.RateLimitInterceptor.RateLimitExceededException;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import jakarta.validation.ConstraintViolationException;
 import java.util.List;
@@ -10,6 +11,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -27,6 +29,7 @@ import org.springframework.util.StringUtils;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private static final String RATE_LIMITED_CODE = "RATE_LIMITED";
     private final AuditService auditService;
 
     public GlobalExceptionHandler(AuditService auditService) {
@@ -37,6 +40,13 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<Void> handleBusiness(BusinessException exception) {
         return ApiResponse.fail(exception.code(), exception.getMessage());
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRateLimit(RateLimitExceededException exception) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", "60")
+                .body(ApiResponse.fail(RATE_LIMITED_CODE, exception.getMessage()));
     }
 
     @ExceptionHandler({

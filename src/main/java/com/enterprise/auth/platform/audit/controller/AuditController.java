@@ -8,6 +8,7 @@ import com.enterprise.auth.platform.audit.model.AuditPage;
 import com.enterprise.auth.platform.audit.model.AuditQuery;
 import com.enterprise.auth.platform.audit.service.AuditExportTaskService;
 import com.enterprise.auth.platform.audit.service.AuditService;
+import com.enterprise.auth.platform.common.annotation.RateLimit;
 import com.enterprise.auth.platform.common.api.ApiResponse;
 import com.enterprise.auth.platform.common.model.PageResult;
 import com.enterprise.auth.platform.common.time.TimeSupport;
@@ -70,6 +71,7 @@ public class AuditController {
     }
 
     @Operation(summary = "导出审计事件")
+    @RateLimit(key = "export", strategy = RateLimit.Strategy.USER)
     @GetMapping("/events/export")
     @PreAuthorize("hasAuthority('audit:read')")
     public ResponseEntity<byte[]> export(
@@ -118,6 +120,7 @@ public class AuditController {
     }
 
     @Operation(summary = "创建异步审计导出任务")
+    @RateLimit(key = "export", strategy = RateLimit.Strategy.USER)
     @PostMapping("/exports")
     @PreAuthorize("hasAuthority('audit:read')")
     public ApiResponse<AuditExportTaskService.ExportTaskView> createExportTask(
@@ -214,6 +217,7 @@ public class AuditController {
     }
 
     @Operation(summary = "重试异步审计导出任务")
+    @RateLimit(key = "export", strategy = RateLimit.Strategy.USER)
     @PostMapping("/exports/{taskId}/retry")
     @PreAuthorize("hasAuthority('audit:read')")
     public ApiResponse<AuditExportTaskService.ExportTaskView> retryExportTask(@PathVariable Long taskId) {

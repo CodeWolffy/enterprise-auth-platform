@@ -5,6 +5,7 @@ import com.enterprise.auth.platform.auth.dto.OauthClientStatusRequest;
 import com.enterprise.auth.platform.auth.dto.RotateOauthClientSecretRequest;
 import com.enterprise.auth.platform.auth.dto.UpdateOauthClientRequest;
 import com.enterprise.auth.platform.auth.service.OAuthClientManagementService;
+import com.enterprise.auth.platform.common.annotation.RateLimit;
 import com.enterprise.auth.platform.common.api.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -87,6 +88,7 @@ public class OAuthClientController {
     }
 
     @Operation(summary = "轮换 OAuth2 客户端密钥")
+    @RateLimit(key = "rotate-secret", strategy = RateLimit.Strategy.USER)
     @PostMapping("/{id}/rotate-secret")
     @PreAuthorize("hasAuthority('auth:write')")
     public ApiResponse<OAuthClientManagementService.OAuthClientView> rotateClientSecret(

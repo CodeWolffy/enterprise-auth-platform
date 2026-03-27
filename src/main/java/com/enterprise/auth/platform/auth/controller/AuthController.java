@@ -17,6 +17,7 @@ import com.enterprise.auth.platform.auth.service.CaptchaService;
 import com.enterprise.auth.platform.auth.service.OAuthCookieSessionService;
 import com.enterprise.auth.platform.auth.service.PermissionSnapshotService;
 import com.enterprise.auth.platform.auth.service.RegistrationPolicyService;
+import com.enterprise.auth.platform.common.annotation.RateLimit;
 import com.enterprise.auth.platform.common.api.ApiResponse;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.time.TimeSupport;
@@ -68,6 +69,7 @@ public class AuthController {
     }
 
     @Operation(summary = "获取登录验证码")
+    @RateLimit(key = "captcha", strategy = RateLimit.Strategy.IP)
     @GetMapping("/captcha")
     public ApiResponse<CaptchaResponse> captcha() {
         CaptchaService.CaptchaChallenge challenge = captchaService.create();
@@ -98,6 +100,7 @@ public class AuthController {
     }
 
     @Operation(summary = "OAuth 授权码交换并写入安全 Cookie")
+    @RateLimit(key = "oauth", strategy = RateLimit.Strategy.IP)
     @PostMapping("/oauth/exchange")
     public ApiResponse<CookieSessionResponse> oauthExchange(
             @Valid @RequestBody OAuthCodeExchangeRequest request,
@@ -115,6 +118,7 @@ public class AuthController {
     }
 
     @Operation(summary = "使用 Cookie 刷新会话")
+    @RateLimit(key = "oauth", strategy = RateLimit.Strategy.IP)
     @PostMapping("/oauth/refresh")
     public ApiResponse<CookieSessionResponse> oauthRefresh(
             HttpServletRequest servletRequest,
@@ -125,12 +129,14 @@ public class AuthController {
     }
 
     @Operation(summary = "账号登录")
+    @RateLimit(key = "login", strategy = RateLimit.Strategy.IP)
     @PostMapping("/login")
     public ApiResponse<TokenResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest servletRequest) {
         return ApiResponse.ok(authService.login(request, servletRequest));
     }
 
     @Operation(summary = "刷新访问令牌")
+    @RateLimit(key = "refresh", strategy = RateLimit.Strategy.IP)
     @PostMapping("/refresh")
     public ApiResponse<TokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
         return ApiResponse.ok(authService.refresh(request.refreshToken()));
