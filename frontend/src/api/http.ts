@@ -207,8 +207,7 @@ http.interceptors.response.use(
 
     if (error.response?.status === 403) {
       showError(error.response?.data?.message ?? 'No permission')
-      await redirectToLogin()
-      return new Promise(() => {})
+      return Promise.reject(error)
     }
 
     const message = error.response?.data?.message ?? 'Request failed, please retry later'

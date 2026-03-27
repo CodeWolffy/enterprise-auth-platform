@@ -86,13 +86,13 @@ public class OAuthClientLookupCacheService {
         // Triggered on OAuth client writes to keep token endpoint lookups consistent.
     }
 
-    String clientIdCacheKey(String tenantId, String clientId) {
+    public String clientIdCacheKey(String tenantId, String clientId) {
         return (StringUtils.hasText(tenantId) ? tenantId.trim() : tenantProperties.platformTenantId())
                 + ":client-id:"
                 + clientId;
     }
 
-    String idCacheKey(String tenantId, String id) {
+    public String idCacheKey(String tenantId, String id) {
         return (StringUtils.hasText(tenantId) ? tenantId.trim() : tenantProperties.platformTenantId())
                 + ":id:"
                 + id;

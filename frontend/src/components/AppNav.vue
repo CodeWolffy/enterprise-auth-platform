@@ -17,7 +17,7 @@
       <span>当前租户</span>
       <strong>{{ authStore.tenantId }}</strong>
       <el-select
-        v-if="authStore.canSwitchTenant"
+        v-if="canLoadTenants"
         :model-value="authStore.tenantId"
         placeholder="切换租户视角"
         size="small"
@@ -59,6 +59,13 @@ import { queryTenants } from '@/api/platform'
 
 const authStore = useAuthStore()
 const tenantOptions = ref<Array<{ tenantId: string; name: string }>>([])
+
+const canLoadTenants = computed(() => {
+  if (!authStore.canSwitchTenant) {
+    return false
+  }
+  return Boolean(authStore.snapshot?.permissions.includes('tenant:read'))
+})
 
 const iconMap: Record<string, any> = {
   dashboard: Monitor,
@@ -113,9 +120,9 @@ const visibleLinks = computed(() => {
 })
 
 watch(
-  () => [authStore.canSwitchTenant, authStore.accessToken] as const,
-  async ([canSwitch, token]) => {
-    if (!canSwitch || !token) {
+  () => [canLoadTenants.value, authStore.accessToken] as const,
+  async ([canLoad, token]) => {
+    if (!canLoad || !token) {
       tenantOptions.value = []
       return
     }
