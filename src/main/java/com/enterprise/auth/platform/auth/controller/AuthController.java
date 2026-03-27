@@ -6,6 +6,7 @@ import com.enterprise.auth.platform.auth.dto.CsrfTokenResponse;
 import com.enterprise.auth.platform.auth.dto.LoginRequest;
 import com.enterprise.auth.platform.auth.dto.OAuthCodeExchangeRequest;
 import com.enterprise.auth.platform.auth.dto.PermissionSnapshotResponse;
+import com.enterprise.auth.platform.auth.dto.RegisterOptionsResponse;
 import com.enterprise.auth.platform.auth.dto.RefreshTokenRequest;
 import com.enterprise.auth.platform.auth.dto.TokenResponse;
 import com.enterprise.auth.platform.auth.dto.UserSessionResponse;
@@ -18,7 +19,10 @@ import com.enterprise.auth.platform.auth.service.PermissionSnapshotService;
 import com.enterprise.auth.platform.common.api.ApiResponse;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.time.TimeSupport;
+import com.enterprise.auth.platform.config.RegistrationProperties;
+import com.enterprise.auth.platform.user.dto.RegisterRequest;
 import com.enterprise.auth.platform.user.model.UserAccount;
+import com.enterprise.auth.platform.user.model.UserSummary;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -45,19 +49,22 @@ public class AuthController {
     private final PermissionSnapshotService permissionSnapshotService;
     private final OAuthCookieSessionService oauthCookieSessionService;
     private final TrustedRequestOriginValidator trustedRequestOriginValidator;
+    private final RegistrationProperties registrationProperties;
 
     public AuthController(
             CaptchaService captchaService,
             AuthService authService,
             PermissionSnapshotService permissionSnapshotService,
             OAuthCookieSessionService oauthCookieSessionService,
-            TrustedRequestOriginValidator trustedRequestOriginValidator
+                TrustedRequestOriginValidator trustedRequestOriginValidator,
+                RegistrationProperties registrationProperties
     ) {
         this.captchaService = captchaService;
         this.authService = authService;
         this.permissionSnapshotService = permissionSnapshotService;
         this.oauthCookieSessionService = oauthCookieSessionService;
         this.trustedRequestOriginValidator = trustedRequestOriginValidator;
+        this.registrationProperties = registrationProperties;
     }
 
     @Operation(summary = "获取登录验证码")
@@ -78,6 +85,15 @@ public class AuthController {
                 csrfToken.getHeaderName(),
                 csrfToken.getParameterName(),
                 csrfToken.getToken()
+        ));
+    }
+
+    @Operation(summary = "获取注册公共配置")
+    @GetMapping("/register/options")
+    public ApiResponse<RegisterOptionsResponse> registerOptions() {
+        return ApiResponse.ok(new RegisterOptionsResponse(
+                registrationProperties.resolvedDefaultTenantId(),
+                List.copyOf(registrationProperties.resolvedDefaultRoleCodes())
         ));
     }
 
@@ -157,6 +173,12 @@ public class AuthController {
     ) {
         authService.forceOffline(currentUser(authentication), sessionId);
         return ApiResponse.ok();
+    }
+
+    @Operation(summary = "用户注册")
+    @PostMapping("/register")
+    public ApiResponse<UserSummary> register(@Valid @RequestBody RegisterRequest request, HttpServletRequest servletRequest) {
+        return ApiResponse.ok(authService.register(request, servletRequest));
     }
 
     private UserAccount currentUser(Authentication authentication) {

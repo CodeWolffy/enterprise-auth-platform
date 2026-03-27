@@ -5,6 +5,7 @@ import com.enterprise.auth.platform.config.AppCacheProperties;
 import com.enterprise.auth.platform.config.FeatureToggleProperties;
 import com.enterprise.auth.platform.config.FrontendProperties;
 import com.enterprise.auth.platform.config.PersistenceProperties;
+import com.enterprise.auth.platform.config.RegistrationProperties;
 import com.enterprise.auth.platform.config.SecurityRedisProperties;
 import com.enterprise.auth.platform.config.SecurityProperties;
 import com.enterprise.auth.platform.tenant.TenantProperties;
@@ -24,6 +25,7 @@ import org.springframework.cache.annotation.EnableCaching;
         FeatureToggleProperties.class,
         FrontendProperties.class,
         PersistenceProperties.class,
+        RegistrationProperties.class,
         TenantProperties.class
 })
 public class EnterpriseAuthPlatformApplication {

@@ -331,6 +331,10 @@ const userRules = reactive<FormRules>({
           callback(new Error('请输入初始密码'))
           return
         }
+        if (value && !/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/.test(value)) {
+          callback(new Error('密码至少8位，包含字母和数字'))
+          return
+        }
         callback()
       },
       trigger: 'blur',
@@ -477,8 +481,8 @@ function promptResetPassword(row: UserSummary) {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     inputType: 'password',
-    inputPattern: /^.{8,64}$/,
-    inputErrorMessage: '密码长度需要在 8 到 64 位之间',
+    inputPattern: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,64}$/,
+    inputErrorMessage: '密码至少8位，包含字母和数字',
   })
     .then(async ({ value }) => {
       await updateUser(row.id, {

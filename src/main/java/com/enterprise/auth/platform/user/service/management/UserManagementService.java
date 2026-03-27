@@ -5,6 +5,7 @@ import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.catalog.CatalogService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.time.TimeSupport;
+import com.enterprise.auth.platform.common.validator.PasswordValidator;
 import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.persistence.entity.SysRoleEntity;
 import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
@@ -73,14 +74,13 @@ public class UserManagementService {
     }
 
     @Transactional
-    public UserSummary create(CreateUserRequest request) {
+    public UserSummary createUser(String tenantId, CreateUserRequest request, String operator) {
         requireDatabaseMode();
-        String tenantId = currentTenantId();
-        String operator = SecuritySupport.currentOperator();
         if (existsUsernameGlobally(request.username())) {
             throw new BusinessException("用户名已存在");
         }
         validateDeptAccess(tenantId, request.deptId());
+        validatePassword(request.password());
 
         SysUserEntity entity = new SysUserEntity();
         entity.setTenantId(tenantId);
@@ -98,7 +98,12 @@ public class UserManagementService {
         syncUserRoles(tenantId, entity.getId(), request.roleCodes());
         authPrincipalCacheService.evictByUser(entity.getId(), tenantId, entity.getUsername());
         auditService.record("USER_CREATED", operator, tenantId, Map.of("userId", entity.getId(), "username", entity.getUsername()));
-        return loadSummary(entity.getId());
+        return loadSummary(entity.getId(), tenantId);
+    }
+
+    @Transactional
+    public UserSummary create(CreateUserRequest request) {
+        return createUser(currentTenantId(), request, SecuritySupport.currentOperator());
     }
 
     @Transactional
@@ -117,6 +122,7 @@ public class UserManagementService {
             entity.setEnabled(request.enabled() ? 1 : 0);
         }
         if (StringUtils.hasText(request.password())) {
+            validatePassword(request.password());
             entity.setPasswordHash(passwordEncoder.encode(request.password()));
             entity.setSessionVersion((entity.getSessionVersion() == null ? 1 : entity.getSessionVersion()) + 1);
             entity.setPasswordUpdatedAt(TimeSupport.utcNowDateTime());
@@ -128,7 +134,7 @@ public class UserManagementService {
         }
         authPrincipalCacheService.evictByUser(entity.getId(), tenantId, entity.getUsername());
         auditService.record("USER_UPDATED", operator, tenantId, Map.of("userId", entity.getId(), "username", entity.getUsername()));
-        return loadSummary(entity.getId());
+        return loadSummary(entity.getId(), tenantId);
     }
 
     @Transactional
@@ -140,7 +146,7 @@ public class UserManagementService {
         syncUserRoles(tenantId, userId, roleCodes);
         authPrincipalCacheService.evictByUser(entity.getId(), tenantId, entity.getUsername());
         auditService.record("USER_ROLE_ASSIGNED", operator, tenantId, Map.of("userId", userId, "roleCodes", roleCodes));
-        return loadSummary(userId);
+        return loadSummary(userId, tenantId);
     }
 
     public List<CatalogService.RoleView> listAssignedRoles(Long userId) {
@@ -245,11 +251,41 @@ public class UserManagementService {
                 .eq(SysUserEntity::getDeleted, 0)) > 0;
     }
 
-    private UserSummary loadSummary(Long userId) {
-        return userDirectoryService.listUsers().stream()
-                .filter(user -> user.id().equals(userId))
-                .findFirst()
-                .orElseThrow(() -> new BusinessException("用户不存在"));
+    public boolean existsByUsername(String tenantId, String username) {
+        if (jdbcTemplate != null) {
+            Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(1) FROM sys_user WHERE tenant_id = ? AND username = ? AND deleted = 0",
+                    Integer.class,
+                    tenantId,
+                    username
+            );
+            return count != null && count > 0;
+        }
+        return sysUserMapper.selectCount(new LambdaQueryWrapper<SysUserEntity>()
+                .eq(SysUserEntity::getTenantId, tenantId)
+                .eq(SysUserEntity::getUsername, username)
+                .eq(SysUserEntity::getDeleted, 0)) > 0;
+    }
+
+    private void validatePassword(String password) {
+        PasswordValidator.validate(password);
+    }
+
+    private UserSummary loadSummary(Long userId, String tenantId) {
+        String previousTenantId = TenantContext.getTenantId();
+        try {
+            TenantContext.setTenantId(tenantId);
+            return userDirectoryService.listUsers().stream()
+                    .filter(user -> user.id().equals(userId))
+                    .findFirst()
+                    .orElseThrow(() -> new BusinessException("用户不存在"));
+        } finally {
+            if (StringUtils.hasText(previousTenantId)) {
+                TenantContext.setTenantId(previousTenantId);
+            } else {
+                TenantContext.clear();
+            }
+        }
     }
 
     private void requireDatabaseMode() {

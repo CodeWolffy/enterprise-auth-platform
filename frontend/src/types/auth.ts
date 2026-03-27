@@ -45,6 +45,11 @@ export interface CsrfTokenResponse {
   token: string
 }
 
+export interface RegisterOptionsResponse {
+  defaultTenantId: string
+  defaultRoleCodes: string[]
+}
+
 export interface ClientView {
   id: number
   tenantId: string

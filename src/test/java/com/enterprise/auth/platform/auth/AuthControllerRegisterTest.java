@@ -1,0 +1,247 @@
+package com.enterprise.auth.platform.auth;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.web.servlet.MockMvc;
+
+@SpringBootTest(properties = {
+                "app.registration.default-role-codes=REGISTER_BASE_TEST",
+        "app.registration.max-attempts-per-user-ip=2",
+        "app.registration.max-attempts-per-ip=100"
+})
+@AutoConfigureMockMvc
+class AuthControllerRegisterTest {
+
+    private static final String DEFAULT_TENANT = "tenant-a";
+        private static final String DEFAULT_ROLE_CODE = "REGISTER_BASE_TEST";
+    private static final String USERNAME_PREFIX = "register_api_ut_";
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+        @BeforeEach
+        void setUp() {
+                ensureDefaultRole();
+        }
+
+    @AfterEach
+    void tearDown() {
+        jdbcTemplate.update(
+                """
+                DELETE ur FROM sys_user_role ur
+                JOIN sys_user u ON u.id = ur.user_id
+                WHERE u.username LIKE ?
+                """,
+                USERNAME_PREFIX + "%"
+        );
+        jdbcTemplate.update(
+                """
+                DELETE ur FROM sys_user_role ur
+                JOIN sys_role r ON r.id = ur.role_id
+                WHERE r.tenant_id = ? AND r.role_code = ?
+                """,
+                DEFAULT_TENANT,
+                DEFAULT_ROLE_CODE
+        );
+        jdbcTemplate.update("DELETE FROM sys_user WHERE username LIKE ?", USERNAME_PREFIX + "%");
+                jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id = ? AND role_code = ?", DEFAULT_TENANT, DEFAULT_ROLE_CODE);
+    }
+
+    @Test
+    void registerShouldCreateUserInDefaultTenant() throws Exception {
+        String username = nextUsername();
+        String rawPassword = "Register123";
+        String mobile = "13800001111";
+        String email = "register.ut@example.com";
+
+        mockMvc.perform(post("/api/auth/register")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerPayload(username, "注册测试用户", rawPassword, mobile, email)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.username").value(username))
+                .andExpect(jsonPath("$.data.tenantId").value(DEFAULT_TENANT))
+                .andExpect(jsonPath("$.data.mobile").value(mobile))
+                .andExpect(jsonPath("$.data.email").value(email));
+
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM sys_user WHERE username = ? AND tenant_id = ? AND deleted = 0",
+                Integer.class,
+                username,
+                DEFAULT_TENANT
+        );
+        String passwordHash = jdbcTemplate.queryForObject(
+                "SELECT password_hash FROM sys_user WHERE username = ? AND deleted = 0",
+                String.class,
+                username
+        );
+        Integer roleCount = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(1)
+                FROM sys_user_role ur
+                JOIN sys_role r ON r.id = ur.role_id
+                JOIN sys_user u ON u.id = ur.user_id
+                WHERE ur.tenant_id = ?
+                  AND u.username = ?
+                  AND u.deleted = 0
+                  AND r.tenant_id = ?
+                                                                        AND r.role_code = ?
+                  AND r.deleted = 0
+                """,
+                Integer.class,
+                DEFAULT_TENANT,
+                username,
+                                                                DEFAULT_TENANT,
+                                                                DEFAULT_ROLE_CODE
+        );
+
+        assertThat(count).isEqualTo(1);
+        assertThat(passwordHash).isNotBlank();
+        assertThat(passwordHash).isNotEqualTo(rawPassword);
+        assertThat(passwordEncoder.matches(rawPassword, passwordHash)).isTrue();
+        assertThat(roleCount).isEqualTo(1);
+    }
+
+        @Test
+        void registerOptionsShouldExposeDefaultTenant() throws Exception {
+                mockMvc.perform(get("/api/auth/register/options"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.code").value("OK"))
+                                .andExpect(jsonPath("$.data.defaultTenantId").value(DEFAULT_TENANT))
+                                .andExpect(jsonPath("$.data.defaultRoleCodes[0]").value(DEFAULT_ROLE_CODE));
+        }
+
+    @Test
+    void registerShouldRejectWeakPassword() throws Exception {
+        String username = nextUsername();
+
+        mockMvc.perform(post("/api/auth/register")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerPayload(username, "弱密码用户", "weakpass", "13800002222", "weak.ut@example.com")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PASSWORD_INVALID"))
+                .andExpect(jsonPath("$.message").value("密码至少8位，包含字母和数字"));
+
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM sys_user WHERE username = ? AND deleted = 0",
+                Integer.class,
+                username
+        );
+        assertThat(count).isEqualTo(0);
+    }
+
+    @Test
+    void registerShouldRejectDuplicateUsername() throws Exception {
+        String username = nextUsername();
+        String payload = registerPayload(username, "重复用户名用户", "Repeat123", "13800003333", "repeat.ut@example.com");
+
+        mockMvc.perform(post("/api/auth/register")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"));
+
+        mockMvc.perform(post("/api/auth/register")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("USERNAME_EXISTS"))
+                .andExpect(jsonPath("$.message").value("用户名已存在"));
+    }
+
+    @Test
+    void registerShouldLimitAttemptsByIpAndUsername() throws Exception {
+        String username = nextUsername();
+        String weakPayload = registerPayload(username, "限频用户", "weakpass", "13800004444", "limit.ut@example.com");
+
+        mockMvc.perform(post("/api/auth/register")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(weakPayload))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PASSWORD_INVALID"));
+
+        mockMvc.perform(post("/api/auth/register")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(weakPayload))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PASSWORD_INVALID"));
+
+        mockMvc.perform(post("/api/auth/register")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(weakPayload))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("REGISTER_RATE_LIMITED"))
+                .andExpect(jsonPath("$.message").value("注册尝试过于频繁，请稍后再试"));
+    }
+
+    private String nextUsername() {
+        return USERNAME_PREFIX + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+    }
+
+        private void ensureDefaultRole() {
+                jdbcTemplate.update(
+                        """
+                        DELETE ur FROM sys_user_role ur
+                        JOIN sys_role r ON r.id = ur.role_id
+                        WHERE r.tenant_id = ? AND r.role_code = ?
+                        """,
+                        DEFAULT_TENANT,
+                        DEFAULT_ROLE_CODE
+                );
+                jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id = ? AND role_code = ?", DEFAULT_TENANT, DEFAULT_ROLE_CODE);
+                jdbcTemplate.update(
+                                """
+                                INSERT INTO sys_role (tenant_id, role_code, role_name, data_scope_type, role_desc, created_by, updated_by, deleted)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+                                """,
+                                DEFAULT_TENANT,
+                                DEFAULT_ROLE_CODE,
+                                "注册默认角色测试",
+                                "SELF",
+                                "注册自动分配默认角色测试数据",
+                                "test",
+                                "test"
+                );
+        }
+
+    private String registerPayload(String username, String displayName, String password, String mobile, String email) {
+        return """
+                {
+                  "username": "%s",
+                  "displayName": "%s",
+                  "password": "%s",
+                  "mobile": "%s",
+                  "email": "%s"
+                }
+                """.formatted(username, displayName, password, mobile, email);
+    }
+}

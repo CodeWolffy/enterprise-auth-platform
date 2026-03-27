@@ -1,0 +1,15 @@
+package com.enterprise.auth.platform.common.validator;
+
+import com.enterprise.auth.platform.common.exception.BusinessException;
+import java.util.regex.Pattern;
+
+public class PasswordValidator {
+
+    private static final Pattern PATTERN = Pattern.compile("^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]{8,}$");
+
+    public static void validate(String password) {
+        if (password == null || !PATTERN.matcher(password).matches()) {
+            throw new BusinessException("PASSWORD_INVALID", "密码至少8位，包含字母和数字");
+        }
+    }
+}

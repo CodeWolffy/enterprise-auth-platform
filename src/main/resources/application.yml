@@ -105,6 +105,14 @@ app:
       - sys_tenant
   persistence:
     database-enabled: true
+  registration:
+    default-tenant-id: tenant-a
+    default-role-codes:
+      - AUDITOR
+    rate-limit-enabled: true
+    max-attempts-per-user-ip: 10
+    max-attempts-per-ip: 40
+    attempt-window: 10m
   cache:
     key-prefix: "eap:cache:"
     namespace-version: "v4"

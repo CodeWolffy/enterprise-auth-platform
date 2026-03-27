@@ -1,5 +1,5 @@
 import { http } from './http'
-import type { ApiResponse, CookieSessionResponse, CsrfTokenResponse, PermissionSnapshot } from '@/types/auth'
+import type { ApiResponse, CookieSessionResponse, CsrfTokenResponse, PermissionSnapshot, RegisterOptionsResponse } from '@/types/auth'
 import { consumeOAuthContext, getRedirectUri } from '@/utils/oauth'
 
 let csrfReady = false
@@ -32,6 +32,11 @@ async function ensureCsrfToken() {
 
 export async function fetchPermissionSnapshot() {
   const { data } = await http.get<ApiResponse<PermissionSnapshot>>('/api/auth/me')
+  return data.data
+}
+
+export async function fetchRegisterOptions() {
+  const { data } = await http.get<ApiResponse<RegisterOptionsResponse>>('/api/auth/register/options')
   return data.data
 }
 

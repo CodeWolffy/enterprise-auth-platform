@@ -13,6 +13,12 @@ const PUBLIC_ROUTES: RouteRecordRaw[] = [
     meta: { public: true, title: 'Sign In' },
   },
   {
+    path: '/register',
+    name: 'register',
+    component: () => import('@/views/RegisterView.vue'),
+    meta: { public: true, title: 'Register' },
+  },
+  {
     path: '/auth/callback',
     name: 'callback',
     component: () => import('@/views/AuthCallbackView.vue'),

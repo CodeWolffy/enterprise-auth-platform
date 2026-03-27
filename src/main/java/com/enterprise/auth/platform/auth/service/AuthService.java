@@ -10,19 +10,25 @@ import com.enterprise.auth.platform.auth.store.SessionStore;
 import com.enterprise.auth.platform.auth.service.LoginAttemptService.LoginFailureResult;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.time.TimeSupport;
+import com.enterprise.auth.platform.common.validator.PasswordValidator;
 import com.enterprise.auth.platform.config.PersistenceProperties;
+import com.enterprise.auth.platform.config.RegistrationProperties;
 import com.enterprise.auth.platform.config.SecurityProperties;
 import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
 import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
 import com.enterprise.auth.platform.security.DataScopeService;
 import com.enterprise.auth.platform.tenant.TenantContext;
+import com.enterprise.auth.platform.user.dto.CreateUserRequest;
+import com.enterprise.auth.platform.user.dto.RegisterRequest;
 import com.enterprise.auth.platform.user.model.UserAccount;
+import com.enterprise.auth.platform.user.model.UserSummary;
 import com.enterprise.auth.platform.user.repository.UserRepository;
+import com.enterprise.auth.platform.user.service.management.UserManagementService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.lang.Nullable;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -44,6 +50,9 @@ public class AuthService {
     private final DataScopeService dataScopeService;
     private final AuthorizationSessionService authorizationSessionService;
     private final LoginAttemptService loginAttemptService;
+    private final RegisterAttemptService registerAttemptService;
+    private final RegistrationProperties registrationProperties;
+    private final UserManagementService userManagementService;
 
     public AuthService(
             CaptchaService captchaService,
@@ -57,7 +66,10 @@ public class AuthService {
             @Nullable SysUserMapper sysUserMapper,
             DataScopeService dataScopeService,
             AuthorizationSessionService authorizationSessionService,
-            LoginAttemptService loginAttemptService
+            LoginAttemptService loginAttemptService,
+                RegisterAttemptService registerAttemptService,
+                RegistrationProperties registrationProperties,
+            UserManagementService userManagementService
     ) {
         this.captchaService = captchaService;
         this.sessionStore = sessionStore;
@@ -71,6 +83,9 @@ public class AuthService {
         this.dataScopeService = dataScopeService;
         this.authorizationSessionService = authorizationSessionService;
         this.loginAttemptService = loginAttemptService;
+        this.registerAttemptService = registerAttemptService;
+        this.registrationProperties = registrationProperties;
+        this.userManagementService = userManagementService;
     }
 
     public TokenResponse login(LoginRequest request, HttpServletRequest servletRequest) {
@@ -183,6 +198,41 @@ public class AuthService {
         authorizationSessionService.revoke(sessionId);
         auditService.record("SESSION_FORCED_OFFLINE", currentUser.username(), currentUser.tenantId(),
                 Map.of("sessionId", sessionId));
+    }
+
+    public UserSummary register(RegisterRequest request, HttpServletRequest servletRequest) {
+        String clientIp = clientIp(servletRequest);
+        registerAttemptService.checkRateLimit(request.username(), clientIp);
+        String defaultTenantId = registrationProperties.resolvedDefaultTenantId();
+        String previousTenantId = TenantContext.getTenantId();
+        try {
+            TenantContext.setTenantId(defaultTenantId);
+            Set<String> defaultRoleCodes = registrationProperties.resolvedDefaultRoleCodes();
+
+            PasswordValidator.validate(request.password());
+
+            if (userManagementService.existsByUsername(defaultTenantId, request.username())) {
+                throw new BusinessException("USERNAME_EXISTS", "用户名已存在");
+            }
+
+            CreateUserRequest createRequest = new CreateUserRequest(
+                    request.username(),
+                    request.displayName(),
+                    request.mobile(),
+                    request.email(),
+                    request.password(),
+                    null,
+                    true,
+                    defaultRoleCodes
+            );
+            return userManagementService.createUser(defaultTenantId, createRequest, "system");
+        } finally {
+            if (StringUtils.hasText(previousTenantId)) {
+                TenantContext.setTenantId(previousTenantId);
+            } else {
+                TenantContext.clear();
+            }
+        }
     }
 
     private TokenResponse issueTokens(UserAccount user, String sessionId) {

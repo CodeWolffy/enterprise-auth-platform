@@ -53,6 +53,8 @@
       <div class="auth-footnote">
         登录后将由后端写入 HttpOnly 安全 Cookie，前端不落地敏感令牌。
       </div>
+
+      <el-divider>还没有账号？<el-link type="primary" @click="$router.push('/register')">立即注册</el-link></el-divider>
     </section>
   </div>
 </template>
@@ -213,6 +215,11 @@ function appendHidden(form: HTMLFormElement, name: string, value: string) {
   color: #61708a;
   font-size: 12px;
   line-height: 1.6;
+}
+
+:deep(.el-divider__text) {
+  font-size: 12px;
+  color: #61708a;
 }
 
 @media (max-width: 960px) {

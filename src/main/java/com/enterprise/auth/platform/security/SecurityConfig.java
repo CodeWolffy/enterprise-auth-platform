@@ -64,8 +64,8 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**"
                         ).permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/refresh").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/auth/captcha", "/api/auth/csrf").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/refresh", "/api/auth/register").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/auth/captcha", "/api/auth/csrf", "/api/auth/register/options").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/oauth/exchange", "/api/auth/oauth/refresh").permitAll()
                         .anyRequest().authenticated())
                 .headers(headers -> applySecurityHeaders(headers))
