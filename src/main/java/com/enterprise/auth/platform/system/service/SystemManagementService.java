@@ -152,7 +152,7 @@ public class SystemManagementService {
     }
 
     @Transactional
-    @CacheEvict(value = {"system:configs", "system:categories:all", "system:categories:target"}, allEntries = true)
+    @CacheEvict(value = {"system:configs", "system:categories:all", "system:categories:target", "registration:policy"}, allEntries = true)
     public ConfigView createConfig(ConfigCrudRequest request) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -168,7 +168,7 @@ public class SystemManagementService {
     }
 
     @Transactional
-    @CacheEvict(value = {"system:configs", "system:categories:all", "system:categories:target"}, allEntries = true)
+    @CacheEvict(value = {"system:configs", "system:categories:all", "system:categories:target", "registration:policy"}, allEntries = true)
     public ConfigView updateConfig(Long id, ConfigCrudRequest request) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -182,7 +182,7 @@ public class SystemManagementService {
     }
 
     @Transactional
-    @CacheEvict(value = {"system:configs", "system:categories:all", "system:categories:target"}, allEntries = true)
+    @CacheEvict(value = {"system:configs", "system:categories:all", "system:categories:target", "registration:policy"}, allEntries = true)
     public void deleteConfig(Long id) {
         requireDatabaseMode();
         String tenantId = currentTenantId();

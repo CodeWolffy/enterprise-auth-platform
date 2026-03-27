@@ -16,10 +16,10 @@ import com.enterprise.auth.platform.auth.service.AuthService;
 import com.enterprise.auth.platform.auth.service.CaptchaService;
 import com.enterprise.auth.platform.auth.service.OAuthCookieSessionService;
 import com.enterprise.auth.platform.auth.service.PermissionSnapshotService;
+import com.enterprise.auth.platform.auth.service.RegistrationPolicyService;
 import com.enterprise.auth.platform.common.api.ApiResponse;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.time.TimeSupport;
-import com.enterprise.auth.platform.config.RegistrationProperties;
 import com.enterprise.auth.platform.user.dto.RegisterRequest;
 import com.enterprise.auth.platform.user.model.UserAccount;
 import com.enterprise.auth.platform.user.model.UserSummary;
@@ -49,22 +49,22 @@ public class AuthController {
     private final PermissionSnapshotService permissionSnapshotService;
     private final OAuthCookieSessionService oauthCookieSessionService;
     private final TrustedRequestOriginValidator trustedRequestOriginValidator;
-    private final RegistrationProperties registrationProperties;
+    private final RegistrationPolicyService registrationPolicyService;
 
     public AuthController(
             CaptchaService captchaService,
             AuthService authService,
             PermissionSnapshotService permissionSnapshotService,
             OAuthCookieSessionService oauthCookieSessionService,
-                TrustedRequestOriginValidator trustedRequestOriginValidator,
-                RegistrationProperties registrationProperties
+            TrustedRequestOriginValidator trustedRequestOriginValidator,
+            RegistrationPolicyService registrationPolicyService
     ) {
         this.captchaService = captchaService;
         this.authService = authService;
         this.permissionSnapshotService = permissionSnapshotService;
         this.oauthCookieSessionService = oauthCookieSessionService;
         this.trustedRequestOriginValidator = trustedRequestOriginValidator;
-        this.registrationProperties = registrationProperties;
+        this.registrationPolicyService = registrationPolicyService;
     }
 
     @Operation(summary = "获取登录验证码")
@@ -92,8 +92,8 @@ public class AuthController {
     @GetMapping("/register/options")
     public ApiResponse<RegisterOptionsResponse> registerOptions() {
         return ApiResponse.ok(new RegisterOptionsResponse(
-                registrationProperties.resolvedDefaultTenantId(),
-                List.copyOf(registrationProperties.resolvedDefaultRoleCodes())
+                registrationPolicyService.resolveDefaultTenantId(),
+                List.copyOf(registrationPolicyService.resolveDefaultRoleCodes())
         ));
     }
 

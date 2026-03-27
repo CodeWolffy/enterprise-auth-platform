@@ -7,9 +7,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.List;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -20,16 +21,18 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = {
-                "app.registration.default-role-codes=REGISTER_BASE_TEST",
         "app.registration.max-attempts-per-user-ip=2",
         "app.registration.max-attempts-per-ip=100"
 })
 @AutoConfigureMockMvc
 class AuthControllerRegisterTest {
 
+    private static final String PLATFORM_TENANT = "platform";
     private static final String DEFAULT_TENANT = "tenant-a";
-        private static final String DEFAULT_ROLE_CODE = "REGISTER_BASE_TEST";
+    private static final String DEFAULT_ROLE_CODE = "REGISTER_BASE_TEST";
     private static final String USERNAME_PREFIX = "register_api_ut_";
+    private static final String CONFIG_KEY_DEFAULT_TENANT = "registration.default_tenant_id";
+    private static final String CONFIG_KEY_DEFAULT_ROLE_CODES = "registration.default_role_codes";
 
     @Autowired
     private MockMvc mockMvc;
@@ -40,10 +43,19 @@ class AuthControllerRegisterTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-        @BeforeEach
-        void setUp() {
-                ensureDefaultRole();
-        }
+    private ConfigSnapshot previousDefaultTenantConfig;
+    private ConfigSnapshot previousDefaultRoleCodesConfig;
+
+    @BeforeEach
+    void setUp() {
+        ensureDefaultRole();
+
+        previousDefaultTenantConfig = snapshotConfig(CONFIG_KEY_DEFAULT_TENANT);
+        previousDefaultRoleCodesConfig = snapshotConfig(CONFIG_KEY_DEFAULT_ROLE_CODES);
+
+        upsertConfig(CONFIG_KEY_DEFAULT_TENANT, DEFAULT_TENANT, "注册默认租户");
+        upsertConfig(CONFIG_KEY_DEFAULT_ROLE_CODES, DEFAULT_ROLE_CODE, "注册默认角色");
+    }
 
     @AfterEach
     void tearDown() {
@@ -65,7 +77,10 @@ class AuthControllerRegisterTest {
                 DEFAULT_ROLE_CODE
         );
         jdbcTemplate.update("DELETE FROM sys_user WHERE username LIKE ?", USERNAME_PREFIX + "%");
-                jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id = ? AND role_code = ?", DEFAULT_TENANT, DEFAULT_ROLE_CODE);
+        jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id = ? AND role_code = ?", DEFAULT_TENANT, DEFAULT_ROLE_CODE);
+
+        restoreConfig(CONFIG_KEY_DEFAULT_TENANT, previousDefaultTenantConfig);
+        restoreConfig(CONFIG_KEY_DEFAULT_ROLE_CODES, previousDefaultRoleCodesConfig);
     }
 
     @Test
@@ -108,14 +123,14 @@ class AuthControllerRegisterTest {
                   AND u.username = ?
                   AND u.deleted = 0
                   AND r.tenant_id = ?
-                                                                        AND r.role_code = ?
+                  AND r.role_code = ?
                   AND r.deleted = 0
                 """,
                 Integer.class,
                 DEFAULT_TENANT,
                 username,
-                                                                DEFAULT_TENANT,
-                                                                DEFAULT_ROLE_CODE
+                DEFAULT_TENANT,
+                DEFAULT_ROLE_CODE
         );
 
         assertThat(count).isEqualTo(1);
@@ -125,14 +140,14 @@ class AuthControllerRegisterTest {
         assertThat(roleCount).isEqualTo(1);
     }
 
-        @Test
-        void registerOptionsShouldExposeDefaultTenant() throws Exception {
-                mockMvc.perform(get("/api/auth/register/options"))
-                                .andExpect(status().isOk())
-                                .andExpect(jsonPath("$.code").value("OK"))
-                                .andExpect(jsonPath("$.data.defaultTenantId").value(DEFAULT_TENANT))
-                                .andExpect(jsonPath("$.data.defaultRoleCodes[0]").value(DEFAULT_ROLE_CODE));
-        }
+    @Test
+    void registerOptionsShouldExposeDefaultTenant() throws Exception {
+        mockMvc.perform(get("/api/auth/register/options"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.defaultTenantId").value(DEFAULT_TENANT))
+                .andExpect(jsonPath("$.data.defaultRoleCodes[0]").value(DEFAULT_ROLE_CODE));
+    }
 
     @Test
     void registerShouldRejectWeakPassword() throws Exception {
@@ -207,31 +222,83 @@ class AuthControllerRegisterTest {
         return USERNAME_PREFIX + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
     }
 
-        private void ensureDefaultRole() {
-                jdbcTemplate.update(
-                        """
-                        DELETE ur FROM sys_user_role ur
-                        JOIN sys_role r ON r.id = ur.role_id
-                        WHERE r.tenant_id = ? AND r.role_code = ?
-                        """,
-                        DEFAULT_TENANT,
-                        DEFAULT_ROLE_CODE
-                );
-                jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id = ? AND role_code = ?", DEFAULT_TENANT, DEFAULT_ROLE_CODE);
-                jdbcTemplate.update(
-                                """
-                                INSERT INTO sys_role (tenant_id, role_code, role_name, data_scope_type, role_desc, created_by, updated_by, deleted)
-                                VALUES (?, ?, ?, ?, ?, ?, ?, 0)
-                                """,
-                                DEFAULT_TENANT,
-                                DEFAULT_ROLE_CODE,
-                                "注册默认角色测试",
-                                "SELF",
-                                "注册自动分配默认角色测试数据",
-                                "test",
-                                "test"
-                );
+    private void ensureDefaultRole() {
+        jdbcTemplate.update(
+                """
+                DELETE ur FROM sys_user_role ur
+                JOIN sys_role r ON r.id = ur.role_id
+                WHERE r.tenant_id = ? AND r.role_code = ?
+                """,
+                DEFAULT_TENANT,
+                DEFAULT_ROLE_CODE
+        );
+        jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id = ? AND role_code = ?", DEFAULT_TENANT, DEFAULT_ROLE_CODE);
+        jdbcTemplate.update(
+                """
+                INSERT INTO sys_role (tenant_id, role_code, role_name, data_scope_type, role_desc, created_by, updated_by, deleted)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+                """,
+                DEFAULT_TENANT,
+                DEFAULT_ROLE_CODE,
+                "注册默认角色测试",
+                "SELF",
+                "注册自动分配默认角色测试数据",
+                "test",
+                "test"
+        );
+    }
+
+    private ConfigSnapshot snapshotConfig(String configKey) {
+        List<ConfigSnapshot> result = jdbcTemplate.query(
+                """
+                SELECT config_value, config_name
+                FROM sys_config
+                WHERE tenant_id = ? AND config_key = ? AND deleted = 0
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (rs, rowNum) -> new ConfigSnapshot(true, rs.getString("config_value"), rs.getString("config_name")),
+                PLATFORM_TENANT,
+                configKey
+        );
+        if (result.isEmpty()) {
+            return ConfigSnapshot.absent();
         }
+        return result.get(0);
+    }
+
+    private void restoreConfig(String configKey, ConfigSnapshot snapshot) {
+        if (snapshot == null || !snapshot.exists()) {
+            jdbcTemplate.update(
+                    "DELETE FROM sys_config WHERE tenant_id = ? AND config_key = ?",
+                    PLATFORM_TENANT,
+                    configKey
+            );
+            return;
+        }
+        upsertConfig(configKey, snapshot.value(), snapshot.configName());
+    }
+
+    private void upsertConfig(String configKey, String configValue, String configName) {
+        String resolvedName = (configName == null || configName.isBlank()) ? configKey : configName;
+        jdbcTemplate.update(
+                """
+                INSERT INTO sys_config (tenant_id, config_key, config_name, config_value, created_by, updated_by, deleted)
+                VALUES (?, ?, ?, ?, ?, ?, 0)
+                ON DUPLICATE KEY UPDATE
+                    config_name = VALUES(config_name),
+                    config_value = VALUES(config_value),
+                    updated_by = VALUES(updated_by),
+                    deleted = 0
+                """,
+                PLATFORM_TENANT,
+                configKey,
+                resolvedName,
+                configValue,
+                "test",
+                "test"
+        );
+    }
 
     private String registerPayload(String username, String displayName, String password, String mobile, String email) {
         return """
@@ -243,5 +310,12 @@ class AuthControllerRegisterTest {
                   "email": "%s"
                 }
                 """.formatted(username, displayName, password, mobile, email);
+    }
+
+    private record ConfigSnapshot(boolean exists, String value, String configName) {
+
+        private static ConfigSnapshot absent() {
+            return new ConfigSnapshot(false, null, null);
+        }
     }
 }

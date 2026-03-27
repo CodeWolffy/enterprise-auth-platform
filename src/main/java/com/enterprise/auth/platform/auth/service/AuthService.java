@@ -12,7 +12,6 @@ import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.common.validator.PasswordValidator;
 import com.enterprise.auth.platform.config.PersistenceProperties;
-import com.enterprise.auth.platform.config.RegistrationProperties;
 import com.enterprise.auth.platform.config.SecurityProperties;
 import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
 import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
@@ -51,7 +50,7 @@ public class AuthService {
     private final AuthorizationSessionService authorizationSessionService;
     private final LoginAttemptService loginAttemptService;
     private final RegisterAttemptService registerAttemptService;
-    private final RegistrationProperties registrationProperties;
+    private final RegistrationPolicyService registrationPolicyService;
     private final UserManagementService userManagementService;
 
     public AuthService(
@@ -67,8 +66,8 @@ public class AuthService {
             DataScopeService dataScopeService,
             AuthorizationSessionService authorizationSessionService,
             LoginAttemptService loginAttemptService,
-                RegisterAttemptService registerAttemptService,
-                RegistrationProperties registrationProperties,
+            RegisterAttemptService registerAttemptService,
+            RegistrationPolicyService registrationPolicyService,
             UserManagementService userManagementService
     ) {
         this.captchaService = captchaService;
@@ -84,7 +83,7 @@ public class AuthService {
         this.authorizationSessionService = authorizationSessionService;
         this.loginAttemptService = loginAttemptService;
         this.registerAttemptService = registerAttemptService;
-        this.registrationProperties = registrationProperties;
+        this.registrationPolicyService = registrationPolicyService;
         this.userManagementService = userManagementService;
     }
 
@@ -203,11 +202,11 @@ public class AuthService {
     public UserSummary register(RegisterRequest request, HttpServletRequest servletRequest) {
         String clientIp = clientIp(servletRequest);
         registerAttemptService.checkRateLimit(request.username(), clientIp);
-        String defaultTenantId = registrationProperties.resolvedDefaultTenantId();
+        String defaultTenantId = registrationPolicyService.resolveDefaultTenantId();
         String previousTenantId = TenantContext.getTenantId();
         try {
             TenantContext.setTenantId(defaultTenantId);
-            Set<String> defaultRoleCodes = registrationProperties.resolvedDefaultRoleCodes();
+            Set<String> defaultRoleCodes = registrationPolicyService.resolveDefaultRoleCodes();
 
             PasswordValidator.validate(request.password());
 

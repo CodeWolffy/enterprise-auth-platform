@@ -106,9 +106,6 @@ app:
   persistence:
     database-enabled: true
   registration:
-    default-tenant-id: tenant-a
-    default-role-codes:
-      - AUDITOR
     rate-limit-enabled: true
     max-attempts-per-user-ip: 10
     max-attempts-per-ip: 40
@@ -118,6 +115,7 @@ app:
     namespace-version: "v4"
     default-ttl: 10m
     auth-principal-ttl: 15m
+    registration-policy-ttl: 5m
     system-dicts-ttl: 30m
     system-configs-ttl: 30m
     system-categories-all-ttl: 60m

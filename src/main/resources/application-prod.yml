@@ -15,10 +15,6 @@ spring:
       max-lifetime: ${DB_POOL_MAX_LIFETIME:1800000}
 
 app:
-  registration:
-    default-tenant-id: ${APP_REGISTRATION_DEFAULT_TENANT_ID:tenant-a}
-    default-role-codes:
-      - ${APP_REGISTRATION_DEFAULT_ROLE_CODES:AUDITOR}
   frontend:
     allowed-origins:
       - ${APP_FRONTEND_ALLOWED_ORIGIN}

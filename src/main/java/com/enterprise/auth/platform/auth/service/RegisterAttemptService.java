@@ -17,17 +17,20 @@ public class RegisterAttemptService {
     private final StringRedisTemplate stringRedisTemplate;
     private final SecurityRedisProperties redisProperties;
     private final RegistrationProperties registrationProperties;
+    private final RegistrationPolicyService registrationPolicyService;
     private final AuditService auditService;
 
     public RegisterAttemptService(
             StringRedisTemplate stringRedisTemplate,
             SecurityRedisProperties redisProperties,
             RegistrationProperties registrationProperties,
+            RegistrationPolicyService registrationPolicyService,
             AuditService auditService
     ) {
         this.stringRedisTemplate = stringRedisTemplate;
         this.redisProperties = redisProperties;
         this.registrationProperties = registrationProperties;
+        this.registrationPolicyService = registrationPolicyService;
         this.auditService = auditService;
     }
 
@@ -45,7 +48,7 @@ public class RegisterAttemptService {
             return;
         }
 
-        auditService.record("REGISTER_RATE_LIMITED", normalizeKeyPart(username), registrationProperties.resolvedDefaultTenantId(),
+        auditService.record("REGISTER_RATE_LIMITED", normalizeKeyPart(username), registrationPolicyService.resolveDefaultTenantId(),
                 Map.of(
                         "clientIp", normalizeKeyPart(clientIp),
                         "username", normalizeKeyPart(username),

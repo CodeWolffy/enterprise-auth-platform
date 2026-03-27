@@ -9,6 +9,7 @@ public record AppCacheProperties(
         String namespaceVersion,
         Duration defaultTtl,
         Duration authPrincipalTtl,
+    Duration registrationPolicyTtl,
         Duration systemDictsTtl,
         Duration systemConfigsTtl,
         Duration systemCategoriesAllTtl,
@@ -41,6 +42,10 @@ public record AppCacheProperties(
 
     public Duration resolvedAuthPrincipalTtl() {
         return resolvePositiveTtl(authPrincipalTtl, Duration.ofMinutes(15));
+    }
+
+    public Duration resolvedRegistrationPolicyTtl() {
+        return resolvePositiveTtl(registrationPolicyTtl, Duration.ofMinutes(5));
     }
 
     public Duration resolvedSystemDictsTtl() {
