@@ -18,6 +18,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +27,8 @@ import org.springframework.util.StringUtils;
 
 @Service
 public class OAuthScopeManagementService {
+
+    public static final String CACHE_NAME = "oauth:scopes";
 
     private final PersistenceProperties persistenceProperties;
     private final SysOauthScopeMapper sysOauthScopeMapper;
@@ -43,6 +47,7 @@ public class OAuthScopeManagementService {
         this.auditService = auditService;
     }
 
+    @Cacheable(value = CACHE_NAME, key = "'list:platform'")
     public List<OAuthScopeView> scopes() {
         requirePlatformDatabaseMode();
         Map<String, ScopeReferenceHint> referenceHints = resolveScopeReferences();
@@ -102,6 +107,7 @@ public class OAuthScopeManagementService {
     }
 
     @Transactional
+    @CacheEvict(value = CACHE_NAME, allEntries = true)
     public OAuthScopeView createScope(OauthScopeCrudRequest request) {
         requirePlatformDatabaseMode();
         if (exists(request.scopeCode(), null)) {
@@ -117,6 +123,7 @@ public class OAuthScopeManagementService {
     }
 
     @Transactional
+    @CacheEvict(value = CACHE_NAME, allEntries = true)
     public OAuthScopeView updateScope(Long id, OauthScopeCrudRequest request) {
         requirePlatformDatabaseMode();
         SysOauthScopeEntity entity = getScope(id);
@@ -131,6 +138,7 @@ public class OAuthScopeManagementService {
     }
 
     @Transactional
+    @CacheEvict(value = CACHE_NAME, allEntries = true)
     public void deleteScope(Long id) {
         requirePlatformDatabaseMode();
         SysOauthScopeEntity entity = getScope(id);

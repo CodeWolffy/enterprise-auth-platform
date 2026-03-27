@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.auth;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.enterprise.auth.platform.auth.service.OAuthClientLookupCacheService;
 import com.enterprise.auth.platform.config.SecurityProperties;
 import com.enterprise.auth.platform.persistence.entity.SysOauthClientEntity;
 import com.enterprise.auth.platform.persistence.mapper.SysOauthClientMapper;
@@ -11,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.lang.Nullable;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -27,21 +29,29 @@ public class DatabaseRegisteredClientRepository implements RegisteredClientRepos
     private final JdbcTemplate jdbcTemplate;
     private final SecurityProperties securityProperties;
     private final TenantProperties tenantProperties;
+    private final OAuthClientLookupCacheService oAuthClientLookupCacheService;
     private final AtomicReference<Boolean> tableExists = new AtomicReference<>();
 
     public DatabaseRegisteredClientRepository(
             @Nullable SysOauthClientMapper sysOauthClientMapper,
             @Nullable JdbcTemplate jdbcTemplate,
             SecurityProperties securityProperties,
-            TenantProperties tenantProperties
+            TenantProperties tenantProperties,
+            OAuthClientLookupCacheService oAuthClientLookupCacheService
     ) {
         this.sysOauthClientMapper = sysOauthClientMapper;
         this.jdbcTemplate = jdbcTemplate;
         this.securityProperties = securityProperties;
         this.tenantProperties = tenantProperties;
+        this.oAuthClientLookupCacheService = oAuthClientLookupCacheService;
     }
 
     @Override
+    @CacheEvict(value = {
+            OAuthClientLookupCacheService.CACHE_NAME,
+            com.enterprise.auth.platform.auth.service.OAuthClientManagementService.CACHE_NAME,
+            com.enterprise.auth.platform.auth.service.OAuthScopeManagementService.CACHE_NAME
+    }, allEntries = true)
     public void save(RegisteredClient registeredClient) {
         requireDatabase();
         SysOauthClientEntity existing = sysOauthClientMapper.selectIncludingDeleted("platform", registeredClient.getClientId());
@@ -69,42 +79,17 @@ public class DatabaseRegisteredClientRepository implements RegisteredClientRepos
     @Override
     public RegisteredClient findById(String id) {
         requireDatabase();
-        SysOauthClientEntity currentTenantClient = sysOauthClientMapper.selectOne(new LambdaQueryWrapper<SysOauthClientEntity>()
-                .eq(SysOauthClientEntity::getDeleted, 0)
-                .eq(SysOauthClientEntity::getClientStatus, 1)
-                .eq(SysOauthClientEntity::getId, id)
-                .last("LIMIT 1"));
-        if (currentTenantClient != null) {
-            return fromEntity(currentTenantClient);
-        }
-        String currentTenantId = TenantContext.getTenantId();
-        String platformTenantId = tenantProperties.platformTenantId();
-        if (StringUtils.hasText(currentTenantId) && currentTenantId.equals(platformTenantId)) {
-            return null;
-        }
-        SysOauthClientEntity platformClient = runInTenant(platformTenantId, () -> sysOauthClientMapper.selectOne(new LambdaQueryWrapper<SysOauthClientEntity>()
-                .eq(SysOauthClientEntity::getDeleted, 0)
-                .eq(SysOauthClientEntity::getClientStatus, 1)
-                .eq(SysOauthClientEntity::getId, id)
-                .last("LIMIT 1")));
-        return platformClient == null ? null : fromEntity(platformClient);
+        String tenantId = resolveTenantId();
+        OAuthClientLookupCacheService.CachedOAuthClient client = oAuthClientLookupCacheService.findById(tenantId, id);
+        return client == null ? null : fromCached(client);
     }
 
     @Override
     public RegisteredClient findByClientId(String clientId) {
         requireDatabase();
-        List<SysOauthClientEntity> matches = sysOauthClientMapper.selectList(new LambdaQueryWrapper<SysOauthClientEntity>()
-                        .eq(SysOauthClientEntity::getDeleted, 0)
-                        .eq(SysOauthClientEntity::getClientStatus, 1)
-                        .eq(SysOauthClientEntity::getClientId, clientId)
-                        .orderByAsc(SysOauthClientEntity::getId));
-        if (matches.isEmpty()) {
-            return null;
-        }
-        if (matches.size() > 1) {
-            throw new IllegalStateException("检测到重复的 OAuth2 client_id，请保持 client_id 全局唯一: " + clientId);
-        }
-        return fromEntity(matches.get(0));
+        String tenantId = resolveTenantId();
+        OAuthClientLookupCacheService.CachedOAuthClient client = oAuthClientLookupCacheService.findByClientId(tenantId, clientId);
+        return client == null ? null : fromCached(client);
     }
 
     private List<RegisteredClient> loadClients() {
@@ -189,6 +174,33 @@ public class DatabaseRegisteredClientRepository implements RegisteredClientRepos
         return builder.build();
     }
 
+    private RegisteredClient fromCached(OAuthClientLookupCacheService.CachedOAuthClient client) {
+        RegisteredClient.Builder builder = RegisteredClient.withId(
+                        StringUtils.hasText(client.id()) ? client.id() : UUID.randomUUID().toString())
+                .clientId(client.clientId())
+                .clientName(client.clientName())
+                .tokenSettings(TokenSettings.builder()
+                        .accessTokenTimeToLive(securityProperties.accessTokenTtl())
+                        .refreshTokenTimeToLive(securityProperties.refreshTokenTtl())
+                        .reuseRefreshTokens(false)
+                        .build())
+                .clientSettings(ClientSettings.builder()
+                        .requireProofKey(client.requirePkce())
+                        .requireAuthorizationConsent(client.requireConsent())
+                        .build());
+        if (StringUtils.hasText(client.clientSecret())) {
+            builder.clientSecret(client.clientSecret())
+                    .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                    .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST);
+        } else {
+            builder.clientAuthenticationMethod(ClientAuthenticationMethod.NONE);
+        }
+        split(client.redirectUris()).forEach(builder::redirectUri);
+        split(client.scopes()).forEach(builder::scope);
+        split(client.grantTypes()).stream().map(this::grantType).forEach(builder::authorizationGrantType);
+        return builder.build();
+    }
+
     private List<String> split(String value) {
         if (!StringUtils.hasText(value)) {
             return List.of();
@@ -208,17 +220,11 @@ public class DatabaseRegisteredClientRepository implements RegisteredClientRepos
         };
     }
 
-    private <T> T runInTenant(String tenantId, java.util.function.Supplier<T> supplier) {
-        String currentTenantId = TenantContext.getTenantId();
-        TenantContext.setTenantId(tenantId);
-        try {
-            return supplier.get();
-        } finally {
-            if (StringUtils.hasText(currentTenantId)) {
-                TenantContext.setTenantId(currentTenantId);
-            } else {
-                TenantContext.clear();
-            }
+    private String resolveTenantId() {
+        String tenantId = TenantContext.getTenantId();
+        if (StringUtils.hasText(tenantId)) {
+            return tenantId;
         }
+        return tenantProperties.platformTenantId();
     }
 }

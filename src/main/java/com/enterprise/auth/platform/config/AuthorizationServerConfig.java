@@ -10,6 +10,7 @@ import com.enterprise.auth.platform.auth.service.AuthorizationSessionService;
 import com.enterprise.auth.platform.auth.service.AuditingAuthorizationConsentService;
 import com.enterprise.auth.platform.auth.service.LoginAttemptService;
 import com.enterprise.auth.platform.auth.service.LoginAttemptService.LoginFailureResult;
+import com.enterprise.auth.platform.auth.service.OAuthClientLookupCacheService;
 import com.enterprise.auth.platform.persistence.mapper.SysOauthClientMapper;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import com.enterprise.auth.platform.tenant.TenantFilter;
@@ -193,9 +194,16 @@ public class AuthorizationServerConfig {
             SecurityProperties securityProperties,
             TenantProperties tenantProperties,
             SysOauthClientMapper sysOauthClientMapper,
-            JdbcTemplate jdbcTemplate
+            JdbcTemplate jdbcTemplate,
+            OAuthClientLookupCacheService oAuthClientLookupCacheService
     ) {
-        return new DatabaseRegisteredClientRepository(sysOauthClientMapper, jdbcTemplate, securityProperties, tenantProperties);
+        return new DatabaseRegisteredClientRepository(
+                sysOauthClientMapper,
+                jdbcTemplate,
+                securityProperties,
+                tenantProperties,
+                oAuthClientLookupCacheService
+        );
     }
 
     private ObjectMapper authorizationObjectMapper() {

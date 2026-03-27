@@ -24,6 +24,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.lang.Nullable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,8 @@ import org.springframework.util.StringUtils;
 
 @Service
 public class OAuthClientManagementService {
+
+    public static final String CACHE_NAME = "oauth:clients";
 
     private final PersistenceProperties persistenceProperties;
     private final SysOauthClientMapper sysOauthClientMapper;
@@ -59,6 +63,7 @@ public class OAuthClientManagementService {
         this.objectMapper = objectMapper;
     }
 
+    @Cacheable(value = CACHE_NAME, key = "#root.target.clientListCacheKey()")
     public List<OAuthClientView> clients() {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -124,6 +129,11 @@ public class OAuthClientManagementService {
     }
 
     @Transactional
+    @CacheEvict(value = {
+            CACHE_NAME,
+            OAuthClientLookupCacheService.CACHE_NAME,
+            OAuthScopeManagementService.CACHE_NAME
+    }, allEntries = true)
     public OAuthClientView createClient(CreateOauthClientRequest request) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -162,6 +172,11 @@ public class OAuthClientManagementService {
     }
 
     @Transactional
+    @CacheEvict(value = {
+            CACHE_NAME,
+            OAuthClientLookupCacheService.CACHE_NAME,
+            OAuthScopeManagementService.CACHE_NAME
+    }, allEntries = true)
     public OAuthClientView updateClient(Long id, UpdateOauthClientRequest request) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -193,6 +208,11 @@ public class OAuthClientManagementService {
     }
 
     @Transactional
+    @CacheEvict(value = {
+            CACHE_NAME,
+            OAuthClientLookupCacheService.CACHE_NAME,
+            OAuthScopeManagementService.CACHE_NAME
+    }, allEntries = true)
     public OAuthClientView updateClientStatus(Long id, boolean enabled) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -210,6 +230,11 @@ public class OAuthClientManagementService {
     }
 
     @Transactional
+    @CacheEvict(value = {
+            CACHE_NAME,
+            OAuthClientLookupCacheService.CACHE_NAME,
+            OAuthScopeManagementService.CACHE_NAME
+    }, allEntries = true)
     public OAuthClientView rotateClientSecret(Long id, RotateOauthClientSecretRequest request) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -229,6 +254,11 @@ public class OAuthClientManagementService {
     }
 
     @Transactional
+    @CacheEvict(value = {
+            CACHE_NAME,
+            OAuthClientLookupCacheService.CACHE_NAME,
+            OAuthScopeManagementService.CACHE_NAME
+    }, allEntries = true)
     public void deleteClient(Long id) {
         requireDatabaseMode();
         String tenantId = currentTenantId();
@@ -487,6 +517,10 @@ public class OAuthClientManagementService {
     private String currentTenantId() {
         String tenantId = TenantContext.getTenantId();
         return StringUtils.hasText(tenantId) ? tenantId : "platform";
+    }
+
+    public String clientListCacheKey() {
+        return "list:" + currentTenantId();
     }
 
     @Schema(description = "OAuth2 客户端视图")

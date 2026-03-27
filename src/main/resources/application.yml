@@ -115,6 +115,9 @@ app:
     namespace-version: "v4"
     default-ttl: 10m
     auth-principal-ttl: 15m
+    oauth-registered-client-ttl: 5m
+    oauth-clients-ttl: 5m
+    oauth-scopes-ttl: 5m
     registration-policy-ttl: 5m
     system-dicts-ttl: 30m
     system-configs-ttl: 30m
