@@ -40,7 +40,6 @@
             show-password
             placeholder="请输入密码"
             autocomplete="current-password"
-            @keyup.enter="handleLogin"
           />
         </el-form-item>
         <div class="auth-actions">
@@ -102,6 +101,9 @@ function resetCredentialErrors() {
 }
 
 async function handleLogin() {
+  if (loading.value) {
+    return
+  }
   resetCredentialErrors()
   loading.value = true
   try {
@@ -135,6 +137,11 @@ function submitBackendLoginForm() {
   const clientId = String(route.query.client_id ?? '').trim()
   if (clientId) {
     appendHidden(form, 'client_id', clientId)
+  }
+
+  const tenantId = String(route.query.tenantId ?? '').trim()
+  if (tenantId) {
+    appendHidden(form, 'tenantId', tenantId)
   }
 
   document.body.appendChild(form)

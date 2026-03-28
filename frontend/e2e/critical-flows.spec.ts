@@ -102,6 +102,31 @@ test.describe('关键流程回归', () => {
     await expect.poll(() => loginPayload).toContain('client_id=eap-frontend-spa')
   })
 
+  test('前端登录页：密码框回车只提交一次 /login', async ({ page }) => {
+    let submitCount = 0
+    let loginPayload = ''
+
+    await page.route('**/login', async (route) => {
+      submitCount += 1
+      loginPayload = route.request().postData() ?? ''
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/html',
+        body: '<html><body>ok</body></html>',
+      })
+    })
+
+    await page.goto('/login?response_type=code&client_id=eap-frontend-spa&state=state-e2e&tenantId=platform')
+    await page.getByPlaceholder('请输入用户名').fill('admin')
+    await page.getByPlaceholder('请输入密码').fill('password-123')
+    await page.getByPlaceholder('请输入密码').press('Enter')
+
+    await expect.poll(() => submitCount).toBe(1)
+    await expect.poll(() => loginPayload).toContain('username=admin')
+    await expect.poll(() => loginPayload).toContain('password=password-123')
+    await expect.poll(() => loginPayload).toContain('tenantId=platform')
+  })
+
   test('登录回调流程：成功换 token 后进入控制台', async ({ page }) => {
     await loginByCallback(page)
     await expect(page.locator('[data-testid="logout-button"]')).toBeVisible()
