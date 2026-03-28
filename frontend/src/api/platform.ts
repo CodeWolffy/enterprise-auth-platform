@@ -158,8 +158,16 @@ export async function deleteDepartment(id: number) {
   await http.delete(`/api/depts/${id}`)
 }
 
-export async function queryTenants(params?: TenantQueryParams) {
-  const { data } = await http.get<ApiResponse<TenantPage>>('/api/tenants', { params })
+export interface TenantRequestOptions {
+  silentAuthFailure?: boolean
+  suppressErrorMessage?: boolean
+}
+
+export async function queryTenants(params?: TenantQueryParams, options?: TenantRequestOptions) {
+  const { data } = await http.get<ApiResponse<TenantPage>>('/api/tenants', {
+    params,
+    ...(options ?? {}),
+  } as any)
   return data.data
 }
 

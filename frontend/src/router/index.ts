@@ -1,4 +1,4 @@
-﻿import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import type { PermissionSnapshot } from '@/types/auth'
@@ -237,7 +237,7 @@ router.afterEach((to) => {
   document.title = `${String(to.meta.title ?? 'Console')} | Enterprise Auth Platform`
 })
 
-function registerDynamicRoutes() {
+function registerDynamicRoutes(_snapshot?: PermissionSnapshot | null) {
   // Routes are statically registered for stability.
 }
 

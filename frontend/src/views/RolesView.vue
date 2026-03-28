@@ -547,19 +547,18 @@ function setTreeExpanded(expanded: boolean) {
 }
 
 function filterTree(nodes: PermissionTreeNode[], keywordValue: string): PermissionTreeNode[] {
-  return nodes
-    .map((node) => {
-      const children = node.children ? filterTree(node.children, keywordValue) : []
-      const matched = node.label.toLowerCase().includes(keywordValue)
-      if (matched || children.length > 0) {
-        return {
-          ...node,
-          children: children.length > 0 ? children : node.children,
-        }
-      }
-      return null
-    })
-    .filter((item): item is PermissionTreeNode => Boolean(item))
+  const filtered: PermissionTreeNode[] = []
+  nodes.forEach((node) => {
+    const children = node.children ? filterTree(node.children, keywordValue) : []
+    const matched = node.label.toLowerCase().includes(keywordValue)
+    if (matched || children.length > 0) {
+      filtered.push({
+        ...node,
+        children: children.length > 0 ? children : node.children,
+      })
+    }
+  })
+  return filtered
 }
 
 function summarizePermissions(source: PermissionView[]) {

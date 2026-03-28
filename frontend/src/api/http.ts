@@ -1,4 +1,4 @@
-﻿import axios from 'axios'
+import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { redirectToAuthorizationPage } from '@/utils/authRedirect'
@@ -164,19 +164,32 @@ http.interceptors.response.use(
   (response) => response,
   async (error) => {
     const authStore = useAuthStore()
-    const requestUrl = String(error.config?.url ?? '')
+    const requestConfig = (error.config ?? {}) as {
+      url?: string
+      method?: string
+      __retry?: boolean
+      __csrfRetry?: boolean
+      silentAuthFailure?: boolean
+      suppressErrorMessage?: boolean
+    }
+    const requestUrl = String(requestConfig.url ?? '')
     const inAuthCallback = typeof window !== 'undefined' && window.location.pathname === '/auth/callback'
     const bypassRedirect = requestUrl.includes('/api/auth/csrf')
       || requestUrl.includes('/api/auth/oauth/exchange')
       || (inAuthCallback && requestUrl.includes('/api/auth/me'))
+    const silentAuthFailure = Boolean(requestConfig.silentAuthFailure)
+    const suppressErrorMessage = Boolean(requestConfig.suppressErrorMessage)
     const canRetryRefresh = !requestUrl.includes('/api/auth/oauth/refresh') && !requestUrl.includes('/api/auth/oauth/exchange')
 
-    if (error.response?.status === 401 && authStore.accessToken && !error.config.__retry && canRetryRefresh) {
+    if (error.response?.status === 401 && authStore.accessToken && !requestConfig.__retry && canRetryRefresh) {
       error.config.__retry = true
       try {
         await authStore.refreshTokens()
         return http.request(error.config)
       } catch {
+        if (silentAuthFailure) {
+          return Promise.reject(error)
+        }
         showError('Login expired, please sign in again')
         await redirectToLogin()
         return Promise.reject(error)
@@ -184,7 +197,7 @@ http.interceptors.response.use(
     }
 
     const authFailure = isAuthenticationFailure(error)
-    if (authFailure && bypassRedirect) {
+    if (authFailure && (bypassRedirect || silentAuthFailure)) {
       return Promise.reject(error)
     }
     if (authFailure) {
@@ -193,7 +206,7 @@ http.interceptors.response.use(
       return new Promise(() => {})
     }
 
-    const method = String(error.config?.method ?? 'get').toLowerCase()
+    const method = String(requestConfig.method ?? 'get').toLowerCase()
     const csrfRetryableMethod = !['get', 'head', 'options'].includes(method)
     if (error.response?.status === 403 && csrfRetryableMethod && !error.config.__csrfRetry && !responseCodeOf(error)) {
       error.config.__csrfRetry = true
@@ -206,12 +219,16 @@ http.interceptors.response.use(
     }
 
     if (error.response?.status === 403) {
-      showError(error.response?.data?.message ?? 'No permission')
+      if (!suppressErrorMessage) {
+        showError(error.response?.data?.message ?? 'No permission')
+      }
       return Promise.reject(error)
     }
 
     const message = error.response?.data?.message ?? 'Request failed, please retry later'
-    showError(message)
+    if (!suppressErrorMessage) {
+      showError(message)
+    }
     return Promise.reject(error)
   },
 )

@@ -574,8 +574,8 @@ function historyParams() {
     changeType: historyQuery.changeType || undefined,
     fieldKey: historyQuery.fieldKey || undefined,
     operator: historyQuery.operator || undefined,
-    fromEpochMs: toEpochMs(historyDateRange.value?.[0]),
-    toEpochMs: toEpochMs(historyDateRange.value?.[1]),
+    fromEpochMs: toEpochMs(historyDateRange.value?.[0]) ?? undefined,
+    toEpochMs: toEpochMs(historyDateRange.value?.[1]) ?? undefined,
   }
 }
 

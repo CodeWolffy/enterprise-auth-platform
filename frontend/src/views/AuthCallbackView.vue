@@ -10,6 +10,7 @@
 </template>
 
 <script setup lang="ts">
+import axios from 'axios'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -42,6 +43,46 @@ const resultTitle = computed(() => {
 const showRetry = computed(() => status.value === 'error')
 const showDashboardEntry = computed(() => status.value === 'success')
 
+const LOGIN_RETRYABLE_CODES = new Set([
+  'SESSION_EXPIRED',
+  'SESSION_NOT_FOUND',
+  'INVALID_TOKEN',
+  'TOKEN_VERSION_MISMATCH',
+  'TENANT_MISMATCH',
+  'USER_DISABLED',
+  'SESSION_SUBJECT_MISMATCH',
+  'ACCESS_TOKEN_TYPE_INVALID',
+])
+const LOGIN_RETRY_ATTEMPTS = 3
+
+function isRetryableLoginError(error: unknown) {
+  if (!axios.isAxiosError(error)) {
+    return false
+  }
+  const status = error.response?.status
+  const code = typeof error.response?.data?.code === 'string' ? error.response.data.code : ''
+  return status === 401 || (status === 403 && LOGIN_RETRYABLE_CODES.has(code))
+}
+
+async function completeLoginWithRetry(code: string, state: string) {
+  let lastError: unknown = null
+  for (let attempt = 1; attempt <= LOGIN_RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      await authStore.finishLogin(code, state)
+      return
+    } catch (error) {
+      lastError = error
+      if (attempt === LOGIN_RETRY_ATTEMPTS || !isRetryableLoginError(error)) {
+        throw error
+      }
+      await new Promise<void>((resolve) => {
+        window.setTimeout(resolve, 150 * attempt)
+      })
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('login callback failed')
+}
+
 function backToLogin() {
   router.replace('/login')
 }
@@ -72,7 +113,7 @@ onMounted(async () => {
   }
 
   try {
-    await authStore.finishLogin(code, state)
+    await completeLoginWithRetry(code, state)
     const target = authStore.menuItems[0]?.path
     if (!target) {
       status.value = 'error'

@@ -119,6 +119,25 @@ const visibleLinks = computed(() => {
   return Array.from(deduped.values())
 })
 
+async function loadTenantOptions() {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const page = await queryTenants(
+        { page: 1, size: 200 },
+        { silentAuthFailure: true, suppressErrorMessage: true },
+      )
+      tenantOptions.value = page.records.map((item) => ({ tenantId: item.tenantId, name: item.name }))
+      return
+    } catch {
+      if (attempt === 1) {
+        tenantOptions.value = []
+        return
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 200))
+    }
+  }
+}
+
 watch(
   () => [canLoadTenants.value, authStore.accessToken] as const,
   async ([canLoad, token]) => {
@@ -126,12 +145,7 @@ watch(
       tenantOptions.value = []
       return
     }
-    try {
-      const page = await queryTenants({ page: 1, size: 200 })
-      tenantOptions.value = page.records.map((item) => ({ tenantId: item.tenantId, name: item.name }))
-    } catch {
-      tenantOptions.value = []
-    }
+    await loadTenantOptions()
   },
   { immediate: true },
 )

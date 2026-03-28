@@ -320,16 +320,15 @@ function pruneEmptyChildren(nodes: DepartmentTreeNode[]) {
 }
 
 function filterTreeByKeyword(nodes: DepartmentTreeNode[], normalizedKeyword: string): DepartmentTreeNode[] {
-  return nodes
-    .map((node) => {
-      const children = node.children ? filterTreeByKeyword(node.children, normalizedKeyword) : []
-      const matched = [node.name, node.code || ''].some((value) => value.toLowerCase().includes(normalizedKeyword))
-      if (matched || children.length > 0) {
-        return { ...node, children: children.length > 0 ? children : undefined }
-      }
-      return null
-    })
-    .filter((item): item is DepartmentTreeNode => Boolean(item))
+  const filtered: DepartmentTreeNode[] = []
+  nodes.forEach((node) => {
+    const children = node.children ? filterTreeByKeyword(node.children, normalizedKeyword) : []
+    const matched = [node.name, node.code || ''].some((value) => value.toLowerCase().includes(normalizedKeyword))
+    if (matched || children.length > 0) {
+      filtered.push({ ...node, children: children.length > 0 ? children : undefined })
+    }
+  })
+  return filtered
 }
 
 function openDepartment(row?: DepartmentView) {

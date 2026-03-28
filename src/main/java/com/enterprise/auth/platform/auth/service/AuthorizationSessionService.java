@@ -14,6 +14,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
@@ -27,6 +29,8 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 @Service
 public class AuthorizationSessionService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthorizationSessionService.class);
 
     private final SessionStore sessionStore;
     private final OAuth2AuthorizationService authorizationService;
@@ -54,7 +58,7 @@ public class AuthorizationSessionService {
             return;
         }
         Instant now = Instant.now();
-        Optional<UserSession> existing = sessionStore.findBySessionId(sessionId);
+        Optional<UserSession> existing = safeFindSession(sessionId);
         UserSession session = new UserSession(
                 sessionId,
                 user.id(),
@@ -67,14 +71,14 @@ public class AuthorizationSessionService {
                 now,
                 true
         );
-        sessionStore.save(session);
+        safeSaveSession(session, "activate");
     }
 
     public Optional<UserSession> findOrRestore(String sessionId, UserAccount user) {
         if (!StringUtils.hasText(sessionId) || user == null) {
             return Optional.empty();
         }
-        Optional<UserSession> existing = sessionStore.findBySessionId(sessionId);
+        Optional<UserSession> existing = safeFindSession(sessionId);
         if (existing.isPresent()) {
             return existing;
         }
@@ -95,7 +99,7 @@ public class AuthorizationSessionService {
                 now,
                 true
         );
-        sessionStore.save(restored);
+        safeSaveSession(restored, "restore");
         return Optional.of(restored);
     }
 
@@ -103,7 +107,11 @@ public class AuthorizationSessionService {
         if (!StringUtils.hasText(sessionId)) {
             return;
         }
-        sessionStore.touch(sessionId);
+        try {
+            sessionStore.touch(sessionId);
+        } catch (RuntimeException ex) {
+            log.warn("Failed to touch authorization session {}, skipped: {}", sessionId, ex.getMessage());
+        }
     }
 
     public void revoke(String sessionId) {
@@ -300,6 +308,24 @@ public class AuthorizationSessionService {
         HttpServletRequest request = attributes.getRequest();
         String userAgent = request.getHeader("User-Agent");
         return StringUtils.hasText(userAgent) ? userAgent : "unknown";
+    }
+
+    private Optional<UserSession> safeFindSession(String sessionId) {
+        try {
+            return sessionStore.findBySessionId(sessionId);
+        } catch (RuntimeException ex) {
+            log.warn("Failed to read authorization session {}, fallback to authorization store: {}", sessionId, ex.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private void safeSaveSession(UserSession session, String phase) {
+        try {
+            sessionStore.save(session);
+        } catch (RuntimeException ex) {
+            log.warn("Failed to persist authorization session during {} for {}, continuing with current auth context: {}",
+                    phase, session.sessionId(), ex.getMessage());
+        }
     }
 
     public record SessionDescriptor(

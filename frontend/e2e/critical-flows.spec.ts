@@ -1,4 +1,4 @@
-﻿import type { Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 import { apiEnvelope, AUTH_STORAGE_KEY, defaultSnapshot, fulfillJson } from './helpers'
 
@@ -127,6 +127,119 @@ test.describe('关键流程回归', () => {
     await expect.poll(() => loginPayload).toContain('tenantId=platform')
   })
 
+  test('auth callback retries transient /api/auth/me failure', async ({ page }) => {
+    const snapshot = defaultSnapshot()
+    let meRequests = 0
+
+    await page.addInitScript(() => {
+      window.sessionStorage.setItem('eap.oauth.verifier', 'verifier-e2e')
+      window.sessionStorage.setItem('eap.oauth.state', 'state-e2e')
+      window.sessionStorage.setItem('eap.oauth.tenant', 'platform')
+    })
+
+    await page.route('**/api/auth/csrf*', async (route) => {
+      await fulfillJson(route, 200, apiEnvelope({
+        headerName: 'X-XSRF-TOKEN',
+        parameterName: '_csrf',
+        token: 'csrf-e2e-token',
+      }))
+    })
+
+    await page.route('**/api/auth/oauth/exchange*', async (route) => {
+      await fulfillJson(route, 200, apiEnvelope({
+        tenantId: 'platform',
+        sessionId: 'oauth-session-e2e',
+        expiresAt: '2099-01-01T00:00:00Z',
+      }))
+    })
+
+    await page.route('**/api/auth/oauth/refresh*', async (route) => {
+      await fulfillJson(route, 200, apiEnvelope({
+        tenantId: 'platform',
+        sessionId: 'oauth-session-e2e',
+        expiresAt: '2099-01-01T00:00:00Z',
+      }))
+    })
+
+    await page.route('**/api/auth/me', async (route) => {
+      meRequests += 1
+      if (meRequests === 1) {
+        await fulfillJson(route, 401, {
+          code: 'SESSION_NOT_FOUND',
+          success: false,
+          data: null,
+          message: 'session missing',
+        })
+        return
+      }
+      await fulfillJson(route, 200, apiEnvelope(snapshot))
+    })
+
+    await page.goto('/auth/callback?code=mock-code&state=state-e2e')
+    await expect(page).toHaveURL(/\/dashboard$/)
+    await expect(page.locator('[data-testid="logout-button"]')).toBeVisible()
+    expect(meRequests).toBeGreaterThanOrEqual(2)
+  })
+
+  test('auth callback ignores transient tenant list 401', async ({ page }) => {
+    const snapshot = {
+      ...defaultSnapshot(),
+      operatorTenantId: 'platform',
+      superAdmin: true,
+    }
+    let tenantRequests = 0
+
+    await page.addInitScript(() => {
+      window.sessionStorage.setItem('eap.oauth.verifier', 'verifier-e2e')
+      window.sessionStorage.setItem('eap.oauth.state', 'state-e2e')
+      window.sessionStorage.setItem('eap.oauth.tenant', 'platform')
+    })
+
+    await page.route('**/api/auth/csrf*', async (route) => {
+      await fulfillJson(route, 200, apiEnvelope({
+        headerName: 'X-XSRF-TOKEN',
+        parameterName: '_csrf',
+        token: 'csrf-e2e-token',
+      }))
+    })
+
+    await page.route('**/api/auth/oauth/exchange*', async (route) => {
+      await fulfillJson(route, 200, apiEnvelope({
+        tenantId: 'platform',
+        sessionId: 'oauth-session-e2e',
+        expiresAt: '2099-01-01T00:00:00Z',
+      }))
+    })
+
+    await page.route('**/api/auth/oauth/refresh*', async (route) => {
+      await fulfillJson(route, 200, apiEnvelope({
+        tenantId: 'platform',
+        sessionId: 'oauth-session-e2e',
+        expiresAt: '2099-01-01T00:00:00Z',
+      }))
+    })
+
+    await page.route('**/api/auth/me', async (route) => {
+      await fulfillJson(route, 200, apiEnvelope(snapshot))
+    })
+
+    await page.route('**/api/tenants*', async (route) => {
+      tenantRequests += 1
+      await fulfillJson(route, 401, {
+        code: 'SESSION_NOT_FOUND',
+        success: false,
+        data: null,
+        message: 'session missing',
+      })
+    })
+
+    await page.goto('/auth/callback?code=mock-code&state=state-e2e')
+    await expect(page).toHaveURL(/\/dashboard$/)
+    await expect(page.locator('[data-testid="logout-button"]')).toBeVisible()
+    await page.waitForTimeout(500)
+    await expect(page).toHaveURL(/\/dashboard$/)
+    expect(tenantRequests).toBeGreaterThan(0)
+  })
   test('登录回调流程：成功换 token 后进入控制台', async ({ page }) => {
     await loginByCallback(page)
     await expect(page.locator('[data-testid="logout-button"]')).toBeVisible()
