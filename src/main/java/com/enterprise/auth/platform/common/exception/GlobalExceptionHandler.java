@@ -4,7 +4,9 @@ import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.common.api.ApiResponse;
 import com.enterprise.auth.platform.common.web.RateLimitInterceptor.RateLimitExceededException;
 import com.enterprise.auth.platform.tenant.TenantContext;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
+import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -14,17 +16,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.csrf.CsrfException;
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.util.StringUtils;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
-import jakarta.servlet.http.HttpServletRequest;
-import java.security.Principal;
-import org.springframework.util.StringUtils;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -45,7 +45,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(RateLimitExceededException.class)
     public ResponseEntity<ApiResponse<Void>> handleRateLimit(RateLimitExceededException exception) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                .header("Retry-After", "60")
+                .header("Retry-After", String.valueOf(exception.retryAfterSeconds()))
                 .body(ApiResponse.fail(RATE_LIMITED_CODE, exception.getMessage()));
     }
 
@@ -59,13 +59,13 @@ public class GlobalExceptionHandler {
     public ApiResponse<Void> handleValidation(Exception exception) {
         return ApiResponse.fail("VALIDATION_ERROR", validationMessage(exception));
     }
+
     @ExceptionHandler(AccessDeniedException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ApiResponse<Void> handleDenied(AccessDeniedException exception, HttpServletRequest request) {
         recordSecurityDenyEvent(exception, request);
         if (exception instanceof CsrfException) {
             log.warn("CSRF 校验失败 {} {}: {}", request.getMethod(), request.getRequestURI(), exception.getMessage());
-            // 返回不带 code 的响应，触发前端 http.ts 拦截器中的 CSRF 重试逻辑
             return ApiResponse.fail(null, "CSRF 令牌不匹配或缺失");
         }
         log.warn("访问被拒绝 {} {}: {}", request.getMethod(), request.getRequestURI(), exception.getMessage());
@@ -99,8 +99,7 @@ public class GlobalExceptionHandler {
                     .orElse("请求参数校验失败");
         }
         if (exception instanceof MethodArgumentTypeMismatchException mismatchException) {
-            String parameter = mismatchException.getName();
-            return parameter + ":参数格式不正确";
+            return mismatchException.getName() + ":参数格式不正确";
         }
         return "请求参数校验失败";
     }

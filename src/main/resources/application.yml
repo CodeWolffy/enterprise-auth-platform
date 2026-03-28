@@ -4,13 +4,16 @@ server:
 spring:
   application:
     name: enterprise-auth-platform
+
   datasource:
+    # 本地开发默认数据库，生产环境请使用 application-prod.yml 的环境变量覆盖。
     url: jdbc:mysql://127.0.0.1:3306/enterprise_auth_platform?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
     username: root
     password: 123456
     driver-class-name: com.mysql.cj.jdbc.Driver
     type: com.zaxxer.hikari.HikariDataSource
     hikari:
+      # 连接池基础参数，默认值偏保守，适合单机开发。
       # 连接池名称（JMX/日志识别用）
       pool-name: EnterpriseAuthHikariCP
       # 最小空闲连接数（保底连接，避免频繁创建）
@@ -26,15 +29,9 @@ spring:
       # 连接最大存活时间（默认30分钟，强制刷新防老化）
       max-lifetime: 1800000
 
-  boot:
-    admin:
-      client:
-        enabled: false
-  jackson:
-    time-zone: UTC
-    default-property-inclusion: non_null
   data:
     redis:
+      # 本地开发默认 Redis，生产环境请改为专用实例。
       host: 139.196.7.151
       port: 6379
       password: zhu123456@
@@ -45,6 +42,15 @@ spring:
           max-wait: -1ms
           max-idle: 8
           min-idle: 0
+
+  jackson:
+    time-zone: UTC
+    default-property-inclusion: non_null
+
+  boot:
+    admin:
+      client:
+        enabled: false
 
 management:
   endpoints:
@@ -64,9 +70,12 @@ knife4j:
 
 app:
   authorization-server:
+    # 部署到正式域名后，这里必须改成外部可访问地址。
     issuer: http://127.0.0.1:8080
     jwk-file: data/oauth2-jwk.json
+
   frontend:
+    # 前端开发环境来源与 OAuth 回调地址。
     allowed-origins:
       - http://127.0.0.1:5173
       - http://localhost:5173
@@ -81,7 +90,9 @@ app:
       - profile
       - api.read
       - api.write
+
   security:
+    # 本地开发密钥，生产环境必须改为安全值。
     jwt-secret: "LOCAL_CHANGE_ME_7B3f1D5k9Q2m6R8t0W4xY7zA1cE5gH9J"
     access-token-ttl: 30m
     refresh-token-ttl: 7d
@@ -95,6 +106,7 @@ app:
       redisson-enabled: true
       key-prefix: "eap:auth:"
       namespace-version: "v2"
+
   tenant:
     header-name: X-Tenant-Id
     platform-tenant-id: platform
@@ -103,27 +115,39 @@ app:
       - oauth2_authorization
       - oauth2_authorization_consent
       - sys_tenant
+
   persistence:
     database-enabled: true
+
   registration:
+    # 注册接口的业务级防刷，不等同于通用接口限流。
     rate-limit-enabled: true
     max-attempts-per-user-ip: 10
     max-attempts-per-ip: 40
     attempt-window: 10m
+
   rate-limit:
+    # 通用接口限流，依赖 Redis 存储令牌桶。
     enabled: true
     default-capacity: 20
     default-refill-tokens: 20
     default-refill-duration: 1m
+    failure-mode: open
+    # 只有来自这些代理地址的请求才会信任 X-Forwarded-For / X-Real-IP。
+    trusted-proxies:
+      - 127.0.0.1/32
+      - ::1/128
     rules:
       login:
         capacity: 5
         refill-tokens: 5
         refill-duration: 60s
+        failure-mode: closed
       captcha:
         capacity: 10
         refill-tokens: 10
         refill-duration: 60s
+        failure-mode: closed
       refresh:
         capacity: 10
         refill-tokens: 10
@@ -132,6 +156,7 @@ app:
         capacity: 5
         refill-tokens: 5
         refill-duration: 60s
+        failure-mode: closed
       rotate-secret:
         capacity: 3
         refill-tokens: 3
@@ -140,7 +165,9 @@ app:
         capacity: 5
         refill-tokens: 5
         refill-duration: 60s
+
   cache:
+    # 统一缓存前缀与不同业务缓存 TTL。
     key-prefix: "eap:cache:"
     namespace-version: "v4"
     default-ttl: 10m
@@ -153,7 +180,9 @@ app:
     system-configs-ttl: 30m
     system-categories-all-ttl: 60m
     system-categories-target-ttl: 60m
+
   features:
+    # 这些开关用于兼容不同部署形态，当前默认全部关闭。
     gateway-enabled: false
     nacos-enabled: false
     mq-enabled: false

@@ -2,7 +2,9 @@ spring:
   config:
     activate:
       on-profile: prod
+
   datasource:
+    # 生产环境数据库账号、密码与连接池参数走环境变量。
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     hikari:
@@ -16,12 +18,15 @@ spring:
 
 app:
   frontend:
+    # 生产环境前端来源与 OAuth 回调地址必须和正式域名一致。
     allowed-origins:
       - ${APP_FRONTEND_ALLOWED_ORIGIN}
     redirect-uris:
       - ${APP_FRONTEND_REDIRECT_URI}
     public-client-secret: ${APP_FRONTEND_CLIENT_SECRET}
+
   security:
+    # 生产环境必须通过环境变量注入安全密钥。
     jwt-secret: ${APP_SECURITY_JWT_SECRET}
     expose-captcha-answer: false
     cookie-secure: true
