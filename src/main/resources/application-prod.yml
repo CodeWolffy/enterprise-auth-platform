@@ -26,7 +26,6 @@ app:
     public-client-secret: ${APP_FRONTEND_CLIENT_SECRET}
 
   security:
-    # 生产环境必须通过环境变量注入安全密钥。
     jwt-secret: ${APP_SECURITY_JWT_SECRET}
     expose-captcha-answer: false
     cookie-secure: true

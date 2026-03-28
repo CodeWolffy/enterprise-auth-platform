@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
 import org.springframework.lang.Nullable;
@@ -40,13 +41,14 @@ import org.springframework.web.servlet.HandlerInterceptor;
 public class RateLimitInterceptor implements HandlerInterceptor {
 
     private static final Logger log = LoggerFactory.getLogger(RateLimitInterceptor.class);
-    private static final String LIMITER_UNAVAILABLE_MESSAGE = "请求频率控制暂不可用，请稍后重试";
+    private static final String LIMITER_UNAVAILABLE_MESSAGE = "限流服务暂不可用，请稍后重试";
 
     private final RateLimitProperties properties;
     private final LettuceBasedProxyManager<String> proxyManager;
     private final RedisClient redisClient;
     private final List<IpAddressMatcher> trustedProxyMatchers;
 
+    @Autowired
     public RateLimitInterceptor(
             RateLimitProperties properties,
             RedisProperties redisProperties
