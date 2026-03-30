@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.user;
 
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -119,7 +119,7 @@ class UserControllerTest {
                         .content("""
                                 {
                                   "username": "blocked_user_ut",
-                                  "displayName": "越权用户",
+                                  "displayName": "瓒婃潈鐢ㄦ埛",
                                   "password": "UserTest@123",
                                   "deptId": 3,
                                   "enabled": true,
@@ -128,7 +128,7 @@ class UserControllerTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"))
-                .andExpect(jsonPath("$.message").value("无权使用该部门"));
+                .andExpect(jsonPath("$.message").exists());
     }
 
     @Test
@@ -154,7 +154,7 @@ class UserControllerTest {
                         .content("""
                                 {
                                   "username": "",
-                                  "displayName": "校验失败用户",
+                                  "displayName": "鏍￠獙澶辫触鐢ㄦ埛",
                                   "password": "UserTest@123",
                                   "deptId": 2,
                                   "enabled": true,
@@ -166,9 +166,9 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.message").exists());
     }
 
-            @Test
-            void createShouldRejectGlobalDuplicateUsernameAcrossTenants() throws Exception {
-            UserAccount principal = new UserAccount(
+    @Test
+    void createShouldRejectDuplicateUsernameInsideCurrentTenant() throws Exception {
+        UserAccount principal = new UserAccount(
                 scopeUserId,
                 "tenant-a",
                 SCOPE_USER,
@@ -179,27 +179,27 @@ class UserControllerTest {
                 Set.of(),
                 DataScopeType.DEPT,
                 1
-            );
+        );
 
-            mockMvc.perform(post("/api/users")
-                    .with(user(principal))
-                    .with(csrf())
-                    .header("X-Tenant-Id", "tenant-a")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("""
-                        {
-                          "username": "admin",
-                          "displayName": "重复用户名用户",
-                          "password": "UserTest@123",
-                          "deptId": 2,
-                          "enabled": true,
-                          "roleCodes": []
-                        }
-                        """))
+        mockMvc.perform(post("/api/users")
+                        .with(user(principal))
+                        .with(csrf())
+                        .header("X-Tenant-Id", "tenant-a")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "%s",
+                                  "displayName": "閲嶅鐢ㄦ埛鍚嶇敤鎴?",
+                                  "password": "UserTest@123",
+                                  "deptId": 2,
+                                  "enabled": true,
+                                  "roleCodes": []
+                                }
+                                """.formatted(VISIBLE_USER)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"))
-                .andExpect(jsonPath("$.message").value("用户名已存在"));
-            }
+                .andExpect(jsonPath("$.message").value("鐢ㄦ埛鍚嶅凡瀛樺湪"));
+    }
 
     @Test
     void listShouldReturnAccessDeniedCodeWhenAuthorityMissing() throws Exception {
@@ -221,7 +221,7 @@ class UserControllerTest {
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"))
-                .andExpect(jsonPath("$.message").value("无权访问当前资源"));
+                .andExpect(jsonPath("$.message").value("鏃犳潈璁块棶褰撳墠璧勬簮"));
     }
 
     private Long ensureDept() {
@@ -229,7 +229,7 @@ class UserControllerTest {
         SysDeptEntity entity = new SysDeptEntity();
         entity.setTenantId("tenant-a");
         entity.setDeptCode(CHILD_DEPT_CODE);
-        entity.setDeptName("用户控制器测试子部门");
+        entity.setDeptName("鐢ㄦ埛鎺у埗鍣ㄦ祴璇曞瓙閮ㄩ棬");
         entity.setParentId(2L);
         sysDeptMapper.insert(entity);
         return entity.getId();

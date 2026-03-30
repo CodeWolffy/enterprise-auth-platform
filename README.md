@@ -1,96 +1,161 @@
-# 企业级权限管理平台（enterprise-auth-platform）
+# 企业级权限管理平台
 
-当前阶段：数据库落地、认证中心可用、前后端联调完成，管理端持续打磨中。
+`enterprise-auth-platform` 是一套面向企业后台场景的权限与租户管理平台。  
+当前代码已经从“OAuth2/OIDC 认证中心 + 自建 JWT/Refresh Token”双轨模式，收敛为更轻量的企业后台模型：
+
+- 账号密码登录
+- Redis Session
+- HttpOnly Cookie
+- CSRF 防护
+- RBAC
+- 多租户隔离
+- 审计与会话治理
+
+## 当前状态
+
+当前主认证链路：
+
+1. 前端调用 `POST /api/auth/login`
+2. 后端校验租户、账号、密码、验证码与登录风控
+3. 后端创建 Redis Session，并下发 `sid` Cookie
+4. 前端通过 `GET /api/auth/me` 恢复用户、菜单和权限快照
+
+当前设计约束：
+
+- 浏览器不再持有 `access_token` / `refresh_token`
+- 后端主链路不再依赖 OAuth2 Authorization Server
+- 角色直接保存 `permissions_json`
+- 自定义数据范围直接保存 `data_scope_value_json`
+- 用户名唯一性按租户约束：`(tenant_id, username)`
+- 改密、禁用、强制下线通过会话版本和 Redis Session 实现
 
 ## 技术栈
 
 ### 后端
+
 - Spring Boot 3.2.5
-- Spring Security + Spring Authorization Server
+- Spring Security
 - MyBatis-Plus
 - MySQL 8.0 + HikariCP
 - Redis / Redisson
-- EasyExcel（审计导出）
+- EasyExcel
 
 ### 前端
+
 - Vue 3 + TypeScript + Vite
 - Element Plus + Pinia + Vue Router + Axios
 - Sass + ECharts
-- Playwright（E2E / 视觉回归）
-
----
+- Playwright
 
 ## 核心能力
 
 ### 认证与授权
-- OAuth2 / OIDC 授权能力可用（授权、令牌、JWK）。
-- 认证 UI 已完全前端化（登录页、授权同意页、回调页均由 Vue 路由承载）。
-- 后端不再渲染认证模板页，仅提供认证能力、授权上下文与安全校验。
-- 授权参数在后端重定向前端登录页时保持透传，前端凭据登录后可无缝继续授权流程。
-- OAuth2 客户端管理：增删改查、启停、密钥轮换、状态历史。
-- OAuth2 作用域管理。
-- 授权记录（consents）查询与撤销。
+
+- 基于 Session Cookie 的企业后台登录
+- 验证码、登录失败限制、会话管理、强制下线
+- RBAC 授权模型
+- 权限快照恢复与菜单动态渲染
 
 ### 平台权限与组织
-- 用户、角色、权限（RBAC）管理。
-- 部门管理。
-- 多租户隔离与租户上下文透传（含平台租户）。
+
+- 用户管理
+- 角色管理
+- 部门管理
+- 多租户隔离与租户上下文透传
 
 ### 系统管理
-- 字典、配置、公告、分类等系统配置管理。
-- 前端管理页统一交互（筛选区、表格偏好、详情抽屉、状态反馈）。
+
+- 字典管理
+- 参数配置
+- 公告管理
+- 分类规则管理
+- 前端统一表格偏好、筛选区、详情抽屉交互
 
 ### 审计与导出治理
-- 审计事件查询与导出。
-- 异步导出任务：创建、列表、下载、重试、单条归档、批量归档、清理。
-- 导出保留策略：查询、更新。
-- 自动治理策略（已落地）：按 `retentionDays` + `maxTasks` 执行归档/清理。
-- 治理支持 `dryRun` 预演。
 
-### 租户目录能力（套餐/能力）
-- 套餐与能力的增删改查。
-- 套餐/能力变更影响分析（impact-analysis）。
+- 审计事件查询与导出
+- 审计导出任务创建、重试、归档、清理
+- 导出保留策略与治理任务
+- `dryRun` 预演支持
 
-### OAuth2 联动引导（已落地）
-- 客户端侧 scope 联动分析。
-- 作用域侧 client 联动分析。
+### 租户目录能力
 
----
+- 套餐管理
+- 能力管理
+- 租户能力覆盖
+- 变更影响分析
 
-## 主要接口（按模块）
+## 主要数据模型
+
+运行时核心表：
+
+- `sys_tenant`
+- `sys_user`
+- `sys_role`
+- `sys_user_role`
+
+角色表关键字段：
+
+- `permissions_json`
+- `data_scope_type`
+- `data_scope_value_json`
+
+已从运行时摘除、通过迁移脚本清理的旧表：
+
+- `oauth2_authorization`
+- `oauth2_authorization_consent`
+- `sys_oauth_client`
+- `sys_oauth_client_history`
+- `sys_oauth_scope`
+- `sys_permission`
+- `sys_role_permission`
+- `sys_role_dept_scope`
+
+## 主要接口
 
 ### 认证
+
 - `GET /api/auth/captcha`
+- `GET /api/auth/csrf`
+- `GET /api/auth/register/options`
 - `POST /api/auth/login`
-- `POST /api/auth/refresh`
 - `POST /api/auth/logout`
 - `GET /api/auth/me`
 - `GET /api/auth/sessions`
 - `POST /api/auth/sessions/{sessionId}/offline`
+- `POST /api/auth/register`
 
-### OAuth2 客户端与作用域
-- `GET /api/oauth-clients`
-- `GET /api/oauth-clients/{id}`
-- `GET /api/oauth-clients/{id}/scope-linkage`
-- `POST /api/oauth-clients`
-- `PUT /api/oauth-clients/{id}`
-- `PUT /api/oauth-clients/{id}/status`
-- `POST /api/oauth-clients/{id}/rotate-secret`
-- `DELETE /api/oauth-clients/{id}`
-- `GET /api/oauth-scopes`
-- `GET /api/oauth-scopes/{id}/client-linkage`
-- `POST /api/oauth-scopes`
-- `PUT /api/oauth-scopes/{id}`
-- `DELETE /api/oauth-scopes/{id}`
+### 用户、角色、部门
 
-### 授权记录
-- `GET /api/auth/consents`
-- `DELETE /api/auth/consents`
+- `GET /api/users`
+- `POST /api/users`
+- `PUT /api/users/{userId}`
+- `DELETE /api/users/{userId}`
+- `GET /api/users/{userId}/roles`
+- `PUT /api/users/{userId}/roles`
+- `GET /api/roles`
+- `POST /api/roles`
+- `PUT /api/roles/{roleId}`
+- `DELETE /api/roles/{roleId}`
+- `GET /api/roles/{roleId}/permissions`
+- `PUT /api/roles/{roleId}/permissions`
+- `GET /api/permissions`
+- `GET /api/depts`
+- `POST /api/depts`
+- `PUT /api/depts/{deptId}`
+- `DELETE /api/depts/{deptId}`
 
 ### 租户与租户目录
+
 - `GET /api/tenants`
+- `POST /api/tenants`
 - `PUT /api/tenants/{tenantId}`
 - `DELETE /api/tenants/{tenantId}`
+- `GET /api/tenants/{tenantId}/history`
+- `GET /api/tenants/{tenantId}/history/summary`
+- `GET /api/tenants/{tenantId}/capability-overrides`
+- `PUT /api/tenants/{tenantId}/capability-overrides`
+- `GET /api/tenants/current`
 - `GET /api/tenant-catalog/packages`
 - `POST /api/tenant-catalog/packages`
 - `PUT /api/tenant-catalog/packages/{id}`
@@ -102,61 +167,86 @@
 - `GET /api/tenant-catalog/capabilities/{id}/impact`
 - `DELETE /api/tenant-catalog/capabilities/{id}`
 
+### 系统管理
+
+- `GET /api/system/features`
+- `GET /api/system/categories`
+- `GET /api/system/categories/{targetType}`
+- `GET /api/system/categories/{targetType}/{code}/analysis`
+- `POST /api/system/categories/{targetType}`
+- `PUT /api/system/categories/{targetType}/{code}`
+- `DELETE /api/system/categories/{targetType}/{code}`
+- `GET /api/system/dicts`
+- `POST /api/system/dicts`
+- `PUT /api/system/dicts/{id}`
+- `DELETE /api/system/dicts/{id}`
+- `GET /api/system/configs`
+- `POST /api/system/configs`
+- `PUT /api/system/configs/{id}`
+- `DELETE /api/system/configs/{id}`
+- `GET /api/system/notices`
+- `POST /api/system/notices`
+- `PUT /api/system/notices/{id}`
+- `DELETE /api/system/notices/{id}`
+
 ### 审计与导出
+
 - `GET /api/audit/events`
 - `GET /api/audit/events/export`
 - `POST /api/audit/exports`
 - `GET /api/audit/exports`
-- `GET /api/audit/exports/{taskId}/download`
-- `POST /api/audit/exports/{taskId}/retry`
-- `POST /api/audit/exports/{taskId}/archive`
-- `POST /api/audit/exports/archive`
-- `DELETE /api/audit/exports/{taskId}`
-- `DELETE /api/audit/exports`
 - `GET /api/audit/exports/policy`
 - `PUT /api/audit/exports/policy`
 - `POST /api/audit/exports/governance`
-
----
+- `GET /api/audit/exports/{taskId}/download`
+- `POST /api/audit/exports/{taskId}/archive`
+- `POST /api/audit/exports/archive`
+- `POST /api/audit/exports/{taskId}/retry`
+- `DELETE /api/audit/exports/{taskId}`
+- `DELETE /api/audit/exports`
 
 ## 启动方式
 
 ### 后端
+
 ```bash
 mvn spring-boot:run
 ```
-或
+
+或：
+
 ```bash
 mvn clean package
 java -jar target/enterprise-auth-platform-0.0.1-SNAPSHOT.jar
 ```
+
 默认端口：`8080`
 
 ### 前端
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-默认端口：`5173`
 
----
+默认端口：`5173`
 
 ## 本地依赖与配置
 
 - MySQL：`127.0.0.1:3306`
 - Redis：`127.0.0.1:6379`
-- 数据库连接池：HikariCP（默认池名 `EnterpriseAuthHikariCP`）
-- 默认数据库连接见 `src/main/resources/application.yml`
+- 默认数据库与安全配置：`src/main/resources/application.yml`
+- 生产配置补充：`src/main/resources/application-prod.yml`
 
-数据库初始化脚本：
-- `src/main/resources/database/enterprise_auth_platform.sql`
+数据库脚本：
 
----
+- 初始化脚本：`src/main/resources/database/enterprise_auth_platform.sql`
 
 ## 构建与测试
 
 ### 后端
+
 ```bash
 mvn "-Dmaven.repo.local=.m2repo" compile
 mvn "-Dmaven.repo.local=.m2repo" test
@@ -164,6 +254,7 @@ mvn "-Dmaven.repo.local=.m2repo" verify
 ```
 
 ### 前端
+
 ```bash
 cd frontend
 npm run lint
@@ -171,6 +262,7 @@ npm run build
 ```
 
 ### E2E / 视觉回归
+
 ```bash
 cd frontend
 npm run test:e2e
@@ -178,26 +270,21 @@ npm run test:visual
 npm run test:visual:update
 ```
 
-### CI 工作流
-- 主 CI：`.github/workflows/ci.yml`（后端 verify + 前端 lint/build + 前端 E2E）。
-- 前端视觉回归：`.github/workflows/frontend-visual-regression.yml`。
+## CI
 
----
+- 主 CI：`.github/workflows/ci.yml`
+- 前端视觉回归：`.github/workflows/frontend-visual-regression.yml`
 
-## 部署前检查清单
+## 部署前检查
 
-- 见 `DEPLOYMENT_CHECKLIST.md`（覆盖 DB、Redis、issuer、allowed-origins、回调地址、租户参数等）。
+- 参考 `DEPLOYMENT_CHECKLIST.md`
+- 重点检查：DB、Redis、`allowed-origins`、租户参数、Cookie 安全策略
 
----
+## 视觉快照策略
 
-## 视觉快照策略（现行唯一）
-
-- 不将 `frontend/e2e/visual-baseline.spec.ts-snapshots/` 提交到 Git。
-- CI 动态生成快照：执行 `npm run test:visual:update`。
-- 快照与报告统一作为 Artifact 上传用于 PR 审阅。
-- 工作流文件：`.github/workflows/frontend-visual-regression.yml`。
-
----
+- 不提交 `frontend/e2e/visual-baseline.spec.ts-snapshots/`
+- CI 中动态生成视觉快照
+- 快照与报告统一作为 Artifact 上传
 
 ## 最近进展（2026-03-23）
 
@@ -252,7 +339,17 @@ npm run test:visual:update
 | 4 | 分布式事务 | Seata（项目已预留依赖） |
 ---
 
+
+
+## 最近改造结果
+
+- 已切换主登录链路到 Session Cookie
+- 已移除前后端 OAuth Client / Scope / Consent 管理入口
+- 已移除后端 JWT / Authorization Server 主路径依赖
+- 已移除权限旧表运行时依赖，角色权限改为 `permissions_json`
+- 已移除自定义部门旧表运行时依赖，角色数据范围改为 `data_scope_value_json`
+
 ## 说明
 
-- 当前 README 已按代码现状整理；如与历史截图/旧文档存在差异，以本文件与代码为准。
-- 认证链路基线：`/login`（前端 UI）→ `/login`（后端表单认证）→ `/auth/consent`（前端 UI）→ `/auth/callback`（前端换码）。
+- 本 README 以当前代码现状为准
+- 如果历史截图、旧设计稿或旧文档与这里不一致，以代码和本文件为准

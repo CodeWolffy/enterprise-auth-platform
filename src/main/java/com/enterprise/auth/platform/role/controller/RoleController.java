@@ -43,7 +43,7 @@ public class RoleController {
 
     @Operation(summary = "查询角色已分配权限")
     @GetMapping("/{roleId}/permissions")
-    @PreAuthorize("hasAuthority('permission:read')")
+    @PreAuthorize("hasAuthority('role:read')")
     public ApiResponse<List<CatalogService.PermissionView>> assignedPermissions(
             @Parameter(description = "角色 ID") @PathVariable Long roleId
     ) {

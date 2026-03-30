@@ -3,7 +3,6 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import type { PermissionSnapshot } from '@/types/auth'
 import { useAuthStore } from '@/stores/auth'
-import { redirectToAuthorizationPage } from '@/utils/authRedirect'
 
 const PUBLIC_ROUTES: RouteRecordRaw[] = [
   {
@@ -18,18 +17,6 @@ const PUBLIC_ROUTES: RouteRecordRaw[] = [
     component: () => import('@/views/RegisterView.vue'),
     meta: { public: true, title: 'Register' },
   },
-  {
-    path: '/auth/callback',
-    name: 'callback',
-    component: () => import('@/views/AuthCallbackView.vue'),
-    meta: { public: true, title: 'Authorization Callback' },
-  },
-  {
-    path: '/auth/consent',
-    name: 'consent-ui',
-    component: () => import('@/views/AuthConsentView.vue'),
-    meta: { public: true, title: 'Authorization Consent' },
-  },
 ]
 
 const DYNAMIC_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = {
@@ -38,18 +25,6 @@ const DYNAMIC_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = {
     name: 'dashboard',
     component: () => import('@/views/DashboardView.vue'),
     meta: { title: 'Dashboard' },
-  },
-  'oauth-clients': {
-    path: 'oauth-clients',
-    name: 'oauth-clients',
-    component: () => import('@/views/OAuthClientsView.vue'),
-    meta: { title: 'OAuth2 Clients' },
-  },
-  'oauth-scopes': {
-    path: 'oauth-scopes',
-    name: 'oauth-scopes',
-    component: () => import('@/views/OAuthScopesView.vue'),
-    meta: { title: 'OAuth2 Scopes', hidden: true, requiresPermission: 'auth:read' },
   },
   users: {
     path: 'system/users',
@@ -62,12 +37,6 @@ const DYNAMIC_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = {
     name: 'roles',
     component: () => import('@/views/RolesView.vue'),
     meta: { title: 'Roles' },
-  },
-  permissions: {
-    path: 'system/permissions',
-    name: 'permissions',
-    component: () => import('@/views/PermissionsView.vue'),
-    meta: { title: 'Permissions' },
   },
   depts: {
     path: 'system/depts',
@@ -92,12 +61,6 @@ const DYNAMIC_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = {
     name: 'settings',
     component: () => import('@/views/SystemManagementView.vue'),
     meta: { title: 'System Settings' },
-  },
-  consents: {
-    path: 'system/consents',
-    name: 'consents',
-    component: () => import('@/views/ConsentsView.vue'),
-    meta: { title: 'Authorization Records', hidden: true, requiresPermission: 'auth:read' },
   },
   'settings-dicts': {
     path: 'system/settings/dicts',
@@ -154,9 +117,6 @@ function isAllowedRoute(snapshot: PermissionSnapshot | null, path: string) {
   if (allowedPaths.has(path)) {
     return true
   }
-  if (snapshot.permissions.includes('auth:read') && ['/system/consents', '/oauth-scopes'].includes(path)) {
-    return true
-  }
   if (snapshot.permissions.includes('system:read') && path.startsWith('/system/settings/')) {
     return true
   }
@@ -181,43 +141,26 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   const authStore = useAuthStore()
-  const tenantId = authStore.operatorTenantId || authStore.tenantId || 'platform'
 
   if (to.meta.public) {
     return true
   }
 
-  if (!authStore.accessToken) {
-    await redirectToAuthorizationPage(tenantId)
-    return false
+  if (!authStore.authenticated) {
+    return { path: '/login', query: { redirect: to.fullPath } }
   }
 
   try {
     if (!authStore.snapshot) {
       await authStore.bootstrapSnapshot()
-    } else if (authStore.shouldRefreshToken()) {
-      await authStore.refreshTokens()
     }
   } catch (error) {
     const status = axios.isAxiosError(error) ? error.response?.status : undefined
-    const code = axios.isAxiosError(error) ? error.response?.data?.code : undefined
-    const shouldClearSession = status === 401
-      || (status === 403 && [
-        'SESSION_EXPIRED',
-        'SESSION_NOT_FOUND',
-        'INVALID_TOKEN',
-        'TOKEN_VERSION_MISMATCH',
-        'TENANT_MISMATCH',
-        'USER_DISABLED',
-        'SESSION_SUBJECT_MISMATCH',
-        'ACCESS_TOKEN_TYPE_INVALID',
-      ].includes(String(code ?? '')))
-    if (!shouldClearSession) {
-      ElMessage.error('Session bootstrap failed, please retry')
-      return false
+    if (status === 401) {
+      authStore.clearSession()
+      return { path: '/login', query: { redirect: to.fullPath } }
     }
-    authStore.clearSession()
-    await redirectToAuthorizationPage(tenantId)
+    ElMessage.error('Session bootstrap failed, please retry')
     return false
   }
 

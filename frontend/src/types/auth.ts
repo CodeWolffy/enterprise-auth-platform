@@ -25,18 +25,16 @@ export interface MenuItem {
   component: string
 }
 
-export interface OAuthTokenResponse {
-  access_token: string
-  refresh_token?: string
-  token_type: string
-  expires_in: number
-  scope?: string
-}
-
 export interface CookieSessionResponse {
   tenantId: string
   sessionId: string
   expiresAt: number
+}
+
+export interface CaptchaResponse {
+  captchaId: string
+  expiresAt: number
+  previewCode?: string | null
 }
 
 export interface CsrfTokenResponse {
@@ -48,76 +46,6 @@ export interface CsrfTokenResponse {
 export interface RegisterOptionsResponse {
   defaultTenantId: string
   defaultRoleCodes: string[]
-}
-
-export interface ClientView {
-  id: number
-  tenantId: string
-  clientId: string
-  clientName: string
-  redirectUris: string[]
-  scopes: string[]
-  scopeDescriptions?: Record<string, string>
-  scopeDetails?: ClientScopeDetailView[]
-  scopeTypeSummary?: Record<string, number>
-  grantTypes: string[]
-  publicClient: boolean
-  requirePkce: boolean
-  requireConsent: boolean
-  enabled: boolean
-  integrationGuidance?: ClientIntegrationGuidanceView | null
-  issuedClientSecret?: string | null
-  statusHistory?: ClientStatusHistoryView[]
-  createdAt?: number
-  updatedAt?: number
-}
-
-export interface ClientScopeDetailView {
-  scopeCode: string
-  scopeName: string
-  scopeDesc?: string | null
-  scopeType?: string | null
-  visibleInConsent: boolean
-  defaultSelected: boolean
-}
-
-export interface ClientIntegrationGuidanceView {
-  recommendedGrantType: string
-  requirePkce: boolean
-  requireConsent: boolean
-  summary: string
-  scopeTips: string[]
-}
-
-export interface ClientStatusHistoryView {
-  eventType: string
-  summary: string
-  operator?: string | null
-  occurredAt?: number | null
-  payload?: Record<string, unknown>
-}
-
-export interface OAuthScopeView {
-  id: number
-  scopeCode: string
-  scopeName: string
-  scopeDesc?: string | null
-  scopeType?: string | null
-  defaultSelected: boolean
-  visibleInConsent: boolean
-  sortOrder?: number | null
-  enabled: boolean
-  updatedAt?: number | null
-  referencedClientCount?: number
-  referencedClientIds?: string[]
-}
-
-export interface ClientStatusPayload {
-  enabled: boolean
-}
-
-export interface RotateClientSecretPayload {
-  clientSecret: string
 }
 
 export interface UserSummary {

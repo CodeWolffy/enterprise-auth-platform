@@ -36,7 +36,7 @@ public class SecurityConfig {
     public SecurityFilterChain apiSecurityFilterChain(
             HttpSecurity http,
             TenantFilter tenantFilter,
-            JwtAuthenticationFilter jwtAuthenticationFilter
+            SessionAuthenticationFilter sessionAuthenticationFilter
     ) throws Exception {
         CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         CsrfTokenRequestAttributeHandler csrfTokenRequestHandler = new CsrfTokenRequestAttributeHandler();
@@ -46,9 +46,7 @@ public class SecurityConfig {
         http.csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository)
                         .csrfTokenRequestHandler(csrfTokenRequestHandler)
-                        .ignoringRequestMatchers(
-                                "/api/auth/login",
-                "/api/auth/refresh"))
+                        .ignoringRequestMatchers("/api/auth/login"))
                 .cors(Customizer.withDefaults())
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
@@ -64,13 +62,12 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**"
                         ).permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/refresh", "/api/auth/register").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/captcha", "/api/auth/csrf", "/api/auth/register/options").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/oauth/exchange", "/api/auth/oauth/refresh").permitAll()
                         .anyRequest().authenticated())
                 .headers(headers -> applySecurityHeaders(headers))
                 .addFilterBefore(tenantFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(jwtAuthenticationFilter, TenantFilter.class)
+                .addFilterAfter(sessionAuthenticationFilter, TenantFilter.class)
                 .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class);
         return http.build();
     }

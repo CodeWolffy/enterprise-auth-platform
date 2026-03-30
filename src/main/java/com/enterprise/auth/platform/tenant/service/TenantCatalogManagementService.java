@@ -131,7 +131,7 @@ public class TenantCatalogManagementService {
             actions.add("先将引用租户迁移到新套餐，再执行删除或高风险变更。");
         }
         if (capabilityCodes.isEmpty()) {
-            actions.add("至少补齐一项基础能力（如 oauth、user、audit）后再下发到租户。");
+            actions.add("至少补齐一项基础能力（如 auth、user、audit）后再下发到租户。");
         }
         if (actions.isEmpty()) {
             actions.add("当前未发现阻断项，可按变更流程执行。");

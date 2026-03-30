@@ -1,21 +1,16 @@
 package com.enterprise.auth.platform.persistence.repository;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.common.model.DataScopeType;
+import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.config.PersistenceProperties;
-import com.enterprise.auth.platform.persistence.entity.SysConfigEntity;
-import com.enterprise.auth.platform.persistence.entity.SysPermissionEntity;
 import com.enterprise.auth.platform.persistence.entity.SysRoleEntity;
-import com.enterprise.auth.platform.persistence.entity.SysRolePermissionEntity;
 import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
 import com.enterprise.auth.platform.persistence.entity.SysUserRoleEntity;
-import com.enterprise.auth.platform.persistence.mapper.SysConfigMapper;
-import com.enterprise.auth.platform.persistence.mapper.SysPermissionMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysRoleMapper;
-import com.enterprise.auth.platform.persistence.mapper.SysRolePermissionMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysUserRoleMapper;
+import com.enterprise.auth.platform.role.support.RolePayloadCodec;
 import com.enterprise.auth.platform.security.AuthPrincipalCacheService;
 import com.enterprise.auth.platform.user.model.UserAccount;
 import com.enterprise.auth.platform.user.repository.UserRepository;
@@ -37,29 +32,23 @@ public class DatabaseUserRepository implements UserRepository {
     private final SysUserMapper sysUserMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
     private final SysRoleMapper sysRoleMapper;
-    private final SysRolePermissionMapper sysRolePermissionMapper;
-    private final SysPermissionMapper sysPermissionMapper;
-    private final SysConfigMapper sysConfigMapper;
     private final AuthPrincipalCacheService authPrincipalCacheService;
+    private final RolePayloadCodec rolePayloadCodec;
 
     public DatabaseUserRepository(
             PersistenceProperties persistenceProperties,
             @Nullable SysUserMapper sysUserMapper,
             @Nullable SysUserRoleMapper sysUserRoleMapper,
             @Nullable SysRoleMapper sysRoleMapper,
-            @Nullable SysRolePermissionMapper sysRolePermissionMapper,
-            @Nullable SysPermissionMapper sysPermissionMapper,
-            @Nullable SysConfigMapper sysConfigMapper,
-            AuthPrincipalCacheService authPrincipalCacheService
+            AuthPrincipalCacheService authPrincipalCacheService,
+            RolePayloadCodec rolePayloadCodec
     ) {
         this.persistenceProperties = persistenceProperties;
         this.sysUserMapper = sysUserMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
         this.sysRoleMapper = sysRoleMapper;
-        this.sysRolePermissionMapper = sysRolePermissionMapper;
-        this.sysPermissionMapper = sysPermissionMapper;
-        this.sysConfigMapper = sysConfigMapper;
         this.authPrincipalCacheService = authPrincipalCacheService;
+        this.rolePayloadCodec = rolePayloadCodec;
     }
 
     @Override
@@ -168,22 +157,12 @@ public class DatabaseUserRepository implements UserRepository {
                 .map(this::parseScope)
                 .max(java.util.Comparator.comparingInt(this::scopeWeight))
                 .orElse(DataScopeType.SELF);
-        Set<Long> customDeptIds = loadCustomDeptIds(tenantId, roles);
-
-        List<Long> roleIds = roles.stream().map(SysRoleEntity::getId).toList();
-        List<SysRolePermissionEntity> rolePermissions = sysRolePermissionMapper.selectList(new LambdaQueryWrapper<SysRolePermissionEntity>()
-                .eq(SysRolePermissionEntity::getTenantId, tenantId)
-                .in(SysRolePermissionEntity::getRoleId, roleIds));
-        if (rolePermissions.isEmpty()) {
-            return new RoleData(new HashSet<>(), dataScopeType, customDeptIds);
-        }
-        List<Long> permissionIds = rolePermissions.stream().map(SysRolePermissionEntity::getPermissionId).distinct().toList();
-        Set<String> permissionCodes = sysPermissionMapper.selectList(new LambdaQueryWrapper<SysPermissionEntity>()
-                        .eq(SysPermissionEntity::getTenantId, tenantId)
-                        .eq(SysPermissionEntity::getDeleted, 0)
-                        .in(SysPermissionEntity::getId, permissionIds))
-                .stream()
-                .map(SysPermissionEntity::getPermissionCode)
+        Set<Long> customDeptIds = roles.stream()
+                .filter(role -> parseScope(role.getDataScopeType()) == DataScopeType.CUSTOM)
+                .flatMap(role -> rolePayloadCodec.readDeptIds(role.getDataScopeValueJson()).stream())
+                .collect(Collectors.toSet());
+        Set<String> permissionCodes = roles.stream()
+                .flatMap(role -> rolePayloadCodec.readPermissionCodes(role.getPermissionsJson()).stream())
                 .collect(Collectors.toSet());
         return new RoleData(permissionCodes, dataScopeType, customDeptIds);
     }
@@ -192,10 +171,7 @@ public class DatabaseUserRepository implements UserRepository {
         return persistenceProperties.databaseEnabled()
                 && sysUserMapper != null
                 && sysUserRoleMapper != null
-                && sysRoleMapper != null
-                && sysRolePermissionMapper != null
-                && sysPermissionMapper != null
-                && sysConfigMapper != null;
+                && sysRoleMapper != null;
     }
 
     private DataScopeType parseScope(String value) {
@@ -214,34 +190,6 @@ public class DatabaseUserRepository implements UserRepository {
             case CUSTOM -> 4;
             case ALL -> 5;
         };
-    }
-
-    private Set<Long> loadCustomDeptIds(String tenantId, List<SysRoleEntity> roles) {
-        List<String> roleCodes = roles.stream()
-                .filter(role -> parseScope(role.getDataScopeType()) == DataScopeType.CUSTOM)
-                .map(SysRoleEntity::getRoleCode)
-                .toList();
-        if (roleCodes.isEmpty()) {
-            return new HashSet<>();
-        }
-        List<String> configKeys = roleCodes.stream().map(roleCode -> "role.custom_dept_ids." + roleCode).toList();
-        return sysConfigMapper.selectList(new LambdaQueryWrapper<SysConfigEntity>()
-                        .eq(SysConfigEntity::getTenantId, tenantId)
-                        .eq(SysConfigEntity::getDeleted, 0)
-                        .in(SysConfigEntity::getConfigKey, configKeys))
-                .stream()
-                .flatMap(config -> java.util.Arrays.stream(config.getConfigValue().split(",")))
-                .map(String::trim)
-                .filter(item -> !item.isEmpty())
-                .map(item -> {
-                    try {
-                        return Long.parseLong(item);
-                    } catch (NumberFormatException ignored) {
-                        return null;
-                    }
-                })
-                .filter(java.util.Objects::nonNull)
-                .collect(Collectors.toSet());
     }
 
     private record RoleData(Set<String> permissionCodes, DataScopeType dataScopeType, Set<Long> customDeptIds) {

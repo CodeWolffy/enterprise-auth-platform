@@ -9,10 +9,7 @@ public record AppCacheProperties(
         String namespaceVersion,
         Duration defaultTtl,
         Duration authPrincipalTtl,
-    Duration oauthRegisteredClientTtl,
-    Duration oauthClientsTtl,
-    Duration oauthScopesTtl,
-    Duration registrationPolicyTtl,
+        Duration registrationPolicyTtl,
         Duration systemDictsTtl,
         Duration systemConfigsTtl,
         Duration systemCategoriesAllTtl,
@@ -45,18 +42,6 @@ public record AppCacheProperties(
 
     public Duration resolvedAuthPrincipalTtl() {
         return resolvePositiveTtl(authPrincipalTtl, Duration.ofMinutes(15));
-    }
-
-    public Duration resolvedOauthRegisteredClientTtl() {
-        return resolvePositiveTtl(oauthRegisteredClientTtl, Duration.ofMinutes(5));
-    }
-
-    public Duration resolvedOauthClientsTtl() {
-        return resolvePositiveTtl(oauthClientsTtl, Duration.ofMinutes(5));
-    }
-
-    public Duration resolvedOauthScopesTtl() {
-        return resolvePositiveTtl(oauthScopesTtl, Duration.ofMinutes(5));
     }
 
     public Duration resolvedRegistrationPolicyTtl() {

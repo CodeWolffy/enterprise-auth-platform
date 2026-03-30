@@ -1,39 +1,34 @@
 <template>
   <div class="auth-stage">
     <section class="auth-panel auth-panel--hero">
-      <span class="eyebrow">Frontend / Authorization Code + PKCE</span>
+      <span class="eyebrow">Session / Redis / RBAC</span>
       <h1>企业级权限管理平台</h1>
       <p>
-        当前前端已经直接联调 Spring Authorization Server。登录完成后会进入统一控制台，可继续管理
-        OAuth2 客户端、用户、角色、权限、部门、租户、审计与系统配置。
+        当前登录链路已切换到轻量模式：账号密码登录、Redis 会话、HttpOnly Cookie、RBAC 与多租户隔离。
+        浏览器不再保存 access token 或 refresh token。
       </p>
       <ul class="highlights">
-        <li>公共客户端：eap-frontend-spa</li>
-        <li>授权方式：Authorization Code + PKCE</li>
-        <li>支持租户登录、中文登录页与中文同意页</li>
+        <li>认证方式：Session Cookie</li>
+        <li>授权模型：RBAC + 多租户</li>
+        <li>安全基线：CSRF、验证码、会话失效、强制下线</li>
       </ul>
     </section>
 
     <section class="auth-panel auth-panel--form">
       <span class="eyebrow">Tenant Access</span>
-      <h2>{{ oauthContextReady ? '登录并继续授权' : '开始 OAuth2 登录' }}</h2>
-      <p>{{ oauthContextReady ? '请输入账号密码，系统将自动匹配所属租户并继续授权流程。' : '点击后将跳转到后端统一认证中心继续完成授权。' }}</p>
-
-      <el-alert
-        v-if="loginErrorMessage"
-        :title="loginErrorMessage"
-        type="warning"
-        show-icon
-        :closable="false"
-        class="auth-alert"
-      />
+      <h2>登录控制台</h2>
+      <p>请输入租户、用户名、密码与验证码，登录成功后会直接进入控制台。</p>
 
       <el-form label-position="top" @submit.prevent="handleLogin">
-        <el-form-item v-if="oauthContextReady" label="用户名" :error="usernameError">
+        <el-form-item label="租户">
+          <el-input v-model="tenantId" placeholder="例如：platform" autocomplete="organization" />
+        </el-form-item>
+
+        <el-form-item label="用户名" :error="usernameError">
           <el-input v-model="username" placeholder="请输入用户名" autocomplete="username" />
         </el-form-item>
 
-        <el-form-item v-if="oauthContextReady" label="密码" :error="passwordError">
+        <el-form-item label="密码" :error="passwordError">
           <el-input
             v-model="password"
             type="password"
@@ -42,15 +37,27 @@
             autocomplete="current-password"
           />
         </el-form-item>
+
+        <el-form-item label="验证码" :error="captchaError">
+          <div class="captcha-row">
+            <el-input v-model="captchaCode" placeholder="请输入验证码" maxlength="4" />
+            <el-button @click="reloadCaptcha">刷新</el-button>
+          </div>
+          <div class="captcha-preview">
+            <span>验证码</span>
+            <strong>{{ captchaPreview }}</strong>
+          </div>
+        </el-form-item>
+
         <div class="auth-actions">
           <el-button type="primary" size="large" :loading="loading" data-testid="login-submit" native-type="submit">
-            {{ oauthContextReady ? '登录并继续授权' : '跳转统一认证中心' }}
+            登录
           </el-button>
         </div>
       </el-form>
 
       <div class="auth-footnote">
-        登录后将由后端写入 HttpOnly 安全 Cookie，前端不落地敏感令牌。
+        登录后将由后端写入 HttpOnly 安全 Cookie，前端仅保存会话状态与权限快照。
       </div>
 
       <el-divider>还没有账号？<el-link type="primary" @click="$router.push('/register')">立即注册</el-link></el-divider>
@@ -59,102 +66,83 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { getBackendOrigin } from '@/utils/oauth'
+import { fetchCaptcha } from '@/api/auth'
 
-const authStore = useAuthStore()
+const router = useRouter()
 const route = useRoute()
+const authStore = useAuthStore()
+
+const tenantId = ref(String(route.query.tenantId ?? 'platform'))
 const username = ref('')
 const password = ref('')
+const captchaId = ref('')
+const captchaCode = ref('')
+const captchaPreview = ref('----')
 const loading = ref(false)
 const usernameError = ref('')
 const passwordError = ref('')
+const captchaError = ref('')
 
-const backendOrigin = getBackendOrigin()
+async function reloadCaptcha() {
+  const captcha = await fetchCaptcha()
+  captchaId.value = captcha.captchaId
+  captchaPreview.value = captcha.previewCode || '开发环境未开放预览'
+  captchaCode.value = ''
+}
 
-const loginErrorMessage = computed(() => {
-  const code = String(route.query.error ?? '').trim().toLowerCase()
-  if (!code) {
-    return ''
-  }
-  if (code === 'locked') {
-    return '账户已锁定，请联系管理员或稍后重试。'
-  }
-  if (code === 'bad_credentials') {
-    return '用户名或密码错误，请重新登录。'
-  }
-  return `登录失败：${code}`
-})
-
-const oauthContextReady = computed(() => {
-  const hasResponseType = String(route.query.response_type ?? '').toLowerCase() === 'code'
-  const hasClientId = String(route.query.client_id ?? '').trim().length > 0
-  const hasState = String(route.query.state ?? '').trim().length > 0
-  return hasResponseType && hasClientId && hasState
-})
-
-function resetCredentialErrors() {
+function resetErrors() {
   usernameError.value = ''
   passwordError.value = ''
+  captchaError.value = ''
 }
 
 async function handleLogin() {
   if (loading.value) {
     return
   }
-  resetCredentialErrors()
+  resetErrors()
+  if (!tenantId.value.trim()) {
+    usernameError.value = '请输入租户'
+    return
+  }
+  if (!username.value.trim()) {
+    usernameError.value = '请输入用户名'
+    return
+  }
+  if (!password.value) {
+    passwordError.value = '请输入密码'
+    return
+  }
+  if (!captchaId.value || !captchaCode.value.trim()) {
+    captchaError.value = '请输入验证码'
+    return
+  }
+
   loading.value = true
   try {
-    if (oauthContextReady.value) {
-      if (!username.value.trim()) {
-        usernameError.value = '请输入用户名'
-        return
-      }
-      if (!password.value) {
-        passwordError.value = '请输入密码'
-        return
-      }
-      submitBackendLoginForm()
-      return
-    }
-
-    await authStore.startLogin()
+    await authStore.login({
+      tenantId: tenantId.value.trim(),
+      username: username.value.trim(),
+      password: password.value,
+      captchaId: captchaId.value,
+      captchaCode: captchaCode.value.trim(),
+      device: navigator.userAgent,
+    })
+    const redirect = String(route.query.redirect ?? authStore.menuItems[0]?.path ?? '/dashboard')
+    await router.replace(redirect)
+  } catch {
+    await reloadCaptcha()
   } finally {
     loading.value = false
   }
 }
 
-function submitBackendLoginForm() {
-  const form = document.createElement('form')
-  form.method = 'post'
-  form.action = `${backendOrigin}/login`
-
-  appendHidden(form, 'username', username.value.trim())
-  appendHidden(form, 'password', password.value)
-
-  const clientId = String(route.query.client_id ?? '').trim()
-  if (clientId) {
-    appendHidden(form, 'client_id', clientId)
-  }
-
-  const tenantId = String(route.query.tenantId ?? '').trim()
-  if (tenantId) {
-    appendHidden(form, 'tenantId', tenantId)
-  }
-
-  document.body.appendChild(form)
-  form.submit()
-}
-
-function appendHidden(form: HTMLFormElement, name: string, value: string) {
-  const input = document.createElement('input')
-  input.type = 'hidden'
-  input.name = name
-  input.value = value
-  form.appendChild(input)
-}
+onMounted(async () => {
+  await reloadCaptcha()
+})
 </script>
 
 <style scoped>
@@ -207,8 +195,26 @@ function appendHidden(form: HTMLFormElement, name: string, value: string) {
   gap: 10px;
 }
 
-.auth-alert {
-  margin-bottom: 4px;
+.captcha-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+}
+
+.captcha-preview {
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(53, 89, 166, 0.08);
+  color: #3559a6;
+}
+
+.captcha-preview strong {
+  font-size: 20px;
+  letter-spacing: 0.18em;
 }
 
 .auth-actions :deep(.el-button) {

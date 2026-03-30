@@ -1,6 +1,12 @@
 import { http } from './http'
-import type { ApiResponse, CookieSessionResponse, CsrfTokenResponse, PermissionSnapshot, RegisterOptionsResponse } from '@/types/auth'
-import { consumeOAuthContext, getRedirectUri } from '@/utils/oauth'
+import type {
+  ApiResponse,
+  CaptchaResponse,
+  CookieSessionResponse,
+  CsrfTokenResponse,
+  PermissionSnapshot,
+  RegisterOptionsResponse,
+} from '@/types/auth'
 
 let csrfReady = false
 let csrfPromise: Promise<void> | null = null
@@ -40,38 +46,21 @@ export async function fetchRegisterOptions() {
   return data.data
 }
 
-export async function exchangeAuthorizationCode(code: string, state: string) {
-  const context = consumeOAuthContext()
-  if (!context.verifier || !context.state || context.state !== state) {
-    throw new Error('授权状态校验失败，请重新登录')
-  }
-  await ensureCsrfToken()
-  const requestConfig = context.tenantId
-    ? {
-        headers: {
-          'X-Tenant-Id': context.tenantId,
-        },
-        params: {
-          tenantId: context.tenantId,
-        },
-      }
-    : undefined
-
-  const { data } = await http.post<ApiResponse<CookieSessionResponse>>(
-    '/api/auth/oauth/exchange',
-    {
-      code,
-      codeVerifier: context.verifier,
-      redirectUri: getRedirectUri(),
-    },
-    requestConfig,
-  )
-  return { payload: data.data, tenantId: data.data.tenantId || context.tenantId || 'platform' }
+export async function fetchCaptcha() {
+  const { data } = await http.get<ApiResponse<CaptchaResponse>>('/api/auth/captcha')
+  return data.data
 }
 
-export async function refreshOauthToken() {
+export async function loginWithPassword(payload: {
+  username: string
+  password: string
+  captchaId: string
+  captchaCode: string
+  tenantId?: string
+  device?: string
+}) {
   await ensureCsrfToken()
-  const { data } = await http.post<ApiResponse<CookieSessionResponse>>('/api/auth/oauth/refresh')
+  const { data } = await http.post<ApiResponse<CookieSessionResponse>>('/api/auth/login', payload)
   return data.data
 }
 

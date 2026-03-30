@@ -3,7 +3,7 @@
     <div class="brand">
       <span class="eyebrow">Enterprise Auth Platform</span>
       <h1>权限中台</h1>
-      <p>统一管理认证、授权、多租户、审计与系统治理能力。</p>
+      <p>统一管理认证、多租户、审计与系统治理能力。</p>
     </div>
 
     <nav class="app-nav__links">
@@ -32,7 +32,7 @@
           :value="tenant.tenantId"
         />
       </el-select>
-      <small v-if="authStore.canSwitchTenant">操作者租户：{{ authStore.operatorTenantId }}</small>
+      <small v-if="authStore.canSwitchTenant">操作员租户：{{ authStore.operatorTenantId }}</small>
       <small>{{ authStore.snapshot?.dataScopeType ?? '未登录' }}</small>
     </div>
   </aside>
@@ -44,8 +44,6 @@ import {
   Connection,
   Flag,
   Histogram,
-  Key,
-  Lock,
   Monitor,
   OfficeBuilding,
   Setting,
@@ -69,7 +67,6 @@ const canLoadTenants = computed(() => {
 
 const iconMap: Record<string, any> = {
   dashboard: Monitor,
-  'oauth-clients': Lock,
   users: Avatar,
   roles: Connection,
   permissions: Tickets,
@@ -77,12 +74,10 @@ const iconMap: Record<string, any> = {
   tenants: Flag,
   audit: Histogram,
   settings: Setting,
-  consents: Key,
 }
 
 const titleMap: Record<string, string> = {
   dashboard: '运行总览',
-  'oauth-clients': 'OAuth2 客户端',
   users: '用户管理',
   roles: '角色管理',
   permissions: '权限管理',
@@ -92,32 +87,13 @@ const titleMap: Record<string, string> = {
   settings: '系统管理',
 }
 
-const visibleLinks = computed(() => {
-  const links = authStore.menuItems.map((menu) => ({
+const visibleLinks = computed(() =>
+  authStore.menuItems.map((menu) => ({
     to: menu.path,
     label: titleMap[menu.code] || menu.title,
     icon: iconMap[menu.code] || Tickets,
-  }))
-
-  if (authStore.snapshot?.permissions.includes('auth:read')) {
-    links.push({
-      to: '/system/consents',
-      label: '授权记录',
-      icon: Key,
-    })
-    links.push({
-      to: '/oauth-scopes',
-      label: 'OAuth2 作用域',
-      icon: Lock,
-    })
-  }
-
-  const deduped = new Map<string, (typeof links)[number]>()
-  for (const link of links) {
-    deduped.set(link.to, link)
-  }
-  return Array.from(deduped.values())
-})
+  })),
+)
 
 async function loadTenantOptions() {
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -139,9 +115,9 @@ async function loadTenantOptions() {
 }
 
 watch(
-  () => [canLoadTenants.value, authStore.accessToken] as const,
-  async ([canLoad, token]) => {
-    if (!canLoad || !token) {
+  () => [canLoadTenants.value, authStore.authenticated] as const,
+  async ([canLoad, authenticated]) => {
+    if (!canLoad || !authenticated) {
       tenantOptions.value = []
       return
     }

@@ -1,7 +1,6 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
-import { redirectToAuthorizationPage } from '@/utils/authRedirect'
 import type { ApiResponse, CsrfTokenResponse } from '@/types/auth'
 
 function resolveBackendOrigin() {
@@ -18,18 +17,6 @@ function resolveBackendOrigin() {
 const backendOrigin = resolveBackendOrigin()
 let csrfReady = false
 let csrfPromise: Promise<void> | null = null
-
-const AUTH_INVALID_CODES = new Set([
-  'SESSION_EXPIRED',
-  'SESSION_NOT_FOUND',
-  'INVALID_TOKEN',
-  'TOKEN_VERSION_MISMATCH',
-  'TENANT_MISMATCH',
-  'USER_DISABLED',
-  'BAD_CREDENTIALS',
-  'SESSION_SUBJECT_MISMATCH',
-  'ACCESS_TOKEN_TYPE_INVALID',
-])
 
 export const http = axios.create({
   baseURL: backendOrigin,
@@ -57,43 +44,18 @@ function showError(message: string) {
   })
 }
 
-async function redirectToLogin() {
-  const authStore = useAuthStore()
-  const tenantId = authStore.operatorTenantId || authStore.tenantId || 'platform'
-  authStore.clearSession()
-  await redirectToAuthorizationPage(tenantId)
-}
-
-function responseCodeOf(error: any): string | null {
-  const code = error?.response?.data?.code
-  return typeof code === 'string' ? code : null
-}
-
-function isAuthenticationFailure(error: any) {
-  const status = error?.response?.status
-  const code = responseCodeOf(error)
-  if (status === 401) {
-    return true
+function redirectToLogin() {
+  if (typeof window === 'undefined' || window.location.pathname === '/login') {
+    return
   }
-  if (status !== 403) {
-    return false
-  }
-  if (!code) {
-    return false
-  }
-  return AUTH_INVALID_CODES.has(code)
+  window.location.href = '/login'
 }
 
 function isAuthEndpoint(url: string) {
   return url.includes('/api/auth/csrf')
-    || url.includes('/api/auth/oauth/exchange')
-    || url.includes('/api/auth/oauth/refresh')
     || url.includes('/api/auth/login')
-    || url.includes('/api/auth/refresh')
-}
-
-function isTenantHeaderBypassEndpoint(url: string) {
-  return isAuthEndpoint(url) || url.includes('/oauth2/')
+    || url.includes('/api/auth/logout')
+    || url.includes('/api/auth/register')
 }
 
 function shouldEnsureCsrf(method: string | undefined, url: string) {
@@ -138,18 +100,7 @@ http.interceptors.request.use(async (config) => {
   if (shouldEnsureCsrf(config.method, requestUrl)) {
     await ensureCsrfToken()
   }
-  if (authStore.accessToken) {
-    try {
-      if (!isAuthEndpoint(requestUrl) && authStore.shouldRefreshToken()) {
-        await authStore.refreshTokens()
-      }
-    } catch {
-      showError('Login expired, please sign in again')
-      await redirectToLogin()
-      return Promise.reject(new Error('token refresh failed'))
-    }
-  }
-  if (authStore.tenantId && !isTenantHeaderBypassEndpoint(requestUrl)) {
+  if (authStore.tenantId && !isAuthEndpoint(requestUrl)) {
     const currentTenantHeader = typeof config.headers?.get === 'function'
       ? config.headers.get('X-Tenant-Id')
       : config.headers?.['X-Tenant-Id']
@@ -167,65 +118,43 @@ http.interceptors.response.use(
     const requestConfig = (error.config ?? {}) as {
       url?: string
       method?: string
-      __retry?: boolean
       __csrfRetry?: boolean
       silentAuthFailure?: boolean
       suppressErrorMessage?: boolean
     }
     const requestUrl = String(requestConfig.url ?? '')
-    const inAuthCallback = typeof window !== 'undefined' && window.location.pathname === '/auth/callback'
-    const bypassRedirect = requestUrl.includes('/api/auth/csrf')
-      || requestUrl.includes('/api/auth/oauth/exchange')
-      || (inAuthCallback && requestUrl.includes('/api/auth/me'))
     const silentAuthFailure = Boolean(requestConfig.silentAuthFailure)
     const suppressErrorMessage = Boolean(requestConfig.suppressErrorMessage)
-    const canRetryRefresh = !requestUrl.includes('/api/auth/oauth/refresh') && !requestUrl.includes('/api/auth/oauth/exchange')
 
-    if (error.response?.status === 401 && authStore.accessToken && !requestConfig.__retry && canRetryRefresh) {
-      error.config.__retry = true
-      try {
-        await authStore.refreshTokens()
-        return http.request(error.config)
-      } catch {
-        if (silentAuthFailure) {
-          return Promise.reject(error)
-        }
-        showError('Login expired, please sign in again')
-        await redirectToLogin()
-        return Promise.reject(error)
+    if (error.response?.status === 401 && !isAuthEndpoint(requestUrl)) {
+      authStore.clearSession()
+      if (!silentAuthFailure) {
+        showError('登录已失效，请重新登录')
+        redirectToLogin()
       }
-    }
-
-    const authFailure = isAuthenticationFailure(error)
-    if (authFailure && (bypassRedirect || silentAuthFailure)) {
       return Promise.reject(error)
-    }
-    if (authFailure) {
-      showError('Login expired, please sign in again')
-      await redirectToLogin()
-      return new Promise(() => {})
     }
 
     const method = String(requestConfig.method ?? 'get').toLowerCase()
     const csrfRetryableMethod = !['get', 'head', 'options'].includes(method)
-    if (error.response?.status === 403 && csrfRetryableMethod && !error.config.__csrfRetry && !responseCodeOf(error)) {
-      error.config.__csrfRetry = true
+    if (error.response?.status === 403 && csrfRetryableMethod && !requestConfig.__csrfRetry && !error.response?.data?.code) {
+      requestConfig.__csrfRetry = true
       try {
         await ensureCsrfToken(true)
         return http.request(error.config)
       } catch {
-        // fallthrough to generic 403 handling
+        // fallthrough
       }
     }
 
     if (error.response?.status === 403) {
       if (!suppressErrorMessage) {
-        showError(error.response?.data?.message ?? 'No permission')
+        showError(error.response?.data?.message ?? '无权限')
       }
       return Promise.reject(error)
     }
 
-    const message = error.response?.data?.message ?? 'Request failed, please retry later'
+    const message = error.response?.data?.message ?? '请求失败，请稍后重试'
     if (!suppressErrorMessage) {
       showError(message)
     }

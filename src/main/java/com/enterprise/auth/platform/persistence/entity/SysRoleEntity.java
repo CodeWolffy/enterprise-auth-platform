@@ -17,7 +17,9 @@ public class SysRoleEntity {
     private String roleCode;
     private String roleName;
     private String roleDesc;
+    private String permissionsJson;
     private String dataScopeType;
+    private String dataScopeValueJson;
     @TableField(fill = FieldFill.INSERT)
     private String createdBy;
     @TableField(fill = FieldFill.INSERT_UPDATE)
@@ -39,8 +41,12 @@ public class SysRoleEntity {
     public void setRoleName(String roleName) { this.roleName = roleName; }
     public String getRoleDesc() { return roleDesc; }
     public void setRoleDesc(String roleDesc) { this.roleDesc = roleDesc; }
+    public String getPermissionsJson() { return permissionsJson; }
+    public void setPermissionsJson(String permissionsJson) { this.permissionsJson = permissionsJson; }
     public String getDataScopeType() { return dataScopeType; }
     public void setDataScopeType(String dataScopeType) { this.dataScopeType = dataScopeType; }
+    public String getDataScopeValueJson() { return dataScopeValueJson; }
+    public void setDataScopeValueJson(String dataScopeValueJson) { this.dataScopeValueJson = dataScopeValueJson; }
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
     public String getUpdatedBy() { return updatedBy; }

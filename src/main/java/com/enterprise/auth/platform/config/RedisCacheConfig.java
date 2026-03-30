@@ -39,9 +39,6 @@ public class RedisCacheConfig implements CachingConfigurer {
     ) {
         return builder -> builder
                 .withCacheConfiguration("auth:principal", defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedAuthPrincipalTtl()))
-                .withCacheConfiguration("oauth:registered-client", defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedOauthRegisteredClientTtl()))
-                .withCacheConfiguration("oauth:clients", defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedOauthClientsTtl()))
-                .withCacheConfiguration("oauth:scopes", defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedOauthScopesTtl()))
                 .withCacheConfiguration("registration:policy", defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedRegistrationPolicyTtl()))
                 .withCacheConfiguration("system:dicts", defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedSystemDictsTtl()))
                 .withCacheConfiguration("system:configs", defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedSystemConfigsTtl()))

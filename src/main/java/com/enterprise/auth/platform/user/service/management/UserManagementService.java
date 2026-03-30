@@ -76,7 +76,7 @@ public class UserManagementService {
     @Transactional
     public UserSummary createUser(String tenantId, CreateUserRequest request, String operator) {
         requireDatabaseMode();
-        if (existsUsernameGlobally(request.username())) {
+        if (existsByUsername(tenantId, request.username())) {
             throw new BusinessException("用户名已存在");
         }
         validateDeptAccess(tenantId, request.deptId());
@@ -235,20 +235,6 @@ public class UserManagementService {
         if (deptId != null && !dataScopeService.canAccessDept(tenantId, deptId)) {
             throw new BusinessException("无权使用该部门");
         }
-    }
-
-    private boolean existsUsernameGlobally(String username) {
-        if (jdbcTemplate != null) {
-            Integer count = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(1) FROM sys_user WHERE username = ? AND deleted = 0",
-                    Integer.class,
-                    username
-            );
-            return count != null && count > 0;
-        }
-        return sysUserMapper.selectCount(new LambdaQueryWrapper<SysUserEntity>()
-                .eq(SysUserEntity::getUsername, username)
-                .eq(SysUserEntity::getDeleted, 0)) > 0;
     }
 
     public boolean existsByUsername(String tenantId, String username) {

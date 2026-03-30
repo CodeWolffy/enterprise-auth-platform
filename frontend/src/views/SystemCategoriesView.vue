@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="panel-stack">
     <section class="dashboard-grid">
       <article class="stat-card">
@@ -122,7 +122,7 @@
           <el-input v-model="form.name" />
         </el-form-item>
         <el-form-item label="匹配规则" prop="matchersText">
-          <el-input v-model="form.matchersText" type="textarea" :rows="4" placeholder="每行一个匹配规则，例如 oauth.*" />
+          <el-input v-model="form.matchersText" type="textarea" :rows="4" placeholder="每行一个匹配规则，例如 auth.*" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -379,3 +379,4 @@ function onCategoryHeaderDragEnd(newWidth: number, _oldWidth: number, column: { 
   margin: 12px 0 8px;
 }
 </style>
+

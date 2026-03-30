@@ -820,7 +820,7 @@ public class TenantManagementService {
 
     private String defaultCapabilityDescription(String code) {
         return switch (code) {
-            case "oauth" -> "统一认证、授权码登录与开放接入能力";
+            case "auth" -> "轻量登录、会话、强制下线与安全治理能力";
             case "user" -> "用户目录、启停、角色分配与组织可见范围管理";
             case "role" -> "角色模型、权限树与数据范围授权";
             case "dept" -> "组织树、负责人和部门层级治理";

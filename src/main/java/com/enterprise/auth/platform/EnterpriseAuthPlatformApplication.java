@@ -1,6 +1,5 @@
 package com.enterprise.auth.platform;
 
-import com.enterprise.auth.platform.config.AuthorizationServerProperties;
 import com.enterprise.auth.platform.config.AppCacheProperties;
 import com.enterprise.auth.platform.config.FeatureToggleProperties;
 import com.enterprise.auth.platform.config.FrontendProperties;
@@ -18,7 +17,6 @@ import org.springframework.cache.annotation.EnableCaching;
 @EnableCaching
 @SpringBootApplication
 @ConfigurationPropertiesScan(basePackageClasses = {
-        AuthorizationServerProperties.class,
         SecurityProperties.class,
         AppCacheProperties.class,
         SecurityRedisProperties.class,

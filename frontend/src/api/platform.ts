@@ -125,20 +125,6 @@ export async function queryPermissions() {
   return data.data
 }
 
-export async function createPermission(payload: Record<string, unknown>) {
-  const { data } = await http.post<ApiResponse<PermissionView>>('/api/permissions', payload)
-  return data.data
-}
-
-export async function updatePermission(id: number, payload: Record<string, unknown>) {
-  const { data } = await http.put<ApiResponse<PermissionView>>(`/api/permissions/${id}`, payload)
-  return data.data
-}
-
-export async function deletePermission(id: number) {
-  await http.delete(`/api/permissions/${id}`)
-}
-
 export async function queryDepartments() {
   const { data } = await http.get<ApiResponse<DepartmentView[]>>('/api/depts')
   return data.data

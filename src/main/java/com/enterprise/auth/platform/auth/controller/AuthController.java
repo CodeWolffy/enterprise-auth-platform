@@ -4,19 +4,15 @@ import com.enterprise.auth.platform.auth.dto.CaptchaResponse;
 import com.enterprise.auth.platform.auth.dto.CookieSessionResponse;
 import com.enterprise.auth.platform.auth.dto.CsrfTokenResponse;
 import com.enterprise.auth.platform.auth.dto.LoginRequest;
-import com.enterprise.auth.platform.auth.dto.OAuthCodeExchangeRequest;
 import com.enterprise.auth.platform.auth.dto.PermissionSnapshotResponse;
 import com.enterprise.auth.platform.auth.dto.RegisterOptionsResponse;
-import com.enterprise.auth.platform.auth.dto.RefreshTokenRequest;
-import com.enterprise.auth.platform.auth.dto.TokenResponse;
 import com.enterprise.auth.platform.auth.dto.UserSessionResponse;
-import com.enterprise.auth.platform.auth.model.TokenClaims;
-import com.enterprise.auth.platform.auth.security.TrustedRequestOriginValidator;
+import com.enterprise.auth.platform.auth.model.SessionPrincipal;
 import com.enterprise.auth.platform.auth.service.AuthService;
 import com.enterprise.auth.platform.auth.service.CaptchaService;
-import com.enterprise.auth.platform.auth.service.OAuthCookieSessionService;
 import com.enterprise.auth.platform.auth.service.PermissionSnapshotService;
 import com.enterprise.auth.platform.auth.service.RegistrationPolicyService;
+import com.enterprise.auth.platform.auth.service.SessionService;
 import com.enterprise.auth.platform.common.annotation.RateLimit;
 import com.enterprise.auth.platform.common.api.ApiResponse;
 import com.enterprise.auth.platform.common.exception.BusinessException;
@@ -48,24 +44,21 @@ public class AuthController {
     private final CaptchaService captchaService;
     private final AuthService authService;
     private final PermissionSnapshotService permissionSnapshotService;
-    private final OAuthCookieSessionService oauthCookieSessionService;
-    private final TrustedRequestOriginValidator trustedRequestOriginValidator;
     private final RegistrationPolicyService registrationPolicyService;
+    private final SessionService sessionService;
 
     public AuthController(
             CaptchaService captchaService,
             AuthService authService,
             PermissionSnapshotService permissionSnapshotService,
-            OAuthCookieSessionService oauthCookieSessionService,
-            TrustedRequestOriginValidator trustedRequestOriginValidator,
-            RegistrationPolicyService registrationPolicyService
+            RegistrationPolicyService registrationPolicyService,
+            SessionService sessionService
     ) {
         this.captchaService = captchaService;
         this.authService = authService;
         this.permissionSnapshotService = permissionSnapshotService;
-        this.oauthCookieSessionService = oauthCookieSessionService;
-        this.trustedRequestOriginValidator = trustedRequestOriginValidator;
         this.registrationPolicyService = registrationPolicyService;
+        this.sessionService = sessionService;
     }
 
     @Operation(summary = "获取登录验证码")
@@ -90,7 +83,7 @@ public class AuthController {
         ));
     }
 
-    @Operation(summary = "获取注册公共配置")
+    @Operation(summary = "获取注册默认配置")
     @GetMapping("/register/options")
     public ApiResponse<RegisterOptionsResponse> registerOptions() {
         return ApiResponse.ok(new RegisterOptionsResponse(
@@ -99,47 +92,18 @@ public class AuthController {
         ));
     }
 
-    @Operation(summary = "OAuth 授权码交换并写入安全 Cookie")
-    @RateLimit(key = "oauth", strategy = RateLimit.Strategy.IP)
-    @PostMapping("/oauth/exchange")
-    public ApiResponse<CookieSessionResponse> oauthExchange(
-            @Valid @RequestBody OAuthCodeExchangeRequest request,
-            HttpServletRequest servletRequest,
-            HttpServletResponse servletResponse
-    ) {
-        trustedRequestOriginValidator.requireTrustedBrowserOrigin(servletRequest);
-        return ApiResponse.ok(oauthCookieSessionService.exchangeAuthorizationCode(
-                request.code(),
-                request.codeVerifier(),
-                request.redirectUri(),
-                servletRequest,
-                servletResponse
-        ));
-    }
-
-    @Operation(summary = "使用 Cookie 刷新会话")
-    @RateLimit(key = "oauth", strategy = RateLimit.Strategy.IP)
-    @PostMapping("/oauth/refresh")
-    public ApiResponse<CookieSessionResponse> oauthRefresh(
-            HttpServletRequest servletRequest,
-            HttpServletResponse servletResponse
-    ) {
-        trustedRequestOriginValidator.requireTrustedBrowserOrigin(servletRequest);
-        return ApiResponse.ok(oauthCookieSessionService.refresh(servletRequest, servletResponse));
-    }
-
-    @Operation(summary = "账号登录")
+    @Operation(summary = "账号密码登录并写入 Session Cookie")
     @RateLimit(key = "login", strategy = RateLimit.Strategy.IP)
     @PostMapping("/login")
-    public ApiResponse<TokenResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest servletRequest) {
-        return ApiResponse.ok(authService.login(request, servletRequest));
-    }
-
-    @Operation(summary = "刷新访问令牌")
-    @RateLimit(key = "refresh", strategy = RateLimit.Strategy.IP)
-    @PostMapping("/refresh")
-    public ApiResponse<TokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
-        return ApiResponse.ok(authService.refresh(request.refreshToken()));
+    public ApiResponse<CookieSessionResponse> login(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletRequest servletRequest,
+            HttpServletResponse servletResponse
+    ) {
+        CookieSessionResponse session = authService.login(request, servletRequest);
+        sessionService.findSession(session.sessionId())
+                .ifPresent(userSession -> sessionService.writeSessionCookie(servletRequest, servletResponse, userSession));
+        return ApiResponse.ok(session);
     }
 
     @Operation(summary = "退出登录")
@@ -149,12 +113,11 @@ public class AuthController {
             HttpServletRequest servletRequest,
             HttpServletResponse servletResponse
     ) {
-        trustedRequestOriginValidator.requireTrustedBrowserOrigin(servletRequest);
-        oauthCookieSessionService.clearCookies(servletRequest, servletResponse);
+        sessionService.clearSessionCookie(servletRequest, servletResponse);
         if (authentication != null
                 && authentication.getPrincipal() instanceof UserAccount user
-                && authentication.getDetails() instanceof TokenClaims claims) {
-            authService.logout(claims.sessionId(), user.username(), user.tenantId());
+                && authentication.getDetails() instanceof SessionPrincipal session) {
+            authService.logout(session.sessionId(), user.username(), user.tenantId());
         }
         return ApiResponse.ok();
     }
@@ -189,7 +152,7 @@ public class AuthController {
 
     private UserAccount currentUser(Authentication authentication) {
         if (authentication == null || !(authentication.getPrincipal() instanceof UserAccount user)) {
-            throw new BusinessException("用户未登录");
+            throw new BusinessException("UNAUTHORIZED", "用户未登录");
         }
         return user;
     }

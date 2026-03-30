@@ -6,7 +6,6 @@ spring:
     name: enterprise-auth-platform
 
   datasource:
-    # 本地开发默认数据库，生产环境请用 application-prod.yml 环境变量覆盖。
     url: jdbc:mysql://127.0.0.1:3306/enterprise_auth_platform?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
     username: root
     password: 123456
@@ -23,7 +22,6 @@ spring:
 
   data:
     redis:
-      # 本地开发默认 Redis。
       host: 139.196.7.151
       port: 6379
       password: zhu123456@
@@ -61,26 +59,10 @@ knife4j:
   enable: true
 
 app:
-  authorization-server:
-    # 部署到正式域名后，这里必须改成外部可访问地址。
-    issuer: http://127.0.0.1:8080
-    jwk-file: data/oauth2-jwk.json
-
   frontend:
     allowed-origins:
       - http://127.0.0.1:5173
       - http://localhost:5173
-    public-client-id: eap-frontend-spa
-    public-client-secret: FrontendClientSecret@123
-    public-client-name: Frontend Console
-    redirect-uris:
-      - http://127.0.0.1:5173/auth/callback
-      - http://localhost:5173/auth/callback
-    scopes:
-      - openid
-      - profile
-      - api.read
-      - api.write
 
   security:
     # 本地开发密钥，生产环境必须覆盖为安全值。
@@ -103,8 +85,6 @@ app:
     platform-tenant-id: platform
     mybatis-tenant-enabled: true
     mybatis-ignore-tables:
-      - oauth2_authorization
-      - oauth2_authorization_consent
       - sys_tenant
 
   persistence:
@@ -138,19 +118,6 @@ app:
         refill-tokens: 10
         refill-duration: 60s
         failure-mode: closed
-      refresh:
-        capacity: 10
-        refill-tokens: 10
-        refill-duration: 60s
-      oauth:
-        capacity: 5
-        refill-tokens: 5
-        refill-duration: 60s
-        failure-mode: closed
-      rotate-secret:
-        capacity: 3
-        refill-tokens: 3
-        refill-duration: 300s
       export:
         capacity: 5
         refill-tokens: 5
@@ -161,9 +128,6 @@ app:
     namespace-version: "v4"
     default-ttl: 10m
     auth-principal-ttl: 15m
-    oauth-registered-client-ttl: 5m
-    oauth-clients-ttl: 5m
-    oauth-scopes-ttl: 5m
     registration-policy-ttl: 5m
     system-dicts-ttl: 30m
     system-configs-ttl: 30m

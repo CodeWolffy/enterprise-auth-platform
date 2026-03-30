@@ -1,16 +1,13 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { ElMessage } from 'element-plus'
-import { exchangeAuthorizationCode, fetchPermissionSnapshot, logoutCurrentSession, refreshOauthToken } from '@/api/auth'
-import type { CookieSessionResponse, PermissionSnapshot } from '@/types/auth'
-import { createOAuthRedirect } from '@/utils/oauth'
+import { fetchPermissionSnapshot, loginWithPassword, logoutCurrentSession } from '@/api/auth'
+import type { PermissionSnapshot } from '@/types/auth'
 import { clearDynamicRoutes, registerDynamicRoutes } from '@/router'
 
 const storageKey = 'eap.frontend.auth'
-
 interface PersistedSession {
-  accessToken: string
-  refreshToken: string
+  authenticated: boolean
   expiresAt: number
   tenantId: string
   operatorTenantId?: string
@@ -18,15 +15,13 @@ interface PersistedSession {
 }
 
 export const useAuthStore = defineStore('auth', () => {
-  const accessToken = ref('')
-  const refreshToken = ref('')
+  const authenticated = ref(false)
   const expiresAt = ref(0)
   const tenantId = ref('platform')
   const operatorTenantId = ref('platform')
   const snapshot = ref<PermissionSnapshot | null>(null)
-  let refreshingPromise: Promise<void> | null = null
 
-  const isAuthenticated = computed(() => Boolean(accessToken.value && snapshot.value))
+  const isAuthenticated = computed(() => authenticated.value)
   const menuItems = computed(() => snapshot.value?.menus ?? [])
   const canSwitchTenant = computed(() => Boolean(snapshot.value?.superAdmin))
 
@@ -36,10 +31,9 @@ export const useAuthStore = defineStore('auth', () => {
       return
     }
     const parsed = JSON.parse(raw) as PersistedSession
-    accessToken.value = parsed.accessToken
-    refreshToken.value = parsed.refreshToken
+    authenticated.value = parsed.authenticated
     expiresAt.value = parsed.expiresAt
-    tenantId.value = parsed.tenantId
+    tenantId.value = parsed.tenantId || 'platform'
     operatorTenantId.value = parsed.operatorTenantId || parsed.tenantId || 'platform'
     snapshot.value = parsed.snapshot
     syncTenantFromSnapshot()
@@ -50,8 +44,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   function persist() {
     const payload: PersistedSession = {
-      accessToken: accessToken.value,
-      refreshToken: refreshToken.value,
+      authenticated: authenticated.value,
       expiresAt: expiresAt.value,
       tenantId: tenantId.value,
       operatorTenantId: operatorTenantId.value,
@@ -60,56 +53,27 @@ export const useAuthStore = defineStore('auth', () => {
     sessionStorage.setItem(storageKey, JSON.stringify(payload))
   }
 
-  async function startLogin() {
-    const target = await createOAuthRedirect()
-    window.location.href = target
-  }
-
-  async function finishLogin(code: string, state: string) {
-    const { payload, tenantId: resolvedTenantId } = await exchangeAuthorizationCode(code, state)
-    applyTokenPayload(payload, resolvedTenantId)
-    tenantId.value = payload.tenantId || resolvedTenantId
+  async function login(payload: {
+    username: string
+    password: string
+    captchaId: string
+    captchaCode: string
+    tenantId?: string
+    device?: string
+  }) {
+    const session = await loginWithPassword(payload)
+    authenticated.value = true
+    expiresAt.value = Number.isFinite(session.expiresAt) ? session.expiresAt : Date.now() + 7 * 24 * 60 * 60 * 1000
+    operatorTenantId.value = session.tenantId || payload.tenantId || 'platform'
+    tenantId.value = operatorTenantId.value
     snapshot.value = await fetchPermissionSnapshot()
     syncTenantFromSnapshot()
     registerDynamicRoutes(snapshot.value)
     persist()
   }
 
-  async function refreshTokens(options?: { reloadSnapshot?: boolean }) {
-    if (refreshingPromise) {
-      await refreshingPromise
-      return
-    }
-
-    const reloadSnapshot = Boolean(options?.reloadSnapshot)
-    refreshingPromise = (async () => {
-      if (!refreshToken.value) {
-        throw new Error('missing refresh token')
-      }
-      const payload = await refreshOauthToken()
-      applyTokenPayload(payload, operatorTenantId.value || tenantId.value)
-
-      if (reloadSnapshot) {
-        snapshot.value = await fetchPermissionSnapshot()
-        syncTenantFromSnapshot()
-        registerDynamicRoutes(snapshot.value)
-      }
-      persist()
-    })()
-
-    try {
-      await refreshingPromise
-    } finally {
-      refreshingPromise = null
-    }
-  }
-
   async function bootstrapSnapshot() {
-    if (!accessToken.value) {
-      return
-    }
-    if (shouldRefreshToken()) {
-      await refreshTokens({ reloadSnapshot: true })
+    if (!authenticated.value) {
       return
     }
     snapshot.value = await fetchPermissionSnapshot()
@@ -139,13 +103,8 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  function shouldRefreshToken() {
-    return Boolean(refreshToken.value) && Date.now() > expiresAt.value - 60_000
-  }
-
   function clearSession() {
-    accessToken.value = ''
-    refreshToken.value = ''
+    authenticated.value = false
     expiresAt.value = 0
     tenantId.value = 'platform'
     operatorTenantId.value = 'platform'
@@ -157,7 +116,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function logout() {
     try {
-      if (accessToken.value) {
+      if (authenticated.value) {
         await logoutCurrentSession()
       }
     } catch {
@@ -165,16 +124,6 @@ export const useAuthStore = defineStore('auth', () => {
     }
     clearSession()
     ElMessage.success('已退出当前会话')
-  }
-
-  function applyTokenPayload(payload: CookieSessionResponse, resolvedTenantId: string) {
-    accessToken.value = 'cookie-access'
-    refreshToken.value = 'cookie-refresh'
-    expiresAt.value = Number.isFinite(payload.expiresAt) ? payload.expiresAt : Date.now() + 5 * 60 * 1000
-    operatorTenantId.value = payload.tenantId || resolvedTenantId
-    if (!tenantId.value) {
-      tenantId.value = operatorTenantId.value
-    }
   }
 
   function syncTenantFromSnapshot() {
@@ -191,8 +140,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   return {
-    accessToken,
-    refreshToken,
+    authenticated,
     expiresAt,
     tenantId,
     operatorTenantId,
@@ -202,11 +150,8 @@ export const useAuthStore = defineStore('auth', () => {
     canSwitchTenant,
     restore,
     bootstrapSnapshot,
-    startLogin,
-    finishLogin,
-    refreshTokens,
+    login,
     switchTenant,
-    shouldRefreshToken,
     clearSession,
     logout,
   }

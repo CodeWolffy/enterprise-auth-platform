@@ -12,11 +12,8 @@ public record TenantProperties(
                 List<String> mybatisIgnoreTables
 ) {
 
-        public List<String> resolvedIgnoreTables() {
-                LinkedHashSet<String> defaults = new LinkedHashSet<>(List.of(
-                                "oauth2_authorization",
-                                "oauth2_authorization_consent"
-                ));
+    public List<String> resolvedIgnoreTables() {
+                LinkedHashSet<String> defaults = new LinkedHashSet<>();
                 if (mybatisIgnoreTables != null) {
                         defaults.addAll(mybatisIgnoreTables);
                 }
