@@ -9,13 +9,13 @@ const PUBLIC_ROUTES: RouteRecordRaw[] = [
     path: '/login',
     name: 'login',
     component: () => import('@/views/LoginView.vue'),
-    meta: { public: true, title: 'Sign In' },
+    meta: { public: true, title: '登录' },
   },
   {
     path: '/register',
     name: 'register',
     component: () => import('@/views/RegisterView.vue'),
-    meta: { public: true, title: 'Register' },
+    meta: { public: true, title: '注册' },
   },
 ]
 
@@ -109,6 +109,13 @@ const SHELL_ROUTE: RouteRecordRaw = {
   ],
 }
 
+const FALLBACK_ROUTE: RouteRecordRaw = {
+  path: '/:pathMatch(.*)*',
+  name: 'not-found',
+  component: () => import('@/views/NotFoundView.vue'),
+  meta: { title: '页面未找到' },
+}
+
 function isAllowedRoute(snapshot: PermissionSnapshot | null, path: string) {
   if (!snapshot) {
     return false
@@ -133,7 +140,7 @@ function resolveFirstAllowedPath(snapshot: PermissionSnapshot | null) {
 
 const router = createRouter({
   history: createWebHistory(),
-  routes: [...PUBLIC_ROUTES, SHELL_ROUTE],
+  routes: [...PUBLIC_ROUTES, SHELL_ROUTE, FALLBACK_ROUTE],
   scrollBehavior() {
     return { top: 0, left: 0 }
   },
@@ -162,6 +169,10 @@ router.beforeEach(async (to) => {
     }
     ElMessage.error('Session bootstrap failed, please retry')
     return false
+  }
+
+  if (to.name === 'not-found') {
+    return true
   }
 
   if (to.path !== '/' && !isAllowedRoute(authStore.snapshot, to.path)) {

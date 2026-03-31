@@ -13,6 +13,7 @@ declare module 'vue' {
   export interface GlobalComponents {
     AdvancedSearch: typeof import('./src/components/AdvancedSearch.vue')['default']
     AppNav: typeof import('./src/components/AppNav.vue')['default']
+    AuthCharactersScene: typeof import('./src/components/auth/AuthCharactersScene.vue')['default']
     ElAlert: typeof import('element-plus/es')['ElAlert']
     ElButton: typeof import('element-plus/es')['ElButton']
     ElCheckbox: typeof import('element-plus/es')['ElCheckbox']
