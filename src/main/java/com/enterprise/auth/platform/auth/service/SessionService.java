@@ -43,7 +43,7 @@ public class SessionService {
                 clientIp,
                 StringUtils.hasText(device) ? device : "unknown",
                 now,
-                now.plus(securityProperties.refreshTokenTtl()),
+                now.plus(securityProperties.sessionTtl()),
                 now,
                 true
         );
@@ -69,7 +69,7 @@ public class SessionService {
 
     public void writeSessionCookie(HttpServletRequest request, HttpServletResponse response, UserSession session) {
         writeCookie(response, request, AuthCookieConstants.SESSION_COOKIE, session.sessionId(),
-                Math.max(1L, securityProperties.refreshTokenTtl().toSeconds()));
+                Math.max(1L, securityProperties.sessionTtl().toSeconds()));
     }
 
     public void clearSessionCookie(HttpServletRequest request, HttpServletResponse response) {

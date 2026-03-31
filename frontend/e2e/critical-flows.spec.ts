@@ -1,230 +1,153 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
-import { apiEnvelope, AUTH_STORAGE_KEY, defaultSnapshot, fulfillJson } from './helpers'
+import { apiEnvelope, AUTH_STORAGE_KEY, defaultSnapshot, fulfillJson, seedAuthSession } from './helpers'
 
-async function loginByCallback(page: Page) {
-  const snapshot = defaultSnapshot()
+async function mockDashboardApis(page: Page) {
+  await page.route('**/*', async (route) => {
+    const request = route.request()
+    const url = new URL(request.url())
+    const method = request.method()
 
-  await page.addInitScript(() => {
-    window.sessionStorage.setItem('eap.oauth.verifier', 'verifier-e2e')
-    window.sessionStorage.setItem('eap.oauth.state', 'state-e2e')
-    window.sessionStorage.setItem('eap.oauth.tenant', 'platform')
+    if (!url.pathname.startsWith('/api/')) {
+      await route.continue()
+      return
+    }
+
+    if (url.pathname === '/api/system/dicts' && method === 'GET') {
+      await fulfillJson(route, 200, apiEnvelope({ total: 2, page: 1, size: 1, records: [] }))
+      return
+    }
+
+    if (url.pathname === '/api/system/configs' && method === 'GET') {
+      await fulfillJson(route, 200, apiEnvelope({ total: 3, page: 1, size: 1, records: [] }))
+      return
+    }
+
+    if (url.pathname === '/api/system/notices' && method === 'GET') {
+      const published = url.searchParams.get('published') === 'true'
+      await fulfillJson(route, 200, apiEnvelope({ total: published ? 1 : 4, page: 1, size: 1, records: [] }))
+      return
+    }
+
+    if (url.pathname === '/api/system/features' && method === 'GET') {
+      await fulfillJson(route, 200, apiEnvelope({
+        gatewayEnabled: false,
+        nacosEnabled: false,
+        mqEnabled: false,
+        seataEnabled: false,
+        jobEnabled: false,
+        lokiEnabled: false,
+      }))
+      return
+    }
+
+    await fulfillJson(route, 200, apiEnvelope({}))
   })
+}
 
-  await page.route('**/api/auth/csrf*', async (route) => {
-    await route.fulfill({
-      status: 200,
-      headers: {
-        'access-control-allow-origin': '*',
-        'access-control-allow-headers': '*',
-        'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS',
-      },
-      contentType: 'application/json',
-      body: JSON.stringify(
-        apiEnvelope({
-          headerName: 'X-XSRF-TOKEN',
-          parameterName: '_csrf',
-          token: 'csrf-e2e-token',
-        }),
-      ),
-    })
-  })
-
-  await page.route('**/api/auth/oauth/exchange*', async (route) => {
-    await route.fulfill({
-      status: 200,
-      headers: {
-        'access-control-allow-origin': '*',
-        'access-control-allow-headers': '*',
-        'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS',
-      },
-      contentType: 'application/json',
-      body: JSON.stringify(
-        apiEnvelope({
-          tenantId: 'platform',
-          sessionId: 'oauth-session-e2e',
-          expiresAt: '2099-01-01T00:00:00Z',
-        }),
-      ),
-    })
-  })
-
-  await page.route('**/api/auth/oauth/refresh*', async (route) => {
-    await route.fulfill({
-      status: 200,
-      headers: {
-        'access-control-allow-origin': '*',
-        'access-control-allow-headers': '*',
-        'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS',
-      },
-      contentType: 'application/json',
-      body: JSON.stringify(
-        apiEnvelope({
-          tenantId: 'platform',
-          sessionId: 'oauth-session-e2e',
-          expiresAt: '2099-01-01T00:00:00Z',
-        }),
-      ),
-    })
-  })
-
-  await page.route('**/api/auth/me', async (route) => {
-    await fulfillJson(route, 200, apiEnvelope(snapshot))
-  })
-
-  await page.goto('/auth/callback?code=mock-code&state=state-e2e')
-  await expect(page).toHaveURL(/\/dashboard$/)
+async function fillLoginForm(page: Page) {
+  const inputs = page.locator('.auth-panel--form input')
+  await inputs.nth(0).fill('platform')
+  await inputs.nth(1).fill('admin')
+  await inputs.nth(2).fill('Admin@123456')
+  await inputs.nth(3).fill('2468')
 }
 
 test.describe('关键流程回归', () => {
-  test('前端登录页：携带 OAuth 参数时展示账号密码并提交 /login', async ({ page }) => {
-    let loginPayload = ''
-
-    await page.route('**/login', async (route) => {
-      loginPayload = route.request().postData() ?? ''
-      await route.fulfill({
-        status: 200,
-        contentType: 'text/html',
-        body: '<html><body>ok</body></html>',
-      })
-    })
-
-    await page.goto('/login?response_type=code&client_id=eap-frontend-spa&state=state-e2e&tenantId=platform')
-    await expect(page.getByRole('heading', { level: 2, name: '登录并继续授权' })).toBeVisible()
-
-    await page.getByPlaceholder('请输入用户名').fill('admin')
-    await page.getByPlaceholder('请输入密码').fill('password-123')
-    await page.locator('[data-testid="login-submit"]').click()
-
-    await expect.poll(() => loginPayload).toContain('tenantId=platform')
-    await expect.poll(() => loginPayload).toContain('username=admin')
-    await expect.poll(() => loginPayload).toContain('password=password-123')
-    await expect.poll(() => loginPayload).toContain('client_id=eap-frontend-spa')
-  })
-
-  test('前端登录页：密码框回车只提交一次 /login', async ({ page }) => {
-    let submitCount = 0
-    let loginPayload = ''
-
-    await page.route('**/login', async (route) => {
-      submitCount += 1
-      loginPayload = route.request().postData() ?? ''
-      await route.fulfill({
-        status: 200,
-        contentType: 'text/html',
-        body: '<html><body>ok</body></html>',
-      })
-    })
-
-    await page.goto('/login?response_type=code&client_id=eap-frontend-spa&state=state-e2e&tenantId=platform')
-    await page.getByPlaceholder('请输入用户名').fill('admin')
-    await page.getByPlaceholder('请输入密码').fill('password-123')
-    await page.getByPlaceholder('请输入密码').press('Enter')
-
-    await expect.poll(() => submitCount).toBe(1)
-    await expect.poll(() => loginPayload).toContain('username=admin')
-    await expect.poll(() => loginPayload).toContain('password=password-123')
-    await expect.poll(() => loginPayload).toContain('tenantId=platform')
-  })
-
-  test('auth callback retries transient /api/auth/me failure', async ({ page }) => {
+  test('登录页走当前 Session 登录链路并进入控制台', async ({ page }) => {
     const snapshot = defaultSnapshot()
-    let meRequests = 0
+    let loginPayload = ''
 
-    await page.addInitScript(() => {
-      window.sessionStorage.setItem('eap.oauth.verifier', 'verifier-e2e')
-      window.sessionStorage.setItem('eap.oauth.state', 'state-e2e')
-      window.sessionStorage.setItem('eap.oauth.tenant', 'platform')
-    })
+    await page.route('**/*', async (route) => {
+      const request = route.request()
+      const url = new URL(request.url())
+      const method = request.method()
 
-    await page.route('**/api/auth/csrf*', async (route) => {
-      await fulfillJson(route, 200, apiEnvelope({
-        headerName: 'X-XSRF-TOKEN',
-        parameterName: '_csrf',
-        token: 'csrf-e2e-token',
-      }))
-    })
-
-    await page.route('**/api/auth/oauth/exchange*', async (route) => {
-      await fulfillJson(route, 200, apiEnvelope({
-        tenantId: 'platform',
-        sessionId: 'oauth-session-e2e',
-        expiresAt: '2099-01-01T00:00:00Z',
-      }))
-    })
-
-    await page.route('**/api/auth/oauth/refresh*', async (route) => {
-      await fulfillJson(route, 200, apiEnvelope({
-        tenantId: 'platform',
-        sessionId: 'oauth-session-e2e',
-        expiresAt: '2099-01-01T00:00:00Z',
-      }))
-    })
-
-    await page.route('**/api/auth/me', async (route) => {
-      meRequests += 1
-      if (meRequests === 1) {
-        await fulfillJson(route, 401, {
-          code: 'SESSION_NOT_FOUND',
-          success: false,
-          data: null,
-          message: 'session missing',
-        })
+      if (!url.pathname.startsWith('/api/')) {
+        await route.continue()
         return
       }
-      await fulfillJson(route, 200, apiEnvelope(snapshot))
+
+      if (url.pathname === '/api/auth/captcha' && method === 'GET') {
+        await fulfillJson(route, 200, apiEnvelope({
+          captchaId: 'captcha-e2e',
+          expiresAt: Date.now() + 300000,
+          previewCode: '2468',
+        }))
+        return
+      }
+
+      if (url.pathname === '/api/auth/csrf' && method === 'GET') {
+        await fulfillJson(route, 200, apiEnvelope({
+          headerName: 'X-XSRF-TOKEN',
+          parameterName: '_csrf',
+          token: 'csrf-e2e-token',
+        }))
+        return
+      }
+
+      if (url.pathname === '/api/auth/login' && method === 'POST') {
+        loginPayload = request.postData() ?? ''
+        await fulfillJson(route, 200, apiEnvelope({
+          tenantId: 'platform',
+          sessionId: 'session-e2e',
+          expiresAt: Date.now() + 3600000,
+        }))
+        return
+      }
+
+      if (url.pathname === '/api/auth/me' && method === 'GET') {
+        await fulfillJson(route, 200, apiEnvelope(snapshot))
+        return
+      }
+
+      if (url.pathname === '/api/system/dicts' && method === 'GET') {
+        await fulfillJson(route, 200, apiEnvelope({ total: 2, page: 1, size: 1, records: [] }))
+        return
+      }
+
+      if (url.pathname === '/api/system/configs' && method === 'GET') {
+        await fulfillJson(route, 200, apiEnvelope({ total: 3, page: 1, size: 1, records: [] }))
+        return
+      }
+
+      if (url.pathname === '/api/system/notices' && method === 'GET') {
+        const published = url.searchParams.get('published') === 'true'
+        await fulfillJson(route, 200, apiEnvelope({ total: published ? 1 : 4, page: 1, size: 1, records: [] }))
+        return
+      }
+
+      if (url.pathname === '/api/system/features' && method === 'GET') {
+        await fulfillJson(route, 200, apiEnvelope({
+          gatewayEnabled: false,
+          nacosEnabled: false,
+          mqEnabled: false,
+          seataEnabled: false,
+          jobEnabled: false,
+          lokiEnabled: false,
+        }))
+        return
+      }
+
+      await fulfillJson(route, 200, apiEnvelope({}))
     })
 
-    await page.goto('/auth/callback?code=mock-code&state=state-e2e')
+    await page.goto('/login')
+    await fillLoginForm(page)
+    await page.locator('[data-testid="login-submit"]').click()
+
+    await expect.poll(() => loginPayload).toContain('"tenantId":"platform"')
+    await expect.poll(() => loginPayload).toContain('"username":"admin"')
+    await expect.poll(() => loginPayload).toContain('"password":"Admin@123456"')
+    await expect.poll(() => loginPayload).toContain('"captchaId":"captcha-e2e"')
+    await expect.poll(() => loginPayload).toContain('"captchaCode":"2468"')
+
     await expect(page).toHaveURL(/\/dashboard$/)
     await expect(page.locator('[data-testid="logout-button"]')).toBeVisible()
-    expect(meRequests).toBeGreaterThanOrEqual(2)
   })
 
-  test('auth callback ignores transient tenant list 401', async ({ page }) => {
-    const snapshot = {
-      ...defaultSnapshot(),
-      operatorTenantId: 'platform',
-      superAdmin: true,
-    }
-    let tenantRequests = 0
-
-    await page.addInitScript(() => {
-      window.sessionStorage.setItem('eap.oauth.verifier', 'verifier-e2e')
-      window.sessionStorage.setItem('eap.oauth.state', 'state-e2e')
-      window.sessionStorage.setItem('eap.oauth.tenant', 'platform')
-    })
-
-    await page.route('**/api/auth/csrf*', async (route) => {
-      await fulfillJson(route, 200, apiEnvelope({
-        headerName: 'X-XSRF-TOKEN',
-        parameterName: '_csrf',
-        token: 'csrf-e2e-token',
-      }))
-    })
-
-    await page.route('**/api/auth/oauth/exchange*', async (route) => {
-      await fulfillJson(route, 200, apiEnvelope({
-        tenantId: 'platform',
-        sessionId: 'oauth-session-e2e',
-        expiresAt: '2099-01-01T00:00:00Z',
-      }))
-    })
-
-    await page.route('**/api/auth/oauth/refresh*', async (route) => {
-      await fulfillJson(route, 200, apiEnvelope({
-        tenantId: 'platform',
-        sessionId: 'oauth-session-e2e',
-        expiresAt: '2099-01-01T00:00:00Z',
-      }))
-    })
-
+  test('会话恢复失败时清理本地状态并返回登录页', async ({ page }) => {
     await page.route('**/api/auth/me', async (route) => {
-      await fulfillJson(route, 200, apiEnvelope(snapshot))
-    })
-
-    await page.route('**/api/tenants*', async (route) => {
-      tenantRequests += 1
       await fulfillJson(route, 401, {
         code: 'SESSION_NOT_FOUND',
         success: false,
@@ -233,58 +156,41 @@ test.describe('关键流程回归', () => {
       })
     })
 
-    await page.goto('/auth/callback?code=mock-code&state=state-e2e')
-    await expect(page).toHaveURL(/\/dashboard$/)
-    await expect(page.locator('[data-testid="logout-button"]')).toBeVisible()
-    await page.waitForTimeout(500)
-    await expect(page).toHaveURL(/\/dashboard$/)
-    expect(tenantRequests).toBeGreaterThan(0)
-  })
-  test('登录回调流程：成功换 token 后进入控制台', async ({ page }) => {
-    await loginByCallback(page)
-    await expect(page.locator('[data-testid="logout-button"]')).toBeVisible()
-  })
-
-  test('会话失效流程：接口 401 后清理会话并回到登录页', async ({ page }) => {
-    await loginByCallback(page)
-    await page.unroute('**/api/auth/me')
-
-    await page.route('**/*', async (route) => {
-      const pathname = new URL(route.request().url()).pathname
-      if (!pathname.startsWith('/api/')) {
-        await route.continue()
-        return
-      }
-      if (pathname.startsWith('/api/auth/csrf')) {
-        await fulfillJson(
-          route,
-          200,
-          apiEnvelope({
-            headerName: 'X-XSRF-TOKEN',
-            parameterName: '_csrf',
-            token: 'csrf-e2e-token',
-          }),
-        )
-        return
-      }
-      await fulfillJson(route, 401, {
-        code: '401',
-        success: false,
-        data: null,
-        message: 'unauthorized',
-      })
+    await page.route('**/api/auth/captcha', async (route) => {
+      await fulfillJson(route, 200, apiEnvelope({
+        captchaId: 'captcha-restore',
+        expiresAt: Date.now() + 300000,
+        previewCode: '2468',
+      }))
     })
 
+    await page.goto('/login')
+    await page.evaluate(
+      ({ key, value }) => {
+        window.sessionStorage.setItem(key, JSON.stringify(value))
+      },
+      {
+        key: AUTH_STORAGE_KEY,
+        value: {
+          authenticated: true,
+          expiresAt: Date.now() + 60 * 60 * 1000,
+          tenantId: 'platform',
+          operatorTenantId: 'platform',
+          snapshot: null,
+        },
+      },
+    )
+
     await page.goto('/system/audit')
+
+    await expect(page).toHaveURL(/\/login/)
     await expect
       .poll(async () => page.evaluate((key) => window.sessionStorage.getItem(key), AUTH_STORAGE_KEY))
       .toBeNull()
-    await expect(page).toHaveURL(/\/oauth2\/authorize\?/)
   })
 
-  test('导出任务链路：查看详情 -> 归档 -> 删除', async ({ page }) => {
-    await loginByCallback(page)
-    await page.unroute('**/api/auth/me')
+  test('导出任务链路：查看详情、归档、删除', async ({ page }) => {
+    await seedAuthSession(page)
 
     let tasks = [
       {
@@ -316,39 +222,31 @@ test.describe('关键流程回归', () => {
         return
       }
       if (url.pathname.startsWith('/api/auth/csrf') && method === 'GET') {
-        await fulfillJson(
-          route,
-          200,
-          apiEnvelope({
-            headerName: 'X-XSRF-TOKEN',
-            parameterName: '_csrf',
-            token: 'csrf-e2e-token',
-          }),
-        )
+        await fulfillJson(route, 200, apiEnvelope({
+          headerName: 'X-XSRF-TOKEN',
+          parameterName: '_csrf',
+          token: 'csrf-e2e-token',
+        }))
         return
       }
 
       if (url.pathname === '/api/audit/events' && method === 'GET') {
-        await fulfillJson(
-          route,
-          200,
-          apiEnvelope({
-            total: 1,
-            page: 1,
-            size: 20,
-            records: [
-              {
-                type: 'USER_UPDATED',
-                operator: 'admin',
-                tenantId: 'platform',
-                requestId: 'req-001',
-                clientIp: '127.0.0.1',
-                occurredAt: '2026-03-20T10:00:00',
-                details: { diff: ['username'] },
-              },
-            ],
-          }),
-        )
+        await fulfillJson(route, 200, apiEnvelope({
+          total: 1,
+          page: 1,
+          size: 20,
+          records: [
+            {
+              type: 'USER_UPDATED',
+              operator: 'admin',
+              tenantId: 'platform',
+              requestId: 'req-001',
+              clientIp: '127.0.0.1',
+              occurredAt: '2026-03-20T10:00:00',
+              details: { diff: ['username'] },
+            },
+          ],
+        }))
         return
       }
 
@@ -358,16 +256,12 @@ test.describe('关键流程回归', () => {
       }
 
       if (url.pathname === '/api/audit/exports' && method === 'GET') {
-        await fulfillJson(
-          route,
-          200,
-          apiEnvelope({
-            total: tasks.length,
-            page: 1,
-            size: 10,
-            records: tasks,
-          }),
-        )
+        await fulfillJson(route, 200, apiEnvelope({
+          total: tasks.length,
+          page: 1,
+          size: 10,
+          records: tasks,
+        }))
         return
       }
 
@@ -426,8 +320,7 @@ test.describe('关键流程回归', () => {
   })
 
   test('异步导出：设置时间范围后创建任务并刷新列表', async ({ page }) => {
-    await loginByCallback(page)
-    await page.unroute('**/api/auth/me')
+    await seedAuthSession(page)
 
     let tasks = [
       {
@@ -459,39 +352,31 @@ test.describe('关键流程回归', () => {
         return
       }
       if (url.pathname.startsWith('/api/auth/csrf') && method === 'GET') {
-        await fulfillJson(
-          route,
-          200,
-          apiEnvelope({
-            headerName: 'X-XSRF-TOKEN',
-            parameterName: '_csrf',
-            token: 'csrf-e2e-token',
-          }),
-        )
+        await fulfillJson(route, 200, apiEnvelope({
+          headerName: 'X-XSRF-TOKEN',
+          parameterName: '_csrf',
+          token: 'csrf-e2e-token',
+        }))
         return
       }
 
       if (url.pathname === '/api/audit/events' && method === 'GET') {
-        await fulfillJson(
-          route,
-          200,
-          apiEnvelope({
-            total: 1,
-            page: 1,
-            size: 20,
-            records: [
-              {
-                type: 'USER_UPDATED',
-                operator: 'admin',
-                tenantId: 'platform',
-                requestId: 'req-201',
-                clientIp: '127.0.0.1',
-                occurredAt: '2026-03-20T10:00:00',
-                details: { diff: ['email'] },
-              },
-            ],
-          }),
-        )
+        await fulfillJson(route, 200, apiEnvelope({
+          total: 1,
+          page: 1,
+          size: 20,
+          records: [
+            {
+              type: 'USER_UPDATED',
+              operator: 'admin',
+              tenantId: 'platform',
+              requestId: 'req-201',
+              clientIp: '127.0.0.1',
+              occurredAt: '2026-03-20T10:00:00',
+              details: { diff: ['email'] },
+            },
+          ],
+        }))
         return
       }
 
@@ -501,16 +386,12 @@ test.describe('关键流程回归', () => {
       }
 
       if (url.pathname === '/api/audit/exports' && method === 'GET') {
-        await fulfillJson(
-          route,
-          200,
-          apiEnvelope({
-            total: tasks.length,
-            page: 1,
-            size: 10,
-            records: tasks,
-          }),
-        )
+        await fulfillJson(route, 200, apiEnvelope({
+          total: tasks.length,
+          page: 1,
+          size: 10,
+          records: tasks,
+        }))
         return
       }
 
@@ -554,106 +435,10 @@ test.describe('关键流程回归', () => {
     await expect(page.locator('[data-testid="audit-task-detail"]')).toHaveCount(2)
     await expect(page.getByText('queued').first()).toBeVisible()
   })
-  test('consents: table preferences persist and revoke flow works', async ({ page }) => {
-    await loginByCallback(page)
-    await page.unroute('**/api/auth/me')
 
-    let records = [
-      {
-        registeredClientId: 'client-reg-1',
-        tenantId: 'platform',
-        clientId: 'eap-web',
-        clientName: 'EAP Web',
-        principalName: 'alice',
-        authorities: ['openid', 'profile'],
-        lastGrantedAt: '2026-03-22T10:00:00',
-        lastRevokedAt: null,
-        auditEventCount: 3,
-      },
-    ]
-
-    await page.route('**/*', async (route) => {
-      const request = route.request()
-      const url = new URL(request.url())
-      const method = request.method()
-      if (!url.pathname.startsWith('/api/')) {
-        await route.continue()
-        return
-      }
-      if (url.pathname.startsWith('/api/auth/csrf') && method === 'GET') {
-        await fulfillJson(
-          route,
-          200,
-          apiEnvelope({
-            headerName: 'X-XSRF-TOKEN',
-            parameterName: '_csrf',
-            token: 'csrf-e2e-token',
-          }),
-        )
-        return
-      }
-
-      if (url.pathname === '/api/auth/consents' && method === 'GET') {
-        await fulfillJson(
-          route,
-          200,
-          apiEnvelope({
-            total: records.length,
-            page: 1,
-            size: 10,
-            records,
-          }),
-        )
-        return
-      }
-
-      if (url.pathname === '/api/auth/consents' && method === 'DELETE') {
-        const clientId = url.searchParams.get('registeredClientId')
-        const principalName = url.searchParams.get('principalName')
-        records = records.filter(
-          (item) => !(item.registeredClientId === clientId && item.principalName === principalName),
-        )
-        await route.fulfill({
-          status: 204,
-          headers: {
-            'access-control-allow-origin': '*',
-            'access-control-allow-headers': '*',
-            'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS',
-          },
-        })
-        return
-      }
-
-      await fulfillJson(route, 200, apiEnvelope({}))
-    })
-
-    await page.goto('/system/consents')
-    await expect(page.getByText('alice')).toBeVisible()
-
-    await page.getByRole('button', { name: '列显示' }).click()
-    await page.locator('.column-chooser .el-checkbox').filter({ hasText: '审计联动' }).click()
-    await page.keyboard.press('Escape')
-    await expect(page.locator('.el-table th').filter({ hasText: '审计联动' })).toHaveCount(0)
-
-    await page.reload()
-    await expect(page.locator('.el-table th').filter({ hasText: '审计联动' })).toHaveCount(0)
-    await expect
-      .poll(async () =>
-        page.evaluate(() => {
-          const raw = window.localStorage.getItem('eap.table.consents')
-          return raw ? JSON.parse(raw) : null
-        }),
-      )
-      .toMatchObject({ visibleColumns: expect.not.arrayContaining(['audit']) })
-
-    await page.getByRole('button', { name: '撤销授权' }).first().click()
-    await page.locator('.el-message-box__btns .el-button--primary').click()
-    await expect(page.getByText('alice')).toHaveCount(0)
-  })
-
-  test('tenant-catalog: both tab tables persist column preferences', async ({ page }) => {
-    await loginByCallback(page)
-    await page.unroute('**/api/auth/me')
+  test('tenant-catalog: 两个 tab 都能持久化列偏好', async ({ page }) => {
+    await seedAuthSession(page)
+    await mockDashboardApis(page)
 
     await page.route('**/*', async (route) => {
       const request = route.request()
@@ -665,49 +450,41 @@ test.describe('关键流程回归', () => {
       }
 
       if (url.pathname === '/api/tenant-catalog/packages' && method === 'GET') {
-        await fulfillJson(
-          route,
-          200,
-          apiEnvelope([
-            {
-              id: 1,
-              tenantId: 'platform',
-              packageCode: 'pkg-standard',
-              packageName: '标准版',
-              userQuota: 200,
-              storageQuotaGb: 200,
-              packageDesc: '适用于常规业务租户',
-              enabled: true,
-              capabilityCodes: ['oauth', 'audit'],
-              referencedTenantCount: 1,
-              referencedTenantIds: ['tenant-a'],
-            },
-          ]),
-        )
+        await fulfillJson(route, 200, apiEnvelope([
+          {
+            id: 1,
+            tenantId: 'platform',
+            packageCode: 'pkg-standard',
+            packageName: '标准版',
+            userQuota: 200,
+            storageQuotaGb: 200,
+            packageDesc: '适用于常规业务租户',
+            enabled: true,
+            capabilityCodes: ['audit'],
+            referencedTenantCount: 1,
+            referencedTenantIds: ['tenant-a'],
+          },
+        ]))
         return
       }
 
       if (url.pathname === '/api/tenant-catalog/capabilities' && method === 'GET') {
-        await fulfillJson(
-          route,
-          200,
-          apiEnvelope([
-            {
-              id: 11,
-              tenantId: 'platform',
-              capabilityCode: 'audit',
-              capabilityName: '审计',
-              capabilityDesc: '审计查询与导出',
-              sortOrder: 10,
-              enabled: true,
-              referencedPackageCount: 1,
-              referencedPackageCodes: ['pkg-standard'],
-              referencedTenantCount: 0,
-              referencedTenantIds: [],
-              overrideReferenceCount: 0,
-            },
-          ]),
-        )
+        await fulfillJson(route, 200, apiEnvelope([
+          {
+            id: 11,
+            tenantId: 'platform',
+            capabilityCode: 'audit',
+            capabilityName: '审计',
+            capabilityDesc: '审计查询与导出',
+            sortOrder: 10,
+            enabled: true,
+            referencedPackageCount: 1,
+            referencedPackageCodes: ['pkg-standard'],
+            referencedTenantCount: 0,
+            referencedTenantIds: [],
+            overrideReferenceCount: 0,
+          },
+        ]))
         return
       }
 

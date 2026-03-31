@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.user;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.enterprise.auth.platform.common.exception.BusinessException;
@@ -10,6 +11,7 @@ import com.enterprise.auth.platform.tenant.TenantContext;
 import com.enterprise.auth.platform.user.dto.CreateUserRequest;
 import com.enterprise.auth.platform.user.dto.UpdateUserRequest;
 import com.enterprise.auth.platform.user.model.UserAccount;
+import com.enterprise.auth.platform.user.model.UserSummary;
 import com.enterprise.auth.platform.user.service.management.UserManagementService;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
@@ -27,6 +29,7 @@ class UserManagementServiceTest {
     private static final String SCOPE_USER = "user_scope_user_ut";
     private static final String HIDDEN_USER = "user_hidden_user_ut";
     private static final String CREATED_USER = "user_created_hidden_dept_ut";
+    private static final String CROSS_TENANT_USER = "user_cross_tenant_ut";
 
     @Autowired
     private UserManagementService userManagementService;
@@ -45,23 +48,29 @@ class UserManagementServiceTest {
         TenantContext.clear();
         SecurityContextHolder.clearContext();
         jdbcTemplate.update(
-                "DELETE FROM sys_user WHERE tenant_id = ? AND username IN (?, ?, ?)",
+                "DELETE FROM sys_user WHERE tenant_id = ? AND username IN (?, ?, ?, ?)",
                 "tenant-a",
                 SCOPE_USER,
                 HIDDEN_USER,
-                CREATED_USER
+                CREATED_USER,
+                CROSS_TENANT_USER
+        );
+        jdbcTemplate.update(
+                "DELETE FROM sys_user WHERE tenant_id = ? AND username = ?",
+                "platform",
+                CROSS_TENANT_USER
         );
     }
 
     @Test
     void shouldRejectCreatingUserInHiddenDepartment() {
         TenantContext.setTenantId("tenant-a");
-        Long scopeUserId = ensureUser(SCOPE_USER, 2L);
+        Long scopeUserId = ensureUser("tenant-a", SCOPE_USER, 2L);
         authenticateScopedUser(scopeUserId, "user:write");
 
         assertThatThrownBy(() -> userManagementService.create(new CreateUserRequest(
                 CREATED_USER,
-                "越权创建用户",
+                "Blocked Dept User",
                 null,
                 null,
                 "UserTest@123",
@@ -76,12 +85,12 @@ class UserManagementServiceTest {
     @Test
     void shouldRejectUpdatingHiddenUser() {
         TenantContext.setTenantId("tenant-a");
-        Long scopeUserId = ensureUser(SCOPE_USER, 2L);
-        Long hiddenUserId = ensureUser(HIDDEN_USER, 3L);
+        Long scopeUserId = ensureUser("tenant-a", SCOPE_USER, 2L);
+        Long hiddenUserId = ensureUser("tenant-a", HIDDEN_USER, 3L);
         authenticateScopedUser(scopeUserId, "user:write");
 
         assertThatThrownBy(() -> userManagementService.update(hiddenUserId, new UpdateUserRequest(
-                "隐藏用户",
+                "Hidden User",
                 null,
                 null,
                 3L,
@@ -94,29 +103,39 @@ class UserManagementServiceTest {
     }
 
     @Test
-    void shouldRejectCreatingUserWhenUsernameAlreadyExistsInAnotherTenant() {
+    void shouldAllowCreatingUserWhenUsernameExistsInAnotherTenant() {
         TenantContext.setTenantId("tenant-a");
-        Long scopeUserId = ensureUser(SCOPE_USER, 2L);
+        ensureUser("platform", CROSS_TENANT_USER, 1L);
+        Long scopeUserId = ensureUser("tenant-a", SCOPE_USER, 2L);
         authenticateScopedUser(scopeUserId, "user:write");
 
-        assertThatThrownBy(() -> userManagementService.create(new CreateUserRequest(
-                "admin",
-                "重复用户名用户",
+        UserSummary created = userManagementService.create(new CreateUserRequest(
+                CROSS_TENANT_USER,
+                "Cross Tenant User",
                 null,
                 null,
                 "UserTest@123",
                 2L,
                 true,
                 Set.of()
-        )))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("用户名已存在");
+        ));
+
+        Integer tenantCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM sys_user WHERE tenant_id = ? AND username = ? AND deleted = 0",
+                Integer.class,
+                "tenant-a",
+                CROSS_TENANT_USER
+        );
+
+        assertThat(created.tenantId()).isEqualTo("tenant-a");
+        assertThat(created.username()).isEqualTo(CROSS_TENANT_USER);
+        assertThat(tenantCount).isEqualTo(1);
     }
 
-    private Long ensureUser(String username, Long deptId) {
-        jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username = ?", "tenant-a", username);
+    private Long ensureUser(String tenantId, String username, Long deptId) {
+        jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username = ?", tenantId, username);
         SysUserEntity entity = new SysUserEntity();
-        entity.setTenantId("tenant-a");
+        entity.setTenantId(tenantId);
         entity.setDeptId(deptId);
         entity.setUsername(username);
         entity.setDisplayName(username);

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.enterprise.auth.platform.common.model.DataScopeType;
 import com.enterprise.auth.platform.role.support.RolePayloadCodec;
+import com.enterprise.auth.platform.tenant.TenantContext;
 import com.enterprise.auth.platform.user.model.UserAccount;
 import java.util.Optional;
 import java.util.Set;
@@ -41,6 +42,7 @@ class DatabaseUserRepositoryRolePayloadTest {
 
     @BeforeEach
     void setUp() {
+        TenantContext.setTenantId(TENANT_ID);
         username = USERNAME_PREFIX + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
         roleCode = ROLE_CODE_PREFIX + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
 
@@ -56,7 +58,7 @@ class DatabaseUserRepositoryRolePayloadTest {
                 "Role Payload Test",
                 "CUSTOM",
                 "payload test role",
-                rolePayloadCodec.writePermissionCodes(Set.of("user:read", "audit:read", "user:read")),
+                rolePayloadCodec.writePermissionCodes(Set.of("user:read", "audit:read")),
                 rolePayloadCodec.writeDeptIds(Set.of(2L, 3L)),
                 "test",
                 "test"
@@ -102,6 +104,7 @@ class DatabaseUserRepositoryRolePayloadTest {
 
     @AfterEach
     void tearDown() {
+        TenantContext.clear();
         if (userId != null) {
             jdbcTemplate.update("DELETE FROM sys_user_role WHERE tenant_id = ? AND user_id = ?", TENANT_ID, userId);
         }

@@ -4,10 +4,8 @@ import { apiEnvelope, defaultSnapshot, fulfillJson, seedAuthSession } from './he
 const snapshot = defaultSnapshot()
 
 const navCases = [
-  { path: '/oauth-clients', name: 'menu-oauth-clients' },
   { path: '/system/users', name: 'menu-users' },
   { path: '/system/roles', name: 'menu-roles' },
-  { path: '/system/permissions', name: 'menu-permissions' },
   { path: '/system/depts', name: 'menu-departments' },
 ]
 
@@ -270,52 +268,6 @@ async function mockApis(page: Page) {
         apiEnvelope([
           { id: 1, code: 'HQ', name: 'HQ', parentId: null, leaderUserId: 1 },
           { id: 2, code: 'OPS', name: 'OPS', parentId: 1, leaderUserId: 2 },
-        ]),
-      )
-      return
-    }
-
-    if (url.pathname === '/api/oauth-clients' && method === 'GET') {
-      await fulfillJson(
-        route,
-        200,
-        apiEnvelope([
-          {
-            id: 1,
-            tenantId: 'platform',
-            clientId: 'eap-web',
-            clientName: 'EAP Web',
-            redirectUris: ['http://localhost:5173/callback'],
-            scopes: ['openid', 'profile'],
-            grantTypes: ['authorization_code', 'refresh_token'],
-            publicClient: false,
-            requirePkce: true,
-            requireConsent: true,
-            enabled: true,
-          },
-        ]),
-      )
-      return
-    }
-
-    if (url.pathname === '/api/oauth-scopes' && method === 'GET') {
-      await fulfillJson(
-        route,
-        200,
-        apiEnvelope([
-          {
-            id: 1,
-            scopeCode: 'openid',
-            scopeName: 'OpenID',
-            scopeDesc: 'identity',
-            scopeType: 'OIDC',
-            defaultSelected: true,
-            visibleInConsent: true,
-            sortOrder: 1,
-            enabled: true,
-            referencedClientCount: 1,
-            referencedClientIds: ['eap-web'],
-          },
         ]),
       )
       return

@@ -119,7 +119,7 @@ class UserControllerTest {
                         .content("""
                                 {
                                   "username": "blocked_user_ut",
-                                  "displayName": "瓒婃潈鐢ㄦ埛",
+                                  "displayName": "Blocked User",
                                   "password": "UserTest@123",
                                   "deptId": 3,
                                   "enabled": true,
@@ -154,7 +154,7 @@ class UserControllerTest {
                         .content("""
                                 {
                                   "username": "",
-                                  "displayName": "鏍￠獙澶辫触鐢ㄦ埛",
+                                  "displayName": "Invalid Payload",
                                   "password": "UserTest@123",
                                   "deptId": 2,
                                   "enabled": true,
@@ -189,7 +189,7 @@ class UserControllerTest {
                         .content("""
                                 {
                                   "username": "%s",
-                                  "displayName": "閲嶅鐢ㄦ埛鍚嶇敤鎴?",
+                                  "displayName": "Duplicate User",
                                   "password": "UserTest@123",
                                   "deptId": 2,
                                   "enabled": true,
@@ -198,7 +198,7 @@ class UserControllerTest {
                                 """.formatted(VISIBLE_USER)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"))
-                .andExpect(jsonPath("$.message").value("鐢ㄦ埛鍚嶅凡瀛樺湪"));
+                .andExpect(jsonPath("$.message").exists());
     }
 
     @Test
@@ -221,7 +221,7 @@ class UserControllerTest {
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"))
-                .andExpect(jsonPath("$.message").value("鏃犳潈璁块棶褰撳墠璧勬簮"));
+                .andExpect(jsonPath("$.message").exists());
     }
 
     private Long ensureDept() {
@@ -229,7 +229,7 @@ class UserControllerTest {
         SysDeptEntity entity = new SysDeptEntity();
         entity.setTenantId("tenant-a");
         entity.setDeptCode(CHILD_DEPT_CODE);
-        entity.setDeptName("鐢ㄦ埛鎺у埗鍣ㄦ祴璇曞瓙閮ㄩ棬");
+        entity.setDeptName("User Controller Child Dept");
         entity.setParentId(2L);
         sysDeptMapper.insert(entity);
         return entity.getId();

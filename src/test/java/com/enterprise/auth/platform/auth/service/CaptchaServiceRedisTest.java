@@ -27,8 +27,6 @@ class CaptchaServiceRedisTest {
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
         SecurityProperties securityProperties = new SecurityProperties(
-                "change-me-to-a-32-char-secret-key-for-prod",
-                Duration.ofMinutes(30),
                 Duration.ofDays(7),
                 Duration.ofMinutes(5),
                 true,

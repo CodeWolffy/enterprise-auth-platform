@@ -8,7 +8,6 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -23,6 +22,7 @@ import java.util.Comparator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -155,12 +155,12 @@ class AuthControllerSessionFlowTest {
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.tenantId").value("platform"))
                 .andExpect(jsonPath("$.data.sessionId").isNotEmpty())
-                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.containsString(AuthCookieConstants.SESSION_COOKIE + "=")))
                 .andReturn();
 
         JsonNode loginBody = objectMapper.readTree(loginResult.getResponse().getContentAsString());
         String sessionId = loginBody.path("data").path("sessionId").asText();
-        Cookie sessionCookie = new Cookie(AuthCookieConstants.SESSION_COOKIE, cookieValue(loginResult, AuthCookieConstants.SESSION_COOKIE));
+        Cookie sessionCookie = loginResult.getResponse().getCookie(AuthCookieConstants.SESSION_COOKIE);
+        Assertions.assertNotNull(sessionCookie, "Missing session cookie");
 
         mockMvc.perform(get("/api/auth/me")
                         .cookie(sessionCookie)
@@ -190,19 +190,5 @@ class AuthControllerSessionFlowTest {
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("SESSION_EXPIRED"));
-    }
-
-    private String cookieValue(MvcResult result, String cookieName) {
-        String headerValue = result.getResponse().getHeader("Set-Cookie");
-        if (headerValue == null) {
-            throw new IllegalStateException("Missing Set-Cookie header");
-        }
-        for (String part : headerValue.split(";")) {
-            String trimmed = part.trim();
-            if (trimmed.startsWith(cookieName + "=")) {
-                return trimmed.substring((cookieName + "=").length());
-            }
-        }
-        throw new IllegalStateException("Missing cookie " + cookieName);
     }
 }

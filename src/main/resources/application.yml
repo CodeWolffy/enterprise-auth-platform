@@ -65,10 +65,7 @@ app:
       - http://localhost:5173
 
   security:
-    # 本地开发密钥，生产环境必须覆盖为安全值。
-    jwt-secret: "LOCAL_CHANGE_ME_7B3f1D5k9Q2m6R8t0W4xY7zA1cE5gH9J"
-    access-token-ttl: 30m
-    refresh-token-ttl: 7d
+    session-ttl: 7d
     captcha-ttl: 5m
     expose-captcha-answer: false
     cookie-secure: false

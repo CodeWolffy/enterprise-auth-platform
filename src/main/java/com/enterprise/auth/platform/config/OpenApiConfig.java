@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.config;
 
+import com.enterprise.auth.platform.auth.AuthCookieConstants;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
@@ -16,13 +17,13 @@ public class OpenApiConfig {
         return new OpenAPI()
                 .info(new Info()
                         .title("企业级权限管理平台 API")
-                        .description("首期模块化单体版本，包含认证、权限、租户、审计和系统管理能力")
+                        .description("当前版本基于 Session Cookie、RBAC、多租户和审计能力构建")
                         .version("0.0.1-SNAPSHOT"))
-                .addSecurityItem(new SecurityRequirement().addList("bearerAuth"))
+                .addSecurityItem(new SecurityRequirement().addList("cookieAuth"))
                 .components(new Components()
-                        .addSecuritySchemes("bearerAuth", new SecurityScheme()
-                                .type(SecurityScheme.Type.HTTP)
-                                .scheme("bearer")
-                                .bearerFormat("JWT")));
+                        .addSecuritySchemes("cookieAuth", new SecurityScheme()
+                                .type(SecurityScheme.Type.APIKEY)
+                                .in(SecurityScheme.In.COOKIE)
+                                .name(AuthCookieConstants.SESSION_COOKIE)));
     }
 }

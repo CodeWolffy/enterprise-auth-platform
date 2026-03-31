@@ -21,7 +21,7 @@ app:
       - ${APP_FRONTEND_ALLOWED_ORIGIN}
 
   security:
-    jwt-secret: ${APP_SECURITY_JWT_SECRET}
+    session-ttl: ${APP_SECURITY_SESSION_TTL:7d}
     expose-captcha-answer: false
     cookie-secure: true
     cookie-same-site: ${APP_SECURITY_COOKIE_SAME_SITE:Lax}

@@ -4,7 +4,7 @@
     <main class="console-main">
       <header class="console-header">
         <div class="console-header__title">
-          <span class="eyebrow">Database + Spring Authorization Server</span>
+          <span class="eyebrow">Session Cookie + Redis + RBAC</span>
           <h2>{{ pageTitle }}</h2>
         </div>
         <div class="console-header__actions">

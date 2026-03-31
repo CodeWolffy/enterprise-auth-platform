@@ -6,10 +6,12 @@ export interface MockPermissionSnapshot {
   userId: number
   username: string
   tenantId: string
+  operatorTenantId?: string
   roles: string[]
   permissions: string[]
   dataScopeType: string
   customDeptIds: number[]
+  superAdmin?: boolean
   menus: Array<{
     code: string
     title: string
@@ -20,7 +22,7 @@ export interface MockPermissionSnapshot {
 
 export function apiEnvelope<T>(data: T) {
   return {
-    code: '200',
+    code: 'OK',
     success: true,
     data,
     message: 'ok',
@@ -32,16 +34,16 @@ export function defaultSnapshot(): MockPermissionSnapshot {
     userId: 1,
     username: 'admin',
     tenantId: 'platform',
+    operatorTenantId: 'platform',
     roles: ['ADMIN'],
-    permissions: ['auth:read', 'tenant:read', 'system:read'],
+    permissions: ['auth:read', 'user:read', 'role:read', 'dept:read', 'tenant:read', 'audit:read', 'system:read'],
     dataScopeType: 'ALL',
     customDeptIds: [],
+    superAdmin: true,
     menus: [
       { code: 'dashboard', title: '运行总览', path: '/dashboard', component: 'DashboardView' },
-      { code: 'oauth-clients', title: 'OAuth2 客户端', path: '/oauth-clients', component: 'OAuthClientsView' },
       { code: 'users', title: '用户管理', path: '/system/users', component: 'UsersView' },
       { code: 'roles', title: '角色管理', path: '/system/roles', component: 'RolesView' },
-      { code: 'permissions', title: '权限管理', path: '/system/permissions', component: 'PermissionsView' },
       { code: 'depts', title: '部门管理', path: '/system/depts', component: 'DepartmentsView' },
       { code: 'tenants', title: '租户管理', path: '/system/tenants', component: 'TenantsView' },
       { code: 'audit', title: '安全审计', path: '/system/audit', component: 'AuditView' },
@@ -50,13 +52,14 @@ export function defaultSnapshot(): MockPermissionSnapshot {
   }
 }
 
-export async function seedAuthSession(page: Page, snapshot: MockPermissionSnapshot = defaultSnapshot()) {
+export async function seedAuthSession(page: Page, snapshot: MockPermissionSnapshot | null = defaultSnapshot()) {
   const now = Date.now()
+  const resolvedTenantId = snapshot?.tenantId ?? 'platform'
   const payload = {
-    accessToken: 'mock-access-token',
-    refreshToken: 'mock-refresh-token',
+    authenticated: true,
     expiresAt: now + 60 * 60 * 1000,
-    tenantId: snapshot.tenantId,
+    tenantId: resolvedTenantId,
+    operatorTenantId: snapshot?.operatorTenantId ?? resolvedTenantId,
     snapshot,
   }
   await page.addInitScript(
