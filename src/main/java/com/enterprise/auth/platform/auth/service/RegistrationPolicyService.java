@@ -11,7 +11,6 @@ import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -29,7 +28,7 @@ public class RegistrationPolicyService {
     private final TenantProperties tenantProperties;
 
     public RegistrationPolicyService(
-            @Nullable SysConfigMapper sysConfigMapper,
+            SysConfigMapper sysConfigMapper,
             TenantProperties tenantProperties
     ) {
         this.sysConfigMapper = sysConfigMapper;
@@ -58,9 +57,6 @@ public class RegistrationPolicyService {
     }
 
     private Optional<String> loadPlatformConfigValue(String configKey) {
-        if (sysConfigMapper == null) {
-            return Optional.empty();
-        }
         String platformTenantId = tenantProperties.platformTenantId();
         if (!StringUtils.hasText(platformTenantId)) {
             return Optional.empty();

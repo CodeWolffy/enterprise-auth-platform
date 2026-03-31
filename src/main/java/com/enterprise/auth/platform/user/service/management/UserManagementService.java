@@ -6,7 +6,6 @@ import com.enterprise.auth.platform.catalog.CatalogService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.common.validator.PasswordValidator;
-import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.persistence.entity.SysRoleEntity;
 import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
 import com.enterprise.auth.platform.persistence.entity.SysUserRoleEntity;
@@ -25,8 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.springframework.lang.Nullable;
-import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,7 +33,6 @@ import org.springframework.util.StringUtils;
 @Service
 public class UserManagementService {
 
-    private final PersistenceProperties persistenceProperties;
     private final SysUserMapper sysUserMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
     private final SysRoleMapper sysRoleMapper;
@@ -45,22 +42,18 @@ public class UserManagementService {
     private final AuditService auditService;
     private final DataScopeService dataScopeService;
     private final AuthPrincipalCacheService authPrincipalCacheService;
-    private final JdbcTemplate jdbcTemplate;
 
     public UserManagementService(
-            PersistenceProperties persistenceProperties,
-            @Nullable SysUserMapper sysUserMapper,
-            @Nullable SysUserRoleMapper sysUserRoleMapper,
-            @Nullable SysRoleMapper sysRoleMapper,
+            SysUserMapper sysUserMapper,
+            SysUserRoleMapper sysUserRoleMapper,
+            SysRoleMapper sysRoleMapper,
             PasswordEncoder passwordEncoder,
             UserDirectoryService userDirectoryService,
             CatalogService catalogService,
             AuditService auditService,
             DataScopeService dataScopeService,
-                AuthPrincipalCacheService authPrincipalCacheService,
-                @Nullable JdbcTemplate jdbcTemplate
+            AuthPrincipalCacheService authPrincipalCacheService
     ) {
-        this.persistenceProperties = persistenceProperties;
         this.sysUserMapper = sysUserMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
         this.sysRoleMapper = sysRoleMapper;
@@ -70,13 +63,11 @@ public class UserManagementService {
         this.auditService = auditService;
         this.dataScopeService = dataScopeService;
         this.authPrincipalCacheService = authPrincipalCacheService;
-        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Transactional
     public UserSummary createUser(String tenantId, CreateUserRequest request, String operator) {
-        requireDatabaseMode();
-        if (existsByUsername(tenantId, request.username())) {
+        if (existsByUsername(request.username())) {
             throw new BusinessException("用户名已存在");
         }
         validateDeptAccess(tenantId, request.deptId());
@@ -93,7 +84,11 @@ public class UserManagementService {
         entity.setEnabled(Boolean.FALSE.equals(request.enabled()) ? 0 : 1);
         entity.setSessionVersion(1);
         entity.setPasswordUpdatedAt(TimeSupport.utcNowDateTime());
-        sysUserMapper.insert(entity);
+        try {
+            sysUserMapper.insert(entity);
+        } catch (DuplicateKeyException ex) {
+            throw new BusinessException("鐢ㄦ埛鍚嶅凡瀛樺湪");
+        }
 
         syncUserRoles(tenantId, entity.getId(), request.roleCodes());
         authPrincipalCacheService.evictByUser(entity.getId(), tenantId, entity.getUsername());
@@ -108,7 +103,6 @@ public class UserManagementService {
 
     @Transactional
     public UserSummary update(Long userId, UpdateUserRequest request) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
         SysUserEntity entity = getUser(userId, tenantId);
@@ -139,7 +133,6 @@ public class UserManagementService {
 
     @Transactional
     public UserSummary assignRoles(Long userId, Set<String> roleCodes) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
         SysUserEntity entity = getUser(userId, tenantId);
@@ -150,7 +143,6 @@ public class UserManagementService {
     }
 
     public List<CatalogService.RoleView> listAssignedRoles(Long userId) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         getUser(userId, tenantId);
         List<Long> roleIds = sysUserRoleMapper.selectList(new LambdaQueryWrapper<SysUserRoleEntity>()
@@ -176,7 +168,6 @@ public class UserManagementService {
 
     @Transactional
     public void delete(Long userId) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
         SysUserEntity entity = getUser(userId, tenantId);
@@ -237,20 +228,8 @@ public class UserManagementService {
         }
     }
 
-    public boolean existsByUsername(String tenantId, String username) {
-        if (jdbcTemplate != null) {
-            Integer count = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(1) FROM sys_user WHERE tenant_id = ? AND username = ? AND deleted = 0",
-                    Integer.class,
-                    tenantId,
-                    username
-            );
-            return count != null && count > 0;
-        }
-        return sysUserMapper.selectCount(new LambdaQueryWrapper<SysUserEntity>()
-                .eq(SysUserEntity::getTenantId, tenantId)
-                .eq(SysUserEntity::getUsername, username)
-                .eq(SysUserEntity::getDeleted, 0)) > 0;
+    public boolean existsByUsername(String username) {
+        return sysUserMapper.countActiveByUsername(username) > 0;
     }
 
     private void validatePassword(String password) {
@@ -271,12 +250,6 @@ public class UserManagementService {
             } else {
                 TenantContext.clear();
             }
-        }
-    }
-
-    private void requireDatabaseMode() {
-        if (!persistenceProperties.databaseEnabled() || sysUserMapper == null || sysUserRoleMapper == null || sysRoleMapper == null) {
-            throw new BusinessException("当前为默认内存模式，暂未启用数据库写入能力");
         }
     }
 

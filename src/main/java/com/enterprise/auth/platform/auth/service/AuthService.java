@@ -9,7 +9,6 @@ import com.enterprise.auth.platform.auth.service.LoginAttemptService.LoginFailur
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.common.validator.PasswordValidator;
-import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
 import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
 import com.enterprise.auth.platform.security.DataScopeService;
@@ -24,7 +23,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.springframework.lang.Nullable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -37,7 +35,6 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
     private final AuditService auditService;
-    private final PersistenceProperties persistenceProperties;
     private final SysUserMapper sysUserMapper;
     private final DataScopeService dataScopeService;
     private final LoginAttemptService loginAttemptService;
@@ -51,8 +48,7 @@ public class AuthService {
             PasswordEncoder passwordEncoder,
             UserRepository userRepository,
             AuditService auditService,
-            PersistenceProperties persistenceProperties,
-            @Nullable SysUserMapper sysUserMapper,
+            SysUserMapper sysUserMapper,
             DataScopeService dataScopeService,
             LoginAttemptService loginAttemptService,
             RegisterAttemptService registerAttemptService,
@@ -64,7 +60,6 @@ public class AuthService {
         this.passwordEncoder = passwordEncoder;
         this.userRepository = userRepository;
         this.auditService = auditService;
-        this.persistenceProperties = persistenceProperties;
         this.sysUserMapper = sysUserMapper;
         this.dataScopeService = dataScopeService;
         this.loginAttemptService = loginAttemptService;
@@ -75,47 +70,47 @@ public class AuthService {
 
     public CookieSessionResponse login(LoginRequest request, HttpServletRequest servletRequest) {
         captchaService.validate(request.captchaId(), request.captchaCode());
-        String tenantId = StringUtils.hasText(request.tenantId()) ? request.tenantId() : TenantContext.getTenantId();
-        if (!StringUtils.hasText(tenantId)) {
-            tenantId = registrationPolicyService.resolveDefaultTenantId();
-        }
+        String tenantId = resolveLoginTenantId(request);
         String clientIp = clientIp(servletRequest);
+        String previousTenantId = TenantContext.getTenantId();
+        try {
+            TenantContext.setTenantId(tenantId);
 
-        if (loginAttemptService.isLocked(tenantId, request.username())) {
-            loginAttemptService.recordBlockedAttempt(tenantId, request.username(), clientIp);
-            throw new BusinessException("ACCOUNT_LOCKED", "账户已锁定，请稍后再试");
-        }
+            if (loginAttemptService.isLocked(tenantId, request.username())) {
+                loginAttemptService.recordBlockedAttempt(tenantId, request.username(), clientIp);
+                throw new BusinessException("ACCOUNT_LOCKED", "账户已锁定，请稍后再试");
+            }
 
-        UserAccount user = userRepository.findByUsername(tenantId, request.username())
-                .orElse(null);
-        if (user == null) {
-            throw buildLoginFailure(tenantId, request.username(), "user_not_found", clientIp);
-        }
-        if (!passwordEncoder.matches(request.password(), user.password())) {
-            throw buildLoginFailure(tenantId, request.username(), "bad_credentials", clientIp);
-        }
-        if (!user.enabled()) {
-            auditService.record("LOGIN_FAILED", user.username(), tenantId,
-                    Map.of("reason", "disabled", "clientIp", clientIp));
-            throw new BusinessException("USER_DISABLED", "用户已禁用");
-        }
+            UserAccount user = userRepository.findByUsername(tenantId, request.username()).orElse(null);
+            if (user == null) {
+                throw buildLoginFailure(tenantId, request.username(), "user_not_found", clientIp);
+            }
+            if (!passwordEncoder.matches(request.password(), user.password())) {
+                throw buildLoginFailure(tenantId, request.username(), "bad_credentials", clientIp);
+            }
+            if (!user.enabled()) {
+                auditService.record("LOGIN_FAILED", user.username(), tenantId, Map.of("reason", "disabled", "clientIp", clientIp));
+                throw new BusinessException("USER_DISABLED", "用户已禁用");
+            }
 
-        loginAttemptService.clearFailures(tenantId, request.username());
-        UserSession session = sessionService.createSession(
-                user.id(),
-                user.username(),
-                user.tenantId(),
-                clientIp,
-                request.device()
-        );
-        updateLastLogin(user.id(), clientIp);
-        auditService.record("LOGIN_SUCCESS", user.username(), user.tenantId(),
-                Map.of("sessionId", session.sessionId(), "clientIp", clientIp));
-        return new CookieSessionResponse(
-                user.tenantId(),
-                session.sessionId(),
-                TimeSupport.toEpochMilli(session.expiresAt())
-        );
+            loginAttemptService.clearFailures(tenantId, request.username());
+            UserSession session = sessionService.createSession(
+                    user.id(),
+                    user.username(),
+                    user.tenantId(),
+                    clientIp,
+                    request.device()
+            );
+            updateLastLogin(user.id(), clientIp);
+            auditService.record("LOGIN_SUCCESS", user.username(), user.tenantId(), Map.of("sessionId", session.sessionId(), "clientIp", clientIp));
+            return new CookieSessionResponse(user.tenantId(), session.sessionId(), TimeSupport.toEpochMilli(session.expiresAt()));
+        } finally {
+            if (StringUtils.hasText(previousTenantId)) {
+                TenantContext.setTenantId(previousTenantId);
+            } else {
+                TenantContext.clear();
+            }
+        }
     }
 
     public void logout(String sessionId, String username, String tenantId) {
@@ -151,8 +146,7 @@ public class AuthService {
             throw new BusinessException("ACCESS_DENIED", "无权操作此会话");
         }
         sessionService.deactivate(sessionId);
-        auditService.record("SESSION_FORCED_OFFLINE", currentUser.username(), currentUser.tenantId(),
-                Map.of("sessionId", sessionId));
+        auditService.record("SESSION_FORCED_OFFLINE", currentUser.username(), currentUser.tenantId(), Map.of("sessionId", sessionId));
     }
 
     public UserSummary register(RegisterRequest request, HttpServletRequest servletRequest) {
@@ -166,7 +160,7 @@ public class AuthService {
 
             PasswordValidator.validate(request.password());
 
-            if (userManagementService.existsByUsername(defaultTenantId, request.username())) {
+            if (userManagementService.existsByUsername(request.username())) {
                 throw new BusinessException("USERNAME_EXISTS", "用户名已存在");
             }
 
@@ -191,7 +185,7 @@ public class AuthService {
     }
 
     private void updateLastLogin(Long userId, String clientIp) {
-        if (!persistenceProperties.databaseEnabled() || sysUserMapper == null || userId == null) {
+        if (userId == null) {
             return;
         }
         SysUserEntity entity = sysUserMapper.selectById(userId);
@@ -202,6 +196,24 @@ public class AuthService {
         entity.setLastLoginIp(clientIp);
         entity.setUpdatedBy(entity.getUsername());
         sysUserMapper.updateById(entity);
+    }
+
+    private String resolveLoginTenantId(LoginRequest request) {
+        String requestedTenantId = StringUtils.hasText(request.tenantId()) ? request.tenantId().trim() : TenantContext.getTenantId();
+        List<String> matchedTenantIds = sysUserMapper.selectActiveTenantIdsByUsername(request.username()).stream()
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .toList();
+        if (matchedTenantIds.size() == 1) {
+            return matchedTenantIds.get(0);
+        }
+        if (matchedTenantIds.size() > 1) {
+            throw new BusinessException("USERNAME_CONFLICT", "用户名数据存在冲突，请联系管理员");
+        }
+        if (StringUtils.hasText(requestedTenantId)) {
+            return requestedTenantId;
+        }
+        return registrationPolicyService.resolveDefaultTenantId();
     }
 
     private String clientIp(HttpServletRequest request) {
@@ -222,9 +234,6 @@ public class AuthService {
         if (result.locked()) {
             return new BusinessException("ACCOUNT_LOCKED", "账户已锁定，请稍后再试");
         }
-        return new BusinessException(
-                "BAD_CREDENTIALS",
-                "用户名或密码错误，剩余尝试次数：" + result.remainingAttempts()
-        );
+        return new BusinessException("BAD_CREDENTIALS", "用户名或密码错误，剩余尝试次数：" + result.remainingAttempts());
     }
 }

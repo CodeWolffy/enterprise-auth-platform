@@ -11,7 +11,6 @@ import com.enterprise.auth.platform.tenant.TenantContext;
 import com.enterprise.auth.platform.user.dto.CreateUserRequest;
 import com.enterprise.auth.platform.user.dto.UpdateUserRequest;
 import com.enterprise.auth.platform.user.model.UserAccount;
-import com.enterprise.auth.platform.user.model.UserSummary;
 import com.enterprise.auth.platform.user.service.management.UserManagementService;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
@@ -103,13 +102,13 @@ class UserManagementServiceTest {
     }
 
     @Test
-    void shouldAllowCreatingUserWhenUsernameExistsInAnotherTenant() {
+    void shouldRejectCreatingUserWhenUsernameExistsInAnotherTenant() {
         TenantContext.setTenantId("tenant-a");
         ensureUser("platform", CROSS_TENANT_USER, 1L);
         Long scopeUserId = ensureUser("tenant-a", SCOPE_USER, 2L);
         authenticateScopedUser(scopeUserId, "user:write");
 
-        UserSummary created = userManagementService.create(new CreateUserRequest(
+        assertThatThrownBy(() -> userManagementService.create(new CreateUserRequest(
                 CROSS_TENANT_USER,
                 "Cross Tenant User",
                 null,
@@ -118,18 +117,11 @@ class UserManagementServiceTest {
                 2L,
                 true,
                 Set.of()
-        ));
-
-        Integer tenantCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(1) FROM sys_user WHERE tenant_id = ? AND username = ? AND deleted = 0",
-                Integer.class,
-                "tenant-a",
-                CROSS_TENANT_USER
-        );
-
-        assertThat(created.tenantId()).isEqualTo("tenant-a");
-        assertThat(created.username()).isEqualTo(CROSS_TENANT_USER);
-        assertThat(tenantCount).isEqualTo(1);
+        )))
+                .isInstanceOfSatisfying(BusinessException.class, ex -> {
+                    assertThat(ex.code()).isEqualTo("BUSINESS_ERROR");
+                    assertThat(ex.getMessage()).isNotBlank();
+                });
     }
 
     private Long ensureUser(String tenantId, String username, Long deptId) {

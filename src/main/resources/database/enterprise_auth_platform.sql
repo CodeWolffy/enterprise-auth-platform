@@ -11,7 +11,7 @@
  Target Server Version : 80043 (8.0.43)
  File Encoding         : 65001
 
- Date: 30/03/2026 23:49:35
+ Date: 31/03/2026 13:33:02
 */
 
 SET NAMES utf8mb4;
@@ -38,7 +38,7 @@ CREATE TABLE `sys_audit_export_policy`  (
 -- ----------------------------
 -- Records of sys_audit_export_policy
 -- ----------------------------
-INSERT INTO `sys_audit_export_policy` VALUES (1, 'platform', 9, 120, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_audit_export_policy` VALUES (1, 'platform', 9, 120, 'system', 'system', 0, '2026-03-21 06:26:06', '2026-03-21 06:26:06');
 
 -- ----------------------------
 -- Table structure for sys_audit_export_task
@@ -59,7 +59,7 @@ CREATE TABLE `sys_audit_export_task`  (
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_sys_audit_export_task_tenant_time`(`tenant_id` ASC, `requested_at` DESC) USING BTREE,
   INDEX `idx_sys_audit_export_task_operator_status`(`operator` ASC, `status` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 33 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '审计导出任务表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 123 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '审计导出任务表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of sys_audit_export_task
@@ -81,7 +81,7 @@ CREATE TABLE `sys_audit_log`  (
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_sys_audit_log_tenant_time`(`tenant_id` ASC, `occurred_at` ASC) USING BTREE,
   INDEX `idx_sys_audit_log_event`(`event_type` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 472 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '安全审计日志表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 1002 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '安全审计日志表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of sys_audit_log
@@ -105,14 +105,14 @@ CREATE TABLE `sys_category_rule`  (
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_sys_category_rule_tenant_target_code`(`tenant_id` ASC, `target_type` ASC, `category_code` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 7 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '系统分类规则表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 15 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '系统分类规则表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of sys_category_rule
 -- ----------------------------
-INSERT INTO `sys_category_rule` VALUES (2, 'platform', 'dict', 'user', '用户域字典', 'user.*,dept.*,role.*', 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
-INSERT INTO `sys_category_rule` VALUES (3, 'platform', 'config', 'auth', '认证参数', 'auth.*', 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
-INSERT INTO `sys_category_rule` VALUES (4, 'platform', 'config', 'platform', '平台参数', 'tenant.*,system.*,feature.*', 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_category_rule` VALUES (2, 'platform', 'dict', 'user', '用户域字典', 'user.*,dept.*,role.*', 'system', 'system', 0, '2026-03-21 06:26:06', '2026-03-21 06:26:06');
+INSERT INTO `sys_category_rule` VALUES (3, 'platform', 'config', 'auth', '认证参数', 'auth.*', 'system', 'system', 0, '2026-03-21 06:26:06', '2026-03-21 06:26:06');
+INSERT INTO `sys_category_rule` VALUES (4, 'platform', 'config', 'platform', '平台参数', 'tenant.*,system.*,feature.*', 'system', 'system', 0, '2026-03-21 06:26:06', '2026-03-21 06:26:06');
 
 -- ----------------------------
 -- Table structure for sys_config
@@ -135,17 +135,17 @@ CREATE TABLE `sys_config`  (
   INDEX `idx_sys_config_deleted`(`tenant_id` ASC, `deleted` ASC) USING BTREE,
   INDEX `idx_sys_config_tenant_deleted_created_at`(`tenant_id` ASC, `deleted` ASC, `created_at` ASC) USING BTREE,
   INDEX `idx_sys_config_tenant_deleted_created_by`(`tenant_id` ASC, `deleted` ASC, `created_by` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 11 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户配置表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 226 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户配置表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of sys_config
 -- ----------------------------
-INSERT INTO `sys_config` VALUES (1, 'platform', 'login.captcha.enabled', 'true', '2026-03-20 00:09:53', NULL, '2026-03-20 00:09:54', NULL, NULL, 0);
-INSERT INTO `sys_config` VALUES (2, 'platform', 'registration.default_tenant_id', 'tenant-a', '2026-03-30 10:00:00', '默认注册租户', '2026-03-30 10:00:00', 'system', 'system', 0);
-INSERT INTO `sys_config` VALUES (3, 'platform', 'system.category.dict.user', 'user.*,dept.*,role.*', '2026-03-20 20:12:50', '用户域字典', '2026-03-20 20:12:50', 'system', 'system', 0);
-INSERT INTO `sys_config` VALUES (4, 'platform', 'system.category.config.auth', 'auth.*', '2026-03-20 20:12:50', '认证参数', '2026-03-20 20:12:50', 'system', 'system', 0);
-INSERT INTO `sys_config` VALUES (5, 'platform', 'system.category.config.platform', 'tenant.*,system.*,feature.*', '2026-03-20 20:12:50', '平台参数', '2026-03-20 20:12:50', 'system', 'system', 0);
-INSERT INTO `sys_config` VALUES (6, 'platform', 'registration.default_role_codes', 'AUDITOR', '2026-03-30 10:00:00', '默认注册角色', '2026-03-30 10:00:00', 'system', 'system', 0);
+INSERT INTO `sys_config` VALUES (1, 'platform', 'login.captcha.enabled', 'true', '2026-03-20 08:09:53', NULL, '2026-03-20 08:09:54', NULL, NULL, 0);
+INSERT INTO `sys_config` VALUES (2, 'platform', 'registration.default_tenant_id', 'tenant-a', '2026-03-30 18:00:00', '默认注册租户', '2026-03-31 13:21:59', 'system', 'test', 0);
+INSERT INTO `sys_config` VALUES (3, 'platform', 'system.category.dict.user', 'user.*,dept.*,role.*', '2026-03-21 04:12:50', '用户域字典', '2026-03-21 04:12:50', 'system', 'system', 0);
+INSERT INTO `sys_config` VALUES (4, 'platform', 'system.category.config.auth', 'auth.*', '2026-03-21 04:12:50', '认证参数', '2026-03-21 04:12:50', 'system', 'system', 0);
+INSERT INTO `sys_config` VALUES (5, 'platform', 'system.category.config.platform', 'tenant.*,system.*,feature.*', '2026-03-21 04:12:50', '平台参数', '2026-03-21 04:12:50', 'system', 'system', 0);
+INSERT INTO `sys_config` VALUES (6, 'platform', 'registration.default_role_codes', 'AUDITOR', '2026-03-30 18:00:00', '默认注册角色', '2026-03-31 13:21:59', 'system', 'test', 0);
 
 -- ----------------------------
 -- Table structure for sys_dept
@@ -167,20 +167,17 @@ CREATE TABLE `sys_dept`  (
   INDEX `idx_sys_dept_tenant_parent`(`tenant_id` ASC, `parent_id` ASC) USING BTREE,
   INDEX `idx_sys_dept_tenant_code`(`tenant_id` ASC, `dept_code` ASC) USING BTREE,
   INDEX `idx_sys_dept_deleted`(`tenant_id` ASC, `deleted` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 183 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '部门树表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 329 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '部门树表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of sys_dept
 -- ----------------------------
-INSERT INTO `sys_dept` VALUES (1, 'platform', NULL, '平台运营中心', '2026-03-20 00:09:53', NULL, NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
-INSERT INTO `sys_dept` VALUES (2, 'tenant-a', NULL, '租户A-财务部', '2026-03-20 00:09:53', NULL, NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
-INSERT INTO `sys_dept` VALUES (3, 'tenant-a', NULL, '租户A-研发部', '2026-03-20 00:09:53', NULL, NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
-INSERT INTO `sys_dept` VALUES (4, 'platform', NULL, 'Platform Operation Center', '2026-03-20 00:34:56', NULL, NULL, '2026-03-20 00:34:56', NULL, NULL, 0);
-INSERT INTO `sys_dept` VALUES (5, 'tenant-a', NULL, 'Tenant A Finance', '2026-03-20 00:34:56', NULL, NULL, '2026-03-20 00:34:56', NULL, NULL, 0);
-INSERT INTO `sys_dept` VALUES (6, 'tenant-a', NULL, 'Tenant A R&D', '2026-03-20 00:34:56', NULL, NULL, '2026-03-20 00:34:56', NULL, NULL, 0);
-INSERT INTO `sys_dept` VALUES (9, 'platform', NULL, '测试部门', '2026-03-20 14:30:50', 'TEST_DEPT_19851573835200', NULL, '2026-03-20 14:30:49', 'system', 'system', 1);
-INSERT INTO `sys_dept` VALUES (153, 'platform', NULL, '测试部门', '2026-03-23 16:45:19', 'TEST_DEPT_15839912323000', NULL, '2026-03-23 16:45:19', 'system', 'system', 1);
-INSERT INTO `sys_dept` VALUES (169, 'platform', NULL, '测试部门', '2026-03-23 16:49:13', 'TEST_DEPT_16073431213700', NULL, '2026-03-23 16:49:12', 'system', 'system', 1);
+INSERT INTO `sys_dept` VALUES (1, 'platform', NULL, '平台运营中心', '2026-03-20 08:09:53', NULL, NULL, '2026-03-20 08:09:53', NULL, NULL, 0);
+INSERT INTO `sys_dept` VALUES (2, 'tenant-a', NULL, '租户A-财务部', '2026-03-20 08:09:53', NULL, NULL, '2026-03-20 08:09:53', NULL, NULL, 0);
+INSERT INTO `sys_dept` VALUES (3, 'tenant-a', NULL, '租户A-研发部', '2026-03-20 08:09:53', NULL, NULL, '2026-03-20 08:09:53', NULL, NULL, 0);
+INSERT INTO `sys_dept` VALUES (4, 'platform', NULL, 'Platform Operation Center', '2026-03-20 08:34:56', NULL, NULL, '2026-03-20 08:34:56', NULL, NULL, 0);
+INSERT INTO `sys_dept` VALUES (5, 'tenant-a', NULL, 'Tenant A Finance', '2026-03-20 08:34:56', NULL, NULL, '2026-03-20 08:34:56', NULL, NULL, 0);
+INSERT INTO `sys_dept` VALUES (6, 'tenant-a', NULL, 'Tenant A R&D', '2026-03-20 08:34:56', NULL, NULL, '2026-03-20 08:34:56', NULL, NULL, 0);
 
 -- ----------------------------
 -- Table structure for sys_dict
@@ -203,15 +200,23 @@ CREATE TABLE `sys_dict`  (
   INDEX `idx_sys_dict_deleted`(`tenant_id` ASC, `deleted` ASC) USING BTREE,
   INDEX `idx_sys_dict_tenant_deleted_created_at`(`tenant_id` ASC, `deleted` ASC, `created_at` ASC) USING BTREE,
   INDEX `idx_sys_dict_tenant_deleted_created_by`(`tenant_id` ASC, `deleted` ASC, `created_by` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 159 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '字典表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 327 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '字典表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of sys_dict
 -- ----------------------------
-INSERT INTO `sys_dict` VALUES (1, 'platform', 'user_status', 'ENABLED', '启用', '2026-03-20 00:09:53', '2026-03-20 00:09:54', NULL, NULL, 0);
-INSERT INTO `sys_dict` VALUES (6, 'platform', 'demo', 'k19853731725700', 'v', '2026-03-20 14:30:52', '2026-03-20 14:30:52', 'system', 'system', 1);
-INSERT INTO `sys_dict` VALUES (137, 'platform', 'demo', 'k15843632237600', 'v', '2026-03-23 16:45:23', '2026-03-23 16:45:22', 'system', 'system', 1);
-INSERT INTO `sys_dict` VALUES (158, 'platform', 'demo', 'k16077250144100', 'v', '2026-03-23 16:49:17', '2026-03-23 16:49:16', 'system', 'system', 1);
+INSERT INTO `sys_dict` VALUES (1, 'platform', 'user_status', 'ENABLED', '启用', '2026-03-20 08:09:53', '2026-03-20 08:09:54', NULL, NULL, 0);
+INSERT INTO `sys_dict` VALUES (6, 'platform', 'demo', 'k19853731725700', 'v', '2026-03-20 22:30:52', '2026-03-20 22:30:52', 'system', 'system', 1);
+INSERT INTO `sys_dict` VALUES (137, 'platform', 'demo', 'k15843632237600', 'v', '2026-03-24 00:45:23', '2026-03-24 00:45:22', 'system', 'system', 1);
+INSERT INTO `sys_dict` VALUES (158, 'platform', 'demo', 'k16077250144100', 'v', '2026-03-24 00:49:17', '2026-03-24 00:49:16', 'system', 'system', 1);
+INSERT INTO `sys_dict` VALUES (179, 'platform', 'demo', 'k5165487907100', 'v', '2026-03-31 02:44:08', '2026-03-31 02:44:08', 'system', 'system', 1);
+INSERT INTO `sys_dict` VALUES (200, 'platform', 'demo', 'k5697353575700', 'v', '2026-03-31 02:53:00', '2026-03-31 02:53:00', 'system', 'system', 1);
+INSERT INTO `sys_dict` VALUES (221, 'platform', 'demo', 'k11501426594800', 'v', '2026-03-31 04:29:44', '2026-03-31 04:29:44', 'system', 'system', 1);
+INSERT INTO `sys_dict` VALUES (242, 'platform', 'demo', 'k11635459207700', 'v', '2026-03-31 04:31:58', '2026-03-31 04:31:58', 'system', 'system', 1);
+INSERT INTO `sys_dict` VALUES (263, 'platform', 'demo', 'k12571502882000', 'v', '2026-03-31 04:47:34', '2026-03-31 04:47:35', 'system', 'system', 1);
+INSERT INTO `sys_dict` VALUES (284, 'platform', 'demo', 'k13219504581200', 'v', '2026-03-31 04:58:22', '2026-03-31 04:58:23', 'system', 'system', 1);
+INSERT INTO `sys_dict` VALUES (305, 'platform', 'demo', 'k14377776670000', 'v', '2026-03-31 05:17:41', '2026-03-31 05:17:41', 'system', 'system', 1);
+INSERT INTO `sys_dict` VALUES (326, 'platform', 'demo', 'k14647582773700', 'v', '2026-03-31 05:22:11', '2026-03-31 05:22:11', 'system', 'system', 1);
 
 -- ----------------------------
 -- Table structure for sys_notice
@@ -240,7 +245,7 @@ CREATE TABLE `sys_notice`  (
 -- ----------------------------
 -- Records of sys_notice
 -- ----------------------------
-INSERT INTO `sys_notice` VALUES (1, 'platform', '首期骨架已启用', '系统管理模块的公告、字典、参数基础能力已初始化。', 1, '2026-03-20 00:09:53', NULL, '2026-03-20 00:09:54', NULL, NULL, 0);
+INSERT INTO `sys_notice` VALUES (1, 'platform', '首期骨架已启用', '系统管理模块的公告、字典、参数基础能力已初始化。', 1, '2026-03-20 08:09:53', NULL, '2026-03-20 08:09:54', NULL, NULL, 0);
 
 -- ----------------------------
 -- Table structure for sys_role
@@ -264,13 +269,13 @@ CREATE TABLE `sys_role`  (
   UNIQUE INDEX `uk_sys_role_tenant_code`(`tenant_id` ASC, `role_code` ASC) USING BTREE,
   INDEX `idx_sys_role_tenant_scope`(`tenant_id` ASC, `data_scope_type` ASC) USING BTREE,
   INDEX `idx_sys_role_deleted`(`tenant_id` ASC, `deleted` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '角色定义表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 68 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '角色定义表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of sys_role
 -- ----------------------------
-INSERT INTO `sys_role` VALUES (1, 'platform', 'ADMIN', '平台管理员', 'ALL', '2026-03-20 00:09:53', NULL, '[\"auth:read\", \"auth:write\", \"user:read\", \"user:write\", \"role:read\", \"role:write\", \"permission:read\", \"permission:write\", \"dept:read\", \"dept:write\", \"tenant:read\", \"tenant:write\", \"audit:read\", \"audit:write\", \"system:read\", \"system:write\", \"session:write\"]', NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
-INSERT INTO `sys_role` VALUES (2, 'tenant-a', 'AUDITOR', '审计员', 'DEPT', '2026-03-20 00:09:53', NULL, '[\"audit:read\", \"user:read\"]', NULL, '2026-03-20 00:09:53', NULL, NULL, 0);
+INSERT INTO `sys_role` VALUES (1, 'platform', 'ADMIN', '平台管理员', 'ALL', '2026-03-20 08:09:53', NULL, '[\"auth:read\", \"auth:write\", \"user:read\", \"user:write\", \"role:read\", \"role:write\", \"permission:read\", \"permission:write\", \"dept:read\", \"dept:write\", \"tenant:read\", \"tenant:write\", \"audit:read\", \"audit:write\", \"system:read\", \"system:write\", \"session:write\"]', NULL, '2026-03-20 08:09:53', NULL, NULL, 0);
+INSERT INTO `sys_role` VALUES (2, 'tenant-a', 'AUDITOR', '审计员', 'DEPT', '2026-03-20 08:09:53', NULL, '[\"audit:read\", \"user:read\"]', NULL, '2026-03-20 08:09:53', NULL, NULL, 0);
 
 -- ----------------------------
 -- Table structure for sys_tenant
@@ -299,8 +304,8 @@ CREATE TABLE `sys_tenant`  (
 -- ----------------------------
 -- Records of sys_tenant
 -- ----------------------------
-INSERT INTO `sys_tenant` VALUES (1, 'platform', '平台租户', 1, '2026-03-20 00:09:53', 1, NULL, 'platform-governance', '负责全局治理与租户运维', '2026-03-20 22:26:06', NULL, NULL, 0);
-INSERT INTO `sys_tenant` VALUES (2, 'tenant-a', '租户A', 0, '2026-03-20 00:09:53', 1, NULL, 'business-standard', '默认标准业务租户', '2026-03-20 22:26:06', NULL, NULL, 0);
+INSERT INTO `sys_tenant` VALUES (1, 'platform', '平台租户', 1, '2026-03-20 08:09:53', 1, NULL, 'platform-governance', '负责全局治理与租户运维', '2026-03-21 06:26:06', NULL, NULL, 0);
+INSERT INTO `sys_tenant` VALUES (2, 'tenant-a', '租户A', 0, '2026-03-20 08:09:53', 1, NULL, 'business-standard', '默认标准业务租户', '2026-03-21 06:26:06', NULL, NULL, 0);
 
 -- ----------------------------
 -- Table structure for sys_tenant_capability
@@ -321,19 +326,19 @@ CREATE TABLE `sys_tenant_capability`  (
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_sys_tenant_capability_tenant_code`(`tenant_id` ASC, `capability_code` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 11 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户能力定义表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 19 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户能力定义表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of sys_tenant_capability
 -- ----------------------------
-INSERT INTO `sys_tenant_capability` VALUES (1, 'platform', 'auth', '认证安全', '登录认证、会话治理与安全基线能力', 10, 1, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
-INSERT INTO `sys_tenant_capability` VALUES (2, 'platform', 'user', '用户管理', '用户目录、启停、角色分配与组织可见范围管理', 20, 1, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
-INSERT INTO `sys_tenant_capability` VALUES (3, 'platform', 'role', '角色授权', '角色模型、权限树与数据范围授权', 30, 1, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
-INSERT INTO `sys_tenant_capability` VALUES (4, 'platform', 'dept', '组织管理', '组织树、负责人和部门层级治理', 40, 1, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
-INSERT INTO `sys_tenant_capability` VALUES (5, 'platform', 'tenant', '租户治理', '租户套餐、能力配置与生命周期治理', 50, 1, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
-INSERT INTO `sys_tenant_capability` VALUES (6, 'platform', 'system', '系统管理', '字典、参数、公告与分类配置管理', 60, 1, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
-INSERT INTO `sys_tenant_capability` VALUES (7, 'platform', 'audit', '安全审计', '审计查询、导出与授权记录联动', 70, 1, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
-INSERT INTO `sys_tenant_capability` VALUES (8, 'platform', 'notice', '通知公告', '公告发布与租户通知能力', 80, 1, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_tenant_capability` VALUES (1, 'platform', 'auth', '认证安全', '登录认证、会话治理与安全基线能力', 10, 1, 'system', 'system', 0, '2026-03-21 06:26:06', '2026-03-21 06:26:06');
+INSERT INTO `sys_tenant_capability` VALUES (2, 'platform', 'user', '用户管理', '用户目录、启停、角色分配与组织可见范围管理', 20, 1, 'system', 'system', 0, '2026-03-21 06:26:06', '2026-03-21 06:26:06');
+INSERT INTO `sys_tenant_capability` VALUES (3, 'platform', 'role', '角色授权', '角色模型、权限树与数据范围授权', 30, 1, 'system', 'system', 0, '2026-03-21 06:26:06', '2026-03-21 06:26:06');
+INSERT INTO `sys_tenant_capability` VALUES (4, 'platform', 'dept', '组织管理', '组织树、负责人和部门层级治理', 40, 1, 'system', 'system', 0, '2026-03-21 06:26:06', '2026-03-21 06:26:06');
+INSERT INTO `sys_tenant_capability` VALUES (5, 'platform', 'tenant', '租户治理', '租户套餐、能力配置与生命周期治理', 50, 1, 'system', 'system', 0, '2026-03-21 06:26:06', '2026-03-21 06:26:06');
+INSERT INTO `sys_tenant_capability` VALUES (6, 'platform', 'system', '系统管理', '字典、参数、公告与分类配置管理', 60, 1, 'system', 'system', 0, '2026-03-21 06:26:06', '2026-03-21 06:26:06');
+INSERT INTO `sys_tenant_capability` VALUES (7, 'platform', 'audit', '安全审计', '审计查询、导出与授权记录联动', 70, 1, 'system', 'system', 0, '2026-03-21 06:26:06', '2026-03-21 06:26:06');
+INSERT INTO `sys_tenant_capability` VALUES (8, 'platform', 'notice', '通知公告', '公告发布与租户通知能力', 80, 1, 'system', 'system', 0, '2026-03-21 06:26:06', '2026-03-21 06:26:06');
 
 -- ----------------------------
 -- Table structure for sys_tenant_capability_override
@@ -351,7 +356,7 @@ CREATE TABLE `sys_tenant_capability_override`  (
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_sys_tenant_capability_override`(`tenant_id` ASC, `capability_code` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 5 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户能力覆盖表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 21 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户能力覆盖表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of sys_tenant_capability_override
@@ -373,13 +378,11 @@ CREATE TABLE `sys_tenant_change_log`  (
   `occurred_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '变更时间',
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_sys_tenant_change_log_tenant_time`(`tenant_id` ASC, `occurred_at` DESC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 35 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户变更记录表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 123 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户变更记录表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of sys_tenant_change_log
 -- ----------------------------
-INSERT INTO `sys_tenant_change_log` VALUES (23, 'tenant-a', 'CAPABILITY', 'capabilityOverrides', NULL, 'audit:true:审计导出与看板能力|notice:false:null', '更新租户能力覆盖', 'tester', '2026-03-23 16:45:24');
-INSERT INTO `sys_tenant_change_log` VALUES (32, 'tenant-a', 'CAPABILITY', 'capabilityOverrides', NULL, 'audit:true:审计导出与看板能力|notice:false:null', '更新租户能力覆盖', 'tester', '2026-03-23 16:49:17');
 
 -- ----------------------------
 -- Table structure for sys_tenant_package
@@ -401,13 +404,13 @@ CREATE TABLE `sys_tenant_package`  (
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_sys_tenant_package_tenant_code`(`tenant_id` ASC, `package_code` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 5 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户套餐定义表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 13 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户套餐定义表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of sys_tenant_package
 -- ----------------------------
-INSERT INTO `sys_tenant_package` VALUES (1, 'platform', 'platform-governance', '平台治理版', 9999, 1024, '负责全局治理与租户运维', 1, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
-INSERT INTO `sys_tenant_package` VALUES (2, 'platform', 'business-standard', '标准版', 200, 200, '适用于常规业务租户', 1, 'system', 'system', 0, '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_tenant_package` VALUES (1, 'platform', 'platform-governance', '平台治理版', 9999, 1024, '负责全局治理与租户运维', 1, 'system', 'system', 0, '2026-03-21 06:26:06', '2026-03-21 06:26:06');
+INSERT INTO `sys_tenant_package` VALUES (2, 'platform', 'business-standard', '标准版', 200, 200, '适用于常规业务租户', 1, 'system', 'system', 0, '2026-03-21 06:26:06', '2026-03-21 06:26:06');
 
 -- ----------------------------
 -- Table structure for sys_tenant_package_capability
@@ -424,19 +427,19 @@ CREATE TABLE `sys_tenant_package_capability`  (
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_sys_tenant_package_capability`(`tenant_id` ASC, `package_code` ASC, `capability_code` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 13 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户套餐能力关联表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 29 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户套餐能力关联表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of sys_tenant_package_capability
 -- ----------------------------
-INSERT INTO `sys_tenant_package_capability` VALUES (1, 'platform', 'platform-governance', 'auth', 'system', 'system', '2026-03-20 22:26:06', '2026-03-20 22:26:06');
-INSERT INTO `sys_tenant_package_capability` VALUES (2, 'platform', 'platform-governance', 'audit', 'system', 'system', '2026-03-20 22:26:06', '2026-03-20 22:26:06');
-INSERT INTO `sys_tenant_package_capability` VALUES (3, 'platform', 'platform-governance', 'system', 'system', 'system', '2026-03-20 22:26:06', '2026-03-20 22:26:06');
-INSERT INTO `sys_tenant_package_capability` VALUES (4, 'platform', 'platform-governance', 'tenant', 'system', 'system', '2026-03-20 22:26:06', '2026-03-20 22:26:06');
-INSERT INTO `sys_tenant_package_capability` VALUES (5, 'platform', 'business-standard', 'user', 'system', 'system', '2026-03-20 22:26:06', '2026-03-20 22:26:06');
-INSERT INTO `sys_tenant_package_capability` VALUES (6, 'platform', 'business-standard', 'role', 'system', 'system', '2026-03-20 22:26:06', '2026-03-20 22:26:06');
-INSERT INTO `sys_tenant_package_capability` VALUES (7, 'platform', 'business-standard', 'audit', 'system', 'system', '2026-03-20 22:26:06', '2026-03-20 22:26:06');
-INSERT INTO `sys_tenant_package_capability` VALUES (8, 'platform', 'business-standard', 'notice', 'system', 'system', '2026-03-20 22:26:06', '2026-03-20 22:26:06');
+INSERT INTO `sys_tenant_package_capability` VALUES (1, 'platform', 'platform-governance', 'auth', 'system', 'system', '2026-03-21 06:26:06', '2026-03-21 06:26:06');
+INSERT INTO `sys_tenant_package_capability` VALUES (2, 'platform', 'platform-governance', 'audit', 'system', 'system', '2026-03-21 06:26:06', '2026-03-21 06:26:06');
+INSERT INTO `sys_tenant_package_capability` VALUES (3, 'platform', 'platform-governance', 'system', 'system', 'system', '2026-03-21 06:26:06', '2026-03-21 06:26:06');
+INSERT INTO `sys_tenant_package_capability` VALUES (4, 'platform', 'platform-governance', 'tenant', 'system', 'system', '2026-03-21 06:26:06', '2026-03-21 06:26:06');
+INSERT INTO `sys_tenant_package_capability` VALUES (5, 'platform', 'business-standard', 'user', 'system', 'system', '2026-03-21 06:26:06', '2026-03-21 06:26:06');
+INSERT INTO `sys_tenant_package_capability` VALUES (6, 'platform', 'business-standard', 'role', 'system', 'system', '2026-03-21 06:26:06', '2026-03-21 06:26:06');
+INSERT INTO `sys_tenant_package_capability` VALUES (7, 'platform', 'business-standard', 'audit', 'system', 'system', '2026-03-21 06:26:06', '2026-03-21 06:26:06');
+INSERT INTO `sys_tenant_package_capability` VALUES (8, 'platform', 'business-standard', 'notice', 'system', 'system', '2026-03-21 06:26:06', '2026-03-21 06:26:06');
 
 -- ----------------------------
 -- Table structure for sys_user
@@ -462,18 +465,18 @@ CREATE TABLE `sys_user`  (
   `last_login_ip` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '最近登录 IP',
   `password_updated_at` datetime NULL DEFAULT NULL COMMENT '密码最近修改时间',
   PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE INDEX `uk_sys_user_tenant_username`(`tenant_id` ASC, `username` ASC) USING BTREE,
   INDEX `idx_sys_user_tenant_dept`(`tenant_id` ASC, `dept_id` ASC) USING BTREE,
   INDEX `idx_sys_user_tenant_mobile`(`tenant_id` ASC, `mobile` ASC) USING BTREE,
   INDEX `idx_sys_user_tenant_email`(`tenant_id` ASC, `email` ASC) USING BTREE,
-  INDEX `idx_sys_user_deleted`(`tenant_id` ASC, `deleted` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 627 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '用户账号表' ROW_FORMAT = DYNAMIC;
+  INDEX `idx_sys_user_deleted`(`tenant_id` ASC, `deleted` ASC) USING BTREE,
+  UNIQUE INDEX `uk_sys_user_username`(`username` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 1249 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '用户账号表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of sys_user
 -- ----------------------------
-INSERT INTO `sys_user` VALUES (1, 'platform', 1, 'admin', '$2b$10$3yP0opk2EICLIv2T8mxlH.wZC9XlhDY6/bVVBp5a9vtRmXjv/KbQK', 1, 1, '2026-03-20 00:09:53', NULL, NULL, NULL, '2026-03-23 15:56:02', NULL, 'test', 0, '2026-03-23 16:49:09', '127.0.0.1', '2026-03-23 16:49:04');
-INSERT INTO `sys_user` VALUES (2, 'tenant-a', 2, 'auditor', '$2b$10$3yP0opk2EICLIv2T8mxlH.wZC9XlhDY6/bVVBp5a9vtRmXjv/KbQK', 1, 1, '2026-03-20 00:09:53', NULL, NULL, NULL, '2026-03-23 15:56:03', NULL, NULL, 0, NULL, NULL, NULL);
+INSERT INTO `sys_user` VALUES (1, 'platform', 1, 'admin', '$2b$10$3yP0opk2EICLIv2T8mxlH.wZC9XlhDY6/bVVBp5a9vtRmXjv/KbQK', 1, 1, '2026-03-20 08:09:53', NULL, NULL, NULL, '2026-03-31 13:31:38', NULL, 'admin', 0, '2026-03-31 05:31:39', '127.0.0.1', '2026-03-23 16:49:04');
+INSERT INTO `sys_user` VALUES (2, 'tenant-a', 2, 'auditor', '$2b$10$3yP0opk2EICLIv2T8mxlH.wZC9XlhDY6/bVVBp5a9vtRmXjv/KbQK', 1, 1, '2026-03-20 08:09:53', NULL, NULL, NULL, '2026-03-23 23:56:03', NULL, NULL, 0, NULL, NULL, NULL);
 
 -- ----------------------------
 -- Table structure for sys_user_role
@@ -492,12 +495,12 @@ CREATE TABLE `sys_user_role`  (
   UNIQUE INDEX `uk_sys_user_role_tenant_user_role`(`tenant_id` ASC, `user_id` ASC, `role_id` ASC) USING BTREE,
   INDEX `idx_sys_user_role_tenant_user`(`tenant_id` ASC, `user_id` ASC) USING BTREE,
   INDEX `idx_sys_user_role_tenant_role`(`tenant_id` ASC, `role_id` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '用户角色关联表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 34 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '用户角色关联表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of sys_user_role
 -- ----------------------------
-INSERT INTO `sys_user_role` VALUES (1, 'platform', 1, 1, '2026-03-20 00:09:53', NULL, NULL, '2026-03-20 00:09:55');
-INSERT INTO `sys_user_role` VALUES (2, 'tenant-a', 2, 2, '2026-03-20 00:09:53', NULL, NULL, '2026-03-20 00:09:55');
+INSERT INTO `sys_user_role` VALUES (1, 'platform', 1, 1, '2026-03-20 08:09:53', NULL, NULL, '2026-03-20 08:09:55');
+INSERT INTO `sys_user_role` VALUES (2, 'tenant-a', 2, 2, '2026-03-20 08:09:53', NULL, NULL, '2026-03-20 08:09:55');
 
 SET FOREIGN_KEY_CHECKS = 1;

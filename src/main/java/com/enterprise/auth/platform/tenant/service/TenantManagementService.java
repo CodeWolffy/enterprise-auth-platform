@@ -6,7 +6,6 @@ import com.enterprise.auth.platform.catalog.CatalogService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.model.PageResult;
 import com.enterprise.auth.platform.common.time.TimeSupport;
-import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.persistence.entity.SysDeptEntity;
 import com.enterprise.auth.platform.persistence.entity.SysRoleEntity;
 import com.enterprise.auth.platform.persistence.entity.SysTenantCapabilityEntity;
@@ -37,7 +36,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
-import org.springframework.lang.Nullable;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -48,7 +46,6 @@ import org.springframework.util.StringUtils;
 @Service
 public class TenantManagementService {
 
-    private final PersistenceProperties persistenceProperties;
     private final SysTenantMapper sysTenantMapper;
     private final SysUserMapper sysUserMapper;
     private final SysRoleMapper sysRoleMapper;
@@ -63,21 +60,19 @@ public class TenantManagementService {
     private final PlatformAdminSupport platformAdminSupport;
 
     public TenantManagementService(
-            PersistenceProperties persistenceProperties,
-            @Nullable SysTenantMapper sysTenantMapper,
-            @Nullable SysUserMapper sysUserMapper,
-            @Nullable SysRoleMapper sysRoleMapper,
-            @Nullable SysDeptMapper sysDeptMapper,
-            @Nullable SysTenantPackageMapper sysTenantPackageMapper,
-            @Nullable SysTenantCapabilityMapper sysTenantCapabilityMapper,
-            @Nullable SysTenantPackageCapabilityMapper sysTenantPackageCapabilityMapper,
-            @Nullable SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper,
-            @Nullable SysTenantChangeLogMapper sysTenantChangeLogMapper,
+            SysTenantMapper sysTenantMapper,
+            SysUserMapper sysUserMapper,
+            SysRoleMapper sysRoleMapper,
+            SysDeptMapper sysDeptMapper,
+            SysTenantPackageMapper sysTenantPackageMapper,
+            SysTenantCapabilityMapper sysTenantCapabilityMapper,
+            SysTenantPackageCapabilityMapper sysTenantPackageCapabilityMapper,
+            SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper,
+            SysTenantChangeLogMapper sysTenantChangeLogMapper,
             CatalogService catalogService,
             AuditService auditService,
             PlatformAdminSupport platformAdminSupport
     ) {
-        this.persistenceProperties = persistenceProperties;
         this.sysTenantMapper = sysTenantMapper;
         this.sysUserMapper = sysUserMapper;
         this.sysRoleMapper = sysRoleMapper;
@@ -94,7 +89,6 @@ public class TenantManagementService {
 
     @Transactional
     public CatalogService.TenantView create(CreateTenantRequest request) {
-        requireDatabaseMode();
         requirePlatformSuperAdmin();
         String operator = SecuritySupport.currentOperator();
         if (existsTenant(request.tenantId())) {
@@ -125,7 +119,6 @@ public class TenantManagementService {
 
     @Transactional
     public CatalogService.TenantView update(String tenantId, UpdateTenantRequest request) {
-        requireDatabaseMode();
         requirePlatformSuperAdmin();
         SysTenantEntity entity = getTenant(tenantId);
         String oldTenantName = entity.getTenantName();
@@ -162,7 +155,6 @@ public class TenantManagementService {
 
     @Transactional
     public void delete(String tenantId) {
-        requireDatabaseMode();
         requirePlatformSuperAdmin();
         String operator = SecuritySupport.currentOperator();
         SysTenantEntity entity = getTenant(tenantId);
@@ -188,7 +180,6 @@ public class TenantManagementService {
     }
 
     public PageResult<CatalogService.TenantView> page(String keyword, Boolean platformLevel, Integer tenantStatus, int page, int size) {
-        requireDatabaseMode();
         boolean platformSuperAdmin = isPlatformSuperAdmin();
         String operatorTenantId = currentTenantId();
         int safePage = Math.max(page, 1);
@@ -236,7 +227,6 @@ public class TenantManagementService {
             int page,
             int size
     ) {
-        requireDatabaseMode();
         ensureTenantReadable(tenantId);
         int safePage = Math.max(page, 1);
         int safeSize = Math.max(size, 1);
@@ -275,7 +265,6 @@ public class TenantManagementService {
             Long fromEpochMs,
             Long toEpochMs
     ) {
-        requireDatabaseMode();
         ensureTenantReadable(tenantId);
         List<SysTenantChangeLogEntity> records = sysTenantChangeLogMapper.selectList(
                 buildHistoryQuery(tenantId, changeType, fieldKey, operator, fromEpochMs, toEpochMs)
@@ -320,7 +309,6 @@ public class TenantManagementService {
     }
 
     public TenantCapabilityOverrideView capabilityOverrides(String tenantId) {
-        requireDatabaseMode();
         ensureTenantReadable(tenantId);
         SysTenantEntity tenant = getTenant(tenantId);
         Map<String, TenantProfile> profiles = loadTenantProfiles(List.of(tenant));
@@ -333,7 +321,6 @@ public class TenantManagementService {
             String tenantId,
             UpdateTenantCapabilityOverridesRequest request
     ) {
-        requireDatabaseMode();
         ensureTenantReadable(tenantId);
         SysTenantEntity tenant = getTenant(tenantId);
         TenantCapabilityOverrideView before = capabilityOverrides(tenantId);
@@ -369,20 +356,6 @@ public class TenantManagementService {
         return entity;
     }
 
-    private void requireDatabaseMode() {
-        if (!persistenceProperties.databaseEnabled()
-                || sysTenantMapper == null
-                || sysUserMapper == null
-                || sysRoleMapper == null
-                || sysDeptMapper == null
-                || sysTenantPackageMapper == null
-                || sysTenantCapabilityMapper == null
-                || sysTenantPackageCapabilityMapper == null
-                || sysTenantCapabilityOverrideMapper == null
-                || sysTenantChangeLogMapper == null) {
-            throw new BusinessException("当前为默认内存模式，暂未启用数据库写入能力");
-        }
-    }
 
     private LambdaQueryWrapper<SysTenantChangeLogEntity> buildHistoryQuery(
             String tenantId,

@@ -44,6 +44,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 class AuthControllerSessionFlowTest {
 
     private static final String ADMIN_PASSWORD = "Admin@123456";
+    private static final String TENANT_USER = "session_flow_tenant_user";
+    private static final String TENANT_USER_PASSWORD = "Tenant@123456";
     private static final String CAPTCHA_ID = "captcha-ut";
     private static final String CAPTCHA_CODE = "2468";
 
@@ -129,6 +131,7 @@ class AuthControllerSessionFlowTest {
                     "admin"
             );
         }
+        jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username = ?", "tenant-a", TENANT_USER);
         sessions.clear();
     }
 
@@ -147,7 +150,6 @@ class AuthControllerSessionFlowTest {
                                   "password": "%s",
                                   "captchaId": "%s",
                                   "captchaCode": "%s",
-                                  "tenantId": "platform",
                                   "device": "test-browser"
                                 }
                                 """.formatted(ADMIN_PASSWORD, CAPTCHA_ID, CAPTCHA_CODE)))
@@ -190,5 +192,64 @@ class AuthControllerSessionFlowTest {
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("SESSION_EXPIRED"));
+    }
+
+    @Test
+    void loginShouldIgnoreExistingSessionCookieAndResolveTenantByUsername() throws Exception {
+        ensureTenantUser();
+
+        MvcResult adminLoginResult = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "admin",
+                                  "password": "%s",
+                                  "captchaId": "%s",
+                                  "captchaCode": "%s",
+                                  "device": "test-browser"
+                                }
+                                """.formatted(ADMIN_PASSWORD, CAPTCHA_ID, CAPTCHA_CODE)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        Cookie adminSessionCookie = adminLoginResult.getResponse().getCookie(AuthCookieConstants.SESSION_COOKIE);
+        Assertions.assertNotNull(adminSessionCookie, "Missing admin session cookie");
+
+        mockMvc.perform(post("/api/auth/login")
+                        .cookie(adminSessionCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "%s",
+                                  "password": "%s",
+                                  "captchaId": "%s",
+                                  "captchaCode": "%s",
+                                  "device": "test-browser"
+                                }
+                                """.formatted(TENANT_USER, TENANT_USER_PASSWORD, CAPTCHA_ID, CAPTCHA_CODE)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.tenantId").value("tenant-a"));
+    }
+
+    private void ensureTenantUser() {
+        jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username = ?", "tenant-a", TENANT_USER);
+        jdbcTemplate.update(
+                """
+                INSERT INTO sys_user (
+                    tenant_id, dept_id, username, display_name, password_hash,
+                    enabled, session_version, created_by, updated_by, deleted, password_updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NOW())
+                """,
+                "tenant-a",
+                2L,
+                TENANT_USER,
+                TENANT_USER,
+                passwordEncoder.encode(TENANT_USER_PASSWORD),
+                1,
+                1,
+                "test",
+                "test"
+        );
     }
 }

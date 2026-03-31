@@ -4,26 +4,22 @@
       <span class="eyebrow">Session / Redis / RBAC</span>
       <h1>企业级权限管理平台</h1>
       <p>
-        当前登录链路已切换到轻量模式：账号密码登录、Redis 会话、HttpOnly Cookie、RBAC 与多租户隔离。
+        当前登录链路已经切换到轻量模式：账号密码登录、Redis 会话、HttpOnly Cookie、RBAC 与多租户隔离。
         浏览器不再保存 access token 或 refresh token。
       </p>
       <ul class="highlights">
         <li>认证方式：Session Cookie</li>
-        <li>授权模型：RBAC + 多租户</li>
+        <li>账号标识：全局唯一用户名</li>
         <li>安全基线：CSRF、验证码、会话失效、强制下线</li>
       </ul>
     </section>
 
     <section class="auth-panel auth-panel--form">
-      <span class="eyebrow">Tenant Access</span>
+      <span class="eyebrow">Account Access</span>
       <h2>登录控制台</h2>
-      <p>请输入租户、用户名、密码与验证码，登录成功后会直接进入控制台。</p>
+      <p>系统会按全局唯一用户名自动定位账号。开发环境会直接显示验证码预览。</p>
 
       <el-form label-position="top" @submit.prevent="handleLogin">
-        <el-form-item label="租户">
-          <el-input v-model="tenantId" placeholder="例如：platform" autocomplete="organization" />
-        </el-form-item>
-
         <el-form-item label="用户名" :error="usernameError">
           <el-input v-model="username" placeholder="请输入用户名" autocomplete="username" />
         </el-form-item>
@@ -68,14 +64,13 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
 import { fetchCaptcha } from '@/api/auth'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 
-const tenantId = ref(String(route.query.tenantId ?? 'platform'))
 const username = ref('')
 const password = ref('')
 const captchaId = ref('')
@@ -104,10 +99,6 @@ async function handleLogin() {
     return
   }
   resetErrors()
-  if (!tenantId.value.trim()) {
-    usernameError.value = '请输入租户'
-    return
-  }
   if (!username.value.trim()) {
     usernameError.value = '请输入用户名'
     return
@@ -124,7 +115,6 @@ async function handleLogin() {
   loading.value = true
   try {
     await authStore.login({
-      tenantId: tenantId.value.trim(),
       username: username.value.trim(),
       password: password.value,
       captchaId: captchaId.value,

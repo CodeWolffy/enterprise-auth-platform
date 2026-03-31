@@ -55,6 +55,11 @@ public class SessionAuthenticationFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
+        if (isBypassEndpoint(request)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         String sessionId = sessionService.resolveSessionId(request);
         if (!StringUtils.hasText(sessionId)) {
             filterChain.doFilter(request, response);
@@ -91,11 +96,8 @@ public class SessionAuthenticationFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
         } catch (BusinessException ex) {
             SecurityContextHolder.clearContext();
-            if (!isBypassEndpoint(request)) {
-                writeAuthFailure(response, ex);
-                return;
-            }
-            filterChain.doFilter(request, response);
+            writeAuthFailure(response, ex);
+            return;
         }
     }
 

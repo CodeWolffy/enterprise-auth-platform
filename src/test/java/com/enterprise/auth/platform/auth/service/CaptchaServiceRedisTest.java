@@ -14,6 +14,7 @@ import com.enterprise.auth.platform.config.SecurityProperties;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
@@ -35,7 +36,13 @@ class CaptchaServiceRedisTest {
         );
         SecurityRedisProperties redisProperties = new SecurityRedisProperties(true, true, false, "eap:auth:", "v2");
 
-        CaptchaService captchaService = new CaptchaService(securityProperties, redisProperties, redisTemplate, null);
+        CaptchaService captchaService = new CaptchaService(
+                securityProperties,
+                redisProperties,
+                redisTemplate,
+                null,
+                new MockEnvironment()
+        );
 
         CaptchaService.CaptchaChallenge challenge = captchaService.create();
 

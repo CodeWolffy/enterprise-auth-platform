@@ -5,7 +5,6 @@ import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.catalog.CatalogService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.model.DataScopeType;
-import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.persistence.entity.SysDeptEntity;
 import com.enterprise.auth.platform.persistence.entity.SysRoleEntity;
 import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
@@ -23,7 +22,6 @@ import com.enterprise.auth.platform.tenant.TenantContext;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -31,7 +29,6 @@ import org.springframework.util.StringUtils;
 @Service
 public class RoleManagementService {
 
-    private final PersistenceProperties persistenceProperties;
     private final SysRoleMapper sysRoleMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
     private final SysDeptMapper sysDeptMapper;
@@ -42,17 +39,15 @@ public class RoleManagementService {
     private final RolePayloadCodec rolePayloadCodec;
 
     public RoleManagementService(
-            PersistenceProperties persistenceProperties,
-            @Nullable SysRoleMapper sysRoleMapper,
-            @Nullable SysUserRoleMapper sysUserRoleMapper,
-            @Nullable SysDeptMapper sysDeptMapper,
-            @Nullable SysUserMapper sysUserMapper,
+            SysRoleMapper sysRoleMapper,
+            SysUserRoleMapper sysUserRoleMapper,
+            SysDeptMapper sysDeptMapper,
+            SysUserMapper sysUserMapper,
             CatalogService catalogService,
             AuditService auditService,
             AuthPrincipalCacheService authPrincipalCacheService,
             RolePayloadCodec rolePayloadCodec
     ) {
-        this.persistenceProperties = persistenceProperties;
         this.sysRoleMapper = sysRoleMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
         this.sysDeptMapper = sysDeptMapper;
@@ -65,7 +60,6 @@ public class RoleManagementService {
 
     @Transactional
     public CatalogService.RoleView create(CreateRoleRequest request) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
         if (existsRoleCode(tenantId, request.roleCode())) {
@@ -87,7 +81,6 @@ public class RoleManagementService {
 
     @Transactional
     public CatalogService.RoleView update(Long roleId, UpdateRoleRequest request) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         SysRoleEntity entity = getRole(roleId, tenantId);
         entity.setRoleName(request.roleName());
@@ -102,7 +95,6 @@ public class RoleManagementService {
 
     @Transactional
     public List<CatalogService.PermissionView> assignPermissions(Long roleId, Set<String> permissionCodes) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
         SysRoleEntity entity = getRole(roleId, tenantId);
@@ -118,7 +110,6 @@ public class RoleManagementService {
     }
 
     public List<CatalogService.PermissionView> listAssignedPermissions(Long roleId) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         SysRoleEntity entity = getRole(roleId, tenantId);
         return catalogService.permissionsByCodes(rolePayloadCodec.readPermissionCodes(entity.getPermissionsJson()));
@@ -126,7 +117,6 @@ public class RoleManagementService {
 
     @Transactional
     public void delete(Long roleId) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
         SysRoleEntity entity = getRole(roleId, tenantId);
@@ -176,10 +166,6 @@ public class RoleManagementService {
         if (userIds.isEmpty()) {
             return;
         }
-        if (sysUserMapper == null) {
-            authPrincipalCacheService.evictAll();
-            return;
-        }
         List<SysUserEntity> users = sysUserMapper.selectList(new LambdaQueryWrapper<SysUserEntity>()
                 .eq(SysUserEntity::getTenantId, tenantId)
                 .eq(SysUserEntity::getDeleted, 0)
@@ -209,15 +195,6 @@ public class RoleManagementService {
             throw new BusinessException("角色不存在");
         }
         return entity;
-    }
-
-    private void requireDatabaseMode() {
-        if (!persistenceProperties.databaseEnabled()
-                || sysRoleMapper == null
-                || sysUserRoleMapper == null
-                || sysDeptMapper == null) {
-            throw new BusinessException("当前为默认内存模式，暂未启用数据库写入能力");
-        }
     }
 
     private String currentTenantId() {

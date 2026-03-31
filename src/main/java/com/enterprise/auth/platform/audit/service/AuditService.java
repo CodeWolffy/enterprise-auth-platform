@@ -7,7 +7,6 @@ import com.enterprise.auth.platform.audit.model.AuditQuery;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.common.web.RequestContext;
-import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.persistence.entity.SysAuditLogEntity;
 import com.enterprise.auth.platform.persistence.mapper.SysAuditLogMapper;
 import com.enterprise.auth.platform.security.DataScopeService;
@@ -18,7 +17,6 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -28,27 +26,21 @@ public class AuditService {
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() { };
     private static final long MAX_EXPORT_RANGE_MS = Duration.ofDays(31).toMillis();
 
-    private final PersistenceProperties persistenceProperties;
     private final SysAuditLogMapper sysAuditLogMapper;
     private final ObjectMapper objectMapper;
     private final DataScopeService dataScopeService;
 
     public AuditService(
-            PersistenceProperties persistenceProperties,
-            @Nullable SysAuditLogMapper sysAuditLogMapper,
+            SysAuditLogMapper sysAuditLogMapper,
             ObjectMapper objectMapper,
             DataScopeService dataScopeService
     ) {
-        this.persistenceProperties = persistenceProperties;
         this.sysAuditLogMapper = sysAuditLogMapper;
         this.objectMapper = objectMapper;
         this.dataScopeService = dataScopeService;
     }
 
     public void record(String type, String operator, String tenantId, Map<String, Object> details) {
-        if (!databaseEnabled()) {
-            return;
-        }
         String resolvedTenantId = StringUtils.hasText(tenantId) ? tenantId : "platform";
         Map<String, Object> enrichedDetails = enrichDetails(details);
 
@@ -68,9 +60,6 @@ public class AuditService {
     }
 
     public AuditPage query(AuditQuery query) {
-        if (!databaseEnabled()) {
-            throw new BusinessException("当前未启用数据库审计存储");
-        }
         validateQueryRange(query);
         return queryInDatabase(query);
     }
@@ -195,10 +184,6 @@ public class AuditService {
 
     private String stringValue(Object value) {
         return value == null ? null : String.valueOf(value);
-    }
-
-    private boolean databaseEnabled() {
-        return persistenceProperties.databaseEnabled() && sysAuditLogMapper != null;
     }
 
     private String queryTenantId(AuditQuery query) {

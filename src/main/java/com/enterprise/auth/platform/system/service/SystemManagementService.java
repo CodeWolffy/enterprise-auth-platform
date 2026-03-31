@@ -6,7 +6,6 @@ import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.model.PageResult;
 import com.enterprise.auth.platform.common.time.TimeSupport;
-import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.persistence.entity.SysCategoryRuleEntity;
 import com.enterprise.auth.platform.persistence.entity.SysConfigEntity;
 import com.enterprise.auth.platform.persistence.entity.SysDictEntity;
@@ -35,7 +34,6 @@ import java.util.function.Function;
 import java.io.Serializable;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -48,7 +46,6 @@ public class SystemManagementService {
     private static final String DICT_CATEGORY_PREFIX = "system.category.dict.";
     private static final String CONFIG_CATEGORY_PREFIX = "system.category.config.";
 
-    private final PersistenceProperties persistenceProperties;
     private final SysDictMapper sysDictMapper;
     private final SysConfigMapper sysConfigMapper;
     private final SysNoticeMapper sysNoticeMapper;
@@ -58,16 +55,14 @@ public class SystemManagementService {
     private final DataScopeService dataScopeService;
 
     public SystemManagementService(
-            PersistenceProperties persistenceProperties,
-            @Nullable SysDictMapper sysDictMapper,
-            @Nullable SysConfigMapper sysConfigMapper,
-            @Nullable SysNoticeMapper sysNoticeMapper,
-            @Nullable SysAuditLogMapper sysAuditLogMapper,
-            @Nullable SysCategoryRuleMapper sysCategoryRuleMapper,
+            SysDictMapper sysDictMapper,
+            SysConfigMapper sysConfigMapper,
+            SysNoticeMapper sysNoticeMapper,
+            SysAuditLogMapper sysAuditLogMapper,
+            SysCategoryRuleMapper sysCategoryRuleMapper,
             AuditService auditService,
             DataScopeService dataScopeService
     ) {
-        this.persistenceProperties = persistenceProperties;
         this.sysDictMapper = sysDictMapper;
         this.sysConfigMapper = sysConfigMapper;
         this.sysNoticeMapper = sysNoticeMapper;
@@ -79,7 +74,6 @@ public class SystemManagementService {
 
     @Cacheable(value = "system:dicts", key = "#root.target.generateCacheKey(new Object[]{#dictType, #category, #keyword, #page, #size, #sortBy, #sortDirection})")
     public PageResult<DictView> dicts(String dictType, String category, String keyword, int page, int size, String sortBy, String sortDirection) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         Optional<Set<String>> visibleCreators = dataScopeService.visibleUsernames(tenantId);
         return pageQuery(
@@ -97,7 +91,6 @@ public class SystemManagementService {
     @Transactional
     @CacheEvict(value = {"system:dicts", "system:categories:all", "system:categories:target"}, allEntries = true)
     public DictView createDict(DictCrudRequest request) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
         SysDictEntity entity = new SysDictEntity();
@@ -113,7 +106,6 @@ public class SystemManagementService {
     @Transactional
     @CacheEvict(value = {"system:dicts", "system:categories:all", "system:categories:target"}, allEntries = true)
     public DictView updateDict(Long id, DictCrudRequest request) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         SysDictEntity entity = getDict(id, tenantId);
         entity.setDictType(request.dictType());
@@ -127,7 +119,6 @@ public class SystemManagementService {
     @Transactional
     @CacheEvict(value = {"system:dicts", "system:categories:all", "system:categories:target"}, allEntries = true)
     public void deleteDict(Long id) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         SysDictEntity entity = getDict(id, tenantId);
         sysDictMapper.deleteById(entity.getId());
@@ -136,7 +127,6 @@ public class SystemManagementService {
 
     @Cacheable(value = "system:configs", key = "#root.target.generateCacheKey(new Object[]{#category, #keyword, #page, #size, #sortBy, #sortDirection})")
     public PageResult<ConfigView> configs(String category, String keyword, int page, int size, String sortBy, String sortDirection) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         Optional<Set<String>> visibleCreators = dataScopeService.visibleUsernames(tenantId);
         return pageQuery(
@@ -154,7 +144,6 @@ public class SystemManagementService {
     @Transactional
     @CacheEvict(value = {"system:configs", "system:categories:all", "system:categories:target", "registration:policy"}, allEntries = true)
     public ConfigView createConfig(ConfigCrudRequest request) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
         SysConfigEntity entity = new SysConfigEntity();
@@ -170,7 +159,6 @@ public class SystemManagementService {
     @Transactional
     @CacheEvict(value = {"system:configs", "system:categories:all", "system:categories:target", "registration:policy"}, allEntries = true)
     public ConfigView updateConfig(Long id, ConfigCrudRequest request) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         SysConfigEntity entity = getConfig(id, tenantId);
         entity.setConfigKey(request.configKey());
@@ -184,7 +172,6 @@ public class SystemManagementService {
     @Transactional
     @CacheEvict(value = {"system:configs", "system:categories:all", "system:categories:target", "registration:policy"}, allEntries = true)
     public void deleteConfig(Long id) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         SysConfigEntity entity = getConfig(id, tenantId);
         sysConfigMapper.deleteById(entity.getId());
@@ -192,7 +179,6 @@ public class SystemManagementService {
     }
 
     public PageResult<NoticeView> notices(Boolean published, String workflowStatus, String keyword, int page, int size, String sortBy, String sortDirection) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         Optional<Set<String>> visibleCreators = dataScopeService.visibleUsernames(tenantId);
         return pageQuery(
@@ -209,7 +195,6 @@ public class SystemManagementService {
 
     @Cacheable(value = "system:categories:all", key = "#root.target.currentTenantId()")
     public Map<String, List<CategoryOption>> categories() {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         return Map.of(
                 "dict", loadCategoryOptions(tenantId, DICT_CATEGORY_PREFIX),
@@ -219,12 +204,10 @@ public class SystemManagementService {
 
     @Cacheable(value = "system:categories:target", key = "#root.target.generateCacheKey(new Object[]{#targetType})")
     public List<CategoryOption> categoryOptions(String targetType) {
-        requireDatabaseMode();
         return loadCategoryOptions(currentTenantId(), prefixForTargetType(targetType));
     }
 
     public CategoryAnalysis analyzeCategoryOption(String targetType, String code) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         SysCategoryRuleEntity entity = getCategoryConfig(tenantId, targetType, code);
         List<String> matchers = splitMatchers(entity.getMatchers());
@@ -251,7 +234,6 @@ public class SystemManagementService {
     @Transactional
     @CacheEvict(value = {"system:categories:all", "system:categories:target", "system:dicts", "system:configs"}, allEntries = true)
     public CategoryOption createCategoryOption(String targetType, CategoryConfigRequest request) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         if (sysCategoryRuleMapper.selectCount(new LambdaQueryWrapper<SysCategoryRuleEntity>()
                 .eq(SysCategoryRuleEntity::getTenantId, tenantId)
@@ -277,7 +259,6 @@ public class SystemManagementService {
     @Transactional
     @CacheEvict(value = {"system:categories:all", "system:categories:target", "system:dicts", "system:configs"}, allEntries = true)
     public CategoryOption updateCategoryOption(String targetType, String code, CategoryConfigRequest request) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         SysCategoryRuleEntity entity = getCategoryConfig(tenantId, targetType, code);
         entity.setCategoryName(request.name());
@@ -293,7 +274,6 @@ public class SystemManagementService {
     @Transactional
     @CacheEvict(value = {"system:categories:all", "system:categories:target", "system:dicts", "system:configs"}, allEntries = true)
     public void deleteCategoryOption(String targetType, String code) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         SysCategoryRuleEntity entity = getCategoryConfig(tenantId, targetType, code);
         sysCategoryRuleMapper.deleteById(entity.getId());
@@ -305,7 +285,6 @@ public class SystemManagementService {
 
     @Transactional
     public NoticeView createNotice(NoticeCrudRequest request) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
         SysNoticeEntity entity = new SysNoticeEntity();
@@ -321,7 +300,6 @@ public class SystemManagementService {
 
     @Transactional
     public NoticeView updateNotice(Long id, NoticeCrudRequest request) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         SysNoticeEntity entity = getNotice(id, tenantId);
         entity.setNoticeTitle(request.noticeTitle());
@@ -335,7 +313,6 @@ public class SystemManagementService {
 
     @Transactional
     public void deleteNotice(Long id) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         SysNoticeEntity entity = getNotice(id, tenantId);
         sysNoticeMapper.deleteById(entity.getId());
@@ -518,16 +495,6 @@ public class SystemManagementService {
         return entity;
     }
 
-    private void requireDatabaseMode() {
-        if (!persistenceProperties.databaseEnabled()
-                || sysDictMapper == null
-                || sysConfigMapper == null
-                || sysNoticeMapper == null
-                || sysAuditLogMapper == null
-                || sysCategoryRuleMapper == null) {
-            throw new BusinessException("当前未启用数据库系统管理能力");
-        }
-    }
 
     private int countMatchingDicts(String tenantId, List<String> matchers) {
         return sysDictMapper.selectList(new LambdaQueryWrapper<SysDictEntity>()

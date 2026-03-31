@@ -14,7 +14,6 @@ import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.springframework.lang.Nullable;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -29,8 +28,8 @@ public class DataScopeService {
     private final PlatformAdminSupport platformAdminSupport;
 
     public DataScopeService(
-            @Nullable SysUserMapper sysUserMapper,
-            @Nullable SysDeptMapper sysDeptMapper,
+            SysUserMapper sysUserMapper,
+            SysDeptMapper sysDeptMapper,
             PlatformAdminSupport platformAdminSupport
     ) {
         this.sysUserMapper = sysUserMapper;
@@ -181,9 +180,6 @@ public class DataScopeService {
         if (principal.dataScopeType() == DataScopeType.ALL) {
             return ScopeContext.ALL;
         }
-        if (sysUserMapper == null) {
-            return ScopeContext.NONE;
-        }
 
         SysUserEntity currentEntity = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>()
                 .eq(SysUserEntity::getId, principal.id())
@@ -216,7 +212,7 @@ public class DataScopeService {
     }
 
     private List<SysUserEntity> loadUsersByDeptIds(String tenantId, Set<Long> deptIds) {
-        if (sysUserMapper == null || deptIds == null || deptIds.isEmpty()) {
+        if (deptIds == null || deptIds.isEmpty()) {
             return List.of();
         }
         return sysUserMapper.selectList(new LambdaQueryWrapper<SysUserEntity>()
@@ -228,9 +224,6 @@ public class DataScopeService {
     private Set<Long> collectDeptAndChildren(String tenantId, Long rootDeptId) {
         if (rootDeptId == null) {
             return Set.of();
-        }
-        if (sysDeptMapper == null) {
-            return Set.of(rootDeptId);
         }
         List<SysDeptEntity> departments = sysDeptMapper.selectList(new LambdaQueryWrapper<SysDeptEntity>()
                 .eq(SysDeptEntity::getTenantId, tenantId)

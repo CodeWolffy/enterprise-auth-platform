@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.catalog.CatalogService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
-import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.dept.dto.DeptCrudRequest;
 import com.enterprise.auth.platform.persistence.entity.SysDeptEntity;
 import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
@@ -14,7 +13,6 @@ import com.enterprise.auth.platform.security.DataScopeService;
 import com.enterprise.auth.platform.security.SecuritySupport;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import java.util.Map;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -22,21 +20,18 @@ import org.springframework.util.StringUtils;
 @Service
 public class DeptManagementService {
 
-    private final PersistenceProperties persistenceProperties;
     private final SysDeptMapper sysDeptMapper;
     private final SysUserMapper sysUserMapper;
     private final AuditService auditService;
     private final DataScopeService dataScopeService;
 
     public DeptManagementService(
-            PersistenceProperties persistenceProperties,
-            @Nullable SysDeptMapper sysDeptMapper,
-            @Nullable SysUserMapper sysUserMapper,
+            SysDeptMapper sysDeptMapper,
+            SysUserMapper sysUserMapper,
             CatalogService catalogService,
             AuditService auditService,
             DataScopeService dataScopeService
     ) {
-        this.persistenceProperties = persistenceProperties;
         this.sysDeptMapper = sysDeptMapper;
         this.sysUserMapper = sysUserMapper;
         this.auditService = auditService;
@@ -45,7 +40,6 @@ public class DeptManagementService {
 
     @Transactional
     public CatalogService.DepartmentView create(DeptCrudRequest request) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
         validateParentAccess(tenantId, request.parentId());
@@ -64,7 +58,6 @@ public class DeptManagementService {
 
     @Transactional
     public CatalogService.DepartmentView update(Long deptId, DeptCrudRequest request) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         SysDeptEntity entity = getDept(deptId, tenantId);
         validateParentAccess(tenantId, request.parentId());
@@ -81,7 +74,6 @@ public class DeptManagementService {
 
     @Transactional
     public void delete(Long deptId) {
-        requireDatabaseMode();
         String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
         SysDeptEntity entity = getDept(deptId, tenantId);
@@ -124,12 +116,6 @@ public class DeptManagementService {
     private void validateLeaderAccess(String tenantId, Long leaderUserId) {
         if (leaderUserId != null && !dataScopeService.canAccessUser(tenantId, leaderUserId)) {
             throw new BusinessException("无权指定该部门负责人");
-        }
-    }
-
-    private void requireDatabaseMode() {
-        if (!persistenceProperties.databaseEnabled() || sysDeptMapper == null || sysUserMapper == null) {
-            throw new BusinessException("当前为默认内存模式，暂未启用数据库写入能力");
         }
     }
 

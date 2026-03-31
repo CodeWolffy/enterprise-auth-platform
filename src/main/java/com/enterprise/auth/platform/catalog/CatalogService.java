@@ -5,7 +5,6 @@ import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.model.DataScopeType;
 import com.enterprise.auth.platform.common.model.MenuItem;
 import com.enterprise.auth.platform.common.time.TimeSupport;
-import com.enterprise.auth.platform.config.PersistenceProperties;
 import com.enterprise.auth.platform.persistence.entity.SysDeptEntity;
 import com.enterprise.auth.platform.persistence.entity.SysRoleEntity;
 import com.enterprise.auth.platform.persistence.entity.SysTenantCapabilityEntity;
@@ -29,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -66,7 +64,6 @@ public class CatalogService {
             new PermissionView(17L, "session", "write", "tenant", "会话写入", "session:write")
     );
 
-    private final PersistenceProperties persistenceProperties;
     private final SysRoleMapper sysRoleMapper;
     private final SysDeptMapper sysDeptMapper;
     private final SysTenantMapper sysTenantMapper;
@@ -78,18 +75,16 @@ public class CatalogService {
     private final RolePayloadCodec rolePayloadCodec;
 
     public CatalogService(
-            PersistenceProperties persistenceProperties,
-            @Nullable SysRoleMapper sysRoleMapper,
-            @Nullable SysDeptMapper sysDeptMapper,
-            @Nullable SysTenantMapper sysTenantMapper,
-            @Nullable SysTenantPackageMapper sysTenantPackageMapper,
-            @Nullable SysTenantCapabilityMapper sysTenantCapabilityMapper,
-            @Nullable SysTenantPackageCapabilityMapper sysTenantPackageCapabilityMapper,
-            @Nullable SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper,
+            SysRoleMapper sysRoleMapper,
+            SysDeptMapper sysDeptMapper,
+            SysTenantMapper sysTenantMapper,
+            SysTenantPackageMapper sysTenantPackageMapper,
+            SysTenantCapabilityMapper sysTenantCapabilityMapper,
+            SysTenantPackageCapabilityMapper sysTenantPackageCapabilityMapper,
+            SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper,
             DataScopeService dataScopeService,
             RolePayloadCodec rolePayloadCodec
     ) {
-        this.persistenceProperties = persistenceProperties;
         this.sysRoleMapper = sysRoleMapper;
         this.sysDeptMapper = sysDeptMapper;
         this.sysTenantMapper = sysTenantMapper;
@@ -110,96 +105,63 @@ public class CatalogService {
 
     public List<RoleView> roles() {
         String tenantId = currentTenantId();
-        if (databaseEnabled() && sysRoleMapper != null) {
-            return sysRoleMapper.selectList(new LambdaQueryWrapper<SysRoleEntity>()
-                            .eq(SysRoleEntity::getTenantId, tenantId)
-                            .eq(SysRoleEntity::getDeleted, 0)
-                            .orderByAsc(SysRoleEntity::getId))
-                    .stream()
-                    .map(role -> new RoleView(
-                            role.getId(),
-                            role.getRoleCode(),
-                            role.getRoleName(),
-                            role.getRoleDesc(),
-                            parseScope(role.getDataScopeType()),
-                            rolePayloadCodec.readDeptIds(role.getDataScopeValueJson()).stream().sorted().toList()
-                    ))
-                    .toList();
-        }
-        if ("platform".equals(tenantId)) {
-            return List.of(new RoleView(1L, "ADMIN", "平台管理员", "全局系统管理角色", DataScopeType.ALL, List.of()));
-        }
-        return List.of(
-                new RoleView(2L, "TENANT_ADMIN", "租户管理员", "租户级管理角色", DataScopeType.DEPT_AND_CHILDREN, List.of()),
-                new RoleView(3L, "AUDITOR", "审计员", "只读审计与用户查看角色", DataScopeType.DEPT, List.of())
-        );
+        return sysRoleMapper.selectList(new LambdaQueryWrapper<SysRoleEntity>()
+                        .eq(SysRoleEntity::getTenantId, tenantId)
+                        .eq(SysRoleEntity::getDeleted, 0)
+                        .orderByAsc(SysRoleEntity::getId))
+                .stream()
+                .map(role -> new RoleView(
+                        role.getId(),
+                        role.getRoleCode(),
+                        role.getRoleName(),
+                        role.getRoleDesc(),
+                        parseScope(role.getDataScopeType()),
+                        rolePayloadCodec.readDeptIds(role.getDataScopeValueJson()).stream().sorted().toList()
+                ))
+                .toList();
     }
-
     public List<DepartmentView> departments() {
         String tenantId = currentTenantId();
-        if (databaseEnabled() && sysDeptMapper != null) {
-            List<SysDeptEntity> departments = sysDeptMapper.selectList(new LambdaQueryWrapper<SysDeptEntity>()
-                    .eq(SysDeptEntity::getTenantId, tenantId)
-                    .eq(SysDeptEntity::getDeleted, 0)
-                    .orderByAsc(SysDeptEntity::getId));
-            departments = dataScopeService.filterDepartments(tenantId, departments);
-            return departments.stream()
-                    .map(dept -> new DepartmentView(
-                            dept.getId(),
-                            dept.getDeptCode(),
-                            dept.getDeptName(),
-                            dept.getParentId(),
-                            dept.getLeaderUserId()
-                    ))
-                    .toList();
-        }
-        if ("platform".equals(tenantId)) {
-            return List.of(new DepartmentView(1000L, "OPS", "平台运营中心", null, null));
-        }
-        return List.of(
-                new DepartmentView(1001L, "FIN", "租户 A 财务部", null, null),
-                new DepartmentView(1002L, "RD", "租户 A 研发部", null, null)
-        );
+        List<SysDeptEntity> departments = sysDeptMapper.selectList(new LambdaQueryWrapper<SysDeptEntity>()
+                .eq(SysDeptEntity::getTenantId, tenantId)
+                .eq(SysDeptEntity::getDeleted, 0)
+                .orderByAsc(SysDeptEntity::getId));
+        departments = dataScopeService.filterDepartments(tenantId, departments);
+        return departments.stream()
+                .map(dept -> new DepartmentView(
+                        dept.getId(),
+                        dept.getDeptCode(),
+                        dept.getDeptName(),
+                        dept.getParentId(),
+                        dept.getLeaderUserId()
+                ))
+                .toList();
     }
-
     public List<TenantView> tenants() {
-        if (databaseEnabled() && sysTenantMapper != null) {
-            List<SysTenantEntity> tenants = sysTenantMapper.selectList(new LambdaQueryWrapper<SysTenantEntity>()
-                    .eq(SysTenantEntity::getDeleted, 0)
-                    .orderByAsc(SysTenantEntity::getId));
-            Map<String, TenantProfile> profiles = loadTenantProfiles(tenants);
-            return tenants.stream()
-                    .map(tenant -> {
-                        TenantProfile profile = profiles.getOrDefault(tenant.getTenantId(), TenantProfile.empty());
-                        return new TenantView(
-                                tenant.getTenantId(),
-                                tenant.getTenantName(),
-                                tenant.getPlatformLevel() != null && tenant.getPlatformLevel() == 1,
-                                tenant.getTenantStatus(),
-                                TimeSupport.toEpochMilli(tenant.getExpireAt()),
-                                profile.packageCode(),
-                                profile.packageName(),
-                                profile.userQuota(),
-                                profile.storageQuotaGb(),
-                                profile.capabilityCodes(),
-                                profile.capabilityDescriptions(),
-                                profile.lifecycleNote()
-                        );
-                    })
-                    .toList();
-        }
-        return List.of(
-                new TenantView("platform", "平台租户", true, 1, null, "platform-governance", "平台治理版", 9999, 1024,
-                        List.of("auth", "audit", "system", "tenant"),
-                        Map.of("auth", "轻量登录、会话与安全治理能力", "audit", "全局审计检索与导出能力", "system", "平台级系统配置与分类管理", "tenant", "租户治理与套餐运营"),
-                        "负责全局治理与租户运营"),
-                new TenantView("tenant-a", "租户 A", false, 1, null, "business-standard", "标准版", 200, 200,
-                        List.of("user", "role", "audit", "notice"),
-                        Map.of("user", "用户与身份目录管理", "role", "角色与授权范围管理", "audit", "安全审计检索能力", "notice", "租户公告发布能力"),
-                        "默认标准业务租户")
-        );
+        List<SysTenantEntity> tenants = sysTenantMapper.selectList(new LambdaQueryWrapper<SysTenantEntity>()
+                .eq(SysTenantEntity::getDeleted, 0)
+                .orderByAsc(SysTenantEntity::getId));
+        Map<String, TenantProfile> profiles = loadTenantProfiles(tenants);
+        return tenants.stream()
+                .map(tenant -> {
+                    TenantProfile profile = profiles.getOrDefault(tenant.getTenantId(), TenantProfile.empty());
+                    return new TenantView(
+                            tenant.getTenantId(),
+                            tenant.getTenantName(),
+                            tenant.getPlatformLevel() != null && tenant.getPlatformLevel() == 1,
+                            tenant.getTenantStatus(),
+                            TimeSupport.toEpochMilli(tenant.getExpireAt()),
+                            profile.packageCode(),
+                            profile.packageName(),
+                            profile.userQuota(),
+                            profile.storageQuotaGb(),
+                            profile.capabilityCodes(),
+                            profile.capabilityDescriptions(),
+                            profile.lifecycleNote()
+                    );
+                })
+                .toList();
     }
-
     public List<PermissionView> permissions() {
         String tenantId = currentTenantId();
         return PERMISSION_CATALOG.stream()
@@ -238,9 +200,6 @@ public class CatalogService {
         return matched;
     }
 
-    private boolean databaseEnabled() {
-        return persistenceProperties.databaseEnabled();
-    }
 
     private String currentTenantId() {
         String tenantId = TenantContext.getTenantId();
@@ -256,11 +215,7 @@ public class CatalogService {
     }
 
     private Map<String, TenantProfile> loadTenantProfiles(List<SysTenantEntity> tenants) {
-        if (tenants.isEmpty()
-                || sysTenantPackageMapper == null
-                || sysTenantCapabilityMapper == null
-                || sysTenantPackageCapabilityMapper == null
-                || sysTenantCapabilityOverrideMapper == null) {
+        if (tenants.isEmpty()) {
             return Map.of();
         }
         List<String> tenantIds = tenants.stream().map(SysTenantEntity::getTenantId).toList();

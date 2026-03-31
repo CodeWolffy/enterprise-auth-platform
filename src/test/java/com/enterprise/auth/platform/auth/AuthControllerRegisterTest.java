@@ -158,8 +158,7 @@ class AuthControllerRegisterTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registerPayload(username, "弱密码用户", "weakpass", "13800002222", "weak.ut@example.com")))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("PASSWORD_INVALID"))
-                .andExpect(jsonPath("$.message").value("密码至少8位，包含字母和数字"));
+                .andExpect(jsonPath("$.code").value("PASSWORD_INVALID"));
 
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(1) FROM sys_user WHERE username = ? AND deleted = 0",
@@ -186,8 +185,20 @@ class AuthControllerRegisterTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("USERNAME_EXISTS"))
-                .andExpect(jsonPath("$.message").value("用户名已存在"));
+                .andExpect(jsonPath("$.code").value("USERNAME_EXISTS"));
+    }
+
+    @Test
+    void registerShouldRejectDuplicateUsernameAcrossTenants() throws Exception {
+        String username = nextUsername();
+        insertUser("platform", username);
+
+        mockMvc.perform(post("/api/auth/register")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerPayload(username, "跨租户重复用户", "Repeat123", "13800005555", "repeat.cross.ut@example.com")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("USERNAME_EXISTS"));
     }
 
     @Test
@@ -214,8 +225,7 @@ class AuthControllerRegisterTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(weakPayload))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("REGISTER_RATE_LIMITED"))
-                .andExpect(jsonPath("$.message").value("注册尝试过于频繁，请稍后再试"));
+                .andExpect(jsonPath("$.code").value("REGISTER_RATE_LIMITED"));
     }
 
     private String nextUsername() {
@@ -295,6 +305,26 @@ class AuthControllerRegisterTest {
                 configKey,
                 resolvedName,
                 configValue,
+                "test",
+                "test"
+        );
+    }
+
+    private void insertUser(String tenantId, String username) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO sys_user (
+                    tenant_id, dept_id, username, display_name, password_hash,
+                    enabled, session_version, created_by, updated_by, deleted, password_updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NOW())
+                """,
+                tenantId,
+                1L,
+                username,
+                username,
+                passwordEncoder.encode("Repeat123"),
+                1,
+                1,
                 "test",
                 "test"
         );

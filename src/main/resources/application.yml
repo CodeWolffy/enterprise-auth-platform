@@ -84,9 +84,6 @@ app:
     mybatis-ignore-tables:
       - sys_tenant
 
-  persistence:
-    database-enabled: true
-
   registration:
     # 注册接口防刷策略。
     rate-limit-enabled: true

@@ -7,6 +7,8 @@ import java.time.Instant;
 import java.util.UUID;
 import org.redisson.api.RBucket;
 import org.redisson.api.RedissonClient;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
@@ -19,17 +21,20 @@ public class CaptchaService {
     private final SecurityRedisProperties redisProperties;
     private final StringRedisTemplate redisTemplate;
     private final RedissonClient redissonClient;
+    private final Environment environment;
 
     public CaptchaService(
             SecurityProperties securityProperties,
             SecurityRedisProperties redisProperties,
             @Nullable StringRedisTemplate redisTemplate,
-            @Nullable RedissonClient redissonClient
+            @Nullable RedissonClient redissonClient,
+            Environment environment
     ) {
         this.securityProperties = securityProperties;
         this.redisProperties = redisProperties;
         this.redisTemplate = redisTemplate;
         this.redissonClient = redissonClient;
+        this.environment = environment;
     }
 
     public CaptchaChallenge create() {
@@ -40,7 +45,7 @@ public class CaptchaService {
         if (redissonCaptchaEnabled()) {
             try {
                 redissonClient.getBucket(captchaKey(captchaId)).set(answer, securityProperties.captchaTtl());
-                return new CaptchaChallenge(captchaId, expiresAt, securityProperties.exposeCaptchaAnswer() ? answer : null);
+                return new CaptchaChallenge(captchaId, expiresAt, shouldExposePreview() ? answer : null);
             } catch (Exception ex) {
                 throw new IllegalStateException("通过 Redisson 持久化验证码失败", ex);
             }
@@ -49,7 +54,7 @@ public class CaptchaService {
         if (redisCaptchaEnabled()) {
             try {
                 redisTemplate.opsForValue().set(captchaKey(captchaId), answer, securityProperties.captchaTtl());
-                return new CaptchaChallenge(captchaId, expiresAt, securityProperties.exposeCaptchaAnswer() ? answer : null);
+                return new CaptchaChallenge(captchaId, expiresAt, shouldExposePreview() ? answer : null);
             } catch (Exception ex) {
                 throw new IllegalStateException("通过 RedisTemplate 持久化验证码失败", ex);
             }
@@ -100,6 +105,10 @@ public class CaptchaService {
 
     private String captchaKey(String captchaId) {
         return redisProperties.resolvedNamespacePrefix() + "captcha:id:" + captchaId;
+    }
+
+    private boolean shouldExposePreview() {
+        return securityProperties.exposeCaptchaAnswer() || !environment.acceptsProfiles(Profiles.of("prod"));
     }
 
     public record CaptchaChallenge(String captchaId, Instant expiresAt, String previewCode) {

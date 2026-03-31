@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.user.dto.CreateUserRequest;
-import com.enterprise.auth.platform.user.model.UserSummary;
 import com.enterprise.auth.platform.user.service.management.UserManagementService;
 import java.util.Set;
 import java.util.UUID;
@@ -36,11 +35,11 @@ class UserManagementServiceTenantUsernameTest {
     }
 
     @Test
-    void createUserShouldAllowSameUsernameInDifferentTenants() {
+    void createUserShouldRejectDuplicateUsernameAcrossTenants() {
         String username = USERNAME_PREFIX + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
         insertUser("platform", username);
 
-        UserSummary created = userManagementService.createUser(
+        assertThatThrownBy(() -> userManagementService.createUser(
                 "tenant-a",
                 new CreateUserRequest(
                         username,
@@ -53,25 +52,10 @@ class UserManagementServiceTenantUsernameTest {
                         Set.of()
                 ),
                 "test"
-        );
-
-        Integer platformCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(1) FROM sys_user WHERE tenant_id = ? AND username = ? AND deleted = 0",
-                Integer.class,
-                "platform",
-                username
-        );
-        Integer tenantCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(1) FROM sys_user WHERE tenant_id = ? AND username = ? AND deleted = 0",
-                Integer.class,
-                "tenant-a",
-                username
-        );
-
-        assertThat(created.tenantId()).isEqualTo("tenant-a");
-        assertThat(created.username()).isEqualTo(username);
-        assertThat(platformCount).isEqualTo(1);
-        assertThat(tenantCount).isEqualTo(1);
+        )).isInstanceOfSatisfying(BusinessException.class, ex -> {
+            assertThat(ex.code()).isEqualTo("BUSINESS_ERROR");
+            assertThat(ex.getMessage()).isNotBlank();
+        });
     }
 
     @Test
