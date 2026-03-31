@@ -14,6 +14,7 @@ import com.enterprise.auth.platform.persistence.mapper.SysAuditExportPolicyMappe
 import com.enterprise.auth.platform.persistence.mapper.SysAuditExportTaskMapper;
 import com.enterprise.auth.platform.security.SecuritySupport;
 import com.enterprise.auth.platform.tenant.TenantContext;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.io.ByteArrayOutputStream;
@@ -48,6 +49,8 @@ import com.enterprise.auth.platform.audit.model.AuditExportVO;
 public class AuditExportTaskService {
     private static final Logger log = LoggerFactory.getLogger(AuditExportTaskService.class);
     private static final DateTimeFormatter EXPORT_FORMATTER = DateTimeFormatter.ISO_INSTANT;
+    private static final TypeReference<Map<String, Object>> QUERY_PAYLOAD_TYPE = new TypeReference<>() {
+    };
 
     private final SysAuditExportTaskMapper sysAuditExportTaskMapper;
     private final SysAuditExportPolicyMapper sysAuditExportPolicyMapper;
@@ -532,7 +535,7 @@ public class AuditExportTaskService {
 
     private AuditQuery parseQuery(SysAuditExportTaskEntity entity) {
         try {
-            Map<String, Object> payload = objectMapper.readValue(entity.getQueryJson(), Map.class);
+            Map<String, Object> payload = objectMapper.readValue(entity.getQueryJson(), QUERY_PAYLOAD_TYPE);
             return new AuditQuery(
                     stringValue(payload.get("tenantId")),
                     stringValue(payload.get("eventType")),

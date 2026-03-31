@@ -7,6 +7,7 @@ import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.ConsumptionProbe;
 import io.github.bucket4j.distributed.BucketProxy;
 import io.github.bucket4j.distributed.ExpirationAfterWriteStrategy;
+import io.github.bucket4j.distributed.proxy.ClientSideConfig;
 import io.github.bucket4j.redis.lettuce.cas.LettuceBasedProxyManager;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisException;
@@ -81,9 +82,10 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         RedisCodec<String, byte[]> codec = RedisCodec.of(StringCodec.UTF8, ByteArrayCodec.INSTANCE);
         StatefulRedisConnection<String, byte[]> connection = redisClient.connect(codec);
         LettuceBasedProxyManager<String> proxyManager = LettuceBasedProxyManager.builderFor(connection)
-                .withExpirationStrategy(
-                        ExpirationAfterWriteStrategy.basedOnTimeForRefillingBucketUpToMax(Duration.ofMinutes(10))
-                )
+                .withClientSideConfig(ClientSideConfig.getDefault()
+                        .withExpirationAfterWriteStrategy(
+                                ExpirationAfterWriteStrategy.basedOnTimeForRefillingBucketUpToMax(Duration.ofMinutes(10))
+                        ))
                 .build();
         return new RedisInfrastructure(proxyManager, redisClient);
     }
