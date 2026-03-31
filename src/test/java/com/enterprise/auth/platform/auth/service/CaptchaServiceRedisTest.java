@@ -14,7 +14,6 @@ import com.enterprise.auth.platform.config.SecurityProperties;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.mock.env.MockEnvironment;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
@@ -29,8 +28,7 @@ class CaptchaServiceRedisTest {
 
         SecurityProperties securityProperties = new SecurityProperties(
                 Duration.ofDays(7),
-                Duration.ofMinutes(5),
-                true,
+                Duration.ofMinutes(1),
                 false,
                 "Lax"
         );
@@ -40,21 +38,20 @@ class CaptchaServiceRedisTest {
                 securityProperties,
                 redisProperties,
                 redisTemplate,
-                null,
-                new MockEnvironment()
+                null
         );
 
         CaptchaService.CaptchaChallenge challenge = captchaService.create();
 
         ArgumentCaptor<String> answerCaptor = ArgumentCaptor.forClass(String.class);
-        verify(valueOperations).set(eq("eap:auth:v2:captcha:id:" + challenge.captchaId()), answerCaptor.capture(), eq(Duration.ofMinutes(5)));
-        assertThat(challenge.previewCode()).isEqualTo(answerCaptor.getValue());
+        verify(valueOperations).set(eq("eap:auth:v2:captcha:id:" + challenge.captchaId()), answerCaptor.capture(), eq(Duration.ofMinutes(1)));
+        assertThat(challenge.imageBytes()).isNotEmpty();
 
-        when(valueOperations.getAndDelete("eap:auth:v2:captcha:id:" + challenge.captchaId())).thenReturn(challenge.previewCode());
-        captchaService.validate(challenge.captchaId(), challenge.previewCode());
+        when(valueOperations.getAndDelete("eap:auth:v2:captcha:id:" + challenge.captchaId())).thenReturn(answerCaptor.getValue());
+        captchaService.validate(challenge.captchaId(), answerCaptor.getValue());
 
         when(valueOperations.getAndDelete(any())).thenReturn(null);
-        assertThatThrownBy(() -> captchaService.validate(challenge.captchaId(), challenge.previewCode()))
+        assertThatThrownBy(() -> captchaService.validate(challenge.captchaId(), answerCaptor.getValue()))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("验证码已过期");
     }

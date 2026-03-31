@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
-import { apiEnvelope, AUTH_STORAGE_KEY, defaultSnapshot, fulfillJson, seedAuthSession } from './helpers'
+import { apiEnvelope, AUTH_STORAGE_KEY, defaultSnapshot, fulfillImage, fulfillJson, seedAuthSession } from './helpers'
 
 async function mockDashboardApis(page: Page) {
   await page.route('**/*', async (route) => {
@@ -46,11 +46,10 @@ async function mockDashboardApis(page: Page) {
 }
 
 async function fillLoginForm(page: Page) {
-  const inputs = page.locator('.auth-panel--form input')
-  await inputs.nth(0).fill('platform')
-  await inputs.nth(1).fill('admin')
-  await inputs.nth(2).fill('Admin@123456')
-  await inputs.nth(3).fill('2468')
+  const inputs = page.locator('.login-form input')
+  await inputs.nth(0).fill('admin')
+  await inputs.nth(1).fill('Admin@123456')
+  await inputs.nth(2).fill('24682')
 }
 
 test.describe('关键流程回归', () => {
@@ -69,11 +68,10 @@ test.describe('关键流程回归', () => {
       }
 
       if (url.pathname === '/api/auth/captcha' && method === 'GET') {
-        await fulfillJson(route, 200, apiEnvelope({
-          captchaId: 'captcha-e2e',
-          expiresAt: Date.now() + 300000,
-          previewCode: '2468',
-        }))
+        await fulfillImage(route, '<svg xmlns="http://www.w3.org/2000/svg"></svg>', 'image/svg+xml', {
+          'x-captcha-id': 'captcha-e2e',
+          'x-captcha-expires-at': String(Date.now() + 60000),
+        })
         return
       }
 
@@ -136,11 +134,10 @@ test.describe('关键流程回归', () => {
     await fillLoginForm(page)
     await page.locator('[data-testid="login-submit"]').click()
 
-    await expect.poll(() => loginPayload).toContain('"tenantId":"platform"')
     await expect.poll(() => loginPayload).toContain('"username":"admin"')
     await expect.poll(() => loginPayload).toContain('"password":"Admin@123456"')
     await expect.poll(() => loginPayload).toContain('"captchaId":"captcha-e2e"')
-    await expect.poll(() => loginPayload).toContain('"captchaCode":"2468"')
+    await expect.poll(() => loginPayload).toContain('"captchaCode":"24682"')
 
     await expect(page).toHaveURL(/\/dashboard$/)
     await expect(page.locator('[data-testid="logout-button"]')).toBeVisible()
@@ -157,11 +154,10 @@ test.describe('关键流程回归', () => {
     })
 
     await page.route('**/api/auth/captcha', async (route) => {
-      await fulfillJson(route, 200, apiEnvelope({
-        captchaId: 'captcha-restore',
-        expiresAt: Date.now() + 300000,
-        previewCode: '2468',
-      }))
+      await fulfillImage(route, '<svg xmlns="http://www.w3.org/2000/svg"></svg>', 'image/svg+xml', {
+        'x-captcha-id': 'captcha-restore',
+        'x-captcha-expires-at': String(Date.now() + 60000),
+      })
     })
 
     await page.goto('/login')

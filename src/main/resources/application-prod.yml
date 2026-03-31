@@ -22,6 +22,5 @@ app:
 
   security:
     session-ttl: ${APP_SECURITY_SESSION_TTL:7d}
-    expose-captcha-answer: false
     cookie-secure: true
     cookie-same-site: ${APP_SECURITY_COOKIE_SAME_SITE:Lax}

@@ -7,7 +7,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record SecurityProperties(
         Duration sessionTtl,
         Duration captchaTtl,
-        boolean exposeCaptchaAnswer,
         boolean cookieSecure,
         String cookieSameSite
 ) {

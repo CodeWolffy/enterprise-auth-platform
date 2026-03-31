@@ -47,8 +47,20 @@ export async function fetchRegisterOptions() {
 }
 
 export async function fetchCaptcha() {
-  const { data } = await http.get<ApiResponse<CaptchaResponse>>('/api/auth/captcha')
-  return data.data
+  const { data, headers } = await http.get<Blob>('/api/auth/captcha', {
+    responseType: 'blob',
+  })
+  const captchaId = String(headers['x-captcha-id'] ?? '')
+  const expiresAtHeader = headers['x-captcha-expires-at']
+  const expiresAt = Number(expiresAtHeader ?? 0)
+  if (!captchaId) {
+    throw new Error('Captcha id missing')
+  }
+  return {
+    captchaId,
+    expiresAt: Number.isFinite(expiresAt) ? expiresAt : 0,
+    imageUrl: URL.createObjectURL(data),
+  } satisfies CaptchaResponse
 }
 
 export async function loginWithPassword(payload: {

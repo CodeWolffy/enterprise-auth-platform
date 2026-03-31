@@ -82,3 +82,17 @@ export async function fulfillJson(route: Route, status: number, body: unknown) {
     body: JSON.stringify(body),
   })
 }
+
+export async function fulfillImage(route: Route, body: string, contentType: string, headers: Record<string, string> = {}) {
+  await route.fulfill({
+    status: 200,
+    headers: {
+      'access-control-allow-origin': '*',
+      'access-control-allow-headers': '*',
+      'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS',
+      'content-type': contentType,
+      ...headers,
+    },
+    body,
+  })
+}

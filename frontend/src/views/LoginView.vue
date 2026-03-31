@@ -1,68 +1,67 @@
 <template>
-  <div class="auth-stage">
-    <section class="auth-panel auth-panel--hero">
-      <span class="eyebrow">Session / Redis / RBAC</span>
-      <h1>企业级权限管理平台</h1>
-      <p>
-        当前登录链路已经切换到轻量模式：账号密码登录、Redis 会话、HttpOnly Cookie、RBAC 与多租户隔离。
-        浏览器不再保存 access token 或 refresh token。
-      </p>
-      <ul class="highlights">
-        <li>认证方式：Session Cookie</li>
-        <li>账号标识：全局唯一用户名</li>
-        <li>安全基线：CSRF、验证码、会话失效、强制下线</li>
-      </ul>
-    </section>
+  <div class="login-shell">
+    <section class="login-card">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-text">Enterprise Auth</span>
+      </div>
 
-    <section class="auth-panel auth-panel--form">
-      <span class="eyebrow">Account Access</span>
-      <h2>登录控制台</h2>
-      <p>系统会按全局唯一用户名自动定位账号。开发环境会直接显示验证码预览。</p>
+      <header class="login-header">
+        <h1>登录</h1>
+      </header>
 
-      <el-form label-position="top" @submit.prevent="handleLogin">
-        <el-form-item label="用户名" :error="usernameError">
-          <el-input v-model="username" placeholder="请输入用户名" autocomplete="username" />
+      <el-form class="login-form" @submit.prevent="handleLogin">
+        <el-form-item :error="usernameError">
+          <el-input v-model="username" size="large" placeholder="用户名" autocomplete="username" />
         </el-form-item>
 
-        <el-form-item label="密码" :error="passwordError">
+        <el-form-item :error="passwordError">
           <el-input
             v-model="password"
+            size="large"
             type="password"
             show-password
-            placeholder="请输入密码"
+            placeholder="密码"
             autocomplete="current-password"
           />
         </el-form-item>
 
-        <el-form-item label="验证码" :error="captchaError">
-          <div class="captcha-row">
-            <el-input v-model="captchaCode" placeholder="请输入验证码" maxlength="4" />
-            <el-button @click="reloadCaptcha">刷新</el-button>
-          </div>
-          <div class="captcha-preview">
-            <span>验证码</span>
-            <strong>{{ captchaPreview }}</strong>
+        <el-form-item :error="captchaError">
+          <div class="captcha-field">
+            <el-input
+              v-model="captchaCode"
+              size="large"
+              maxlength="5"
+              autocomplete="one-time-code"
+              placeholder="验证码"
+              spellcheck="false"
+            />
+            <button class="captcha-image" type="button" title="刷新验证码" @click="reloadCaptcha">
+              <img v-if="captchaImage" :src="captchaImage" alt="验证码" />
+              <span v-else>加载中</span>
+            </button>
           </div>
         </el-form-item>
 
-        <div class="auth-actions">
-          <el-button type="primary" size="large" :loading="loading" data-testid="login-submit" native-type="submit">
-            登录
-          </el-button>
-        </div>
+        <el-button
+          class="submit-button"
+          type="primary"
+          size="large"
+          :loading="loading"
+          data-testid="login-submit"
+          native-type="submit"
+        >
+          进入系统
+        </el-button>
       </el-form>
 
-      <div class="auth-footnote">
-        登录后将由后端写入 HttpOnly 安全 Cookie，前端仅保存会话状态与权限快照。
-      </div>
-
-      <el-divider>还没有账号？<el-link type="primary" @click="$router.push('/register')">立即注册</el-link></el-divider>
+      <button class="register-link" type="button" @click="router.push('/register')">注册</button>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fetchCaptcha } from '@/api/auth'
 import { useAuthStore } from '@/stores/auth'
@@ -75,16 +74,19 @@ const username = ref('')
 const password = ref('')
 const captchaId = ref('')
 const captchaCode = ref('')
-const captchaPreview = ref('----')
+const captchaImage = ref('')
 const loading = ref(false)
 const usernameError = ref('')
 const passwordError = ref('')
 const captchaError = ref('')
 
 async function reloadCaptcha() {
+  if (captchaImage.value) {
+    URL.revokeObjectURL(captchaImage.value)
+  }
   const captcha = await fetchCaptcha()
   captchaId.value = captcha.captchaId
-  captchaPreview.value = captcha.previewCode || '开发环境未开放预览'
+  captchaImage.value = captcha.imageUrl
   captchaCode.value = ''
 }
 
@@ -133,102 +135,233 @@ async function handleLogin() {
 onMounted(async () => {
   await reloadCaptcha()
 })
+
+onBeforeUnmount(() => {
+  if (captchaImage.value) {
+    URL.revokeObjectURL(captchaImage.value)
+  }
+})
 </script>
 
 <style scoped>
-.auth-stage {
+.login-shell {
+  --surface: rgba(255, 255, 255, 0.82);
+  --surface-border: rgba(15, 23, 42, 0.08);
+  --surface-shadow: 0 28px 60px rgba(15, 23, 42, 0.16);
+  --text-primary: #111827;
+  --text-muted: #6b7280;
+  --accent: #0f172a;
   min-height: calc(100vh - 120px);
+  position: relative;
   display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
-  gap: 20px;
-  padding: 28px;
+  place-items: center;
+  padding: 24px;
+  overflow: hidden;
 }
 
-.auth-panel {
-  border-radius: 24px;
-  background: linear-gradient(175deg, rgba(255, 255, 255, 0.94) 0%, rgba(244, 248, 255, 0.92) 100%);
-  border: 1px solid rgba(27, 42, 68, 0.08);
-  box-shadow: 0 24px 64px rgba(20, 32, 52, 0.12);
-  padding: 28px;
+.login-shell::before,
+.login-shell::after {
+  content: '';
+  position: absolute;
+  inset: auto;
+  border-radius: 999px;
+  filter: blur(10px);
 }
 
-.auth-panel--hero {
-  display: grid;
-  gap: 16px;
+.login-shell::before {
+  width: 320px;
+  height: 320px;
+  top: 8%;
+  left: calc(50% - 280px);
+  background: radial-gradient(circle, rgba(180, 206, 255, 0.72), rgba(180, 206, 255, 0));
 }
 
-.eyebrow {
+.login-shell::after {
+  width: 280px;
+  height: 280px;
+  right: calc(50% - 260px);
+  bottom: 6%;
+  background: radial-gradient(circle, rgba(221, 214, 254, 0.56), rgba(221, 214, 254, 0));
+}
+
+.login-card {
+  position: relative;
+  width: min(100%, 420px);
+  padding: 32px;
+  border-radius: 28px;
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  box-shadow: var(--surface-shadow);
+  backdrop-filter: blur(18px);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-primary);
+}
+
+.brand-mark {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #111827, #64748b);
+  box-shadow: 0 0 0 6px rgba(15, 23, 42, 0.08);
+}
+
+.brand-text {
+  font-size: 13px;
+  font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  font-size: 12px;
-  color: #3559a6;
-  font-weight: 700;
 }
 
-.highlights {
+.login-header {
+  margin: 26px 0 18px;
+}
+
+.login-header h1 {
   margin: 0;
-  padding: 0;
-  list-style: none;
+  font-size: 34px;
+  line-height: 1;
+  color: var(--text-primary);
+  letter-spacing: -0.04em;
+}
+
+.login-form {
   display: grid;
   gap: 8px;
 }
 
-.highlights li {
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(53, 89, 166, 0.08);
-}
-
-.auth-panel--form {
+.captcha-field {
   display: grid;
-  align-content: start;
-  gap: 10px;
-}
-
-.captcha-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) 124px;
   gap: 12px;
+  align-items: stretch;
 }
 
-.captcha-preview {
-  margin-top: 10px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(53, 89, 166, 0.08);
-  color: #3559a6;
+.captcha-image {
+  display: grid;
+  place-items: center;
+  width: 124px;
+  min-height: 48px;
+  padding: 0;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 16px;
+  background: rgba(248, 250, 252, 0.96);
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
 }
 
-.captcha-preview strong {
-  font-size: 20px;
-  letter-spacing: 0.18em;
+.captcha-image:hover {
+  transform: translateY(-1px);
+  border-color: rgba(15, 23, 42, 0.14);
+  box-shadow: 0 14px 26px rgba(15, 23, 42, 0.1);
 }
 
-.auth-actions :deep(.el-button) {
+.captcha-image img {
+  display: block;
   width: 100%;
-  border-radius: 12px;
-  min-height: 44px;
+  height: 48px;
+  object-fit: cover;
+}
+
+.captcha-image span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.submit-button {
+  margin-top: 6px;
+  min-height: 50px;
+  border: 0;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
   font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
-.auth-footnote {
-  color: #61708a;
-  font-size: 12px;
-  line-height: 1.6;
+.register-link {
+  margin-top: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.18s ease;
 }
 
-:deep(.el-divider__text) {
-  font-size: 12px;
-  color: #61708a;
+.register-link:hover {
+  color: var(--text-primary);
 }
 
-@media (max-width: 960px) {
-  .auth-stage {
-    grid-template-columns: 1fr;
+:deep(.el-form-item) {
+  margin-bottom: 0;
+}
+
+:deep(.el-input__wrapper) {
+  min-height: 50px;
+  padding: 0 16px;
+  border-radius: 16px;
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+:deep(.el-input__wrapper.is-focus) {
+  border-color: rgba(15, 23, 42, 0.2);
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+:deep(.el-input__inner) {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+:deep(.el-input__inner::placeholder) {
+  color: #9ca3af;
+}
+
+:deep(.el-form-item__error) {
+  padding-top: 6px;
+}
+
+@media (max-width: 640px) {
+  .login-shell {
+    min-height: calc(100vh - 96px);
     padding: 16px;
+  }
+
+  .login-card {
+    padding: 24px;
+    border-radius: 24px;
+  }
+
+  .login-header {
+    margin-top: 22px;
+  }
+
+  .login-header h1 {
+    font-size: 30px;
+  }
+
+  .captcha-field {
+    grid-template-columns: 1fr;
+  }
+
+  .captcha-image {
+    width: 100%;
   }
 }
 </style>

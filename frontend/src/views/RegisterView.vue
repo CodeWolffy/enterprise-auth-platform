@@ -1,59 +1,55 @@
 <template>
-  <div class="auth-stage">
-    <section class="auth-panel auth-panel--hero">
-      <span class="eyebrow">Registration</span>
-      <h1>用户注册</h1>
-      <p>创建一个新账号以访问企业级权限管理平台。</p>
-      <ul class="highlights">
-        <li>默认分配到 {{ defaultTenantId }} 租户</li>
-        <li v-if="defaultRoleCodes.length">注册后默认角色：{{ defaultRoleCodes.join(' / ') }}</li>
-        <li v-else>注册后需管理员分配角色权限</li>
-        <li>密码至少8位，包含字母和数字</li>
-        <li>注册后可登录系统</li>
-      </ul>
-    </section>
+  <div class="register-shell">
+    <section class="register-card">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-text">Enterprise Auth</span>
+      </div>
 
-    <section class="auth-panel auth-panel--form">
-      <span class="eyebrow">Create Account</span>
-      <h2>填写注册信息</h2>
-      <p>请填写以下信息完成注册。</p>
+      <header class="register-header">
+        <h1>注册</h1>
+        <p class="register-meta">
+          <span>{{ defaultTenantId }}</span>
+          <span v-if="defaultRoleCodes.length">{{ defaultRoleCodes.join(' / ') }}</span>
+        </p>
+      </header>
 
-      <el-alert v-if="errorMessage" :title="errorMessage" type="error" show-icon :closable="false" class="auth-alert" />
+      <el-alert v-if="errorMessage" :title="errorMessage" type="error" :closable="false" class="register-alert" />
 
-      <el-form ref="formRef" label-position="top" :rules="rules" :model="form" @submit.prevent="handleRegister">
-        <el-form-item label="用户名" prop="username">
-          <el-input v-model="form.username" placeholder="请输入用户名（3-50字符）" />
+      <el-form ref="formRef" class="register-form" :rules="rules" :model="form" @submit.prevent="handleRegister">
+        <el-form-item prop="username">
+          <el-input v-model="form.username" size="large" placeholder="用户名" spellcheck="false" />
         </el-form-item>
 
-        <el-form-item label="显示名称" prop="displayName">
-          <el-input v-model="form.displayName" placeholder="请输入显示名称（2-100字符）" />
+        <el-form-item prop="displayName">
+          <el-input v-model="form.displayName" size="large" placeholder="显示名称" spellcheck="false" />
         </el-form-item>
 
-        <el-form-item label="密码" prop="password">
+        <el-form-item prop="password">
           <el-input
             v-model="form.password"
+            size="large"
             type="password"
             show-password
-            placeholder="请输入密码（至少8位，包含字母和数字）"
+            placeholder="密码"
+            autocomplete="new-password"
           />
         </el-form-item>
 
-        <el-form-item label="手机号" prop="mobile">
-          <el-input v-model="form.mobile" placeholder="请输入手机号（可选）" />
+        <el-form-item prop="mobile">
+          <el-input v-model="form.mobile" size="large" placeholder="手机号（选填）" />
         </el-form-item>
 
-        <el-form-item label="邮箱" prop="email">
-          <el-input v-model="form.email" placeholder="请输入邮箱地址（可选）" />
+        <el-form-item prop="email">
+          <el-input v-model="form.email" size="large" placeholder="邮箱（选填）" spellcheck="false" />
         </el-form-item>
 
-        <div class="auth-actions">
-          <el-button type="primary" size="large" :loading="loading" native-type="submit">立即注册</el-button>
-        </div>
+        <el-button class="submit-button" type="primary" size="large" :loading="loading" native-type="submit">
+          创建账号
+        </el-button>
       </el-form>
 
-      <div class="auth-footnote">
-        已有账号？<el-link type="primary" @click="$router.push('/login')">立即登录</el-link>
-      </div>
+      <button class="login-link" type="button" @click="router.push('/login')">返回登录</button>
     </section>
   </div>
 </template>
@@ -108,7 +104,9 @@ const rules = reactive<FormRules>({
 })
 
 async function handleRegister() {
-  if (!formRef.value) return
+  if (!formRef.value) {
+    return
+  }
 
   try {
     await formRef.value.validate()
@@ -122,7 +120,7 @@ async function handleRegister() {
   try {
     await http.post('/api/auth/register', form)
     ElMessage.success('注册成功，请登录')
-    router.push('/login')
+    await router.push('/login')
   } catch (err) {
     const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
     errorMessage.value = message || '注册失败，请稍后重试'
@@ -139,83 +137,202 @@ onMounted(async () => {
     }
     defaultRoleCodes.value = Array.isArray(options?.defaultRoleCodes) ? options.defaultRoleCodes : []
   } catch {
-    // Keep fallback copy when register options endpoint is temporarily unavailable.
+    // Keep defaults when remote options are temporarily unavailable.
   }
 })
 </script>
 
 <style scoped>
-.auth-stage {
+.register-shell {
+  --surface: rgba(255, 255, 255, 0.82);
+  --surface-border: rgba(15, 23, 42, 0.08);
+  --surface-shadow: 0 28px 60px rgba(15, 23, 42, 0.16);
+  --text-primary: #111827;
+  --text-muted: #6b7280;
   min-height: calc(100vh - 120px);
+  position: relative;
   display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
-  gap: 20px;
-  padding: 28px;
+  place-items: center;
+  padding: 24px;
+  overflow: hidden;
 }
 
-.auth-panel {
-  border-radius: 24px;
-  background: linear-gradient(175deg, rgba(255, 255, 255, 0.94) 0%, rgba(244, 248, 255, 0.92) 100%);
-  border: 1px solid rgba(27, 42, 68, 0.08);
-  box-shadow: 0 24px 64px rgba(20, 32, 52, 0.12);
-  padding: 28px;
+.register-shell::before,
+.register-shell::after {
+  content: '';
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(12px);
 }
 
-.auth-panel--hero {
-  display: grid;
-  gap: 16px;
+.register-shell::before {
+  width: 360px;
+  height: 360px;
+  top: 4%;
+  left: calc(50% - 310px);
+  background: radial-gradient(circle, rgba(194, 233, 251, 0.72), rgba(194, 233, 251, 0));
 }
 
-.eyebrow {
+.register-shell::after {
+  width: 300px;
+  height: 300px;
+  right: calc(50% - 280px);
+  bottom: 4%;
+  background: radial-gradient(circle, rgba(253, 230, 138, 0.4), rgba(253, 230, 138, 0));
+}
+
+.register-card {
+  position: relative;
+  width: min(100%, 460px);
+  padding: 32px;
+  border-radius: 28px;
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  box-shadow: var(--surface-shadow);
+  backdrop-filter: blur(18px);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-primary);
+}
+
+.brand-mark {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #111827, #64748b);
+  box-shadow: 0 0 0 6px rgba(15, 23, 42, 0.08);
+}
+
+.brand-text {
+  font-size: 13px;
+  font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  font-size: 12px;
-  color: #3559a6;
-  font-weight: 700;
 }
 
-.highlights {
+.register-header {
+  margin: 26px 0 18px;
+}
+
+.register-header h1 {
   margin: 0;
-  padding: 0;
-  list-style: none;
+  font-size: 34px;
+  line-height: 1;
+  color: var(--text-primary);
+  letter-spacing: -0.04em;
+}
+
+.register-meta {
+  margin: 10px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.register-meta span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.register-alert {
+  margin-bottom: 12px;
+  border-radius: 16px;
+}
+
+.register-form {
   display: grid;
   gap: 8px;
 }
 
-.highlights li {
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(53, 89, 166, 0.08);
-}
-
-.auth-panel--form {
-  display: grid;
-  align-content: start;
-  gap: 10px;
-}
-
-.auth-alert {
-  margin-bottom: 4px;
-}
-
-.auth-actions :deep(.el-button) {
-  width: 100%;
-  border-radius: 12px;
-  min-height: 44px;
+.submit-button {
+  margin-top: 6px;
+  min-height: 50px;
+  border: 0;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
   font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
-.auth-footnote {
-  color: #61708a;
-  font-size: 12px;
-  line-height: 1.6;
-  text-align: center;
+.login-link {
+  margin-top: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.18s ease;
 }
 
-@media (max-width: 960px) {
-  .auth-stage {
-    grid-template-columns: 1fr;
+.login-link:hover {
+  color: var(--text-primary);
+}
+
+:deep(.el-form-item) {
+  margin-bottom: 0;
+}
+
+:deep(.el-input__wrapper) {
+  min-height: 50px;
+  padding: 0 16px;
+  border-radius: 16px;
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+:deep(.el-input__wrapper.is-focus) {
+  border-color: rgba(15, 23, 42, 0.2);
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+:deep(.el-input__inner) {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+:deep(.el-input__inner::placeholder) {
+  color: #9ca3af;
+}
+
+:deep(.el-form-item__error) {
+  padding-top: 6px;
+}
+
+@media (max-width: 640px) {
+  .register-shell {
+    min-height: calc(100vh - 96px);
     padding: 16px;
+  }
+
+  .register-card {
+    padding: 24px;
+    border-radius: 24px;
+  }
+
+  .register-header {
+    margin-top: 22px;
+  }
+
+  .register-header h1 {
+    font-size: 30px;
   }
 }
 </style>

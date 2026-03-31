@@ -16,7 +16,12 @@ public class CorsConfig {
         configuration.setAllowedOriginPatterns(frontendProperties.resolvedAllowedOrigins());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
-        configuration.setExposedHeaders(List.of("Authorization", "X-Request-Id"));
+        configuration.setExposedHeaders(List.of(
+                "Authorization",
+                "X-Request-Id",
+                "X-Captcha-Id",
+                "X-Captcha-Expires-At"
+        ));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 

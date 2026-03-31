@@ -66,8 +66,7 @@ app:
 
   security:
     session-ttl: 7d
-    captcha-ttl: 5m
-    expose-captcha-answer: false
+    captcha-ttl: 1m
     cookie-secure: false
     cookie-same-site: Lax
     redis:

@@ -8,9 +8,12 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.enterprise.auth.platform.auth.controller.AuthController;
 import com.enterprise.auth.platform.auth.model.UserSession;
 import com.enterprise.auth.platform.auth.service.CaptchaService;
 import com.enterprise.auth.platform.auth.store.SessionStore;
@@ -47,7 +50,7 @@ class AuthControllerSessionFlowTest {
     private static final String TENANT_USER = "session_flow_tenant_user";
     private static final String TENANT_USER_PASSWORD = "Tenant@123456";
     private static final String CAPTCHA_ID = "captcha-ut";
-    private static final String CAPTCHA_CODE = "2468";
+    private static final String CAPTCHA_CODE = "24682";
 
     @Autowired
     private MockMvc mockMvc;
@@ -88,8 +91,8 @@ class AuthControllerSessionFlowTest {
         sessions.clear();
         when(captchaService.create()).thenReturn(new CaptchaService.CaptchaChallenge(
                 CAPTCHA_ID,
-                Instant.now().plusSeconds(300),
-                CAPTCHA_CODE
+                Instant.now().plusSeconds(60),
+                new byte[] {1, 2, 3, 4}
         ));
         doAnswer(invocation -> null).when(captchaService).validate(anyString(), anyString());
         doAnswer(invocation -> {
@@ -139,8 +142,10 @@ class AuthControllerSessionFlowTest {
     void loginShouldIssueCookieAndAuthorizeSessionEndpoints() throws Exception {
         mockMvc.perform(get("/api/auth/captcha"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.captchaId").value(CAPTCHA_ID))
-                .andExpect(jsonPath("$.data.previewCode").value(CAPTCHA_CODE));
+                .andExpect(content().contentType("image/svg+xml"))
+                .andExpect(header().string(AuthController.CAPTCHA_ID_HEADER, CAPTCHA_ID))
+                .andExpect(header().exists(AuthController.CAPTCHA_EXPIRES_AT_HEADER))
+                .andExpect(content().bytes(new byte[] {1, 2, 3, 4}));
 
         MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

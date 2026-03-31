@@ -34,7 +34,7 @@ export interface CookieSessionResponse {
 export interface CaptchaResponse {
   captchaId: string
   expiresAt: number
-  previewCode?: string | null
+  imageUrl: string
 }
 
 export interface CsrfTokenResponse {

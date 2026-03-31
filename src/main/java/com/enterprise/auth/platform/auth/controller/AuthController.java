@@ -1,6 +1,5 @@
 package com.enterprise.auth.platform.auth.controller;
 
-import com.enterprise.auth.platform.auth.dto.CaptchaResponse;
 import com.enterprise.auth.platform.auth.dto.CookieSessionResponse;
 import com.enterprise.auth.platform.auth.dto.CsrfTokenResponse;
 import com.enterprise.auth.platform.auth.dto.LoginRequest;
@@ -27,6 +26,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.List;
+import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,6 +43,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
+
+    public static final String CAPTCHA_ID_HEADER = "X-Captcha-Id";
+    public static final String CAPTCHA_EXPIRES_AT_HEADER = "X-Captcha-Expires-At";
+    private static final MediaType CAPTCHA_MEDIA_TYPE = MediaType.parseMediaType("image/svg+xml");
 
     private final CaptchaService captchaService;
     private final AuthService authService;
@@ -64,13 +71,16 @@ public class AuthController {
     @Operation(summary = "获取登录验证码")
     @RateLimit(key = "captcha", strategy = RateLimit.Strategy.IP)
     @GetMapping("/captcha")
-    public ApiResponse<CaptchaResponse> captcha() {
+    public ResponseEntity<byte[]> captcha() {
         CaptchaService.CaptchaChallenge challenge = captchaService.create();
-        return ApiResponse.ok(new CaptchaResponse(
-                challenge.captchaId(),
-                TimeSupport.toEpochMilli(challenge.expiresAt()),
-                challenge.previewCode()
-        ));
+        return ResponseEntity.ok()
+                .contentType(CAPTCHA_MEDIA_TYPE)
+                .cacheControl(CacheControl.noStore().mustRevalidate())
+                .header(HttpHeaders.PRAGMA, "no-cache")
+                .header(HttpHeaders.EXPIRES, "0")
+                .header(CAPTCHA_ID_HEADER, challenge.captchaId())
+                .header(CAPTCHA_EXPIRES_AT_HEADER, String.valueOf(TimeSupport.toEpochMilli(challenge.expiresAt())))
+                .body(challenge.imageBytes());
     }
 
     @Operation(summary = "获取 CSRF Token")
