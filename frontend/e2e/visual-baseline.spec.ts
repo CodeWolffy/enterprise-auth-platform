@@ -235,32 +235,6 @@ async function mockApis(page: Page) {
       return
     }
 
-    if (url.pathname === '/api/permissions' && method === 'GET') {
-      await fulfillJson(
-        route,
-        200,
-        apiEnvelope([
-          {
-            id: 1,
-            permissionName: 'Read User',
-            permissionCode: 'user:read',
-            resourceCode: 'user',
-            actionCode: 'read',
-            scopeCode: 'platform',
-          },
-          {
-            id: 2,
-            permissionName: 'Write User',
-            permissionCode: 'user:write',
-            resourceCode: 'user',
-            actionCode: 'write',
-            scopeCode: 'platform',
-          },
-        ]),
-      )
-      return
-    }
-
     if (url.pathname === '/api/depts' && method === 'GET') {
       await fulfillJson(
         route,

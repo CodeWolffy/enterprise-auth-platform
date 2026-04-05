@@ -127,8 +127,8 @@ public class GlobalExceptionHandler {
                     "userAgent", String.valueOf(request.getHeader("User-Agent"))
             );
             auditService.record("SECURITY_ACCESS_DENIED", operator, tenantId, payload);
-        } catch (Exception ignored) {
-            // Keep exception handling resilient even when audit storage is unavailable.
+            } catch (Exception ignored) {
+            // 即使审计存储不可用，也要保持异常处理的健壮性。
         }
     }
 }

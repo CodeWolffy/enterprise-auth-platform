@@ -1,7 +1,7 @@
-import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+﻿import { createRouter, createWebHistory, type RouteLocationNormalized, type RouteRecordRaw } from 'vue-router'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import type { PermissionSnapshot } from '@/types/auth'
+import type { MenuItem, PermissionSnapshot } from '@/types/auth'
 import { useAuthStore } from '@/stores/auth'
 
 const PUBLIC_ROUTES: RouteRecordRaw[] = [
@@ -24,74 +24,90 @@ const DYNAMIC_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = {
     path: 'dashboard',
     name: 'dashboard',
     component: () => import('@/views/DashboardView.vue'),
-    meta: { title: 'Dashboard' },
+    meta: { title: '运行总览', routeKey: 'dashboard' },
   },
   users: {
     path: 'system/users',
     name: 'users',
     component: () => import('@/views/UsersView.vue'),
-    meta: { title: 'Users' },
+    meta: { title: '用户管理', routeKey: 'users' },
   },
   roles: {
     path: 'system/roles',
     name: 'roles',
     component: () => import('@/views/RolesView.vue'),
-    meta: { title: 'Roles' },
+    meta: { title: '角色管理', routeKey: 'roles' },
   },
   depts: {
     path: 'system/depts',
     name: 'depts',
     component: () => import('@/views/DepartmentsView.vue'),
-    meta: { title: 'Departments' },
+    meta: { title: '部门管理', routeKey: 'depts' },
   },
   tenants: {
     path: 'system/tenants',
     name: 'tenants',
     component: () => import('@/views/TenantsView.vue'),
-    meta: { title: 'Tenants' },
+    meta: { title: '租户管理', routeKey: 'tenants' },
   },
   audit: {
     path: 'system/audit',
     name: 'audit',
     component: () => import('@/views/AuditView.vue'),
-    meta: { title: 'Audit' },
+    meta: { title: '安全审计', routeKey: 'audit' },
   },
   settings: {
     path: 'system/settings',
     name: 'settings',
     component: () => import('@/views/SystemManagementView.vue'),
-    meta: { title: 'System Settings' },
+    meta: { title: '系统设置', routeKey: 'settings' },
   },
   'settings-dicts': {
     path: 'system/settings/dicts',
     name: 'settings-dicts',
     component: () => import('@/views/SystemDictsView.vue'),
-    meta: { title: 'Dictionaries', hidden: true, requiresPermission: 'system:read' },
+    meta: { title: '字典管理', hidden: true, requiresGrant: 'system:read' },
   },
   'settings-configs': {
     path: 'system/settings/configs',
     name: 'settings-configs',
     component: () => import('@/views/SystemConfigsView.vue'),
-    meta: { title: 'Configurations', hidden: true, requiresPermission: 'system:read' },
+    meta: { title: '参数配置', hidden: true, requiresGrant: 'system:read' },
   },
   'settings-notices': {
     path: 'system/settings/notices',
     name: 'settings-notices',
     component: () => import('@/views/SystemNoticesView.vue'),
-    meta: { title: 'Notices', hidden: true, requiresPermission: 'system:read' },
+    meta: { title: '公告管理', hidden: true, requiresGrant: 'system:read' },
   },
   'settings-categories': {
     path: 'system/settings/categories',
     name: 'settings-categories',
     component: () => import('@/views/SystemCategoriesView.vue'),
-    meta: { title: 'Categories', hidden: true, requiresPermission: 'system:read' },
+    meta: { title: '分类配置', hidden: true, requiresGrant: 'system:read' },
   },
   'tenant-catalog': {
     path: 'system/settings/tenant-catalog',
     name: 'tenant-catalog',
     component: () => import('@/views/TenantCatalogView.vue'),
-    meta: { title: 'Tenant Catalog', hidden: true, requiresPermission: 'tenant:read' },
+    meta: { title: '租户目录', hidden: true, requiresGrant: 'tenant:read' },
   },
+  'settings-resources': {
+    path: 'system/settings/resources',
+    name: 'settings-resources',
+    component: () => import('@/views/ResourceManagementView.vue'),
+    meta: { title: '菜单管理', hidden: true, requiresGrant: 'system:write' },
+  },
+}
+
+const ROUTE_KEY_PATH_MAP: Record<string, string> = {
+  dashboard: '/dashboard',
+  users: '/system/users',
+  roles: '/system/roles',
+  depts: '/system/depts',
+  tenants: '/system/tenants',
+  audit: '/system/audit',
+  settings: '/system/settings',
 }
 
 const SHELL_ROUTE: RouteRecordRaw = {
@@ -114,28 +130,6 @@ const FALLBACK_ROUTE: RouteRecordRaw = {
   name: 'not-found',
   component: () => import('@/views/NotFoundView.vue'),
   meta: { title: '页面未找到' },
-}
-
-function isAllowedRoute(snapshot: PermissionSnapshot | null, path: string) {
-  if (!snapshot) {
-    return false
-  }
-  const allowedPaths = new Set(snapshot.menus.map((item) => item.path))
-  if (allowedPaths.has(path)) {
-    return true
-  }
-  if (snapshot.permissions.includes('system:read') && path.startsWith('/system/settings/')) {
-    return true
-  }
-  if (snapshot.permissions.includes('tenant:read') && path === '/system/settings/tenant-catalog') {
-    return true
-  }
-  return false
-}
-
-function resolveFirstAllowedPath(snapshot: PermissionSnapshot | null) {
-  const firstMenuPath = snapshot?.menus?.[0]?.path
-  return firstMenuPath && firstMenuPath.startsWith('/') ? firstMenuPath : null
 }
 
 const router = createRouter({
@@ -167,7 +161,7 @@ router.beforeEach(async (to) => {
       authStore.clearSession()
       return { path: '/login', query: { redirect: to.fullPath } }
     }
-    ElMessage.error('Session bootstrap failed, please retry')
+    ElMessage.error('会话引导失败，请重试')
     return false
   }
 
@@ -175,7 +169,7 @@ router.beforeEach(async (to) => {
     return true
   }
 
-  if (to.path !== '/' && !isAllowedRoute(authStore.snapshot, to.path)) {
+  if (!isAllowedRoute(authStore.snapshot, to)) {
     const fallbackPath = resolveFirstAllowedPath(authStore.snapshot)
     if (fallbackPath && fallbackPath !== to.path) {
       return fallbackPath
@@ -191,12 +185,89 @@ router.afterEach((to) => {
   document.title = `${String(to.meta.title ?? 'Console')} | Enterprise Auth Platform`
 })
 
-function registerDynamicRoutes(_snapshot?: PermissionSnapshot | null) {
-  // Routes are statically registered for stability.
+function isAllowedRoute(snapshot: PermissionSnapshot | null, to: RouteLocationNormalized) {
+  if (!snapshot) {
+    return false
+  }
+
+  const grantSet = new Set(snapshot.grants ?? [])
+  const requiredGrant = String(to.meta.requiresGrant ?? '').trim()
+  if (requiredGrant && !grantSet.has(requiredGrant)) {
+    return false
+  }
+
+  const routeKey = String(to.meta.routeKey ?? '').trim()
+  if (!routeKey) {
+    return true
+  }
+
+  const routeKeys = collectAllowedRouteKeys(snapshot.menus ?? [])
+  return routeKeys.has(routeKey)
+}
+
+function resolveFirstAllowedPath(snapshot: PermissionSnapshot | null) {
+  if (!snapshot) {
+    return null
+  }
+  const routeKeys = collectAllowedRouteKeys(snapshot.menus ?? [])
+  const menuList = flattenMenuTree(snapshot.menus ?? [])
+  for (const menu of menuList) {
+    const routeKey = menu.routeKey?.trim()
+    if (!routeKey || !routeKeys.has(routeKey)) {
+      continue
+    }
+    const path = ROUTE_KEY_PATH_MAP[routeKey]
+    if (path) {
+      return path
+    }
+  }
+  return routeKeys.has('dashboard') ? '/dashboard' : null
+}
+
+function collectAllowedRouteKeys(menus: MenuItem[]) {
+  const routeKeys = new Set<string>()
+  const walk = (items: MenuItem[]) => {
+    for (const item of items) {
+      const routeKey = item.routeKey?.trim()
+      if (routeKey) {
+        if (Object.hasOwn(DYNAMIC_ROUTE_DEFINITIONS, routeKey)) {
+          routeKeys.add(routeKey)
+        } else {
+          console.warn('[auth] 后端菜单快照中存在未知的路由键:', routeKey)
+        }
+      }
+      if (item.children?.length) {
+        walk(item.children)
+      }
+    }
+  }
+  walk(menus)
+  return routeKeys
+}
+
+function flattenMenuTree(menus: MenuItem[]) {
+  const result: MenuItem[] = []
+  const walk = (items: MenuItem[]) => {
+    for (const item of items) {
+      result.push(item)
+      if (item.children?.length) {
+        walk(item.children)
+      }
+    }
+  }
+  walk(menus)
+  return result
+}
+
+function registerDynamicRoutes(snapshot?: PermissionSnapshot | null) {
+  if (!snapshot) {
+    return
+  }
+  collectAllowedRouteKeys(snapshot.menus ?? [])
 }
 
 function clearDynamicRoutes() {
-  // Keep for backward compatibility with auth store API.
+  // 静态路由注册，此处留空
 }
 
 export { registerDynamicRoutes, clearDynamicRoutes }

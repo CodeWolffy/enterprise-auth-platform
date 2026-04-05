@@ -24,9 +24,9 @@
 
 - 浏览器不再持有 `access_token` / `refresh_token`
 - 后端主链路不再依赖 OAuth2 Authorization Server
-- 角色直接保存 `permissions_json`
+- 角色资源授权保存于 `sys_role_resource`
 - 自定义数据范围直接保存 `data_scope_value_json`
-- 用户名唯一性按租户约束：`(tenant_id, username)`
+- 用户名唯一性为全局约束：`username`
 - 改密、禁用、强制下线通过会话版本和 Redis Session 实现
 
 ## 技术栈
@@ -93,10 +93,12 @@
 - `sys_user`
 - `sys_role`
 - `sys_user_role`
+- `sys_resource`
+- `sys_role_resource`
+- `sys_tenant_resource_override`
 
 角色表关键字段：
 
-- `permissions_json`
 - `data_scope_type`
 - `data_scope_value_json`
 
@@ -137,13 +139,19 @@
 - `POST /api/roles`
 - `PUT /api/roles/{roleId}`
 - `DELETE /api/roles/{roleId}`
-- `GET /api/roles/{roleId}/permissions`
-- `PUT /api/roles/{roleId}/permissions`
-- `GET /api/permissions`
+- `GET /api/roles/{roleId}/resources`
+- `PUT /api/roles/{roleId}/resources`
 - `GET /api/depts`
 - `POST /api/depts`
 - `PUT /api/depts/{deptId}`
 - `DELETE /api/depts/{deptId}`
+- `GET /api/resources/tree`
+- `POST /api/resources`
+- `PUT /api/resources/{resourceId}`
+- `DELETE /api/resources/{resourceId}`
+- `PUT /api/resources/{resourceId}/sort`
+- `GET /api/tenants/{tenantId}/resource-overrides`
+- `PUT /api/tenants/{tenantId}/resource-overrides`
 
 ### 租户与租户目录
 
@@ -346,7 +354,7 @@ npm run test:visual:update
 - 已切换主登录链路到 Session Cookie
 - 已移除前后端 OAuth Client / Scope / Consent 管理入口
 - 已移除后端 JWT / Authorization Server 主路径依赖
-- 已移除权限旧表运行时依赖，角色权限改为 `permissions_json`
+- 已切换资源授权模型（`sys_resource` + `sys_role_resource` + `sys_tenant_resource_override`）
 - 已移除自定义部门旧表运行时依赖，角色数据范围改为 `data_scope_value_json`
 
 ## 说明

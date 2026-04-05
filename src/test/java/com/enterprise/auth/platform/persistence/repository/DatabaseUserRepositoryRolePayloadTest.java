@@ -50,15 +50,14 @@ class DatabaseUserRepositoryRolePayloadTest {
                 """
                 INSERT INTO sys_role (
                     tenant_id, role_code, role_name, data_scope_type, role_desc,
-                    permissions_json, data_scope_value_json, created_by, updated_by, deleted
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+                    data_scope_value_json, created_by, updated_by, deleted
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
                 """,
                 TENANT_ID,
                 roleCode,
                 "Role Payload Test",
                 "CUSTOM",
                 "payload test role",
-                rolePayloadCodec.writePermissionCodes(Set.of("user:read", "audit:read")),
                 rolePayloadCodec.writeDeptIds(Set.of(2L, 3L)),
                 "test",
                 "test"
@@ -68,6 +67,22 @@ class DatabaseUserRepositoryRolePayloadTest {
                 Long.class,
                 TENANT_ID,
                 roleCode
+        );
+        jdbcTemplate.update(
+                """
+                INSERT IGNORE INTO sys_role_resource (
+                    tenant_id, role_id, resource_id, created_by, updated_by, created_at, updated_at
+                )
+                SELECT ?, ?, id, ?, ?, NOW(), NOW()
+                FROM sys_resource
+                WHERE tenant_id = 'platform'
+                  AND deleted = 0
+                  AND grant_key IN ('user:read', 'audit:read')
+                """,
+                TENANT_ID,
+                roleId,
+                "test",
+                "test"
         );
 
         jdbcTemplate.update(
@@ -112,6 +127,17 @@ class DatabaseUserRepositoryRolePayloadTest {
             jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username = ?", TENANT_ID, username);
         }
         if (roleCode != null) {
+            Long roleId = jdbcTemplate.query(
+                            "SELECT id FROM sys_role WHERE tenant_id = ? AND role_code = ?",
+                            (rs, rowNum) -> rs.getLong(1),
+                            TENANT_ID,
+                            roleCode
+                    ).stream()
+                    .findFirst()
+                    .orElse(null);
+            if (roleId != null) {
+                jdbcTemplate.update("DELETE FROM sys_role_resource WHERE tenant_id = ? AND role_id = ?", TENANT_ID, roleId);
+            }
             jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id = ? AND role_code = ?", TENANT_ID, roleCode);
         }
     }

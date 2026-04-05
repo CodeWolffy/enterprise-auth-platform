@@ -16,6 +16,7 @@ import com.enterprise.auth.platform.persistence.mapper.SysUserRoleMapper;
 import com.enterprise.auth.platform.role.dto.CreateRoleRequest;
 import com.enterprise.auth.platform.role.dto.UpdateRoleRequest;
 import com.enterprise.auth.platform.role.support.RolePayloadCodec;
+import com.enterprise.auth.platform.resource.service.ResourceService;
 import com.enterprise.auth.platform.security.AuthPrincipalCacheService;
 import com.enterprise.auth.platform.security.SecuritySupport;
 import com.enterprise.auth.platform.tenant.TenantContext;
@@ -37,6 +38,7 @@ public class RoleManagementService {
     private final AuditService auditService;
     private final AuthPrincipalCacheService authPrincipalCacheService;
     private final RolePayloadCodec rolePayloadCodec;
+    private final ResourceService resourceService;
 
     public RoleManagementService(
             SysRoleMapper sysRoleMapper,
@@ -46,7 +48,8 @@ public class RoleManagementService {
             CatalogService catalogService,
             AuditService auditService,
             AuthPrincipalCacheService authPrincipalCacheService,
-            RolePayloadCodec rolePayloadCodec
+            RolePayloadCodec rolePayloadCodec,
+            ResourceService resourceService
     ) {
         this.sysRoleMapper = sysRoleMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
@@ -56,6 +59,7 @@ public class RoleManagementService {
         this.auditService = auditService;
         this.authPrincipalCacheService = authPrincipalCacheService;
         this.rolePayloadCodec = rolePayloadCodec;
+        this.resourceService = resourceService;
     }
 
     @Transactional
@@ -71,7 +75,6 @@ public class RoleManagementService {
         entity.setRoleCode(request.roleCode());
         entity.setRoleName(request.roleName());
         entity.setRoleDesc(request.roleDesc());
-        entity.setPermissionsJson(rolePayloadCodec.writePermissionCodes(Set.of()));
         applyDataScope(entity, tenantId, request.dataScopeType(), request.customDeptIds());
         sysRoleMapper.insert(entity);
 
@@ -94,25 +97,20 @@ public class RoleManagementService {
     }
 
     @Transactional
-    public List<CatalogService.PermissionView> assignPermissions(Long roleId, Set<String> permissionCodes) {
+    public Set<Long> assignResources(Long roleId, Set<Long> resourceIds) {
         String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
         SysRoleEntity entity = getRole(roleId, tenantId);
-        List<CatalogService.PermissionView> assigned = catalogService.requirePermissionsByCodes(permissionCodes);
-
-        entity.setPermissionsJson(rolePayloadCodec.writePermissionCodes(
-                assigned.stream().map(CatalogService.PermissionView::permissionCode).toList()
-        ));
-        sysRoleMapper.updateById(entity);
+        Set<Long> assigned = resourceService.assignRoleResources(tenantId, roleId, resourceIds);
         evictPrincipalsByRole(tenantId, roleId);
-        auditService.record("ROLE_PERMISSION_ASSIGNED", operator, tenantId, Map.of("roleId", entity.getId(), "roleCode", entity.getRoleCode(), "permissionCodes", permissionCodes));
+        auditService.record("ROLE_RESOURCE_ASSIGNED", operator, tenantId, Map.of("roleId", entity.getId(), "roleCode", entity.getRoleCode(), "resourceIds", assigned));
         return assigned;
     }
 
-    public List<CatalogService.PermissionView> listAssignedPermissions(Long roleId) {
+    public Set<Long> listAssignedResources(Long roleId) {
         String tenantId = currentTenantId();
-        SysRoleEntity entity = getRole(roleId, tenantId);
-        return catalogService.permissionsByCodes(rolePayloadCodec.readPermissionCodes(entity.getPermissionsJson()));
+        getRole(roleId, tenantId);
+        return resourceService.listRoleResourceIds(tenantId, roleId);
     }
 
     @Transactional

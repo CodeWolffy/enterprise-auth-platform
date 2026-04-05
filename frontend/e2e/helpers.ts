@@ -8,15 +8,17 @@ export interface MockPermissionSnapshot {
   tenantId: string
   operatorTenantId?: string
   roles: string[]
-  permissions: string[]
+  grants: string[]
   dataScopeType: string
   customDeptIds: number[]
   superAdmin?: boolean
   menus: Array<{
+    id: number
     code: string
     title: string
     path: string
     component: string
+    routeKey?: string
   }>
 }
 
@@ -36,18 +38,18 @@ export function defaultSnapshot(): MockPermissionSnapshot {
     tenantId: 'platform',
     operatorTenantId: 'platform',
     roles: ['ADMIN'],
-    permissions: ['auth:read', 'user:read', 'role:read', 'dept:read', 'tenant:read', 'audit:read', 'system:read'],
+    grants: ['auth:read', 'user:read', 'role:read', 'dept:read', 'tenant:read', 'audit:read', 'system:read'],
     dataScopeType: 'ALL',
     customDeptIds: [],
     superAdmin: true,
     menus: [
-      { code: 'dashboard', title: '运行总览', path: '/dashboard', component: 'DashboardView' },
-      { code: 'users', title: '用户管理', path: '/system/users', component: 'UsersView' },
-      { code: 'roles', title: '角色管理', path: '/system/roles', component: 'RolesView' },
-      { code: 'depts', title: '部门管理', path: '/system/depts', component: 'DepartmentsView' },
-      { code: 'tenants', title: '租户管理', path: '/system/tenants', component: 'TenantsView' },
-      { code: 'audit', title: '安全审计', path: '/system/audit', component: 'AuditView' },
-      { code: 'settings', title: '系统管理', path: '/system/settings', component: 'SystemManagementView' },
+      { id: 10, code: 'dashboard', title: '运行总览', path: '/dashboard', component: 'DashboardView', routeKey: 'dashboard' },
+      { id: 21, code: 'users', title: '用户管理', path: '/system/users', component: 'UsersView', routeKey: 'users' },
+      { id: 22, code: 'roles', title: '角色管理', path: '/system/roles', component: 'RolesView', routeKey: 'roles' },
+      { id: 23, code: 'depts', title: '部门管理', path: '/system/depts', component: 'DepartmentsView', routeKey: 'depts' },
+      { id: 24, code: 'tenants', title: '租户管理', path: '/system/tenants', component: 'TenantsView', routeKey: 'tenants' },
+      { id: 25, code: 'audit', title: '安全审计', path: '/system/audit', component: 'AuditView', routeKey: 'audit' },
+      { id: 26, code: 'settings', title: '系统管理', path: '/system/settings', component: 'SystemManagementView', routeKey: 'settings' },
     ],
   }
 }

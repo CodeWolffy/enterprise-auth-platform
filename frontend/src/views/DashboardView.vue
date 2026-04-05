@@ -13,7 +13,7 @@
       </article>
       <article class="stat-card">
         <span>权限数量</span>
-        <strong>{{ authStore.snapshot?.permissions.length ?? 0 }}</strong>
+        <strong>{{ authStore.snapshot?.grants.length ?? 0 }}</strong>
         <small>接口与菜单权限已生效</small>
       </article>
       <article class="stat-card">
@@ -38,7 +38,7 @@
             </article>
             <article class="insight-card">
               <span>权限</span>
-              <strong>{{ authStore.snapshot?.permissions.length ?? 0 }}</strong>
+              <strong>{{ authStore.snapshot?.grants.length ?? 0 }}</strong>
             </article>
             <article class="insight-card">
               <span>菜单</span>
@@ -60,7 +60,7 @@
       <section class="dashboard-panel dashboard-panel--snapshot">
         <div class="panel-head">
           <div>
-            <span class="eyebrow">Authorization</span>
+            <span class="eyebrow">授权</span>
             <h3>当前权限快照</h3>
           </div>
         </div>
@@ -104,7 +104,7 @@ use([PieChart, TooltipComponent, CanvasRenderer])
 const authStore = useAuthStore()
 const chartRef = ref<HTMLDivElement | null>(null)
 const topMenus = computed(() => (authStore.snapshot?.menus ?? []).map((item) => item.title).slice(0, 6))
-const topPermissions = computed(() => (authStore.snapshot?.permissions ?? []).slice(0, 8))
+const topPermissions = computed(() => (authStore.snapshot?.grants ?? []).slice(0, 8))
 
 let chart: EChartsType | null = null
 
@@ -134,7 +134,7 @@ async function renderChart() {
         },
         data: [
           { name: '角色', value: authStore.snapshot.roles.length, itemStyle: { color: '#0f766e' } },
-          { name: '权限', value: authStore.snapshot.permissions.length, itemStyle: { color: '#c96b29' } },
+          { name: '权限', value: authStore.snapshot.grants.length, itemStyle: { color: '#c96b29' } },
           { name: '菜单', value: authStore.snapshot.menus.length, itemStyle: { color: '#355c7d' } },
         ],
       },

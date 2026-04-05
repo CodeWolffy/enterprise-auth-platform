@@ -2,7 +2,7 @@ package com.enterprise.auth.platform.role.controller;
 
 import com.enterprise.auth.platform.catalog.CatalogService;
 import com.enterprise.auth.platform.common.api.ApiResponse;
-import com.enterprise.auth.platform.role.dto.AssignPermissionsRequest;
+import com.enterprise.auth.platform.role.dto.AssignResourcesRequest;
 import com.enterprise.auth.platform.role.dto.CreateRoleRequest;
 import com.enterprise.auth.platform.role.dto.UpdateRoleRequest;
 import com.enterprise.auth.platform.role.service.RoleManagementService;
@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Set;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -41,13 +42,11 @@ public class RoleController {
         return ApiResponse.ok(catalogService.roles());
     }
 
-    @Operation(summary = "查询角色已分配权限")
-    @GetMapping("/{roleId}/permissions")
+    @Operation(summary = "查询角色已分配资源")
+    @GetMapping("/{roleId}/resources")
     @PreAuthorize("hasAuthority('role:read')")
-    public ApiResponse<List<CatalogService.PermissionView>> assignedPermissions(
-            @Parameter(description = "角色 ID") @PathVariable Long roleId
-    ) {
-        return ApiResponse.ok(roleManagementService.listAssignedPermissions(roleId));
+    public ApiResponse<Set<Long>> assignedResources(@Parameter(description = "角色 ID") @PathVariable Long roleId) {
+        return ApiResponse.ok(roleManagementService.listAssignedResources(roleId));
     }
 
     @Operation(summary = "新增角色")
@@ -67,14 +66,14 @@ public class RoleController {
         return ApiResponse.ok(roleManagementService.update(roleId, request));
     }
 
-    @Operation(summary = "分配角色权限")
-    @PutMapping("/{roleId}/permissions")
+    @Operation(summary = "分配角色资源")
+    @PutMapping("/{roleId}/resources")
     @PreAuthorize("hasAuthority('role:write')")
-    public ApiResponse<List<CatalogService.PermissionView>> assignPermissions(
+    public ApiResponse<Set<Long>> assignResources(
             @Parameter(description = "角色 ID") @PathVariable Long roleId,
-            @Valid @RequestBody AssignPermissionsRequest request
+            @Valid @RequestBody AssignResourcesRequest request
     ) {
-        return ApiResponse.ok(roleManagementService.assignPermissions(roleId, request.permissionCodes()));
+        return ApiResponse.ok(roleManagementService.assignResources(roleId, request.resourceIds()));
     }
 
     @Operation(summary = "删除角色")

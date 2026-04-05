@@ -18,25 +18,21 @@ function checkPermission(el: HTMLElement, binding: DirectiveBinding<string | str
     return
   }
 
-  const userPermissions = authStore.snapshot?.permissions || []
-  
-  // Super admin bypass
-  const hasAdmin = userPermissions.includes('*:*:*') || userPermissions.includes('admin')
-  if (hasAdmin) {
+  const grantSet = new Set(authStore.snapshot?.grants ?? [])
+
+  if (authStore.snapshot?.superAdmin) {
     return
   }
 
   let hasPermission = false
   if (Array.isArray(requiredPermissions)) {
-    // If array, require AT LEAST ONE permission (OR logic)
-    hasPermission = requiredPermissions.some(perm => userPermissions.includes(perm))
+    hasPermission = requiredPermissions.some((perm) => grantSet.has(perm))
   } else {
-    hasPermission = userPermissions.includes(requiredPermissions)
+    hasPermission = grantSet.has(requiredPermissions)
   }
 
   if (!hasPermission) {
     el.parentNode?.removeChild(el)
-    // fallback for virtual DOM
     el.style.display = 'none'
   }
 }

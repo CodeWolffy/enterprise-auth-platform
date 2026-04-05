@@ -659,7 +659,7 @@ public class AuditExportTaskService {
             try {
                 return Long.parseLong(String.valueOf(primaryValue));
             } catch (NumberFormatException ignored) {
-                // fallback to legacy format
+                // 回退到旧格式以兼容历史数据
             }
         }
         if (legacyInstantValue == null || !StringUtils.hasText(String.valueOf(legacyInstantValue))) {

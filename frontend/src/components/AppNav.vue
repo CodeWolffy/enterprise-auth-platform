@@ -1,7 +1,7 @@
-<template>
+﻿<template>
   <aside class="app-nav">
     <div class="brand">
-      <span class="eyebrow">Enterprise Auth Platform</span>
+      <span class="eyebrow">企业级权限中台</span>
       <h1>权限中台</h1>
       <p>统一管理认证、多租户、审计与系统治理能力。</p>
     </div>
@@ -54,22 +54,32 @@ import { RouterLink } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { queryTenants } from '@/api/platform'
+import type { MenuItem } from '@/types/auth'
 
 const authStore = useAuthStore()
 const tenantOptions = ref<Array<{ tenantId: string; name: string }>>([])
+
+const ROUTE_KEY_PATH_MAP: Record<string, string> = {
+  dashboard: '/dashboard',
+  users: '/system/users',
+  roles: '/system/roles',
+  depts: '/system/depts',
+  tenants: '/system/tenants',
+  audit: '/system/audit',
+  settings: '/system/settings',
+}
 
 const canLoadTenants = computed(() => {
   if (!authStore.canSwitchTenant) {
     return false
   }
-  return Boolean(authStore.snapshot?.permissions.includes('tenant:read'))
+  return Boolean(authStore.snapshot?.grants.includes('tenant:read'))
 })
 
 const iconMap: Record<string, any> = {
   dashboard: Monitor,
   users: Avatar,
   roles: Connection,
-  permissions: Tickets,
   depts: OfficeBuilding,
   tenants: Flag,
   audit: Histogram,
@@ -80,20 +90,55 @@ const titleMap: Record<string, string> = {
   dashboard: '运行总览',
   users: '用户管理',
   roles: '角色管理',
-  permissions: '权限管理',
   depts: '部门管理',
   tenants: '租户管理',
   audit: '安全审计',
   settings: '系统管理',
 }
 
-const visibleLinks = computed(() =>
-  authStore.menuItems.map((menu) => ({
-    to: menu.path,
-    label: titleMap[menu.code] || menu.title,
-    icon: iconMap[menu.code] || Tickets,
-  })),
-)
+const visibleLinks = computed(() => {
+  const flattened = flattenMenus(authStore.snapshot?.menus ?? [])
+  const links = flattened
+    .map((menu) => {
+      const routeKey = menu.routeKey?.trim()
+      if (!routeKey) {
+        return null
+      }
+      const path = ROUTE_KEY_PATH_MAP[routeKey]
+      if (!path) {
+        console.warn('[auth] 后端菜单快照中存在未知的路由键:', routeKey)
+        return null
+      }
+      return {
+        to: path,
+        label: titleMap[routeKey] || menu.title,
+        icon: iconMap[routeKey] || Tickets,
+      }
+    })
+    .filter((item): item is { to: string; label: string; icon: any } => Boolean(item))
+
+  const deduplicated = new Map<string, { to: string; label: string; icon: any }>()
+  for (const item of links) {
+    if (!deduplicated.has(item.to)) {
+      deduplicated.set(item.to, item)
+    }
+  }
+  return Array.from(deduplicated.values())
+})
+
+function flattenMenus(nodes: MenuItem[]): MenuItem[] {
+  const result: MenuItem[] = []
+  const walk = (items: MenuItem[]) => {
+    for (const item of items) {
+      result.push(item)
+      if (item.children?.length) {
+        walk(item.children)
+      }
+    }
+  }
+  walk(nodes)
+  return result
+}
 
 async function loadTenantOptions() {
   for (let attempt = 0; attempt < 2; attempt += 1) {

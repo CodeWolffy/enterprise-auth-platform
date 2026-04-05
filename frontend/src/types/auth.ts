@@ -11,7 +11,7 @@ export interface PermissionSnapshot {
   tenantId: string
   operatorTenantId?: string
   roles: string[]
-  permissions: string[]
+  grants: string[]
   dataScopeType: string
   customDeptIds: number[]
   menus: MenuItem[]
@@ -19,10 +19,15 @@ export interface PermissionSnapshot {
 }
 
 export interface MenuItem {
+  id: number
   code: string
   title: string
-  path: string
-  component: string
+  path?: string | null
+  component?: string | null
+  routeKey?: string | null
+  icon?: string | null
+  orderNo?: number | null
+  children?: MenuItem[]
 }
 
 export interface CookieSessionResponse {
@@ -71,13 +76,25 @@ export interface RoleView {
   customDeptIds?: number[]
 }
 
-export interface PermissionView {
+export type ResourceType = 'DIR' | 'MENU' | 'BUTTON' | 'API'
+
+export interface ResourceTreeNode {
   id: number
-  resourceCode: string
-  actionCode: string
-  scopeCode: string
-  permissionName?: string | null
-  permissionCode: string
+  resourceKey: string
+  resourceName: string
+  resourceType: ResourceType
+  parentId?: number | null
+  ancestors?: string | null
+  routeKey?: string | null
+  grantKey?: string | null
+  path?: string | null
+  component?: string | null
+  icon?: string | null
+  orderNo?: number | null
+  visible: boolean
+  enabled: boolean
+  system: boolean
+  children?: ResourceTreeNode[]
 }
 
 export interface DepartmentView {

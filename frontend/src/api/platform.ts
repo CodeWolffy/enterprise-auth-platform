@@ -5,7 +5,8 @@ import type {
   AuditExportTask,
   AuditPage,
   DepartmentView,
-  PermissionView,
+  ResourceTreeNode,
+  ResourceType,
   RoleView,
   TenantChangeView,
   TenantCapabilityOverrideView,
@@ -110,18 +111,52 @@ export async function deleteRole(id: number) {
   await http.delete(`/api/roles/${id}`)
 }
 
-export async function queryAssignedPermissions(roleId: number) {
-  const { data } = await http.get<ApiResponse<PermissionView[]>>(`/api/roles/${roleId}/permissions`)
+export async function queryAssignedRoleResources(roleId: number) {
+  const { data } = await http.get<ApiResponse<number[]>>(`/api/roles/${roleId}/resources`)
   return data.data
 }
 
-export async function assignRolePermissions(roleId: number, permissionCodes: string[]) {
-  const { data } = await http.put<ApiResponse<PermissionView[]>>(`/api/roles/${roleId}/permissions`, { permissionCodes })
+export async function assignRoleResources(roleId: number, resourceIds: number[]) {
+  const { data } = await http.put<ApiResponse<number[]>>(`/api/roles/${roleId}/resources`, { resourceIds })
   return data.data
 }
 
-export async function queryPermissions() {
-  const { data } = await http.get<ApiResponse<PermissionView[]>>('/api/permissions')
+export async function queryResourceTree() {
+  const { data } = await http.get<ApiResponse<ResourceTreeNode[]>>('/api/resources/tree')
+  return data.data
+}
+
+export interface ResourceMutationPayload {
+  parentId?: number | null
+  resourceType: ResourceType
+  resourceKey: string
+  resourceName: string
+  routeKey?: string | null
+  grantKey?: string | null
+  path?: string | null
+  component?: string | null
+  icon?: string | null
+  orderNo?: number | null
+  visible?: boolean | null
+  enabled?: boolean | null
+}
+
+export async function createResource(payload: ResourceMutationPayload) {
+  const { data } = await http.post<ApiResponse<ResourceTreeNode>>('/api/resources', payload)
+  return data.data
+}
+
+export async function updateResource(resourceId: number, payload: ResourceMutationPayload) {
+  const { data } = await http.put<ApiResponse<ResourceTreeNode>>(`/api/resources/${resourceId}`, payload)
+  return data.data
+}
+
+export async function deleteResource(resourceId: number) {
+  await http.delete(`/api/resources/${resourceId}`)
+}
+
+export async function sortResource(resourceId: number, orderNo: number) {
+  const { data } = await http.put<ApiResponse<ResourceTreeNode>>(`/api/resources/${resourceId}/sort`, { orderNo })
   return data.data
 }
 

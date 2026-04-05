@@ -2,7 +2,7 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { ElMessage } from 'element-plus'
 import { fetchPermissionSnapshot, loginWithPassword, logoutCurrentSession } from '@/api/auth'
-import type { PermissionSnapshot } from '@/types/auth'
+import type { MenuItem, PermissionSnapshot } from '@/types/auth'
 import { clearDynamicRoutes, registerDynamicRoutes } from '@/router'
 
 const storageKey = 'eap.frontend.auth'
@@ -22,7 +22,7 @@ export const useAuthStore = defineStore('auth', () => {
   const snapshot = ref<PermissionSnapshot | null>(null)
 
   const isAuthenticated = computed(() => authenticated.value)
-  const menuItems = computed(() => snapshot.value?.menus ?? [])
+  const menuItems = computed(() => flattenMenuItems(snapshot.value?.menus ?? []))
   const canSwitchTenant = computed(() => Boolean(snapshot.value?.superAdmin))
 
   function restore() {
@@ -137,6 +137,23 @@ export const useAuthStore = defineStore('auth', () => {
       return
     }
     tenantId.value = operator
+  }
+
+  function flattenMenuItems(nodes: MenuItem[]): MenuItem[] {
+    const result: MenuItem[] = []
+    const walk = (items: MenuItem[]) => {
+      for (const item of items) {
+        const path = item.path?.trim()
+        if (path) {
+          result.push(item)
+        }
+        if (item.children?.length) {
+          walk(item.children)
+        }
+      }
+    }
+    walk(nodes)
+    return result
   }
 
   return {

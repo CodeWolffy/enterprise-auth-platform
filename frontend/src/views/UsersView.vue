@@ -2,22 +2,22 @@
   <div class="panel-stack">
     <section class="dashboard-grid">
       <article class="stat-card">
-        <span class="eyebrow">Users</span>
+        <span class="eyebrow">用户</span>
         <strong>{{ totalUsers }}</strong>
         <span>当前筛选条件下的用户总数</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Enabled</span>
+        <span class="eyebrow">启用</span>
         <strong>{{ enabledCount }}</strong>
         <span>处于启用状态的用户</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Disabled</span>
+        <span class="eyebrow">禁用</span>
         <strong>{{ disabledCount }}</strong>
         <span>当前已禁用的用户</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Roles</span>
+        <span class="eyebrow">角色</span>
         <strong>{{ averageRoleCount }}</strong>
         <span>当前页人均角色数</span>
       </article>
@@ -27,7 +27,7 @@
       <div class="panel-head">
         <div>
 
-          <span class="eyebrow">Users</span>
+          <span class="eyebrow">用户</span>
           <h3>用户管理</h3>
         </div>
         <el-button type="primary" @click="openUser()">新增用户</el-button>
@@ -378,7 +378,7 @@ void load()
 async function load() {
   loading.value = true
   try {
-    const shouldLoadRoles = authStore.snapshot?.permissions.includes('role:read')
+    const shouldLoadRoles = authStore.snapshot?.grants.includes('role:read')
     const [userPage, roleList] = await Promise.all([
       queryUsers(queryParams),
       shouldLoadRoles ? queryRoles() : Promise.resolve([] as RoleView[]),

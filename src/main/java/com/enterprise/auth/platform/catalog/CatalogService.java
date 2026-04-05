@@ -3,7 +3,6 @@ package com.enterprise.auth.platform.catalog;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.model.DataScopeType;
-import com.enterprise.auth.platform.common.model.MenuItem;
 import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.persistence.entity.SysDeptEntity;
 import com.enterprise.auth.platform.persistence.entity.SysRoleEntity;
@@ -26,43 +25,12 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 @Service
 public class CatalogService {
-
-    private static final List<MenuRule> MENU_RULES = List.of(
-            new MenuRule(new MenuItem("dashboard", "运行总览", "/dashboard", "DashboardView"), Set.of("auth:read")),
-            new MenuRule(new MenuItem("users", "用户管理", "/system/users", "UsersView"), Set.of("user:read")),
-            new MenuRule(new MenuItem("roles", "角色管理", "/system/roles", "RolesView"), Set.of("role:read")),
-            new MenuRule(new MenuItem("depts", "部门管理", "/system/depts", "DepartmentsView"), Set.of("dept:read")),
-            new MenuRule(new MenuItem("tenants", "租户管理", "/system/tenants", "TenantsView"), Set.of("tenant:read")),
-            new MenuRule(new MenuItem("audit", "安全审计", "/system/audit", "AuditView"), Set.of("audit:read")),
-            new MenuRule(new MenuItem("settings", "系统管理", "/system/settings", "SystemManagementView"), Set.of("system:read"))
-    );
-
-    private static final List<PermissionView> PERMISSION_CATALOG = List.of(
-            new PermissionView(1L, "auth", "read", "tenant", "认证读取", "auth:read"),
-            new PermissionView(2L, "auth", "write", "tenant", "认证写入", "auth:write"),
-            new PermissionView(3L, "user", "read", "tenant", "用户读取", "user:read"),
-            new PermissionView(4L, "user", "write", "tenant", "用户写入", "user:write"),
-            new PermissionView(5L, "role", "read", "tenant", "角色读取", "role:read"),
-            new PermissionView(6L, "role", "write", "tenant", "角色写入", "role:write"),
-            new PermissionView(7L, "permission", "read", "tenant", "权限目录读取", "permission:read"),
-            new PermissionView(8L, "permission", "write", "tenant", "权限目录写入", "permission:write"),
-            new PermissionView(9L, "dept", "read", "tenant", "部门读取", "dept:read"),
-            new PermissionView(10L, "dept", "write", "tenant", "部门写入", "dept:write"),
-            new PermissionView(11L, "tenant", "read", "platform", "租户读取", "tenant:read"),
-            new PermissionView(12L, "tenant", "write", "platform", "租户写入", "tenant:write"),
-            new PermissionView(13L, "audit", "read", "tenant", "审计读取", "audit:read"),
-            new PermissionView(14L, "audit", "write", "tenant", "审计写入", "audit:write"),
-            new PermissionView(15L, "system", "read", "tenant", "系统读取", "system:read"),
-            new PermissionView(16L, "system", "write", "tenant", "系统写入", "system:write"),
-            new PermissionView(17L, "session", "write", "tenant", "会话写入", "session:write")
-    );
 
     private final SysRoleMapper sysRoleMapper;
     private final SysDeptMapper sysDeptMapper;
@@ -94,13 +62,6 @@ public class CatalogService {
         this.sysTenantCapabilityOverrideMapper = sysTenantCapabilityOverrideMapper;
         this.dataScopeService = dataScopeService;
         this.rolePayloadCodec = rolePayloadCodec;
-    }
-
-    public List<MenuItem> menusFor(Set<String> permissions) {
-        return MENU_RULES.stream()
-                .filter(rule -> permissions.containsAll(rule.permissions()))
-                .map(MenuRule::menu)
-                .toList();
     }
 
     public List<RoleView> roles() {
@@ -162,13 +123,6 @@ public class CatalogService {
                 })
                 .toList();
     }
-    public List<PermissionView> permissions() {
-        String tenantId = currentTenantId();
-        return PERMISSION_CATALOG.stream()
-                .filter(permission -> "platform".equals(tenantId) || !"platform".equals(permission.scopeCode()))
-                .toList();
-    }
-
     public RoleView role(String roleCode) {
         return roles().stream()
                 .filter(role -> role.code().equals(roleCode))
@@ -182,24 +136,6 @@ public class CatalogService {
                 .findFirst()
                 .orElseThrow(() -> new BusinessException("租户不存在"));
     }
-
-    public List<PermissionView> permissionsByCodes(Set<String> permissionCodes) {
-        return permissions().stream()
-                .filter(permission -> permissionCodes.contains(permission.permissionCode()))
-                .toList();
-    }
-
-    public List<PermissionView> requirePermissionsByCodes(Set<String> permissionCodes) {
-        if (permissionCodes == null || permissionCodes.isEmpty()) {
-            return List.of();
-        }
-        List<PermissionView> matched = permissionsByCodes(permissionCodes);
-        if (matched.size() != permissionCodes.size()) {
-            throw new BusinessException("存在无效的权限编码");
-        }
-        return matched;
-    }
-
 
     private String currentTenantId() {
         String tenantId = TenantContext.getTenantId();
@@ -344,20 +280,6 @@ public class CatalogService {
             @Schema(description = "能力说明映射") Map<String, String> capabilityDescriptions,
             @Schema(description = "运营备注") String lifecycleNote
     ) {
-    }
-
-    @Schema(description = "权限目录项")
-    public record PermissionView(
-            @Schema(description = "权限 ID") Long id,
-            @Schema(description = "资源编码") String resourceCode,
-            @Schema(description = "动作编码") String actionCode,
-            @Schema(description = "作用域编码") String scopeCode,
-            @Schema(description = "权限名称") String permissionName,
-            @Schema(description = "权限编码") String permissionCode
-    ) {
-    }
-
-    private record MenuRule(MenuItem menu, Set<String> permissions) {
     }
 
     private record TenantProfile(

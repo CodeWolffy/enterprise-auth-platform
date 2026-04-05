@@ -140,7 +140,7 @@ public class CaptchaService {
         ThreadLocalRandom random = ThreadLocalRandom.current();
         StringBuilder svg = new StringBuilder(SVG_CAPACITY);
         svg.append("""
-                <svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d" role="img" aria-label="captcha">
+            <svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d" role="img" aria-label="验证码">
                   <defs>
                     <linearGradient id="captcha-bg" x1="0%%" y1="0%%" x2="100%%" y2="100%%">
                       <stop offset="0%%" stop-color="#f8fafc"/>

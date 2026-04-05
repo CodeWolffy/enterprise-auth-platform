@@ -9,7 +9,7 @@ import com.enterprise.auth.platform.persistence.entity.SysUserRoleEntity;
 import com.enterprise.auth.platform.persistence.mapper.SysRoleMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysUserRoleMapper;
-import com.enterprise.auth.platform.role.support.RolePayloadCodec;
+import com.enterprise.auth.platform.resource.service.ResourceService;
 import com.enterprise.auth.platform.security.DataScopeService;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import com.enterprise.auth.platform.user.model.UserSummary;
@@ -27,20 +27,20 @@ public class UserDirectoryService {
     private final SysUserRoleMapper sysUserRoleMapper;
     private final SysRoleMapper sysRoleMapper;
     private final DataScopeService dataScopeService;
-    private final RolePayloadCodec rolePayloadCodec;
+    private final ResourceService resourceService;
 
     public UserDirectoryService(
             SysUserMapper sysUserMapper,
             SysUserRoleMapper sysUserRoleMapper,
             SysRoleMapper sysRoleMapper,
             DataScopeService dataScopeService,
-            RolePayloadCodec rolePayloadCodec
+            ResourceService resourceService
     ) {
         this.sysUserMapper = sysUserMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
         this.sysRoleMapper = sysRoleMapper;
         this.dataScopeService = dataScopeService;
-        this.rolePayloadCodec = rolePayloadCodec;
+        this.resourceService = resourceService;
     }
 
     public List<UserSummary> listUsers() {
@@ -129,29 +129,16 @@ public class UserDirectoryService {
     }
 
     private Map<Long, Set<String>> loadPermissionCodes(String tenantId, Map<Long, Set<String>> roleCodesByUserId) {
-        Set<String> roleCodes = roleCodesByUserId.values().stream().flatMap(Set::stream).collect(Collectors.toSet());
-        if (roleCodes.isEmpty()) {
+        if (roleCodesByUserId.isEmpty()) {
             return Map.of();
         }
-
-        Map<String, Set<String>> permissionCodesByRoleCode = sysRoleMapper.selectList(new LambdaQueryWrapper<SysRoleEntity>()
-                        .eq(SysRoleEntity::getTenantId, tenantId)
-                        .eq(SysRoleEntity::getDeleted, 0)
-                        .in(SysRoleEntity::getRoleCode, roleCodes))
-                .stream()
-                .collect(Collectors.toMap(
-                        SysRoleEntity::getRoleCode,
-                        role -> rolePayloadCodec.readPermissionCodes(role.getPermissionsJson()),
-                        (left, right) -> right
-                ));
-
+        Map<Set<String>, Set<String>> cache = new java.util.HashMap<>();
         return roleCodesByUserId.entrySet().stream().collect(Collectors.toMap(
                 Map.Entry::getKey,
-                entry -> entry.getValue().stream()
-                        .map(permissionCodesByRoleCode::get)
-                        .filter(java.util.Objects::nonNull)
-                        .flatMap(Set::stream)
-                        .collect(Collectors.toSet())
+                entry -> {
+                    Set<String> key = entry.getValue() == null ? Set.of() : new java.util.TreeSet<>(entry.getValue());
+                    return cache.computeIfAbsent(key, item -> resourceService.resolveGrantKeys(tenantId, item, false));
+                }
         ));
     }
 

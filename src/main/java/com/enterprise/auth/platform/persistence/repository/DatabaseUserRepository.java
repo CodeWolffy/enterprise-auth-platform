@@ -10,6 +10,7 @@ import com.enterprise.auth.platform.persistence.mapper.SysRoleMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysUserRoleMapper;
 import com.enterprise.auth.platform.role.support.RolePayloadCodec;
+import com.enterprise.auth.platform.resource.service.ResourceService;
 import com.enterprise.auth.platform.security.AuthPrincipalCacheService;
 import com.enterprise.auth.platform.user.model.UserAccount;
 import com.enterprise.auth.platform.user.repository.UserRepository;
@@ -31,19 +32,22 @@ public class DatabaseUserRepository implements UserRepository {
     private final SysRoleMapper sysRoleMapper;
     private final AuthPrincipalCacheService authPrincipalCacheService;
     private final RolePayloadCodec rolePayloadCodec;
+    private final ResourceService resourceService;
 
     public DatabaseUserRepository(
             SysUserMapper sysUserMapper,
             SysUserRoleMapper sysUserRoleMapper,
             SysRoleMapper sysRoleMapper,
             AuthPrincipalCacheService authPrincipalCacheService,
-            RolePayloadCodec rolePayloadCodec
+            RolePayloadCodec rolePayloadCodec,
+            ResourceService resourceService
     ) {
         this.sysUserMapper = sysUserMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
         this.sysRoleMapper = sysRoleMapper;
         this.authPrincipalCacheService = authPrincipalCacheService;
         this.rolePayloadCodec = rolePayloadCodec;
+        this.resourceService = resourceService;
     }
 
     @Override
@@ -144,9 +148,8 @@ public class DatabaseUserRepository implements UserRepository {
                 .filter(role -> parseScope(role.getDataScopeType()) == DataScopeType.CUSTOM)
                 .flatMap(role -> rolePayloadCodec.readDeptIds(role.getDataScopeValueJson()).stream())
                 .collect(Collectors.toSet());
-        Set<String> permissionCodes = roles.stream()
-                .flatMap(role -> rolePayloadCodec.readPermissionCodes(role.getPermissionsJson()).stream())
-                .collect(Collectors.toSet());
+        boolean superAdmin = "platform".equals(tenantId) && roleCodes.contains("ADMIN");
+        Set<String> permissionCodes = resourceService.resolveGrantKeys(tenantId, roleCodes, superAdmin);
         return new RoleData(permissionCodes, dataScopeType, customDeptIds);
     }
 

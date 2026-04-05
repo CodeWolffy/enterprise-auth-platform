@@ -76,6 +76,15 @@
           </div>
           <el-button type="primary" @click="goTo('tenant-catalog')">进入套餐与能力</el-button>
         </article>
+
+        <article class="setting-card">
+          <div>
+            <span class="eyebrow">Resource Auth</span>
+            <h4>菜单管理</h4>
+            <p>维护统一资源树（目录/菜单/按钮/API），支持授权键、路由键、可见性与排序配置。</p>
+          </div>
+          <el-button type="primary" @click="goTo('settings-resources')">进入菜单管理</el-button>
+        </article>
       </div>
     </section>
 
@@ -144,7 +153,7 @@ async function load() {
 }
 
 function goTo(
-  name: 'settings-dicts' | 'settings-configs' | 'settings-notices' | 'settings-categories' | 'tenant-catalog',
+  name: 'settings-dicts' | 'settings-configs' | 'settings-notices' | 'settings-categories' | 'tenant-catalog' | 'settings-resources',
 ) {
   void router.push({ name })
 }

@@ -139,7 +139,7 @@ class AuthControllerSessionFlowTest {
     }
 
     @Test
-    void loginShouldIssueCookieAndAuthorizeSessionEndpoints() throws Exception {
+    void 登录应颁发Cookie并授权会话端点() throws Exception {
         mockMvc.perform(get("/api/auth/captcha"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType("image/svg+xml"))
@@ -167,7 +167,7 @@ class AuthControllerSessionFlowTest {
         JsonNode loginBody = objectMapper.readTree(loginResult.getResponse().getContentAsString());
         String sessionId = loginBody.path("data").path("sessionId").asText();
         Cookie sessionCookie = loginResult.getResponse().getCookie(AuthCookieConstants.SESSION_COOKIE);
-        Assertions.assertNotNull(sessionCookie, "Missing session cookie");
+        Assertions.assertNotNull(sessionCookie, "缺少会话 Cookie");
 
         mockMvc.perform(get("/api/auth/me")
                         .cookie(sessionCookie)
@@ -176,7 +176,7 @@ class AuthControllerSessionFlowTest {
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.username").value("admin"))
                 .andExpect(jsonPath("$.data.tenantId").value("platform"))
-                .andExpect(jsonPath("$.data.permissions[?(@=='tenant:read')]").exists());
+                .andExpect(jsonPath("$.data.grants[?(@=='tenant:read')]").exists());
 
         mockMvc.perform(get("/api/auth/sessions")
                         .cookie(sessionCookie)
@@ -200,7 +200,7 @@ class AuthControllerSessionFlowTest {
     }
 
     @Test
-    void loginShouldIgnoreExistingSessionCookieAndResolveTenantByUsername() throws Exception {
+    void 登录应忽略已有Cookie并按用户名解析租户() throws Exception {
         ensureTenantUser();
 
         MvcResult adminLoginResult = mockMvc.perform(post("/api/auth/login")
