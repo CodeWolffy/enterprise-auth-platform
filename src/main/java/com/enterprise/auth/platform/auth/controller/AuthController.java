@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.auth.controller;
 
+import com.enterprise.auth.platform.auth.dto.CaptchaVerifyRequest;
 import com.enterprise.auth.platform.auth.dto.CookieSessionResponse;
 import com.enterprise.auth.platform.auth.dto.CsrfTokenResponse;
 import com.enterprise.auth.platform.auth.dto.LoginRequest;
@@ -15,7 +16,6 @@ import com.enterprise.auth.platform.auth.service.SessionService;
 import com.enterprise.auth.platform.common.annotation.RateLimit;
 import com.enterprise.auth.platform.common.api.ApiResponse;
 import com.enterprise.auth.platform.common.exception.BusinessException;
-import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.user.dto.RegisterRequest;
 import com.enterprise.auth.platform.user.model.UserAccount;
 import com.enterprise.auth.platform.user.model.UserSummary;
@@ -26,10 +26,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.List;
-import org.springframework.http.CacheControl;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -43,10 +39,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
-
-    public static final String CAPTCHA_ID_HEADER = "X-Captcha-Id";
-    public static final String CAPTCHA_EXPIRES_AT_HEADER = "X-Captcha-Expires-At";
-    private static final MediaType CAPTCHA_MEDIA_TYPE = MediaType.parseMediaType("image/svg+xml");
 
     private final CaptchaService captchaService;
     private final AuthService authService;
@@ -71,16 +63,16 @@ public class AuthController {
     @Operation(summary = "获取登录验证码")
     @RateLimit(key = "captcha", strategy = RateLimit.Strategy.IP)
     @GetMapping("/captcha")
-    public ResponseEntity<byte[]> captcha() {
-        CaptchaService.CaptchaChallenge challenge = captchaService.create();
-        return ResponseEntity.ok()
-                .contentType(CAPTCHA_MEDIA_TYPE)
-                .cacheControl(CacheControl.noStore().mustRevalidate())
-                .header(HttpHeaders.PRAGMA, "no-cache")
-                .header(HttpHeaders.EXPIRES, "0")
-                .header(CAPTCHA_ID_HEADER, challenge.captchaId())
-                .header(CAPTCHA_EXPIRES_AT_HEADER, String.valueOf(TimeSupport.toEpochMilli(challenge.expiresAt())))
-                .body(challenge.imageBytes());
+    public ApiResponse<CaptchaService.CaptchaChallenge> captcha() {
+        return ApiResponse.ok(captchaService.create());
+    }
+
+    @Operation(summary = "校验滑块验证码")
+    @RateLimit(key = "captcha-verify", strategy = RateLimit.Strategy.IP)
+    @PostMapping("/captcha/verify")
+    public ApiResponse<Void> verifyCaptcha(@Valid @RequestBody CaptchaVerifyRequest request) {
+        captchaService.verify(request.captchaId(), request.captchaCode());
+        return ApiResponse.ok();
     }
 
     @Operation(summary = "获取 CSRF Token")
@@ -102,7 +94,7 @@ public class AuthController {
         ));
     }
 
-    @Operation(summary = "账号密码登录并写入 Session Cookie")
+    @Operation(summary = "账号密码登录并写入Session Cookie")
     @RateLimit(key = "login", strategy = RateLimit.Strategy.IP)
     @PostMapping("/login")
     public ApiResponse<CookieSessionResponse> login(
@@ -147,7 +139,7 @@ public class AuthController {
     @Operation(summary = "强制指定会话下线")
     @PostMapping("/sessions/{sessionId}/offline")
     public ApiResponse<Void> forceOffline(
-            @Parameter(description = "会话 ID") @PathVariable String sessionId,
+            @Parameter(description = "会话ID") @PathVariable String sessionId,
             Authentication authentication
     ) {
         authService.forceOffline(currentUser(authentication), sessionId);

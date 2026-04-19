@@ -1,255 +1,149 @@
 <template>
-  <div class="auth-page auth-page--register">
-    <section class="auth-card">
-      <aside class="left-panel">
-        <AuthCharactersScene
-          mode="register"
-          :focused-field="focusedField"
-          :password-visible="showPassword || showConfirmPassword"
-          :status="sceneStatus"
-          :confirm-match="confirmMatchState"
-        />
-      </aside>
+  <div class="auth-page">
+    <div class="auth-card auth-card--wide">
+      <div class="auth-logo">
+        <span class="auth-logo__mark">EA</span>
+      </div>
+      <h1 class="auth-title">创建账号</h1>
+      <p class="auth-subtitle">注册后即可登录平台</p>
 
-      <main class="right-panel">
-        <div class="form-container">
-          <div class="sparkle-icon">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2L13.5 9H10.5L12 2Z" fill="#1A1A2E" />
-              <path d="M12 22L10.5 15H13.5L12 22Z" fill="#1A1A2E" />
-              <path d="M2 12L9 10.5V13.5L2 12Z" fill="#1A1A2E" />
-              <path d="M22 12L15 13.5V10.5L22 12Z" fill="#1A1A2E" />
-            </svg>
-          </div>
-
-          <header class="form-header">
-            <h1>创建账号</h1>
-            <p>立即加入企业认证平台</p>
-            <div class="meta-tags">
-              <span>{{ defaultTenantId }}</span>
-              <span v-if="defaultRoleCodes.length">{{ defaultRoleCodes.join(' / ') }}</span>
-            </div>
-          </header>
-
-          <form class="register-form" @submit.prevent="handleRegister">
-            <div class="form-group">
-              <label :class="{ 'error-label': Boolean(fieldErrors.username) }" for="register-username">用户名</label>
-              <div class="input-wrapper">
-                <input
-                  id="register-username"
-                  v-model.trim="form.username"
-                  type="text"
-                  placeholder="请输入用户名"
-                  autocomplete="off"
-                  :class="{ error: Boolean(fieldErrors.username) }"
-                  @focus="focusedField = 'text'"
-                  @blur="onFieldBlur"
-                  @input="clearFieldError('username')"
-                />
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label :class="{ 'error-label': Boolean(fieldErrors.displayName) }" for="register-display-name">显示名称</label>
-              <div class="input-wrapper">
-                <input
-                  id="register-display-name"
-                  v-model.trim="form.displayName"
-                  type="text"
-                  placeholder="请输入显示名称"
-                  autocomplete="off"
-                  :class="{ error: Boolean(fieldErrors.displayName) }"
-                  @focus="focusedField = 'text'"
-                  @blur="onFieldBlur"
-                  @input="clearFieldError('displayName')"
-                />
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label :class="{ 'error-label': Boolean(fieldErrors.password) }" for="register-password">密码</label>
-              <div class="input-wrapper">
-                <input
-                  id="register-password"
-                  v-model="form.password"
-                  :type="showPassword ? 'text' : 'password'"
-                  placeholder="••••••••"
-                  autocomplete="new-password"
-                  :class="{ error: Boolean(fieldErrors.password) }"
-                  @focus="focusedField = 'password'"
-                  @blur="onFieldBlur"
-                  @input="clearFieldError('password')"
-                />
-                <button
-                  type="button"
-                  class="toggle-password"
-                  :class="{ closed: showPassword, error: sceneStatus === 'error', success: sceneStatus === 'success' }"
-                  aria-label="切换密码可见性"
-                  @mousedown.prevent
-                  @click="showPassword = !showPassword"
-                >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.5"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path class="eye-upper"></path>
-                    <path class="eye-lower"></path>
-                    <g class="eyelashes">
-                      <g style="transform: translateY(-4px)">
-                        <line x1="12" y1="18.5" x2="12" y2="22.5"></line>
-                        <line x1="7" y1="17" x2="4.5" y2="20"></line>
-                        <line x1="17" y1="17" x2="19.5" y2="20"></line>
-                      </g>
-                    </g>
-                    <circle class="eye-pupil" cx="12" cy="12" r="3" fill="currentColor"></circle>
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label :class="{ 'error-label': Boolean(fieldErrors.confirmPassword) }" for="register-confirm-password">确认密码</label>
-              <div class="input-wrapper">
-                <input
-                  id="register-confirm-password"
-                  v-model="confirmPassword"
-                  :type="showConfirmPassword ? 'text' : 'password'"
-                  placeholder="••••••••"
-                  autocomplete="new-password"
-                  :class="{ error: Boolean(fieldErrors.confirmPassword) }"
-                  @focus="focusedField = 'password'"
-                  @blur="onFieldBlur"
-                  @input="clearFieldError('confirmPassword')"
-                />
-                <button
-                  type="button"
-                  class="toggle-password"
-                  :class="{ closed: showConfirmPassword, error: sceneStatus === 'error', success: sceneStatus === 'success' }"
-                  aria-label="切换确认密码可见性"
-                  @mousedown.prevent
-                  @click="showConfirmPassword = !showConfirmPassword"
-                >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.5"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path class="eye-upper"></path>
-                    <path class="eye-lower"></path>
-                    <g class="eyelashes">
-                      <g style="transform: translateY(-4px)">
-                        <line x1="12" y1="18.5" x2="12" y2="22.5"></line>
-                        <line x1="7" y1="17" x2="4.5" y2="20"></line>
-                        <line x1="17" y1="17" x2="19.5" y2="20"></line>
-                      </g>
-                    </g>
-                    <circle class="eye-pupil" cx="12" cy="12" r="3" fill="currentColor"></circle>
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label :class="{ 'error-label': Boolean(fieldErrors.mobile) }" for="register-mobile">手机号（选填）</label>
-              <div class="input-wrapper">
-                <input
-                  id="register-mobile"
-                  v-model.trim="form.mobile"
-                  type="text"
-                  inputmode="numeric"
-                  placeholder="13800000000"
-                  :class="{ error: Boolean(fieldErrors.mobile) }"
-                  @focus="focusedField = 'text'"
-                  @blur="onFieldBlur"
-                  @input="clearFieldError('mobile')"
-                />
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label :class="{ 'error-label': Boolean(fieldErrors.email) }" for="register-email">邮箱（选填）</label>
-              <div class="input-wrapper">
-                <input
-                  id="register-email"
-                  v-model.trim="form.email"
-                  type="email"
-                  placeholder="you@example.com"
-                  :class="{ error: Boolean(fieldErrors.email) }"
-                  @focus="focusedField = 'text'"
-                  @blur="onFieldBlur"
-                  @input="clearFieldError('email')"
-                />
-              </div>
-            </div>
-
-            <div class="form-options">
-              <label class="terms-checkbox">
-                <input v-model="acceptedTerms" type="checkbox" />
-                我同意
-                <a href="#" @click.prevent="showComingSoon('服务条款')">服务条款</a>
-              </label>
-            </div>
-
-            <div class="status-msg error" :class="{ visible: sceneStatus === 'error' && Boolean(statusMessage) }">
-              {{ statusMessage }}
-            </div>
-            <div class="status-msg success" :class="{ visible: sceneStatus === 'success' && Boolean(statusMessage) }">
-              {{ statusMessage }}
-            </div>
-
-            <button class="btn-login" :class="{ success: sceneStatus === 'success' }" type="submit" :disabled="loading">
-              <span class="btn-text">{{ loading ? '创建中...' : '创建账号' }}</span>
-              <span class="btn-hover-content">
-                <span>{{ sceneStatus === 'success' ? '欢迎加入！' : '创建账号' }}</span>
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                  <polyline points="12 5 19 12 12 19" />
-                </svg>
-              </span>
-            </button>
-          </form>
-
-          <div class="auth-switch-link">
-            已有账号？
-            <a href="#" @click.prevent="router.push('/login')">去登录</a>
-          </div>
+      <form class="auth-form" @submit.prevent="handleRegister">
+        <div class="auth-field">
+          <input
+            id="register-username"
+            v-model.trim="form.username"
+            type="text"
+            placeholder="用户名（3-50 位）"
+            autocomplete="off"
+            :class="{ 'is-error': Boolean(fieldErrors.username) }"
+            @input="clearFieldError('username')"
+          />
+          <p v-if="fieldErrors.username" class="auth-error">{{ fieldErrors.username }}</p>
         </div>
-      </main>
-    </section>
+
+        <div class="auth-field">
+          <input
+            id="register-display-name"
+            v-model.trim="form.displayName"
+            type="text"
+            placeholder="显示名称"
+            autocomplete="off"
+            :class="{ 'is-error': Boolean(fieldErrors.displayName) }"
+            @input="clearFieldError('displayName')"
+          />
+          <p v-if="fieldErrors.displayName" class="auth-error">{{ fieldErrors.displayName }}</p>
+        </div>
+
+        <div class="auth-field">
+          <div class="auth-password">
+            <input
+              id="register-password"
+              v-model="form.password"
+              :type="showPassword ? 'text' : 'password'"
+              placeholder="密码（至少 8 位，含字母和数字）"
+              autocomplete="new-password"
+              :class="{ 'is-error': Boolean(fieldErrors.password) }"
+              @input="clearFieldError('password')"
+            />
+            <button
+              class="auth-toggle-pw"
+              type="button"
+              :aria-label="showPassword ? '隐藏密码' : '显示密码'"
+              @click="showPassword = !showPassword"
+            >
+              <svg v-if="showPassword" viewBox="0 0 24 24" fill="none" width="18" height="18">
+                <path d="M3 3l18 18M10.58 10.59A2 2 0 0013.41 13.4M9.88 5.09A10.94 10.94 0 0112 5c5 0 9.27 3.11 11 7-0.64 1.43-1.67 2.79-3 3.96M6.61 6.62C4.62 7.88 3.09 9.77 2 12c1.73 3.89 6 7 10 7 1.66 0 3.24-.34 4.68-.96" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" />
+              </svg>
+              <svg v-else viewBox="0 0 24 24" fill="none" width="18" height="18">
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" stroke="currentColor" stroke-width="1.5" />
+                <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5" />
+              </svg>
+            </button>
+          </div>
+          <p v-if="fieldErrors.password" class="auth-error">{{ fieldErrors.password }}</p>
+        </div>
+
+        <div class="auth-field">
+          <div class="auth-password">
+            <input
+              id="register-confirm-password"
+              v-model="confirmPassword"
+              :type="showConfirmPassword ? 'text' : 'password'"
+              placeholder="确认密码"
+              autocomplete="new-password"
+              :class="{ 'is-error': Boolean(fieldErrors.confirmPassword) }"
+              @input="clearFieldError('confirmPassword')"
+            />
+            <button
+              class="auth-toggle-pw"
+              type="button"
+              :aria-label="showConfirmPassword ? '隐藏确认密码' : '显示确认密码'"
+              @click="showConfirmPassword = !showConfirmPassword"
+            >
+              <svg v-if="showConfirmPassword" viewBox="0 0 24 24" fill="none" width="18" height="18">
+                <path d="M3 3l18 18M10.58 10.59A2 2 0 0013.41 13.4M9.88 5.09A10.94 10.94 0 0112 5c5 0 9.27 3.11 11 7-0.64 1.43-1.67 2.79-3 3.96M6.61 6.62C4.62 7.88 3.09 9.77 2 12c1.73 3.89 6 7 10 7 1.66 0 3.24-.34 4.68-.96" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" />
+              </svg>
+              <svg v-else viewBox="0 0 24 24" fill="none" width="18" height="18">
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" stroke="currentColor" stroke-width="1.5" />
+                <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5" />
+              </svg>
+            </button>
+          </div>
+          <p v-if="fieldErrors.confirmPassword" class="auth-error">{{ fieldErrors.confirmPassword }}</p>
+        </div>
+
+        <div class="auth-row">
+          <input
+            id="register-mobile"
+            v-model.trim="form.mobile"
+            type="text"
+            inputmode="numeric"
+            placeholder="手机号（选填）"
+            :class="{ 'is-error': Boolean(fieldErrors.mobile) }"
+            @input="clearFieldError('mobile')"
+          />
+          <input
+            id="register-email"
+            v-model.trim="form.email"
+            type="email"
+            placeholder="邮箱（选填）"
+            :class="{ 'is-error': Boolean(fieldErrors.email) }"
+            @input="clearFieldError('email')"
+          />
+        </div>
+        <p v-if="fieldErrors.mobile" class="auth-error">{{ fieldErrors.mobile }}</p>
+        <p v-if="fieldErrors.email" class="auth-error">{{ fieldErrors.email }}</p>
+
+        <label class="auth-check">
+          <input v-model="acceptedTerms" type="checkbox" @change="clearFieldError('terms')" />
+          <span>我已阅读并同意平台服务条款与注册规则</span>
+        </label>
+        <p v-if="fieldErrors.terms" class="auth-error">{{ fieldErrors.terms }}</p>
+
+        <div v-if="statusMessage" class="auth-status" :class="sceneStatus">
+          {{ statusMessage }}
+        </div>
+
+        <button class="auth-submit" type="submit" :disabled="loading">
+          {{ loading ? '创建中...' : '创建账号' }}
+        </button>
+      </form>
+
+      <p class="auth-switch">
+        已有账号？<button class="auth-link" type="button" @click="router.push('/login')">去登录</button>
+      </p>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import AuthCharactersScene from '@/components/auth/AuthCharactersScene.vue'
 import { fetchRegisterOptions } from '@/api/auth'
 import { http } from '@/api/http'
 
-type FocusState = 'none' | 'text' | 'password'
 type SceneStatus = 'idle' | 'error' | 'success'
-type FieldErrorKey = keyof typeof fieldErrors
+type RegisterField = 'username' | 'displayName' | 'password' | 'confirmPassword' | 'mobile' | 'email' | 'terms'
 
 const router = useRouter()
 
@@ -261,18 +155,7 @@ const form = reactive({
   email: '',
 })
 
-const confirmPassword = ref('')
-const acceptedTerms = ref(false)
-const showPassword = ref(false)
-const showConfirmPassword = ref(false)
-const loading = ref(false)
-const focusedField = ref<FocusState>('none')
-const sceneStatus = ref<SceneStatus>('idle')
-const statusMessage = ref('')
-const defaultTenantId = ref('tenant-a')
-const defaultRoleCodes = ref<string[]>([])
-
-const fieldErrors = reactive({
+const fieldErrors = reactive<Record<RegisterField, string>>({
   username: '',
   displayName: '',
   password: '',
@@ -282,16 +165,15 @@ const fieldErrors = reactive({
   terms: '',
 })
 
-const confirmMatchState = computed<boolean | null>(() => {
-  if (!confirmPassword.value) {
-    return null
-  }
-  return confirmPassword.value === form.password
-})
-
-function onFieldBlur() {
-  focusedField.value = 'none'
-}
+const confirmPassword = ref('')
+const acceptedTerms = ref(false)
+const showPassword = ref(false)
+const showConfirmPassword = ref(false)
+const loading = ref(false)
+const sceneStatus = ref<SceneStatus>('idle')
+const statusMessage = ref('')
+const defaultTenantId = ref('tenant-a')
+const defaultRoleCodes = ref<string[]>([])
 
 function clearAllErrors() {
   fieldErrors.username = ''
@@ -303,7 +185,7 @@ function clearAllErrors() {
   fieldErrors.terms = ''
 }
 
-function clearFieldError(field: FieldErrorKey) {
+function clearFieldError(field: RegisterField) {
   fieldErrors[field] = ''
   if (sceneStatus.value === 'error') {
     sceneStatus.value = 'idle'
@@ -311,11 +193,7 @@ function clearFieldError(field: FieldErrorKey) {
   }
 }
 
-function showComingSoon(feature: string) {
-  ElMessage.info(`${feature}功能暂未开放`)
-}
-
-function setError(field: FieldErrorKey, message: string) {
+function setError(field: RegisterField, message: string) {
   fieldErrors[field] = message
 }
 
@@ -327,7 +205,7 @@ function validateForm() {
     setError('username', '请输入用户名')
     hasError = true
   } else if (form.username.trim().length < 3 || form.username.trim().length > 50) {
-    setError('username', '用户名长度应为3-50个字符')
+    setError('username', '用户名长度需为 3-50 位')
     hasError = true
   }
 
@@ -335,7 +213,7 @@ function validateForm() {
     setError('displayName', '请输入显示名称')
     hasError = true
   } else if (form.displayName.trim().length < 2 || form.displayName.trim().length > 100) {
-    setError('displayName', '显示名称长度应为2-100个字符')
+    setError('displayName', '显示名称长度需为 2-100 位')
     hasError = true
   }
 
@@ -343,37 +221,38 @@ function validateForm() {
     setError('password', '请输入密码')
     hasError = true
   } else if (!/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/.test(form.password)) {
-    setError('password', '密码至少8位，需包含字母和数字')
+    setError('password', '密码至少 8 位，且需包含字母和数字')
     hasError = true
   }
 
   if (!confirmPassword.value) {
-    setError('confirmPassword', '请确认密码')
+    setError('confirmPassword', '请再次输入密码')
     hasError = true
   } else if (confirmPassword.value !== form.password) {
-    setError('confirmPassword', '两次密码输入不一致')
+    setError('confirmPassword', '两次输入的密码不一致')
     hasError = true
   }
 
   if (form.mobile && !/^1\d{10}$/.test(form.mobile)) {
-    setError('mobile', '请输入正确的11位手机号')
+    setError('mobile', '请输入正确的 11 位手机号')
     hasError = true
   }
 
   if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-    setError('email', '邮箱格式不正确')
+    setError('email', '请输入正确的邮箱地址')
     hasError = true
   }
 
   if (!acceptedTerms.value) {
-    setError('terms', '请先同意服务条款')
+    setError('terms', '请先同意服务条款与注册规则')
     hasError = true
   }
 
   if (hasError) {
     sceneStatus.value = 'error'
-    statusMessage.value = fieldErrors.terms || '请修正表单中的错误信息'
+    statusMessage.value = fieldErrors.terms || '请先修正表单中的错误信息。'
   }
+
   return !hasError
 }
 
@@ -386,6 +265,7 @@ async function handleRegister() {
   if (loading.value) {
     return
   }
+
   if (!validateForm()) {
     return
   }
@@ -403,7 +283,7 @@ async function handleRegister() {
       email: form.email.trim(),
     })
     sceneStatus.value = 'success'
-    statusMessage.value = '账号创建成功，正在跳转登录...'
+    statusMessage.value = '账号创建成功，正在跳转登录页...'
     window.setTimeout(async () => {
       await router.push('/login')
     }, 380)
@@ -427,10 +307,3 @@ onMounted(async () => {
   }
 })
 </script>
-
-<style scoped>
-.auth-page .right-panel {
-  align-items: flex-start;
-  padding-top: 30px;
-}
-</style>

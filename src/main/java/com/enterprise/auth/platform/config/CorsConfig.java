@@ -18,9 +18,7 @@ public class CorsConfig {
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of(
                 "Authorization",
-                "X-Request-Id",
-                "X-Captcha-Id",
-                "X-Captcha-Expires-At"
+                "X-Request-Id"
         ));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);

@@ -38,8 +38,31 @@ export interface CookieSessionResponse {
 
 export interface CaptchaResponse {
   captchaId: string
-  expiresAt: number
-  imageUrl: string
+  backgroundImage: string
+  sliderImage: string
+  backgroundImageWidth: number
+  backgroundImageHeight: number
+  sliderImageWidth: number
+  sliderImageHeight: number
+}
+
+export interface CaptchaTrackPoint {
+  x: number
+  y: number
+  t: number
+  type: string
+}
+
+export interface CaptchaTrackPayload {
+  bgImageWidth: number
+  bgImageHeight: number
+  templateImageWidth: number
+  templateImageHeight: number
+  startTime: number
+  stopTime: number
+  left: number
+  top: number
+  trackList: CaptchaTrackPoint[]
 }
 
 export interface CsrfTokenResponse {

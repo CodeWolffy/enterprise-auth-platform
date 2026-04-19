@@ -36,6 +36,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <easyexcel.version>4.0.3</easyexcel.version>
         <commons-compress.version>1.25.0</commons-compress.version>
+        <tianai-captcha.version>1.5.5</tianai-captcha.version>
+
     </properties>
 
     <dependencyManagement>
@@ -168,6 +170,11 @@
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers</artifactId>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>cloud.tianai.captcha</groupId>
+            <artifactId>tianai-captcha-springboot-starter</artifactId>
+            <version>${tianai-captcha.version}</version>
         </dependency>
     </dependencies>
 

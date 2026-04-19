@@ -47,20 +47,19 @@ export async function fetchRegisterOptions() {
 }
 
 export async function fetchCaptcha() {
-  const { data, headers } = await http.get<Blob>('/api/auth/captcha', {
-    responseType: 'blob',
-  })
-  const captchaId = String(headers['x-captcha-id'] ?? '')
-  const expiresAtHeader = headers['x-captcha-expires-at']
-  const expiresAt = Number(expiresAtHeader ?? 0)
-  if (!captchaId) {
+  const { data } = await http.get<ApiResponse<CaptchaResponse>>('/api/auth/captcha')
+  if (!data.data?.captchaId) {
     throw new Error('Captcha id missing')
   }
-  return {
+  return data.data
+}
+
+export async function verifyCaptcha(captchaId: string, captchaCode: string) {
+  const { data } = await http.post<ApiResponse<void>>('/api/auth/captcha/verify', {
     captchaId,
-    expiresAt: Number.isFinite(expiresAt) ? expiresAt : 0,
-    imageUrl: URL.createObjectURL(data),
-  } satisfies CaptchaResponse
+    captchaCode,
+  })
+  return data
 }
 
 export async function loginWithPassword(payload: {

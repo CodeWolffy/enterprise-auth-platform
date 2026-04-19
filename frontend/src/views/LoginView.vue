@@ -1,227 +1,115 @@
 <template>
-  <div class="auth-page auth-page--login">
-    <section class="auth-card">
-      <aside class="left-panel">
-        <AuthCharactersScene
-          mode="login"
-          :focused-field="focusedField"
-          :password-visible="showPassword"
-          :status="sceneStatus"
-        />
-      </aside>
+  <div class="auth-page">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <span class="auth-logo__mark">EA</span>
+      </div>
+      <h1 class="auth-title">欢迎回来</h1>
+      <p class="auth-subtitle">登录以继续</p>
 
-      <main class="right-panel">
-        <div class="form-container">
-          <div class="sparkle-icon">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2L13.5 9H10.5L12 2Z" fill="#1A1A2E" />
-              <path d="M12 22L10.5 15H13.5L12 22Z" fill="#1A1A2E" />
-              <path d="M2 12L9 10.5V13.5L2 12Z" fill="#1A1A2E" />
-              <path d="M22 12L15 13.5V10.5L22 12Z" fill="#1A1A2E" />
-            </svg>
-          </div>
-
-          <header class="form-header">
-            <h1>欢迎回来！</h1>
-            <p>请输入您的登录信息</p>
-          </header>
-
-          <form class="login-form" @submit.prevent="handleLogin">
-            <div class="form-group">
-              <label :class="{ 'error-label': Boolean(fieldErrors.username) }" for="login-username">用户名</label>
-              <div class="input-wrapper">
-                <input
-                  id="login-username"
-                  v-model.trim="username"
-                  type="text"
-                  placeholder="请输入用户名"
-                  autocomplete="username"
-                  :class="{ error: Boolean(fieldErrors.username) }"
-                  @focus="focusedField = 'text'"
-                  @blur="onFieldBlur"
-                  @input="clearFieldError('username')"
-                />
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label :class="{ 'error-label': Boolean(fieldErrors.password) }" for="login-password">密码</label>
-              <div class="input-wrapper">
-                <input
-                  id="login-password"
-                  v-model="password"
-                  :type="showPassword ? 'text' : 'password'"
-                  placeholder="••••••••"
-                  autocomplete="current-password"
-                  :class="{ error: Boolean(fieldErrors.password) }"
-                  @focus="focusedField = 'password'"
-                  @blur="onFieldBlur"
-                  @input="clearFieldError('password')"
-                />
-                <button
-                  ref="toggleButtonRef"
-                  type="button"
-                  class="toggle-password"
-                  :class="{ closed: showPassword, error: sceneStatus === 'error', success: sceneStatus === 'success' }"
-                  aria-label="切换密码可见性"
-                  @mousedown.prevent
-                  @click="togglePasswordVisibility"
-                >
-                  <svg
-                    id="interactive-eye"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.5"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path class="eye-upper"></path>
-                    <path class="eye-lower"></path>
-                    <g class="eyelashes">
-                      <g style="transform: translateY(-4px)">
-                        <line x1="12" y1="18.5" x2="12" y2="22.5"></line>
-                        <line x1="7" y1="17" x2="4.5" y2="20"></line>
-                        <line x1="17" y1="17" x2="19.5" y2="20"></line>
-                      </g>
-                    </g>
-                    <circle
-                      class="eye-pupil"
-                      cx="12"
-                      cy="12"
-                      r="3"
-                      fill="currentColor"
-                      :style="{ transform: `translate(${eyePupilOffset.x}px, ${eyePupilOffset.y}px)` }"
-                    ></circle>
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label :class="{ 'error-label': Boolean(fieldErrors.captcha) }" for="login-captcha">验证码</label>
-              <div class="captcha-row">
-                <div class="input-wrapper">
-                  <input
-                    id="login-captcha"
-                    v-model.trim="captchaCode"
-                    type="text"
-                    maxlength="5"
-                    placeholder="请输入验证码"
-                    autocomplete="one-time-code"
-                    :class="{ error: Boolean(fieldErrors.captcha) }"
-                    @focus="focusedField = 'text'"
-                    @blur="onFieldBlur"
-                    @input="clearFieldError('captcha')"
-                  />
-                </div>
-                <button class="captcha-preview" type="button" title="刷新验证码" @click="reloadCaptcha">
-                  <img v-if="captchaImage" :src="captchaImage" alt="验证码" />
-                  <span v-else>加载中...</span>
-                </button>
-              </div>
-            </div>
-
-            <div class="form-options">
-              <label class="remember-me">
-                <input v-model="rememberMe" type="checkbox" />
-                记住30天
-              </label>
-              <a href="#" class="forgot-link" @click.prevent="showComingSoon('忘记密码')">忘记密码？</a>
-            </div>
-
-            <div class="status-msg error" :class="{ visible: sceneStatus === 'error' && Boolean(statusMessage) }">
-              {{ statusMessage }}
-            </div>
-            <div class="status-msg success" :class="{ visible: sceneStatus === 'success' && Boolean(statusMessage) }">
-              {{ statusMessage }}
-            </div>
-
-            <button
-              class="btn-login"
-              :class="{ success: sceneStatus === 'success' }"
-              type="submit"
-              :disabled="loading"
-              data-testid="login-submit"
-            >
-              <span class="btn-text">{{ loading ? '登录中...' : '登录' }}</span>
-              <span class="btn-hover-content">
-                <span>{{ sceneStatus === 'success' ? '跳转中...' : '登录' }}</span>
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                  <polyline points="12 5 19 12 12 19" />
-                </svg>
-              </span>
-            </button>
-
-            <button class="btn-google" type="button" @click="showComingSoon('Google 登录')">
-              <span class="btn-text">
-                <svg class="google-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
-                    fill="#4285F4"
-                  />
-                  <path
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                    fill="#34A853"
-                  />
-                  <path
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18A11.96 11.96 0 001 12c0 1.94.46 3.77 1.18 5.07l3.66-2.84v-.14z"
-                    fill="#FBBC05"
-                  />
-                  <path
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                    fill="#EA4335"
-                  />
-                </svg>
-                使用 Google 登录
-              </span>
-              <span class="btn-hover-content">
-                <span>即将支持</span>
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                  <polyline points="12 5 19 12 12 19" />
-                </svg>
-              </span>
-            </button>
-
-            <button class="register-link-button" type="button" @click="router.push('/register')">注册</button>
-          </form>
+      <form class="auth-form" @submit.prevent="handleLogin">
+        <div class="auth-field">
+          <input
+            id="login-username"
+            v-model.trim="username"
+            type="text"
+            placeholder="用户名"
+            autocomplete="username"
+            :class="{ 'is-error': Boolean(fieldErrors.username) }"
+            @input="clearFieldError('username')"
+          />
+          <p v-if="fieldErrors.username" class="auth-error">{{ fieldErrors.username }}</p>
         </div>
-      </main>
-    </section>
+
+        <div class="auth-field">
+          <div class="auth-password">
+            <input
+              id="login-password"
+              v-model="password"
+              :type="showPassword ? 'text' : 'password'"
+              placeholder="密码"
+              autocomplete="current-password"
+              :class="{ 'is-error': Boolean(fieldErrors.password) }"
+              @input="clearFieldError('password')"
+            />
+            <button
+              class="auth-toggle-pw"
+              type="button"
+              :aria-label="showPassword ? '隐藏密码' : '显示密码'"
+              @click="showPassword = !showPassword"
+            >
+              <svg v-if="showPassword" viewBox="0 0 24 24" fill="none" width="18" height="18">
+                <path d="M3 3l18 18M10.58 10.59A2 2 0 0013.41 13.4M9.88 5.09A10.94 10.94 0 0112 5c5 0 9.27 3.11 11 7-0.64 1.43-1.67 2.79-3 3.96M6.61 6.62C4.62 7.88 3.09 9.77 2 12c1.73 3.89 6 7 10 7 1.66 0 3.24-.34 4.68-.96" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" />
+              </svg>
+              <svg v-else viewBox="0 0 24 24" fill="none" width="18" height="18">
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" stroke="currentColor" stroke-width="1.5" />
+                <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5" />
+              </svg>
+            </button>
+          </div>
+          <p v-if="fieldErrors.password" class="auth-error">{{ fieldErrors.password }}</p>
+        </div>
+
+        <div class="auth-captcha-row" :class="{ 'is-verified': captchaVerified }">
+          <span>{{ captchaVerified ? '验证通过' : '需完成滑块验证' }}</span>
+          <button class="auth-link" type="button" @click="openCaptchaDialog({ refresh: !captchaVerified })">
+            {{ captchaVerified ? '重新验证' : '去验证' }}
+          </button>
+        </div>
+        <p v-if="fieldErrors.captcha" class="auth-error">{{ fieldErrors.captcha }}</p>
+
+        <div v-if="statusMessage" class="auth-status" :class="sceneStatus">
+          {{ statusMessage }}
+        </div>
+
+        <button class="auth-submit" type="submit" :disabled="loading" data-testid="login-submit">
+          {{ loading ? '登录中...' : '登录' }}
+        </button>
+      </form>
+
+      <p class="auth-switch">
+        还没有账号？<button class="auth-link" type="button" @click="router.push('/register')">注册</button>
+      </p>
+    </div>
+
+    <el-dialog
+      v-model="captchaDialogVisible"
+      class="captcha-verify-dialog"
+      title="安全验证"
+      width="360px"
+      :close-on-click-modal="false"
+      :destroy-on-close="false"
+      :show-close="true"
+      @closed="handleCaptchaDialogClosed"
+    >
+<SliderCaptcha
+      v-if="!captchaLoading && captchaBackground && captchaSlider"
+      :background-image="captchaBackground"
+      :slider-image="captchaSlider"
+      :background-width="captchaBackgroundWidth"
+      :background-height="captchaBackgroundHeight"
+      :slider-width="captchaSliderWidth"
+      :slider-height="captchaSliderHeight"
+      :verifying="captchaVerifying"
+      @verify="handleSliderVerify"
+      @refresh="reloadCaptcha"
+    />
+      <div v-else class="captcha-dialog__loading">
+        <div class="captcha-dialog__spinner"></div>
+        <span>验证码加载中</span>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import AuthCharactersScene from '@/components/auth/AuthCharactersScene.vue'
-import { fetchCaptcha } from '@/api/auth'
+import SliderCaptcha from '@/components/auth/SliderCaptcha.vue'
+import { fetchCaptcha, verifyCaptcha } from '@/api/auth'
 import { useAuthStore } from '@/stores/auth'
+import type { CaptchaTrackPayload } from '@/types/auth'
 
-type FocusState = 'none' | 'text' | 'password'
 type SceneStatus = 'idle' | 'error' | 'success'
 
 const router = useRouter()
@@ -230,17 +118,23 @@ const authStore = useAuthStore()
 
 const username = ref('')
 const password = ref('')
-const captchaCode = ref('')
-const captchaId = ref('')
-const captchaImage = ref('')
-const rememberMe = ref(true)
-const loading = ref(false)
 const showPassword = ref(false)
-const focusedField = ref<FocusState>('none')
+const loading = ref(false)
 const sceneStatus = ref<SceneStatus>('idle')
 const statusMessage = ref('')
-const toggleButtonRef = ref<HTMLButtonElement | null>(null)
-const eyePupilOffset = ref({ x: 0, y: 0 })
+
+const captchaCode = ref('')
+const captchaId = ref('')
+const captchaBackground = ref('')
+const captchaSlider = ref('')
+const captchaBackgroundWidth = ref(0)
+const captchaBackgroundHeight = ref(0)
+const captchaSliderWidth = ref(0)
+const captchaSliderHeight = ref(0)
+const captchaVerified = ref(false)
+const captchaDialogVisible = ref(false)
+const captchaLoading = ref(false)
+const pendingSubmitAfterCaptcha = ref(false)
 
 const fieldErrors = reactive({
   username: '',
@@ -262,35 +156,73 @@ function clearAllErrors() {
   fieldErrors.captcha = ''
 }
 
-function onFieldBlur() {
-  focusedField.value = 'none'
+function resetCaptchaVerification() {
+  captchaVerified.value = false
+  captchaCode.value = ''
+  captchaId.value = ''
 }
 
-function showComingSoon(feature: string) {
-  ElMessage.info(`${feature}功能暂未开放`)
-}
-
-function togglePasswordVisibility() {
-  showPassword.value = !showPassword.value
-  focusedField.value = 'password'
-  if (showPassword.value) {
-    eyePupilOffset.value = { x: 0, y: 0 }
+function toImageDataUrl(image: string, defaultMime: string) {
+  if (!image) {
+    return ''
   }
-}
-
-function revokeCaptchaUrl() {
-  if (captchaImage.value) {
-    URL.revokeObjectURL(captchaImage.value)
-    captchaImage.value = ''
-  }
+  return image.startsWith('data:') ? image : `data:${defaultMime};base64,${image}`
 }
 
 async function reloadCaptcha() {
-  revokeCaptchaUrl()
-  const captcha = await fetchCaptcha()
-  captchaId.value = captcha.captchaId
-  captchaImage.value = captcha.imageUrl
-  captchaCode.value = ''
+  captchaLoading.value = true
+  try {
+    const captcha = await fetchCaptcha()
+    captchaId.value = captcha.captchaId
+    captchaBackground.value = toImageDataUrl(captcha.backgroundImage, 'image/jpeg')
+    captchaSlider.value = toImageDataUrl(captcha.sliderImage, 'image/png')
+    captchaBackgroundWidth.value = captcha.backgroundImageWidth || 0
+    captchaBackgroundHeight.value = captcha.backgroundImageHeight || 0
+    captchaSliderWidth.value = captcha.sliderImageWidth || 0
+    captchaSliderHeight.value = captcha.sliderImageHeight || 0
+    captchaVerified.value = false
+    captchaCode.value = ''
+  } finally {
+    captchaLoading.value = false
+  }
+}
+
+async function openCaptchaDialog(options: { refresh?: boolean } = {}) {
+  fieldErrors.captcha = ''
+  if (options.refresh || !captchaBackground.value || !captchaSlider.value || !captchaId.value) {
+    await reloadCaptcha()
+  }
+  captchaDialogVisible.value = true
+}
+
+function handleCaptchaDialogClosed() {
+  if (!captchaVerified.value) {
+    pendingSubmitAfterCaptcha.value = false
+  }
+}
+
+const captchaVerifying = ref(false)
+
+async function handleSliderVerify(track: CaptchaTrackPayload) {
+  const code = JSON.stringify(track)
+  captchaVerifying.value = true
+  try {
+    await verifyCaptcha(captchaId.value, code)
+    captchaCode.value = code
+    captchaVerified.value = true
+    captchaDialogVisible.value = false
+
+    if (pendingSubmitAfterCaptcha.value) {
+      pendingSubmitAfterCaptcha.value = false
+      await submitLogin()
+    }
+  } catch {
+    captchaVerified.value = false
+    captchaCode.value = ''
+    await reloadCaptcha()
+  } finally {
+    captchaVerifying.value = false
+  }
 }
 
 function resolveErrorMessage(error: unknown, fallback: string) {
@@ -306,23 +238,17 @@ function validateForm() {
     fieldErrors.username = '请输入用户名'
     hasError = true
   }
+
   if (!password.value) {
     fieldErrors.password = '请输入密码'
-    hasError = true
-  }
-  if (!captchaCode.value.trim()) {
-    fieldErrors.captcha = '请输入验证码'
-    hasError = true
-  }
-  if (!captchaId.value) {
-    fieldErrors.captcha = '验证码缺失，请刷新后重试'
     hasError = true
   }
 
   if (hasError) {
     sceneStatus.value = 'error'
-    statusMessage.value = '请完整填写登录信息'
+    statusMessage.value = '请先完善登录信息。'
   }
+
   return !hasError
 }
 
@@ -330,7 +256,23 @@ async function handleLogin() {
   if (loading.value) {
     return
   }
+
   if (!validateForm()) {
+    return
+  }
+
+  if (!captchaVerified.value) {
+    pendingSubmitAfterCaptcha.value = true
+    fieldErrors.captcha = '请先完成滑块验证'
+    await openCaptchaDialog({ refresh: true })
+    return
+  }
+
+  await submitLogin()
+}
+
+async function submitLogin() {
+  if (loading.value) {
     return
   }
 
@@ -347,71 +289,17 @@ async function handleLogin() {
       device: navigator.userAgent,
     })
     sceneStatus.value = 'success'
-    statusMessage.value = '登录成功，正在跳转...'
+    statusMessage.value = '登录成功，正在进入控制台...'
     const redirect = String(route.query.redirect ?? authStore.menuItems[0]?.path ?? '/dashboard')
     window.setTimeout(async () => {
       await router.replace(redirect)
     }, 280)
   } catch (error) {
+    resetCaptchaVerification()
     sceneStatus.value = 'error'
     statusMessage.value = resolveErrorMessage(error, '用户名、密码或验证码错误')
-    await reloadCaptcha()
   } finally {
     loading.value = false
   }
 }
-
-function updateEyePupilOffset(event: MouseEvent) {
-  if (showPassword.value) {
-    return
-  }
-  const toggleButton = toggleButtonRef.value
-  if (!toggleButton) {
-    return
-  }
-  const rect = toggleButton.getBoundingClientRect()
-  const cx = rect.left + rect.width / 2
-  const cy = rect.top + rect.height / 2
-  const dx = event.clientX - cx
-  const dy = event.clientY - cy
-  const angle = Math.atan2(dy, dx)
-  const dist = Math.min(Math.sqrt(dx * dx + dy * dy) / 40, 2.5)
-  eyePupilOffset.value = {
-    x: Math.cos(angle) * dist,
-    y: Math.sin(angle) * dist,
-  }
-}
-
-onMounted(async () => {
-  await reloadCaptcha()
-  window.addEventListener('mousemove', updateEyePupilOffset, { passive: true })
-})
-
-onBeforeUnmount(() => {
-  revokeCaptchaUrl()
-  window.removeEventListener('mousemove', updateEyePupilOffset)
-})
 </script>
-
-<style scoped>
-.auth-page .right-panel {
-  padding-top: 28px;
-}
-
-.register-link-button {
-  margin-top: 16px;
-  width: 100%;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: #1a1a2e;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.register-link-button:hover {
-  color: #5b21b6;
-  text-decoration: underline;
-}
-</style>

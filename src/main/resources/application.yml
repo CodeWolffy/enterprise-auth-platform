@@ -58,6 +58,18 @@ mybatis-plus:
 knife4j:
   enable: true
 
+captcha:
+  prefix: eap:captcha
+  expire:
+    default: 120000
+  init-default-resource: true
+  local-cache-enabled: false
+  local-cache-size: 20
+  secondary:
+    enabled: true
+    expire: 300000
+    keyPrefix: "eap:captcha:secondary"
+
 app:
   frontend:
     allowed-origins:

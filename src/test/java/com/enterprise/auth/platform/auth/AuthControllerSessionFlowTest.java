@@ -8,12 +8,9 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.enterprise.auth.platform.auth.controller.AuthController;
 import com.enterprise.auth.platform.auth.model.UserSession;
 import com.enterprise.auth.platform.auth.service.CaptchaService;
 import com.enterprise.auth.platform.auth.store.SessionStore;
@@ -25,8 +22,8 @@ import java.util.Comparator;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,9 +32,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest(properties = {
         "app.security.redis.session-enabled=false",
@@ -91,8 +88,12 @@ class AuthControllerSessionFlowTest {
         sessions.clear();
         when(captchaService.create()).thenReturn(new CaptchaService.CaptchaChallenge(
                 CAPTCHA_ID,
-                Instant.now().plusSeconds(60),
-                new byte[] {1, 2, 3, 4}
+                "background-base64",
+                "slider-base64",
+                320,
+                180,
+                64,
+                180
         ));
         doAnswer(invocation -> null).when(captchaService).validate(anyString(), anyString());
         doAnswer(invocation -> {
@@ -139,13 +140,17 @@ class AuthControllerSessionFlowTest {
     }
 
     @Test
-    void 登录应颁发Cookie并授权会话端点() throws Exception {
+    void 登录应返回滑块验证码并完成完整会话流程() throws Exception {
         mockMvc.perform(get("/api/auth/captcha"))
                 .andExpect(status().isOk())
-                .andExpect(content().contentType("image/svg+xml"))
-                .andExpect(header().string(AuthController.CAPTCHA_ID_HEADER, CAPTCHA_ID))
-                .andExpect(header().exists(AuthController.CAPTCHA_EXPIRES_AT_HEADER))
-                .andExpect(content().bytes(new byte[] {1, 2, 3, 4}));
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.captchaId").value(CAPTCHA_ID))
+                .andExpect(jsonPath("$.data.backgroundImage").value("background-base64"))
+                .andExpect(jsonPath("$.data.sliderImage").value("slider-base64"))
+                .andExpect(jsonPath("$.data.backgroundImageWidth").value(320))
+                .andExpect(jsonPath("$.data.backgroundImageHeight").value(180))
+                .andExpect(jsonPath("$.data.sliderImageWidth").value(64))
+                .andExpect(jsonPath("$.data.sliderImageHeight").value(180));
 
         MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

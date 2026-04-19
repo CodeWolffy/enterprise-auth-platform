@@ -104,10 +104,11 @@ public class SessionAuthenticationFilter extends OncePerRequestFilter {
     private boolean isBypassEndpoint(HttpServletRequest request) {
         String uri = request.getRequestURI();
         return "/api/auth/captcha".equals(uri)
-                || "/api/auth/csrf".equals(uri)
-                || "/api/auth/login".equals(uri)
-                || "/api/auth/register".equals(uri)
-                || "/api/auth/register/options".equals(uri);
+            || "/api/auth/captcha/verify".equals(uri)
+            || "/api/auth/csrf".equals(uri)
+            || "/api/auth/login".equals(uri)
+            || "/api/auth/register".equals(uri)
+            || "/api/auth/register/options".equals(uri);
     }
 
     private void writeAuthFailure(HttpServletResponse response, BusinessException exception) throws IOException {
