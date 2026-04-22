@@ -1,8 +1,8 @@
-﻿<template>
+<template>
   <el-container class="admin-layout">
     <el-aside :width="isCollapse ? '64px' : '200px'" class="admin-aside">
       <div class="logo-box">
-        <el-icon class="logo-icon-svg"><Platform /></el-icon>
+        <el-icon class="logo-icon"><Box /></el-icon>
         <transition name="logo-fade">
           <h1 v-show="!isCollapse" class="logo-text">系统租户</h1>
         </transition>
@@ -13,12 +13,12 @@
     </el-aside>
 
     <el-container class="admin-container">
-      <el-header class="admin-header" height="50px">
+      <el-header class="admin-header" height="48px">
         <div class="header-left">
           <el-icon class="action-icon" @click="isCollapse = !isCollapse">
             <component :is="isCollapse ? Expand : Fold" />
           </el-icon>
-          <el-icon class="action-icon action-icon--refresh" @click="reloadPage"><RefreshRight /></el-icon>
+          <el-icon class="action-icon"><Refresh /></el-icon>
           <el-breadcrumb separator="/" class="breadcrumb">
             <el-breadcrumb-item :to="{ path: '/dashboard' }">首页</el-breadcrumb-item>
             <el-breadcrumb-item v-if="pageTitle && pageTitle !== '运行总览'">{{ pageTitle }}</el-breadcrumb-item>
@@ -35,7 +35,6 @@
               size="small"
               filterable
               class="borderless-select"
-              style="width: 120px; margin: 0 8px;"
               @change="handleTenantChange"
             >
               <el-option
@@ -48,25 +47,19 @@
             <span v-else class="tenant-value">{{ authStore.tenantId }}</span>
           </div>
 
-          <div class="search-capsule">
-            <el-icon><Search /></el-icon>
-            <span class="search-badge">Ctrl K</span>
-          </div>
-
           <div class="header-actions">
-            <el-icon class="action-icon" title="设置"><Setting /></el-icon>
-            <el-icon class="action-icon" title="暗色模式" @click="toggleDark"><Moon /></el-icon>
-            <el-icon class="action-icon" title="语言"><Platform /></el-icon>
-            <el-icon class="action-icon" title="全屏" @click="toggleFullScreen"><FullScreen /></el-icon>
-            <el-badge is-dot class="action-item-badge">
-              <el-icon class="action-icon" title="在线设备" @click="openSessions"><Monitor /></el-icon>
-            </el-badge>
+            <div class="search-input">
+              <el-icon class="search-icon"><Search /></el-icon>
+              <span class="search-shortcut">Ctrl K</span>
+            </div>
+            <el-icon class="action-icon-small"><Setting /></el-icon>
+            <el-icon class="action-icon-small"><Moon /></el-icon>
+            <el-icon class="action-icon-small"><FullScreen /></el-icon>
           </div>
 
           <el-dropdown trigger="click" @command="handleCommand">
             <div class="avatar-container">
               <el-avatar :size="28" class="user-avatar">{{ avatarName }}</el-avatar>
-              <el-icon class="el-icon--right"><arrow-down /></el-icon>
             </div>
             <template #dropdown>
               <el-dropdown-menu>
@@ -78,16 +71,16 @@
       </el-header>
 
       <div class="tags-view-container">
-        <div
+        <span
           v-for="tag in visitedViews"
           :key="tag.path"
           class="tags-view-item"
           :class="{ active: route.path === tag.path }"
           @click="router.push(tag.path)"
         >
-          <span class="tags-view-item-text">{{ tag.title }}</span>
-          <el-icon v-if="tag.path !== '/dashboard'" class="tags-view-close" @click.stop="closeView(tag)"><Close /></el-icon>
-        </div>
+          {{ tag.title }}
+          <el-icon v-if="tag.path !== '/dashboard'" class="tag-close" @click.stop="closeView(tag)"><Close /></el-icon>
+        </span>
       </div>
 
       <el-main class="admin-main">
@@ -138,7 +131,7 @@
 import { computed, ref, watch, onMounted } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Expand, Fold, Monitor, ArrowDown, Platform, RefreshRight, Search, Setting, Moon, FullScreen, Close } from '@element-plus/icons-vue'
+import { Expand, Fold, Monitor, ArrowDown, Box, Search, Setting, Moon, FullScreen, Refresh, Close } from '@element-plus/icons-vue'
 import AppNav from '@/components/AppNav.vue'
 import { useAuthStore } from '@/stores/auth'
 import { querySessions, forceOffline } from '@/api/auth'
@@ -162,7 +155,6 @@ const avatarName = computed(() => {
   return name.charAt(0).toUpperCase()
 })
 
-// tags view simplified
 const visitedViews = ref<{ path: string; title: string }[]>([])
 
 watch(() => route.path, () => {
@@ -180,29 +172,6 @@ function addVisitedView() {
   }
 }
 
-function reloadPage() {
-  window.location.reload()
-}
-
-function toggleFullScreen() {
-  if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen()
-  } else {
-    if (document.exitFullscreen) {
-      document.exitFullscreen()
-    }
-  }
-}
-
-function toggleDark() {
-  const html = document.documentElement
-  if (html.classList.contains('dark')) {
-    html.classList.remove('dark')
-  } else {
-    html.classList.add('dark')
-  }
-}
-
 function closeView(tag: any) {
   const index = visitedViews.value.indexOf(tag)
   visitedViews.value.splice(index, 1)
@@ -216,7 +185,6 @@ function closeView(tag: any) {
   }
 }
 
-// tenant loading
 const tenantOptions = ref<Array<{ tenantId: string; name: string }>>([])
 const canLoadTenants = computed(() => {
   return authStore.canSwitchTenant && Boolean(authStore.snapshot?.grants.includes('tenant:read'))
@@ -233,7 +201,6 @@ async function loadTenantOptions() {
     const page = await queryTenants({ page: 1, size: 200 }, { silentAuthFailure: true, suppressErrorMessage: true })
     tenantOptions.value = page.list
   } catch {
-    //
   }
 }
 
@@ -298,7 +265,7 @@ function formatDevice(raw?: string) {
 .admin-layout {
   height: 100vh;
   width: 100vw;
-  background-color: #f0f2f5;
+  background-color: var(--bg-shell, #f0f2f5);
 }
 
 .admin-aside {
@@ -312,18 +279,17 @@ function formatDevice(raw?: string) {
 }
 
 .logo-box {
-  height: 50px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0 16px;
   overflow: hidden;
-  border-bottom: 1px solid var(--line, #e5e7eb);
   background: #fff;
 }
 
-.logo-icon-svg {
-  font-size: 28px;
+.logo-icon {
+  font-size: 24px;
   color: #303133;
 }
 
@@ -346,7 +312,6 @@ function formatDevice(raw?: string) {
   justify-content: space-between;
   padding: 0 16px;
   border-bottom: 1px solid var(--line, #e5e7eb);
-  box-shadow: 0 1px 4px rgba(0,21,41,.08);
 }
 
 .header-left, .header-right {
@@ -357,55 +322,64 @@ function formatDevice(raw?: string) {
 .action-icon {
   font-size: 18px;
   cursor: pointer;
-  margin-right: 14px;
+  margin-right: 16px;
   color: #5a5e66;
   &:hover {
     color: var(--accent, #409eff);
   }
 }
 
-.action-icon--refresh {
-  margin-right: 20px;
+.action-icon-small {
+  font-size: 16px;
+  cursor: pointer;
+  color: #5a5e66;
+  &:hover {
+    color: var(--accent, #409eff);
+  }
 }
 
 .header-actions {
   display: flex;
   align-items: center;
   margin: 0 16px;
-  gap: 12px;
+  gap: 16px;
 }
 
-.search-capsule {
+.search-input {
   display: flex;
   align-items: center;
-  background-color: #f5f7fa;
+  background: #f4f4f5;
   border-radius: 16px;
   padding: 4px 12px;
-  font-size: 13px;
+  font-size: 12px;
   color: #909399;
-  cursor: pointer;
-  margin: 0 12px;
-  
-  .search-badge {
-    margin-left: 8px;
-    font-size: 12px;
-  }
-  
-  &:hover {
-    background-color: #e4e7ed;
-  }
-}
+  cursor: text;
 
-.borderless-select :deep(.el-input__wrapper) {
-  box-shadow: none !important;
-  background-color: transparent;
+  .search-icon {
+    margin-right: 6px;
+  }
+  .search-shortcut {
+    border: 1px solid #dcdfe6;
+    border-radius: 4px;
+    padding: 0 4px;
+    background: #fff;
+    margin-left: 8px;
+    transform: scale(0.9);
+  }
 }
 
 .tenant-selector {
   display: flex;
   align-items: center;
-  font-size: 14px;
+  font-size: 13px;
   color: #606266;
+  margin-right: 12px;
+}
+.tenant-selector :deep(.el-input__wrapper) {
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 4px;
+  width: 100px;
 }
 
 .avatar-container {
@@ -417,7 +391,8 @@ function formatDevice(raw?: string) {
 
 .user-avatar {
   background: var(--accent, #409eff);
-  margin-right: 4px;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .tags-view-container {
@@ -425,7 +400,6 @@ function formatDevice(raw?: string) {
   width: 100%;
   background: #fff;
   border-bottom: 1px solid var(--line, #e5e7eb);
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
   padding: 4px 16px;
   display: flex;
   align-items: center;
@@ -440,41 +414,37 @@ function formatDevice(raw?: string) {
   display: inline-flex;
   align-items: center;
   height: 26px;
+  line-height: 26px;
   padding: 0 10px;
-  font-size: 13px;
+  font-size: 12px;
   color: #606266;
   background: transparent;
-  border: 1px solid transparent;
+  border: 1px solid #dcdfe6;
+  border-radius: 2px;
   cursor: pointer;
-  border-radius: 4px;
-  transition: all 0.2s cubic-bezier(0.645, 0.045, 0.355, 1);
-  white-space: nowrap;
+  transition: all 0.2s;
 
-  &:hover {
-    background-color: #f5f7fa;
-  }
-
-  &.active {
-    color: #409eff;
-    background-color: #e6f2ff;
-  }
-
-  .tags-view-close {
+  .tag-close {
     font-size: 12px;
-    margin-left: 6px;
+    margin-left: 4px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
-    padding: 2px;
-    transition: all .2s;
-    
     &:hover {
       background-color: #c0c4cc;
       color: #fff;
     }
   }
+
+  &.active {
+    background: #e6f2ff;
+    color: #409eff;
+    border-color: #e6f2ff;
+  }
 }
 
 .admin-main {
-  background: #f0f2f5;
+  background: var(--bg-shell, #f0f2f5);
   padding: 16px;
 }
 
@@ -483,10 +453,8 @@ function formatDevice(raw?: string) {
   min-height: calc(100vh - 120px);
   border-radius: 4px;
   padding: 20px;
-  box-shadow: 0 1px 4px rgba(0,21,41,.08);
 }
 
-/* Transitions */
 .logo-fade-enter-active,
 .logo-fade-leave-active {
   transition: opacity 0.2s;

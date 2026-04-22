@@ -4,9 +4,9 @@
     class="sidebar-menu"
     :collapse="collapse"
     :router="true"
-    background-color="#001529"
-    text-color="#a6bdbd"
-    active-text-color="#fff"
+    background-color="#ffffff"
+    text-color="#606266"
+    active-text-color="#409eff"
   >
     <el-menu-item v-for="item in visibleLinks" :key="item.to" :index="item.to">
       <el-icon><component :is="item.icon" /></el-icon>
@@ -118,15 +118,22 @@ function flattenMenus(nodes: MenuItem[]): MenuItem[] {
 .sidebar-menu {
   border-right: none;
   &:not(.el-menu--collapse) {
-    width: 219px;
+    width: 199px;
   }
 }
 .sidebar-menu :deep(.el-menu-item) {
+  height: 40px;
+  line-height: 40px;
+  margin: 4px 8px;
+  border-radius: 4px;
+  font-size: 13px;
+
   &.is-active {
-    background-color: var(--accent, #409eff) !important;
+    background-color: #e6f2ff !important;
+    color: #409eff !important;
   }
-  &:hover {
-    background-color: #263445 !important;
+  &:hover:not(.is-active) {
+    background-color: #f5f7fa !important;
   }
 }
 </style>
