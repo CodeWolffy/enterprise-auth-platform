@@ -14,9 +14,9 @@ public class CaptchaResourceConfiguration {
     @Bean
     public ResourceStore captchaResourceStore() {
         LocalMemoryResourceStore resourceStore = new LocalMemoryResourceStore();
-        addIfExists(resourceStore, "META-INF/cut-image/resource/1.jpg");
-        addIfExists(resourceStore, "META-INF/cut-image/resource/2.jpg");
-        addIfExists(resourceStore, "META-INF/cut-image/resource/3.jpg");
+        addIfExists(resourceStore, "META-INF/cut-image/resource/1.png");
+        addIfExists(resourceStore, "META-INF/cut-image/resource/2.png");
+        addIfExists(resourceStore, "META-INF/cut-image/resource/3.png");
         return resourceStore;
     }
 

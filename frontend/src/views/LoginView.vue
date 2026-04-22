@@ -52,7 +52,7 @@
 
         <div class="auth-captcha-row" :class="{ 'is-verified': captchaVerified }">
           <span>{{ captchaVerified ? '验证通过' : '需完成滑块验证' }}</span>
-          <button class="auth-link" type="button" @click="openCaptchaDialog({ refresh: !captchaVerified })">
+          <button class="auth-link" type="button" @click="openCaptchaDialog({ refresh: true })">
             {{ captchaVerified ? '重新验证' : '去验证' }}
           </button>
         </div>

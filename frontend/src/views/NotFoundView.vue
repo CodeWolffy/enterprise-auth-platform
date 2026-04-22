@@ -1,50 +1,45 @@
 <template>
-  <div class="notfound-page">
-    <div class="wrapper">
-      <div class="four-oh-four">404</div>
+  <div class="auth-page">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <span class="auth-logo__mark">404</span>
+      </div>
+      <h1 class="auth-title">页面未找到</h1>
+      <p class="auth-subtitle">您访问的页面不存在或已被移除</p>
 
-      <div class="characters">
-        <div class="character char-orange">
-          <div class="eyes dizzy">
-            <div class="eyeball"><div class="pupil"></div></div>
-            <div class="eyeball"><div class="pupil"></div></div>
-          </div>
-          <div class="mouth"></div>
-        </div>
+      <div class="notfound-illustration">
+        <svg viewBox="0 0 200 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- 搜索框 -->
+          <rect x="20" y="20" width="160" height="40" rx="8" fill="#f1f5f9" stroke="#e2e8f0" stroke-width="2"/>
+          <circle cx="40" cy="40" r="8" fill="#94a3b8"/>
+          <rect x="56" y="36" width="80" height="8" rx="4" fill="#cbd5e1"/>
+          <!-- 放大镜 -->
+          <circle cx="155" cy="40" r="12" stroke="#2563eb" stroke-width="3" fill="none"/>
+          <line x1="164" y1="49" x2="172" y2="57" stroke="#2563eb" stroke-width="3" stroke-linecap="round"/>
+          <!-- 问号 -->
+          <text x="95" y="95" font-size="32" font-weight="600" fill="#2563eb" text-anchor="middle">?</text>
+          <!-- 装饰点 -->
+          <circle cx="30" cy="100" r="4" fill="#dbeafe"/>
+          <circle cx="170" cy="100" r="4" fill="#dbeafe"/>
+          <circle cx="50" cy="110" r="3" fill="#e0e7ff"/>
+          <circle cx="150" cy="110" r="3" fill="#e0e7ff"/>
+        </svg>
+      </div>
 
-        <div class="character char-purple">
-          <div class="eyes dizzy">
-            <div class="eyeball"><div class="pupil"></div></div>
-            <div class="eyeball"><div class="pupil"></div></div>
-          </div>
-          <div class="mouth"></div>
-        </div>
-
-        <div class="character char-black">
-          <div class="eyes dizzy">
-            <div class="eyeball"><div class="pupil"></div></div>
-            <div class="eyeball"><div class="pupil"></div></div>
-          </div>
-          <div class="mouth"></div>
-        </div>
-
-        <div class="character char-yellow">
-          <div class="eyes dizzy">
-            <div class="eyeball"><div class="pupil"></div></div>
-            <div class="eyeball"><div class="pupil"></div></div>
-          </div>
-          <div class="mouth"></div>
+      <div class="auth-form">
+        <div class="auth-btn-group">
+          <button class="auth-submit" type="button" @click="router.push('/dashboard')">
+            返回首页
+          </button>
+          <button class="auth-submit auth-submit--secondary" type="button" @click="goBack">
+            返回上一页
+          </button>
         </div>
       </div>
 
-      <div class="message">
-        <h1>页面未找到</h1>
-        <p>您访问的页面不存在。</p>
-        <div class="btn-group">
-          <button class="btn btn-primary" type="button" @click="router.push('/login')">去登录</button>
-          <button class="btn btn-secondary" type="button" @click="goBack">返回上一页</button>
-        </div>
-      </div>
+      <p class="auth-switch">
+        需要帮助？<button class="auth-link" type="button" @click="router.push('/login')">重新登录</button>
+      </p>
     </div>
   </div>
 </template>
@@ -64,220 +59,162 @@ function goBack() {
 </script>
 
 <style scoped>
-.notfound-page {
+.auth-page {
+  --ink: #0f172a;
+  --muted: #64748b;
+  --line: #e2e8f0;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
   min-height: 100vh;
-  background: #181821;
-  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #f8fafc;
+  padding: 2rem 1.5rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
-.wrapper {
+.auth-card {
   width: 100%;
-  max-width: 650px;
-  padding: 80px 50px;
+  max-width: 400px;
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  padding: 2.5rem 2rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   text-align: center;
 }
 
-.four-oh-four {
-  font-size: 160px;
-  font-weight: 800;
-  line-height: 1;
-  color: #353549;
-  margin-bottom: 40px;
-}
-
-.characters {
+.auth-logo {
   display: flex;
   justify-content: center;
-  align-items: flex-end;
-  gap: 24px;
-  margin-bottom: 50px;
-  height: 150px;
+  margin-bottom: 1.5rem;
 }
 
-.character {
-  position: relative;
-  border-radius: 8px 8px 0 0;
-}
-
-.char-purple {
-  width: 65px;
-  height: 130px;
-  background: #6c3ff5;
-}
-
-.char-black {
-  width: 48px;
-  height: 100px;
-  background: #2d2d2d;
-}
-
-.char-orange {
-  width: 85px;
-  height: 75px;
-  background: #ff9b6b;
-  border-radius: 43px 43px 0 0;
-}
-
-.char-yellow {
-  width: 55px;
-  height: 85px;
-  background: #e8d754;
-  border-radius: 28px 28px 0 0;
-}
-
-.eyes {
-  position: absolute;
-  display: flex;
-  gap: 8px;
-  left: 50%;
-  transform: translateX(-50%);
-  top: 18px;
-}
-
-.char-purple .eyes {
-  top: 25px;
-}
-
-.eyeball {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #fff;
-  position: relative;
-}
-
-.pupil {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #1a1a2e;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.dizzy .eyeball::after {
-  content: 'x';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-family: monospace;
-  font-weight: 700;
-  color: #1a1a2e;
-  line-height: 1;
-}
-
-.dizzy .pupil {
-  display: none;
-}
-
-.mouth {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #2d2d2d;
-  top: 36px;
-}
-
-.char-purple .mouth {
-  top: 50px;
-}
-
-.char-black .mouth,
-.char-yellow .mouth {
-  width: 5px;
-  height: 5px;
-}
-
-.message h1 {
-  margin: 0 0 10px;
-  font-size: 28px;
-  font-weight: 600;
-}
-
-.message p {
-  margin: 0 0 28px;
-  color: #888;
-  font-size: 15px;
-}
-
-.btn-group {
-  display: flex;
-  justify-content: center;
-  gap: 14px;
-}
-
-.btn {
-  border: 0;
-  border-radius: 6px;
-  padding: 12px 24px;
-  font-size: 14px;
-  font-weight: 500;
-  transition: opacity 0.2s;
-  cursor: pointer;
-}
-
-.btn-primary {
+.auth-logo__mark {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
   color: #fff;
-  background: #6c3ff5;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 1.5rem;
+  letter-spacing: 0.02em;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
 }
 
-.btn-secondary {
-  color: #aaa;
-  background: #333;
+.auth-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: center;
+  margin: 0 0 0.5rem;
+  letter-spacing: -0.01em;
 }
 
-.btn:hover {
-  opacity: 0.82;
+.auth-subtitle {
+  font-size: 0.875rem;
+  color: var(--muted);
+  text-align: center;
+  margin: 0 0 1.5rem;
+}
+
+.notfound-illustration {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+
+.notfound-illustration svg {
+  width: 100%;
+  max-width: 200px;
+  height: auto;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.auth-btn-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.auth-submit {
+  width: 100%;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.auth-submit:hover {
+  background: var(--accent-hover);
+}
+
+.auth-submit:active {
+  background: #1e40af;
+}
+
+.auth-submit--secondary {
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.auth-submit--secondary:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.auth-submit--secondary:active {
+  background: #f1f5f9;
+}
+
+.auth-switch {
+  margin: 1.5rem 0 0;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.auth-link {
+  color: var(--accent);
+  background: none;
+  border: none;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  font-size: inherit;
+  transition: color 0.15s;
+}
+
+.auth-link:hover {
+  color: var(--accent-hover);
 }
 
 @media (max-width: 480px) {
-  .wrapper {
-    padding: 40px 18px;
+  .auth-card {
+    padding: 2rem 1.25rem;
+    border-radius: 12px;
   }
 
-  .four-oh-four {
-    font-size: 100px;
-  }
-
-  .characters {
-    gap: 10px;
-  }
-
-  .char-purple {
-    width: 45px;
-    height: 80px;
-  }
-
-  .char-black {
-    width: 32px;
-    height: 64px;
-  }
-
-  .char-orange {
+  .auth-logo__mark {
     width: 56px;
-    height: 48px;
-    border-radius: 28px 28px 0 0;
-  }
-
-  .char-yellow {
-    width: 36px;
     height: 56px;
-    border-radius: 18px 18px 0 0;
-  }
-
-  .btn-group {
-    flex-direction: column;
+    font-size: 1.25rem;
   }
 }
 </style>
