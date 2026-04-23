@@ -122,11 +122,17 @@ function flattenMenus(nodes: MenuItem[]): MenuItem[] {
   }
 }
 .sidebar-menu :deep(.el-menu-item) {
-  height: 40px;
-  line-height: 40px;
-  margin: 4px 8px;
+  height: 36px;
+  line-height: 36px;
+  margin: 3px 6px;
+  padding: 0 12px !important;
   border-radius: 4px;
   font-size: 13px;
+
+  .el-icon {
+    margin-right: 7px;
+    font-size: 17px;
+  }
 
   &.is-active {
     background-color: #e6f2ff !important;
@@ -134,6 +140,16 @@ function flattenMenus(nodes: MenuItem[]): MenuItem[] {
   }
   &:hover:not(.is-active) {
     background-color: #f5f7fa !important;
+  }
+}
+
+.sidebar-menu.el-menu--collapse :deep(.el-menu-item) {
+  margin: 3px 6px;
+  padding: 0 !important;
+  justify-content: center;
+
+  .el-icon {
+    margin-right: 0;
   }
 }
 </style>
