@@ -45,10 +45,16 @@ const DYNAMIC_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = {
     meta: { title: '部门管理', routeKey: 'depts' },
   },
   tenants: {
-    path: 'system/tenants',
+    path: 'platform/tenants',
     name: 'tenants',
     component: () => import('@/views/TenantsView.vue'),
     meta: { title: '租户管理', routeKey: 'tenants' },
+  },
+  'online-users': {
+    path: 'system/online-users',
+    name: 'online-users',
+    component: () => import('@/views/OnlineUsersView.vue'),
+    meta: { title: '在线用户', routeKey: 'online-users' },
   },
   audit: {
     path: 'system/audit',
@@ -68,11 +74,23 @@ const DYNAMIC_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = {
     component: () => import('@/views/SystemDictsView.vue'),
     meta: { title: '字典管理', hidden: true, requiresGrant: 'system:read' },
   },
+  dicts: {
+    path: 'platform/dicts',
+    name: 'dicts',
+    component: () => import('@/views/SystemDictsView.vue'),
+    meta: { title: '字典管理', routeKey: 'dicts' },
+  },
   'settings-configs': {
     path: 'system/settings/configs',
     name: 'settings-configs',
     component: () => import('@/views/SystemConfigsView.vue'),
     meta: { title: '参数配置', hidden: true, requiresGrant: 'system:read' },
+  },
+  configs: {
+    path: 'platform/configs',
+    name: 'configs',
+    component: () => import('@/views/SystemConfigsView.vue'),
+    meta: { title: '参数管理', routeKey: 'configs' },
   },
   'settings-notices': {
     path: 'system/settings/notices',
@@ -80,23 +98,41 @@ const DYNAMIC_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = {
     component: () => import('@/views/SystemNoticesView.vue'),
     meta: { title: '公告管理', hidden: true, requiresGrant: 'system:read' },
   },
+  notices: {
+    path: 'platform/notices',
+    name: 'notices',
+    component: () => import('@/views/SystemNoticesView.vue'),
+    meta: { title: '公告管理', routeKey: 'notices' },
+  },
   'settings-categories': {
     path: 'system/settings/categories',
     name: 'settings-categories',
     component: () => import('@/views/SystemCategoriesView.vue'),
     meta: { title: '分类配置', hidden: true, requiresGrant: 'system:read' },
   },
+  categories: {
+    path: 'platform/categories',
+    name: 'categories',
+    component: () => import('@/views/SystemCategoriesView.vue'),
+    meta: { title: '分类配置', routeKey: 'categories' },
+  },
   'tenant-catalog': {
-    path: 'system/settings/tenant-catalog',
+    path: 'platform/tenant-catalog',
     name: 'tenant-catalog',
     component: () => import('@/views/TenantCatalogView.vue'),
-    meta: { title: '租户目录', hidden: true, requiresGrant: 'tenant:read' },
+    meta: { title: '租户套餐', routeKey: 'tenant-catalog' },
   },
   'settings-resources': {
     path: 'system/settings/resources',
     name: 'settings-resources',
     component: () => import('@/views/ResourceManagementView.vue'),
     meta: { title: '菜单管理', hidden: true, requiresGrant: 'system:write' },
+  },
+  resources: {
+    path: 'system/resources',
+    name: 'resources',
+    component: () => import('@/views/ResourceManagementView.vue'),
+    meta: { title: '菜单管理', routeKey: 'resources' },
   },
 }
 
@@ -105,9 +141,16 @@ const ROUTE_KEY_PATH_MAP: Record<string, string> = {
   users: '/system/users',
   roles: '/system/roles',
   depts: '/system/depts',
-  tenants: '/system/tenants',
+  'online-users': '/system/online-users',
+  tenants: '/platform/tenants',
   audit: '/system/audit',
   settings: '/system/settings',
+  dicts: '/platform/dicts',
+  configs: '/platform/configs',
+  notices: '/platform/notices',
+  categories: '/platform/categories',
+  'tenant-catalog': '/platform/tenant-catalog',
+  resources: '/system/resources',
 }
 
 const SHELL_ROUTE: RouteRecordRaw = {

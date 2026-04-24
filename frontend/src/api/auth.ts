@@ -6,6 +6,7 @@ import type {
   CsrfTokenResponse,
   PermissionSnapshot,
   RegisterOptionsResponse,
+  UserSessionView,
 } from '@/types/auth'
 
 let csrfReady = false
@@ -81,7 +82,7 @@ export async function logoutCurrentSession() {
 }
 
 export async function querySessions() {
-  const { data } = await http.get<ApiResponse<any[]>>('/api/auth/sessions')
+  const { data } = await http.get<ApiResponse<UserSessionView[]>>('/api/auth/sessions')
   return data.data
 }
 

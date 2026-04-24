@@ -155,7 +155,7 @@ public class ResourceService {
         requirePlatformTenant();
         validateGrantKey(request.grantKey());
         SysResourceEntity parent = request.parentId() == null ? null : getTemplateResource(request.parentId());
-        validateParentType(request.resourceType(), parent);
+        validateResourceShape(request.resourceType(), parent, request.routeKey(), request.path(), request.component(), request.grantKey());
 
         SysResourceEntity entity = new SysResourceEntity();
         entity.setTenantId(platformTenantId());
@@ -200,7 +200,7 @@ public class ResourceService {
         if (parent != null && parseAncestors(parent.getAncestors()).contains(resourceId)) {
             throw new BusinessException("资源父节点不能是当前节点的子孙节点");
         }
-        validateParentType(request.resourceType(), parent);
+        validateResourceShape(request.resourceType(), parent, request.routeKey(), request.path(), request.component(), request.grantKey());
 
         entity.setParentId(request.parentId());
         entity.setAncestors(resolveAncestors(parent));
@@ -600,16 +600,44 @@ public class ResourceService {
         return parent.getAncestors() + "," + parent.getId();
     }
 
+    private void validateResourceShape(
+            ResourceType childType,
+            SysResourceEntity parent,
+            String routeKey,
+            String path,
+            String component,
+            String grantKey
+    ) {
+        validateParentType(childType, parent);
+        if (childType == ResourceType.MENU) {
+            if (!StringUtils.hasText(routeKey) || !StringUtils.hasText(path) || !StringUtils.hasText(component)) {
+                throw new BusinessException("菜单资源必须配置路由标识、路径和组件");
+            }
+            if (!StringUtils.hasText(grantKey)) {
+                throw new BusinessException("菜单资源必须配置读权限授权键");
+            }
+        }
+        if ((childType == ResourceType.BUTTON || childType == ResourceType.API) && !StringUtils.hasText(grantKey)) {
+            throw new BusinessException("按钮/API 权限必须配置授权键");
+        }
+    }
+
     private void validateParentType(ResourceType childType, SysResourceEntity parent) {
         if (parent == null) {
+            if (childType == ResourceType.BUTTON) {
+                throw new BusinessException("按钮权限必须挂在菜单节点下");
+            }
             return;
         }
         ResourceType parentType = parseType(parent.getResourceType());
         if (parentType == ResourceType.BUTTON || parentType == ResourceType.API) {
             throw new BusinessException("按钮/API 资源不能作为父节点");
         }
-        if (childType == ResourceType.DIR && parentType == ResourceType.MENU) {
-            throw new BusinessException("菜单节点下不允许挂目录资源");
+        if (parentType == ResourceType.MENU && childType != ResourceType.BUTTON && childType != ResourceType.API) {
+            throw new BusinessException("菜单节点下只允许挂按钮或 API 权限");
+        }
+        if (childType == ResourceType.BUTTON && parentType != ResourceType.MENU) {
+            throw new BusinessException("按钮权限必须挂在菜单节点下");
         }
     }
 

@@ -10,25 +10,23 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @Configuration
 public class CorsConfig {
 
-  @Bean
-  public CorsConfigurationSource corsConfigurationSource(FrontendProperties frontendProperties) {
-    CorsConfiguration configuration = new CorsConfiguration();
-    // TODO
-    // 开发测试环境：允许所有来源
-    configuration.addAllowedOriginPattern("*");
-    // 生产环境请使用具体配置：
-    // configuration.setAllowedOriginPatterns(frontendProperties.resolvedAllowedOrigins());
-    configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-    configuration.setAllowedHeaders(List.of("*"));
-    configuration.setExposedHeaders(List.of(
-      "Authorization",
-      "X-Request-Id"
-    ));
-    configuration.setAllowCredentials(true);
-    configuration.setMaxAge(3600L);
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource(FrontendProperties frontendProperties) {
+        CorsConfiguration configuration = new CorsConfiguration();
+        // 开发环境：允许所有来源
+        // 生产环境请改用：configuration.setAllowedOriginPatterns(frontendProperties.resolvedAllowedOrigins());
+        configuration.addAllowedOriginPattern("*");
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setExposedHeaders(List.of(
+                "Authorization",
+                "X-Request-Id"
+        ));
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
 
-    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-    source.registerCorsConfiguration("/api/**", configuration);
-    return source;
-  }
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/**", configuration);
+        return source;
+    }
 }

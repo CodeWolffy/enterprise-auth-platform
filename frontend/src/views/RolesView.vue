@@ -115,7 +115,7 @@
         <el-table-column
           v-if="roleTablePrefs.visibleColumnMap.resourceCount"
           column-key="resourceCount"
-          label="资源数"
+          label="权限数"
           min-width="100"
           :width="roleTablePrefs.getColumnWidth('resourceCount')"
         >
@@ -125,7 +125,7 @@
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button link type="primary" @click="openRole(row)">编辑</el-button>
-            <el-button link type="primary" @click="openResourceAssignment(row)">分配资源</el-button>
+            <el-button link type="primary" @click="openResourceAssignment(row)">分配权限</el-button>
             <el-button link type="danger" @click="removeRole(row.id)">删除</el-button>
           </template>
         </el-table-column>
@@ -151,7 +151,7 @@
           <el-descriptions-item label="角色名称">{{ detailRole.name }}</el-descriptions-item>
           <el-descriptions-item label="数据范围">{{ detailRole.dataScopeType }}</el-descriptions-item>
           <el-descriptions-item label="自定义部门">{{ detailRole.customDeptIds?.length || 0 }}</el-descriptions-item>
-          <el-descriptions-item label="已分配资源">{{ assignedResourceIds.length }}</el-descriptions-item>
+          <el-descriptions-item label="已分配权限">{{ assignedResourceIds.length }}</el-descriptions-item>
           <el-descriptions-item label="角色描述" :span="2">{{ detailRole.description || '-' }}</el-descriptions-item>
         </el-descriptions>
 
@@ -163,12 +163,12 @@
 
         <div class="tree-panel drawer-section drawer-section--history">
           <div class="tree-panel__head">
-            <strong>资源树</strong>
-            <span>{{ assignedResourceIds.length }} 个资源节点</span>
+            <strong>权限树</strong>
+            <span>{{ assignedResourceIds.length }} 个菜单/权限节点</span>
           </div>
           <div class="resource-summary">
             <el-tag v-for="item in detailResourceSummary" :key="item.type" effect="plain">
-              {{ item.type }} / {{ item.count }}
+              {{ typeLabel(item.type) }} / {{ item.count }}
             </el-tag>
           </div>
           <el-tree
@@ -181,7 +181,7 @@
             <template #default="{ data }">
               <div class="resource-node">
                 <span>{{ data.label }}</span>
-                <el-tag size="small" effect="plain">{{ data.resourceType }}</el-tag>
+                <el-tag size="small" effect="plain">{{ typeLabel(data.resourceType) }}</el-tag>
               </div>
             </template>
           </el-tree>
@@ -234,17 +234,18 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="resourceVisible" title="分配角色资源" width="760px">
+    <el-dialog v-model="resourceVisible" title="分配角色权限" width="800px">
       <div class="assignment-toolbar">
-        <el-input v-model="resourceKeyword" placeholder="筛选资源名、资源键或授权键" clearable />
+        <el-input v-model="resourceKeyword" placeholder="筛选菜单名、编码或授权标识" clearable />
         <div class="assignment-toolbar__actions">
           <el-button @click="expandAll">全部展开</el-button>
           <el-button @click="collapseAll">全部折叠</el-button>
-          <span class="assignment-toolbar__meta">共 {{ allResourceCount }} 个资源节点</span>
+          <el-button :disabled="focusedResourceId == null" @click="selectFocusedDescendants">全选当前子级</el-button>
+          <span class="assignment-toolbar__meta">共 {{ allResourceCount }} 个菜单/权限节点</span>
         </div>
         <div class="resource-summary">
           <el-tag v-for="item in selectedResourceSummary" :key="item.type" effect="plain">
-            {{ item.type }} / {{ item.count }}
+            {{ typeLabel(item.type) }} / {{ item.count }}
           </el-tag>
         </div>
       </div>
@@ -252,17 +253,20 @@
         ref="resourceTreeRef"
         :data="filteredResourceTree"
         show-checkbox
+        check-strictly
+        highlight-current
         node-key="id"
         default-expand-all
         :props="{ children: 'children', label: 'label' }"
         class="permission-tree"
         @check="syncSelectedResourceIds"
+        @node-click="handleResourceNodeClick"
       >
         <template #default="{ data }">
           <div class="resource-node">
             <span>{{ data.label }}</span>
             <div class="resource-node__meta">
-              <el-tag size="small" effect="plain">{{ data.resourceType }}</el-tag>
+              <el-tag size="small" effect="plain">{{ typeLabel(data.resourceType) }}</el-tag>
               <el-tag v-if="data.grantKey" size="small" type="success" effect="plain">{{ data.grantKey }}</el-tag>
             </div>
           </div>
@@ -316,6 +320,7 @@ const resourceTargetRoleId = ref<number | null>(null)
 const detailRole = ref<RoleView | null>(null)
 const assignedResourceIds = ref<number[]>([])
 const assignedCountByRoleId = reactive<Record<number, number>>({})
+const focusedResourceId = ref<number | null>(null)
 const loading = ref(false)
 const keyword = ref('')
 const scopeFilter = ref('')
@@ -395,7 +400,7 @@ const roleTablePrefs = useTablePreferences('eap.table.roles', [
   { key: 'name', label: '角色名称', width: 160 },
   { key: 'description', label: '角色描述', width: 220 },
   { key: 'dataScopeType', label: '数据范围', width: 140 },
-  { key: 'resourceCount', label: '资源数', width: 100 },
+  { key: 'resourceCount', label: '权限数', width: 100 },
   { key: 'actions', label: '操作', width: 320 },
 ])
 
@@ -475,6 +480,7 @@ async function openResourceAssignment(row: RoleView) {
   assignedCountByRoleId[row.id] = assignedIds.length
   resourceVisible.value = true
   resourceKeyword.value = ''
+  focusedResourceId.value = null
   await nextTick()
   resourceTreeRef.value?.setCheckedKeys(assignedIds)
   selectedResourceIds.value = [...assignedIds]
@@ -491,7 +497,7 @@ async function submitResourceAssignment() {
   const assignedIds = await assignRoleResources(resourceTargetRoleId.value, selectedIds)
   assignedCountByRoleId[resourceTargetRoleId.value] = assignedIds.length
   resourceVisible.value = false
-  ElMessage.success('角色资源已更新')
+  ElMessage.success('角色权限已更新')
 
   if (detailRole.value?.id === resourceTargetRoleId.value) {
     assignedResourceIds.value = assignedIds
@@ -510,6 +516,25 @@ function syncSelectedResourceIds() {
   selectedResourceIds.value = ((resourceTreeRef.value?.getCheckedKeys(false) || []) as Array<string | number>)
     .map((item) => Number(item))
     .filter((item) => Number.isFinite(item))
+}
+
+function handleResourceNodeClick(data: ResourceDisplayNode) {
+  focusedResourceId.value = data.id
+}
+
+function selectFocusedDescendants() {
+  if (focusedResourceId.value == null) {
+    return
+  }
+  const focused = findResourceNode(resourceTreeData.value, focusedResourceId.value)
+  if (!focused) {
+    return
+  }
+  const checked = new Set<number>(selectedResourceIds.value)
+  collectNodeAndDescendantIds(focused).forEach((id) => checked.add(id))
+  const checkedIds = Array.from(checked)
+  resourceTreeRef.value?.setCheckedKeys(checkedIds)
+  selectedResourceIds.value = checkedIds
 }
 
 async function removeRole(id: number) {
@@ -538,6 +563,29 @@ function toResourceDisplayTree(source: ResourceTreeNode[]): ResourceDisplayNode[
     grantKey: item.grantKey || undefined,
     children: item.children?.length ? toResourceDisplayTree(item.children) : undefined,
   }))
+}
+
+function findResourceNode(nodes: ResourceDisplayNode[], id: number): ResourceDisplayNode | null {
+  for (const node of nodes) {
+    if (node.id === id) {
+      return node
+    }
+    const child = node.children?.length ? findResourceNode(node.children, id) : null
+    if (child) {
+      return child
+    }
+  }
+  return null
+}
+
+function collectNodeAndDescendantIds(node: ResourceDisplayNode) {
+  const ids: number[] = []
+  const walk = (item: ResourceDisplayNode) => {
+    ids.push(item.id)
+    item.children?.forEach(walk)
+  }
+  walk(node)
+  return ids
 }
 
 function flattenTree(nodes: ResourceDisplayNode[]): ResourceDisplayNode[] {
@@ -596,6 +644,16 @@ function summarizeByType(selectedIds: Set<number>, tree: ResourceDisplayNode[]) 
     counter.set(node.resourceType, (counter.get(node.resourceType) || 0) + 1)
   }
   return Array.from(counter.entries()).map(([type, count]) => ({ type, count }))
+}
+
+function typeLabel(type: ResourceType) {
+  const labels: Record<ResourceType, string> = {
+    DIR: '目录',
+    MENU: '菜单',
+    BUTTON: '按钮',
+    API: 'API',
+  }
+  return labels[type]
 }
 
 function buildDepartmentTree(source: DepartmentView[]) {

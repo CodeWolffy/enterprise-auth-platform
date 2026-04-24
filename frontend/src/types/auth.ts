@@ -36,6 +36,18 @@ export interface CookieSessionResponse {
   expiresAt: number
 }
 
+export interface UserSessionView {
+  sessionId: string
+  username: string
+  tenantId: string
+  clientIp?: string | null
+  device?: string | null
+  issuedAt?: number | null
+  expiresAt?: number | null
+  lastAccessAt?: number | null
+  active: boolean
+}
+
 export interface CaptchaResponse {
   captchaId: string
   backgroundImage: string

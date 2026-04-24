@@ -361,20 +361,28 @@ CREATE TABLE `sys_resource`  (
 -- ----------------------------
 INSERT INTO `sys_resource` VALUES (1, 'platform', NULL, '', 'DIR', 'root', '根节点', NULL, NULL, NULL, NULL, NULL, 0, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
 INSERT INTO `sys_resource` VALUES (10, 'platform', 1, '1', 'MENU', 'dashboard', '运行总览', 'dashboard', 'auth:read', '/dashboard', 'DashboardView', 'Monitor', 10, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
-INSERT INTO `sys_resource` VALUES (20, 'platform', 1, '1', 'DIR', 'system', '系统模块', NULL, NULL, NULL, NULL, 'Setting', 20, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
+INSERT INTO `sys_resource` VALUES (20, 'platform', 1, '1', 'DIR', 'system', '系统管理', NULL, NULL, NULL, NULL, 'Setting', 20, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
 INSERT INTO `sys_resource` VALUES (21, 'platform', 20, '1,20', 'MENU', 'users', '用户管理', 'users', 'user:read', '/system/users', 'UsersView', 'Avatar', 10, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
 INSERT INTO `sys_resource` VALUES (22, 'platform', 20, '1,20', 'MENU', 'roles', '角色管理', 'roles', 'role:read', '/system/roles', 'RolesView', 'Connection', 20, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
 INSERT INTO `sys_resource` VALUES (23, 'platform', 20, '1,20', 'MENU', 'depts', '部门管理', 'depts', 'dept:read', '/system/depts', 'DepartmentsView', 'OfficeBuilding', 30, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
-INSERT INTO `sys_resource` VALUES (24, 'platform', 20, '1,20', 'MENU', 'tenants', '租户管理', 'tenants', 'tenant:read', '/system/tenants', 'TenantsView', 'Flag', 40, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
-INSERT INTO `sys_resource` VALUES (25, 'platform', 20, '1,20', 'MENU', 'audit', '安全审计', 'audit', 'audit:read', '/system/audit', 'AuditView', 'Histogram', 50, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
-INSERT INTO `sys_resource` VALUES (26, 'platform', 20, '1,20', 'MENU', 'settings', '系统管理', 'settings', 'system:read', '/system/settings', 'SystemManagementView', 'Setting', 60, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
+INSERT INTO `sys_resource` VALUES (24, 'platform', 30, '1,30', 'MENU', 'tenants', '租户管理', 'tenants', 'tenant:read', '/platform/tenants', 'TenantsView', 'Flag', 20, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
+INSERT INTO `sys_resource` VALUES (25, 'platform', 1, '1', 'MENU', 'audit', '安全审计', 'audit', 'audit:read', '/system/audit', 'AuditView', 'Histogram', 40, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
+INSERT INTO `sys_resource` VALUES (26, 'platform', 20, '1,20', 'MENU', 'settings', '系统设置', 'settings', 'system:read', '/system/settings', 'SystemManagementView', 'Setting', 60, 0, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
+INSERT INTO `sys_resource` VALUES (27, 'platform', 20, '1,20', 'MENU', 'online-users', '在线用户', 'online-users', 'session:write', '/system/online-users', 'OnlineUsersView', 'Monitor', 40, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
+INSERT INTO `sys_resource` VALUES (28, 'platform', 20, '1,20', 'MENU', 'resources', '菜单管理', 'resources', 'system:write', '/system/resources', 'ResourceManagementView', 'Tickets', 50, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
+INSERT INTO `sys_resource` VALUES (30, 'platform', 1, '1', 'DIR', 'platform-management', '平台管理', NULL, NULL, NULL, NULL, 'Platform', 30, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
+INSERT INTO `sys_resource` VALUES (31, 'platform', 30, '1,30', 'MENU', 'dicts', '字典管理', 'dicts', 'system:read', '/platform/dicts', 'SystemDictsView', 'Tickets', 10, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
+INSERT INTO `sys_resource` VALUES (32, 'platform', 30, '1,30', 'MENU', 'tenant-catalog', '租户套餐', 'tenant-catalog', 'tenant:read', '/platform/tenant-catalog', 'TenantCatalogView', 'Tickets', 30, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
+INSERT INTO `sys_resource` VALUES (33, 'platform', 30, '1,30', 'MENU', 'configs', '参数管理', 'configs', 'system:read', '/platform/configs', 'SystemConfigsView', 'Setting', 40, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
+INSERT INTO `sys_resource` VALUES (34, 'platform', 30, '1,30', 'MENU', 'notices', '公告管理', 'notices', 'system:read', '/platform/notices', 'SystemNoticesView', 'Tickets', 50, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
+INSERT INTO `sys_resource` VALUES (35, 'platform', 30, '1,30', 'MENU', 'categories', '分类配置', 'categories', 'system:read', '/platform/categories', 'SystemCategoriesView', 'Tickets', 60, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
 INSERT INTO `sys_resource` VALUES (210, 'platform', 21, '1,20,21', 'BUTTON', 'users.create', '新增用户', NULL, 'user:write', NULL, NULL, NULL, 10, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
 INSERT INTO `sys_resource` VALUES (211, 'platform', 21, '1,20,21', 'BUTTON', 'users.update', '编辑用户', NULL, 'user:write', NULL, NULL, NULL, 20, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
 INSERT INTO `sys_resource` VALUES (212, 'platform', 21, '1,20,21', 'BUTTON', 'users.delete', '删除用户', NULL, 'user:write', NULL, NULL, NULL, 30, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
 INSERT INTO `sys_resource` VALUES (220, 'platform', 22, '1,20,22', 'BUTTON', 'roles.assign', '角色授权', NULL, 'role:write', NULL, NULL, NULL, 10, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
 INSERT INTO `sys_resource` VALUES (230, 'platform', 23, '1,20,23', 'BUTTON', 'depts.manage', '部门维护', NULL, 'dept:write', NULL, NULL, NULL, 10, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
-INSERT INTO `sys_resource` VALUES (240, 'platform', 24, '1,20,24', 'BUTTON', 'tenants.manage', '租户维护', NULL, 'tenant:write', NULL, NULL, NULL, 10, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
-INSERT INTO `sys_resource` VALUES (250, 'platform', 25, '1,20,25', 'BUTTON', 'audit.export', '审计导出', NULL, 'audit:write', NULL, NULL, NULL, 10, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
+INSERT INTO `sys_resource` VALUES (240, 'platform', 24, '1,30,24', 'BUTTON', 'tenants.manage', '租户维护', NULL, 'tenant:write', NULL, NULL, NULL, 10, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
+INSERT INTO `sys_resource` VALUES (250, 'platform', 25, '1,25', 'BUTTON', 'audit.export', '审计导出', NULL, 'audit:write', NULL, NULL, NULL, 10, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
 INSERT INTO `sys_resource` VALUES (260, 'platform', 26, '1,20,26', 'BUTTON', 'settings.manage', '系统治理', NULL, 'system:write', NULL, NULL, NULL, 10, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
 INSERT INTO `sys_resource` VALUES (300, 'platform', 1, '1', 'DIR', 'api', 'API 权限', NULL, NULL, NULL, NULL, NULL, 100, 0, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
 INSERT INTO `sys_resource` VALUES (301, 'platform', 300, '1,300', 'API', 'api.auth.read', '认证读', NULL, 'auth:read', NULL, NULL, NULL, 10, 0, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
@@ -484,6 +492,14 @@ INSERT INTO `sys_role_resource` VALUES (115, 'platform', 1, 313, 'admin', 'admin
 INSERT INTO `sys_role_resource` VALUES (116, 'platform', 1, 250, 'admin', 'admin', '2026-04-05 12:53:03', '2026-04-05 12:53:03');
 INSERT INTO `sys_role_resource` VALUES (117, 'platform', 1, 314, 'admin', 'admin', '2026-04-05 12:53:03', '2026-04-05 12:53:03');
 INSERT INTO `sys_role_resource` VALUES (118, 'platform', 1, 315, 'admin', 'admin', '2026-04-05 12:53:03', '2026-04-05 12:53:03');
+INSERT INTO `sys_role_resource` VALUES (119, 'platform', 1, 27, 'admin', 'admin', '2026-04-05 12:53:03', '2026-04-05 12:53:03');
+INSERT INTO `sys_role_resource` VALUES (120, 'platform', 1, 30, 'admin', 'admin', '2026-04-05 12:53:03', '2026-04-05 12:53:03');
+INSERT INTO `sys_role_resource` VALUES (121, 'platform', 1, 31, 'admin', 'admin', '2026-04-05 12:53:03', '2026-04-05 12:53:03');
+INSERT INTO `sys_role_resource` VALUES (122, 'platform', 1, 32, 'admin', 'admin', '2026-04-05 12:53:03', '2026-04-05 12:53:03');
+INSERT INTO `sys_role_resource` VALUES (123, 'platform', 1, 33, 'admin', 'admin', '2026-04-05 12:53:03', '2026-04-05 12:53:03');
+INSERT INTO `sys_role_resource` VALUES (124, 'platform', 1, 28, 'admin', 'admin', '2026-04-05 12:53:03', '2026-04-05 12:53:03');
+INSERT INTO `sys_role_resource` VALUES (125, 'platform', 1, 34, 'admin', 'admin', '2026-04-05 12:53:03', '2026-04-05 12:53:03');
+INSERT INTO `sys_role_resource` VALUES (126, 'platform', 1, 35, 'admin', 'admin', '2026-04-05 12:53:03', '2026-04-05 12:53:03');
 
 -- ----------------------------
 -- Table structure for sys_tenant

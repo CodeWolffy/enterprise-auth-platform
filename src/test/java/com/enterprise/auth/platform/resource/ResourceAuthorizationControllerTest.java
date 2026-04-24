@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -83,6 +84,62 @@ class ResourceAuthorizationControllerTest {
     }
 
     @Test
+    void createMenuShouldRequireRouteAndGrantFields() throws Exception {
+        mockMvc.perform(post("/api/resources")
+                        .with(user(principal("platform", Set.of("system:write"))))
+                        .with(csrf())
+                        .header("X-Tenant-Id", "platform")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "parentId": 20,
+                                  "resourceType": "MENU",
+                                  "resourceKey": "ut.missing.route",
+                                  "resourceName": "UT Missing Route",
+                                  "routeKey": null,
+                                  "grantKey": null,
+                                  "path": null,
+                                  "component": null,
+                                  "icon": null,
+                                  "orderNo": 999,
+                                  "visible": true,
+                                  "enabled": true
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"))
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    void createButtonShouldRequireMenuParentAndGrantKey() throws Exception {
+        mockMvc.perform(post("/api/resources")
+                        .with(user(principal("platform", Set.of("system:write"))))
+                        .with(csrf())
+                        .header("X-Tenant-Id", "platform")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "parentId": 20,
+                                  "resourceType": "BUTTON",
+                                  "resourceKey": "ut.button.invalid.parent",
+                                  "resourceName": "UT Invalid Button",
+                                  "routeKey": null,
+                                  "grantKey": null,
+                                  "path": null,
+                                  "component": null,
+                                  "icon": null,
+                                  "orderNo": 999,
+                                  "visible": true,
+                                  "enabled": true
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"))
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
     void assignRoleResourcesShouldAutoFillAncestors() throws Exception {
         Long roleId = createTempRole("tenant-a");
 
@@ -93,21 +150,80 @@ class ResourceAuthorizationControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "resourceIds": [25]
+                                  "resourceIds": [24]
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[?(@==1)]").exists())
-                .andExpect(jsonPath("$.data[?(@==20)]").exists())
-                .andExpect(jsonPath("$.data[?(@==25)]").exists());
+                .andExpect(jsonPath("$.data[?(@==30)]").exists())
+                .andExpect(jsonPath("$.data[?(@==24)]").exists());
 
         mockMvc.perform(get("/api/roles/{roleId}/resources", roleId)
                         .with(user(principal("tenant-a", Set.of("role:read"))))
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[?(@==1)]").exists())
+                .andExpect(jsonPath("$.data[?(@==30)]").exists())
+                .andExpect(jsonPath("$.data[?(@==24)]").exists());
+    }
+
+    @Test
+    void assignMenuShouldNotGrantChildButtonsUnlessSelected() throws Exception {
+        Long roleId = createTempRole("tenant-a");
+
+        mockMvc.perform(put("/api/roles/{roleId}/resources", roleId)
+                        .with(user(principal("tenant-a", Set.of("role:write"))))
+                        .with(csrf())
+                        .header("X-Tenant-Id", "tenant-a")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "resourceIds": [21]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@==1)]").exists())
                 .andExpect(jsonPath("$.data[?(@==20)]").exists())
-                .andExpect(jsonPath("$.data[?(@==25)]").exists());
+                .andExpect(jsonPath("$.data[?(@==21)]").exists());
+
+        List<Long> assignedIds = jdbcTemplate.queryForList(
+                "SELECT resource_id FROM sys_role_resource WHERE tenant_id = ? AND role_id = ?",
+                Long.class,
+                "tenant-a",
+                roleId
+        );
+        assertThat(assignedIds).contains(1L, 20L, 21L);
+        assertThat(assignedIds).doesNotContain(210L, 211L, 212L);
+    }
+
+    @Test
+    void assignButtonShouldAutoFillAncestorMenuOnly() throws Exception {
+        Long roleId = createTempRole("tenant-a");
+
+        mockMvc.perform(put("/api/roles/{roleId}/resources", roleId)
+                        .with(user(principal("tenant-a", Set.of("role:write"))))
+                        .with(csrf())
+                        .header("X-Tenant-Id", "tenant-a")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "resourceIds": [210]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@==1)]").exists())
+                .andExpect(jsonPath("$.data[?(@==20)]").exists())
+                .andExpect(jsonPath("$.data[?(@==21)]").exists())
+                .andExpect(jsonPath("$.data[?(@==210)]").exists());
+
+        List<Long> assignedIds = jdbcTemplate.queryForList(
+                "SELECT resource_id FROM sys_role_resource WHERE tenant_id = ? AND role_id = ?",
+                Long.class,
+                "tenant-a",
+                roleId
+        );
+        assertThat(assignedIds).contains(1L, 20L, 21L, 210L);
+        assertThat(assignedIds).doesNotContain(211L, 212L);
     }
 
     @Test

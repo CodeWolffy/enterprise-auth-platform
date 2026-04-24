@@ -20,7 +20,7 @@
           </el-icon>
           <el-icon class="action-icon action-icon--refresh" @click="reloadPage"><RefreshRight /></el-icon>
           <el-breadcrumb separator=">" class="breadcrumb">
-            <el-breadcrumb-item :to="{ path: '/dashboard' }">平台管理</el-breadcrumb-item>
+            <el-breadcrumb-item :to="{ path: '/dashboard' }">{{ breadcrumbRoot }}</el-breadcrumb-item>
             <el-breadcrumb-item v-if="pageTitle && pageTitle !== '运行总览'">{{ pageTitle }}</el-breadcrumb-item>
           </el-breadcrumb>
         </div>
@@ -231,6 +231,15 @@ const canScrollTagsLeft = ref(false)
 const canScrollTagsRight = ref(false)
 
 const pageTitle = computed(() => String(route.meta.title ?? '控制台'))
+const breadcrumbRoot = computed(() => {
+  if (route.path.startsWith('/platform')) {
+    return '平台管理'
+  }
+  if (route.path.startsWith('/system')) {
+    return '系统管理'
+  }
+  return '控制台'
+})
 const avatarName = computed(() => {
   const name = authStore.snapshot?.username || 'U'
   return name.charAt(0).toUpperCase()

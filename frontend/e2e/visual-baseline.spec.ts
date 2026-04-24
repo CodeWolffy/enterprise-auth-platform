@@ -7,14 +7,17 @@ const navCases = [
   { path: '/system/users', name: 'menu-users' },
   { path: '/system/roles', name: 'menu-roles' },
   { path: '/system/depts', name: 'menu-departments' },
+  { path: '/system/online-users', name: 'menu-online-users' },
+  { path: '/system/resources', name: 'menu-resources' },
 ]
 
 const systemCases = [
-  { path: '/system/settings', name: 'system-workbench' },
-  { path: '/system/settings/dicts', name: 'system-dicts' },
-  { path: '/system/settings/configs', name: 'system-configs' },
-  { path: '/system/settings/notices', name: 'system-notices' },
-  { path: '/system/settings/categories', name: 'system-categories' },
+  { path: '/platform/dicts', name: 'platform-dicts' },
+  { path: '/platform/tenants', name: 'platform-tenants' },
+  { path: '/platform/tenant-catalog', name: 'platform-tenant-catalog' },
+  { path: '/platform/configs', name: 'platform-configs' },
+  { path: '/platform/notices', name: 'platform-notices' },
+  { path: '/platform/categories', name: 'platform-categories' },
 ]
 
 function noAnimationCss() {
@@ -178,6 +181,142 @@ async function mockApis(page: Page) {
             },
           ],
         }),
+      )
+      return
+    }
+
+    if (url.pathname === '/api/auth/sessions' && method === 'GET') {
+      await fulfillJson(
+        route,
+        200,
+        apiEnvelope([
+          {
+            sessionId: 'session-1',
+            username: 'admin',
+            tenantId: 'platform',
+            clientIp: '127.0.0.1',
+            device: 'Mozilla/5.0 Chrome/120',
+            issuedAt: 1773997200000,
+            expiresAt: 1774087200000,
+            lastAccessAt: 1774000800000,
+            active: true,
+          },
+        ]),
+      )
+      return
+    }
+
+    if (url.pathname === '/api/resources/tree' && method === 'GET') {
+      await fulfillJson(
+        route,
+        200,
+        apiEnvelope([
+          {
+            id: 20,
+            resourceKey: 'system',
+            resourceName: '系统管理',
+            resourceType: 'DIR',
+            parentId: 1,
+            ancestors: '1',
+            routeKey: null,
+            grantKey: null,
+            path: null,
+            component: null,
+            icon: 'Setting',
+            orderNo: 20,
+            visible: true,
+            enabled: true,
+            system: true,
+            children: [
+              {
+                id: 21,
+                resourceKey: 'users',
+                resourceName: '用户管理',
+                resourceType: 'MENU',
+                parentId: 20,
+                ancestors: '1,20',
+                routeKey: 'users',
+                grantKey: 'user:read',
+                path: '/system/users',
+                component: 'UsersView',
+                icon: 'Avatar',
+                orderNo: 10,
+                visible: true,
+                enabled: true,
+                system: true,
+                children: [],
+              },
+            ],
+          },
+        ]),
+      )
+      return
+    }
+
+    if (url.pathname === '/api/tenants' && method === 'GET') {
+      await fulfillJson(
+        route,
+        200,
+        apiEnvelope({
+          total: 1,
+          page: 1,
+          size: 10,
+          records: [
+            {
+              tenantId: 'platform',
+              name: '平台租户',
+              platformLevel: true,
+              tenantStatus: 1,
+              expireAt: null,
+              packageCode: 'platform-governance',
+              packageName: '平台治理版',
+              userQuota: 100,
+              storageQuotaGb: 100,
+              capabilityCodes: ['auth', 'tenant'],
+              lifecycleNote: 'mock',
+            },
+          ],
+        }),
+      )
+      return
+    }
+
+    if (url.pathname === '/api/tenant-catalog/packages' && method === 'GET') {
+      await fulfillJson(
+        route,
+        200,
+        apiEnvelope([
+          {
+            id: 1,
+            packageCode: 'platform-governance',
+            packageName: '平台治理版',
+            userQuota: 100,
+            storageQuotaGb: 100,
+            packageDesc: 'mock package',
+            enabled: true,
+            capabilityCodes: ['auth', 'tenant'],
+            referencedTenantCount: 1,
+          },
+        ]),
+      )
+      return
+    }
+
+    if (url.pathname === '/api/tenant-catalog/capabilities' && method === 'GET') {
+      await fulfillJson(
+        route,
+        200,
+        apiEnvelope([
+          {
+            id: 1,
+            capabilityCode: 'auth',
+            capabilityName: '认证安全',
+            capabilityDesc: 'mock capability',
+            sortOrder: 10,
+            enabled: true,
+            referencedPackageCount: 1,
+          },
+        ]),
       )
       return
     }
