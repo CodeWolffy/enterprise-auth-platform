@@ -46,6 +46,7 @@ export interface UserSessionView {
   expiresAt?: number | null
   lastAccessAt?: number | null
   active: boolean
+  currentSession?: boolean
 }
 
 export interface CaptchaResponse {

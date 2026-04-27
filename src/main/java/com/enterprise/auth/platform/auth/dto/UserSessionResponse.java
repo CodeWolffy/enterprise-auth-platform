@@ -12,6 +12,14 @@ public record UserSessionResponse(
         @Schema(description = "签发时间") Long issuedAt,
         @Schema(description = "过期时间") Long expiresAt,
         @Schema(description = "最后访问时间") Long lastAccessAt,
-        @Schema(description = "是否仍然有效") boolean active
+        @Schema(description = "是否仍然有效") boolean active,
+        @Schema(description = "是否当前会话") boolean currentSession
 ) {
+    public UserSessionResponse(
+            String sessionId, String username, String tenantId, String clientIp,
+            String device, Long issuedAt, Long expiresAt, Long lastAccessAt, boolean active
+    ) {
+        this(sessionId, username, tenantId, clientIp, device,
+                issuedAt, expiresAt, lastAccessAt, active, false);
+    }
 }

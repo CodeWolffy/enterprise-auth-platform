@@ -54,7 +54,7 @@ const DYNAMIC_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = {
     path: 'system/online-users',
     name: 'online-users',
     component: () => import('@/views/OnlineUsersView.vue'),
-    meta: { title: '在线用户', routeKey: 'online-users', requiresGrant: 'auth:read' },
+    meta: { title: '在线用户', routeKey: 'online-users', requiresGrant: 'session:write' },
   },
   audit: {
     path: 'system/audit',

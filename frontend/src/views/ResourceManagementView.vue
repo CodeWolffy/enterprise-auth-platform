@@ -37,7 +37,7 @@
             </template>
           </el-input>
           <el-button :icon="Refresh" @click="load">刷新</el-button>
-          <el-button type="primary" :icon="Plus" @click="openCreate(null)">新增顶层</el-button>
+          <el-button v-permission="'system:write'" type="primary" :icon="Plus" data-testid="resources-create-root" @click="openCreate(null)">新增顶层</el-button>
         </div>
       </div>
 
@@ -106,6 +106,7 @@
           <template #default="{ row }">
             <el-input-number
               v-model="sortDrafts[row.id]"
+              v-permission="'system:write'"
               :min="0"
               :max="9999"
               size="small"
@@ -120,6 +121,7 @@
             <div class="row-actions">
               <el-tooltip content="新增下级" placement="top">
                 <el-button
+                  v-permission="'system:write'"
                   circle
                   :icon="Plus"
                   type="primary"
@@ -129,10 +131,10 @@
                 />
               </el-tooltip>
               <el-tooltip content="编辑" placement="top">
-                <el-button circle :icon="Edit" type="primary" plain @click="openEdit(row)" />
+                <el-button v-permission="'system:write'" circle :icon="Edit" type="primary" plain data-testid="resources-edit" @click="openEdit(row)" />
               </el-tooltip>
               <el-tooltip content="删除" placement="top">
-                <el-button circle :icon="Delete" type="danger" plain :disabled="row.system" @click="removeResource(row)" />
+                <el-button v-permission="'system:write'" circle :icon="Delete" type="danger" plain data-testid="resources-delete" :disabled="row.system" @click="removeResource(row)" />
               </el-tooltip>
             </div>
           </template>
@@ -239,7 +241,7 @@
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitForm">保存</el-button>
+        <el-button v-permission="'system:write'" type="primary" @click="submitForm">保存</el-button>
       </template>
     </el-dialog>
   </div>

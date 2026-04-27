@@ -19,7 +19,7 @@
 <span class="eyebrow">分类</span>
           <h3>分类配置管理</h3>
         </div>
-        <el-button type="primary" @click="openDialog()">新增分类</el-button>
+        <el-button v-permission="'system:write'" type="primary" @click="openDialog()">新增分类</el-button>
       </div>
 
       <el-tabs v-model="activeTab" @tab-change="handleTabChange">
@@ -103,8 +103,8 @@
         >
           <template #default="{ row }">
             <el-button link type="primary" @click="openAnalysis(row)">分析</el-button>
-            <el-button link type="primary" @click="openDialog(row)">编辑</el-button>
-            <el-button link type="danger" @click="removeRow(row)">删除</el-button>
+            <el-button v-permission="'system:write'" link type="primary" @click="openDialog(row)">编辑</el-button>
+            <el-button v-permission="'system:write'" link type="danger" @click="removeRow(row)">删除</el-button>
           </template>
         </el-table-column>
         <template #empty>
@@ -127,7 +127,7 @@
       </el-form>
       <template #footer>
         <el-button @click="visible = false">取消</el-button>
-        <el-button type="primary" @click="submit">保存</el-button>
+        <el-button v-permission="'system:write'" type="primary" @click="submit">保存</el-button>
       </template>
     </el-dialog>
 

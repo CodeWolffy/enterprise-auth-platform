@@ -70,7 +70,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
             return;
         }
         registry.addMapping("/api/**")
-                .allowedOrigins(allowedOrigins.toArray(String[]::new))
+                .allowedOriginPatterns(allowedOrigins.toArray(String[]::new))
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true)

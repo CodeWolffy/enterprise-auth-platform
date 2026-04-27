@@ -29,13 +29,13 @@
           <span class="eyebrow">在线用户</span>
           <h3>在线用户</h3>
         </div>
-        <el-button type="primary" :loading="loading" @click="load">刷新</el-button>
+        <el-button type="primary" :loading="loading" data-testid="online-users-refresh" @click="load">刷新</el-button>
       </div>
 
       <div class="session-toolbar">
         <el-input v-model.trim="keyword" placeholder="搜索用户、租户、IP 或设备" clearable />
         <el-radio-group v-model="statusFilter" size="small">
-          <el-radio-button v-for="item in statusOptions" :key="item.value" :label="item.value">
+          <el-radio-button v-for="item in statusOptions" :key="item.value" :value="item.value">
             {{ item.label }}
           </el-radio-button>
         </el-radio-group>
@@ -47,8 +47,13 @@
         </template>
       </el-result>
 
-      <el-table v-else v-loading="loading" :data="filteredSessions" stripe>
+      <el-table v-else v-loading="loading" :data="filteredSessions" stripe data-testid="online-users-table">
         <el-table-column prop="username" label="用户" min-width="130" />
+        <el-table-column label="标记" width="100">
+          <template #default="{ row }">
+            <el-tag v-if="row.currentSession" type="success" effect="dark" size="small">当前会话</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="tenantId" label="租户" min-width="130" />
         <el-table-column prop="clientIp" label="登录 IP" min-width="130" />
         <el-table-column label="设备" min-width="170" show-overflow-tooltip>
@@ -80,7 +85,7 @@
         </el-table-column>
         <el-table-column label="操作" width="120" fixed="right">
           <template #default="{ row }">
-            <el-button link type="danger" :disabled="!row.active" @click="kickSession(row.sessionId)">
+            <el-button v-permission="'session:write'" link type="danger" data-testid="online-users-force-offline" :disabled="!row.active || row.currentSession" @click="kickSession(row.sessionId)">
               强制下线
             </el-button>
           </template>
@@ -142,7 +147,7 @@ async function load() {
   loading.value = true
   loadError.value = ''
   try {
-    sessions.value = await querySessions()
+    sessions.value = await querySessions('all')
   } catch {
     sessions.value = []
     loadError.value = '在线用户数据加载失败，请稍后重试。'

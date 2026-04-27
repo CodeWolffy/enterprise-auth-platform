@@ -15,6 +15,7 @@
             type="text"
             placeholder="用户名"
             autocomplete="username"
+            data-testid="login-username"
             :class="{ 'is-error': Boolean(fieldErrors.username) }"
             @input="clearFieldError('username')"
           />
@@ -29,12 +30,14 @@
               :type="showPassword ? 'text' : 'password'"
               placeholder="密码"
               autocomplete="current-password"
+              data-testid="login-password"
               :class="{ 'is-error': Boolean(fieldErrors.password) }"
               @input="clearFieldError('password')"
             />
             <button
               class="auth-toggle-pw"
               type="button"
+              data-testid="login-toggle-password"
               :aria-label="showPassword ? '隐藏密码' : '显示密码'"
               @click="showPassword = !showPassword"
             >
@@ -52,13 +55,13 @@
 
         <div class="auth-captcha-row" :class="{ 'is-verified': captchaVerified }">
           <span>{{ captchaVerified ? '验证通过' : '需完成滑块验证' }}</span>
-          <button class="auth-link" type="button" @click="openCaptchaDialog({ refresh: true })">
+          <button class="auth-link" type="button" data-testid="login-open-captcha" @click="openCaptchaDialog({ refresh: true })">
             {{ captchaVerified ? '重新验证' : '去验证' }}
           </button>
         </div>
         <p v-if="fieldErrors.captcha" class="auth-error">{{ fieldErrors.captcha }}</p>
 
-        <div v-if="statusMessage" class="auth-status" :class="sceneStatus">
+        <div v-if="statusMessage" class="auth-status" :class="sceneStatus" data-testid="login-status">
           {{ statusMessage }}
         </div>
 
@@ -103,7 +106,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import SliderCaptcha from '@/components/auth/SliderCaptcha.vue'
 import { fetchCaptcha, verifyCaptcha } from '@/api/auth'
@@ -140,6 +143,15 @@ const fieldErrors = reactive({
   username: '',
   password: '',
   captcha: '',
+})
+
+onMounted(() => {
+  const reason = String(route.query.authReason ?? '')
+  if (!reason) {
+    return
+  }
+  sceneStatus.value = 'error'
+  statusMessage.value = authReasonMessage(reason)
 })
 
 function clearFieldError(field: keyof typeof fieldErrors) {
@@ -228,6 +240,19 @@ async function handleSliderVerify(track: CaptchaTrackPayload) {
 function resolveErrorMessage(error: unknown, fallback: string) {
   const maybe = error as { response?: { data?: { message?: string } } }
   return maybe?.response?.data?.message || fallback
+}
+
+function authReasonMessage(reason: string) {
+  if (reason === 'SESSION_OFFLINE') {
+    return '当前账号已被强制下线，请重新登录'
+  }
+  if (reason === 'SESSION_EXPIRED') {
+    return '登录已过期，请重新登录'
+  }
+  if (reason === 'INVALID_TOKEN') {
+    return '登录凭证已失效，请重新登录'
+  }
+  return '请先登录后继续访问'
 }
 
 function validateForm() {

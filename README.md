@@ -1,12 +1,11 @@
 # 企业级权限管理平台
 
 `enterprise-auth-platform` 是一套面向企业后台场景的权限与租户管理平台。  
-当前代码已经从“OAuth2/OIDC 认证中心 + 自建 JWT/Refresh Token”双轨模式，收敛为更轻量的企业后台模型：
+当前代码已经从“OAuth2/OIDC 认证中心 + 自建 JWT/Refresh Token”双轨模式，收敛为基于 Sa-Token 的企业后台模型：
 
 - 账号密码登录
 - Redis Session
-- HttpOnly Cookie
-- CSRF 防护
+- `Authorization: Bearer` Header Token
 - RBAC
 - 多租户隔离
 - 审计与会话治理
@@ -17,12 +16,13 @@
 
 1. 前端调用 `POST /api/auth/login`
 2. 后端校验租户、账号、密码、验证码与登录风控
-3. 后端创建 Redis Session，并下发 `sid` Cookie
-4. 前端通过 `GET /api/auth/me` 恢复用户、菜单和权限快照
+3. 后端创建 Sa-Token Redis Session，并返回 Bearer token
+4. 前端用 `Authorization: Bearer <token>` 调用 `GET /api/auth/me` 恢复用户、菜单和权限快照
 
 当前设计约束：
 
-- 浏览器不再持有 `access_token` / `refresh_token`
+- 浏览器不再持有自建 `access_token` / `refresh_token`
+- 主认证链路不依赖 Cookie，不启用 CSRF Token
 - 后端主链路不再依赖 OAuth2 Authorization Server
 - 角色资源授权保存于 `sys_role_resource`
 - 自定义数据范围直接保存 `data_scope_value_json`
@@ -51,7 +51,7 @@
 
 ### 认证与授权
 
-- 基于 Session Cookie 的企业后台登录
+- 基于 Sa-Token Header Token 的企业后台登录
 - 验证码、登录失败限制、会话管理、强制下线
 - RBAC 授权模型
 - 权限快照恢复与菜单动态渲染
@@ -118,7 +118,6 @@
 ### 认证
 
 - `GET /api/auth/captcha`
-- `GET /api/auth/csrf`
 - `GET /api/auth/register/options`
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
@@ -126,6 +125,8 @@
 - `GET /api/auth/sessions`
 - `POST /api/auth/sessions/{sessionId}/offline`
 - `POST /api/auth/register`
+
+详细认证与会话策略见 [docs/security-auth.md](docs/security-auth.md)。
 
 ### 用户、角色、部门
 
@@ -286,7 +287,7 @@ npm run test:visual:update
 ## 部署前检查
 
 - 参考 `DEPLOYMENT_CHECKLIST.md`
-- 重点检查：DB、Redis、`allowed-origins`、租户参数、Cookie 安全策略
+- 重点检查：DB、Redis、`allowed-origins`、租户参数、Bearer Token 与会话超时策略
 
 ## 视觉快照策略
 
@@ -351,7 +352,7 @@ npm run test:visual:update
 
 ## 最近改造结果
 
-- 已切换主登录链路到 Session Cookie
+- 已切换主登录链路到 Sa-Token Header Token
 - 已移除前后端 OAuth Client / Scope / Consent 管理入口
 - 已移除后端 JWT / Authorization Server 主路径依赖
 - 已切换资源授权模型（`sys_resource` + `sys_role_resource` + `sys_tenant_resource_override`）

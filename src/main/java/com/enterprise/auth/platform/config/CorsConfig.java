@@ -13,9 +13,7 @@ public class CorsConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource(FrontendProperties frontendProperties) {
         CorsConfiguration configuration = new CorsConfiguration();
-        // 开发环境：允许所有来源
-        // 生产环境请改用：configuration.setAllowedOriginPatterns(frontendProperties.resolvedAllowedOrigins());
-        configuration.addAllowedOriginPattern("*");
+        configuration.setAllowedOriginPatterns(frontendProperties.resolvedAllowedOrigins());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of(

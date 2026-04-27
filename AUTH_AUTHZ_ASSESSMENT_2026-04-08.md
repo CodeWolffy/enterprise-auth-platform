@@ -1,5 +1,7 @@
 # 登录认证与鉴权机制全面评估报告 (2026-04-08)
 
+> 注：本文是 2026-04-08 的历史评估。当前主认证链路已迁移为 Sa-Token `Authorization: Bearer` Header Token 模式；旧的 Session-Cookie / CSRF 设计结论仅作为历史背景，当前策略以 `docs/security-auth.md` 为准。
+
 基于对当前 `enterprise-auth-platform` 系统前端（Vue3 + Pinia + Axios）与后端（Spring Boot 3 + Spring Security + Redis）的全面代码审计与架构分析，现提供以下系统的认证鉴权机制评估报告。
 
 ## 一、 当前架构概况与合理性分析

@@ -89,6 +89,7 @@ export async function seedAuthSession(page: Page, snapshot: MockPermissionSnapsh
   const resolvedTenantId = snapshot?.tenantId ?? 'platform'
   const payload = {
     authenticated: true,
+    token: 'e2e-token',
     expiresAt: now + 60 * 60 * 1000,
     tenantId: resolvedTenantId,
     operatorTenantId: snapshot?.operatorTenantId ?? resolvedTenantId,

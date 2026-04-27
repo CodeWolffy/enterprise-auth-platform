@@ -22,12 +22,14 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import cn.dev33.satoken.stp.StpUtil;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "认证中心")
@@ -79,7 +81,7 @@ public class AuthController {
         ));
     }
 
-    @Operation(summary = "账号密码登录并写入 Sa-Token Cookie")
+    @Operation(summary = "账号密码登录并返回 Sa-Token Bearer Token")
     @RateLimit(key = "login", strategy = RateLimit.Strategy.IP)
     @PostMapping("/login")
     public ApiResponse<TokenSessionResponse> login(
@@ -106,8 +108,10 @@ public class AuthController {
 
     @Operation(summary = "获取当前用户在线会话")
     @GetMapping("/sessions")
-    public ApiResponse<List<UserSessionResponse>> sessions() {
-        return ApiResponse.ok(authService.sessions(currentUser()));
+    public ApiResponse<List<UserSessionResponse>> sessions(
+            @Parameter(description = "查询范围: own(仅自己) 或 all(全租户)") @RequestParam(defaultValue = "own") String scope
+    ) {
+        return ApiResponse.ok(authService.sessions(currentUser(), scope, StpUtil.getTokenValue()));
     }
 
     @Operation(summary = "强制指定会话下线")

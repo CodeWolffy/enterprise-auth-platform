@@ -393,7 +393,7 @@ async function mockApis(page: Page) {
 async function captureCases(page: Page, cases: Array<{ path: string; name: string }>, suffix: string) {
   for (const item of cases) {
     await page.goto(item.path)
-    await expect(page.locator('.console-content .panel-stack').first()).toBeVisible()
+    await expect(page.locator('.admin-main .panel-stack').first()).toBeVisible()
     await expect(page.locator('.panel-head h3').first()).toBeVisible()
     await expect(page).toHaveScreenshot(`${item.name}-${suffix}.png`, { fullPage: true, maxDiffPixelRatio: 0.02 })
   }

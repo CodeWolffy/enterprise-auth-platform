@@ -3,6 +3,7 @@ package com.enterprise.auth.platform.auth;
 import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.bearer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -110,9 +111,92 @@ class AuthorizationBoundaryTest {
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
 
+    @Test
+    void auditWriteEndpointsShouldRequireAuditWritePermission() throws Exception {
+        mockMvc.perform(get("/api/audit/events/export")
+                        .with(bearer(principal(Set.of("audit:read"))))
+                        .header("X-Tenant-Id", "platform"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mockMvc.perform(post("/api/audit/exports")
+                        .with(bearer(principal(Set.of("audit:read"))))
+                        .header("X-Tenant-Id", "platform"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mockMvc.perform(put("/api/audit/exports/policy")
+                        .with(bearer(principal(Set.of("audit:read"))))
+                        .header("X-Tenant-Id", "platform")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "retentionDays": 7,
+                                  "maxTasks": 100
+                                }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+    }
+
+    @Test
+    void systemAndResourceWriteEndpointsShouldRequireSystemWritePermission() throws Exception {
+        mockMvc.perform(post("/api/system/dicts")
+                        .with(bearer(principal(Set.of("system:read"))))
+                        .header("X-Tenant-Id", "platform")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "dictType": "auth_boundary",
+                                  "dictCode": "AUTH_BOUNDARY_DICT",
+                                  "dictValue": "Auth Boundary"
+                                }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mockMvc.perform(post("/api/resources")
+                        .with(bearer(principal(Set.of("system:read"))))
+                        .header("X-Tenant-Id", "platform")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "parentId": 20,
+                                  "resourceType": "MENU",
+                                  "resourceKey": "auth.boundary",
+                                  "resourceName": "Auth Boundary",
+                                  "routeKey": "auth-boundary",
+                                  "grantKey": "auth:read",
+                                  "path": "/auth-boundary",
+                                  "component": "AuthBoundaryView",
+                                  "icon": null,
+                                  "orderNo": 999,
+                                  "visible": true,
+                                  "enabled": true
+                                }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+    }
+
+    @Test
+    void allScopeSessionsShouldFallBackToOwnSessionsWithoutSessionWritePermission() throws Exception {
+        mockMvc.perform(get("/api/auth/sessions")
+                        .queryParam("scope", "all")
+                        .with(bearer(principal(990001L, Set.of("auth:read"))))
+                        .header("X-Tenant-Id", "platform"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.username!='authorization_boundary_user')]").doesNotExist())
+                .andExpect(jsonPath("$.data[?(@.currentSession==true)]").exists());
+    }
+
     private UserAccount principal(Set<String> permissions) {
+        return principal(1L, permissions);
+    }
+
+    private UserAccount principal(long userId, Set<String> permissions) {
         return new UserAccount(
-                1L,
+                userId,
                 "platform",
                 "authorization_boundary_user",
                 passwordHasher.hash("Boundary@123"),

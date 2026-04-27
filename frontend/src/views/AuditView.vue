@@ -30,8 +30,8 @@
           <h3>安全审计</h3>
         </div>
         <div class="panel-actions">
-          <el-button data-testid="audit-export-current" @click="exportCurrentPage">导出当前查询</el-button>
-          <el-button type="primary" plain data-testid="audit-export-async" @click="createAsyncExport">异步导出</el-button>
+          <el-button v-permission="'audit:write'" data-testid="audit-export-current" @click="exportCurrentPage">导出当前查询</el-button>
+          <el-button v-permission="'audit:write'" type="primary" plain data-testid="audit-export-async" @click="createAsyncExport">异步导出</el-button>
         </div>
       </div>
 
@@ -164,8 +164,8 @@
           </p>
         </div>
         <div class="panel-actions">
-          <el-button @click="archiveExportTasksByFilter">批量归档</el-button>
-          <el-button @click="cleanupExportTasks">批量清理</el-button>
+          <el-button v-permission="'audit:write'" @click="archiveExportTasksByFilter">批量归档</el-button>
+          <el-button v-permission="'audit:write'" @click="cleanupExportTasks">批量清理</el-button>
         </div>
       </div>
 
@@ -201,7 +201,7 @@
           <el-input-number v-model="exportPolicy.maxTasks" :min="1" :max="5000" />
         </el-form-item>
         <template #extra-actions>
-          <el-button type="success" plain @click="saveRetentionPolicy">保存保留策略</el-button>
+          <el-button v-permission="'audit:write'" type="success" plain @click="saveRetentionPolicy">保存保留策略</el-button>
         </template>
       </AdvancedSearch>
 
@@ -280,10 +280,10 @@
         <el-table-column v-if="exportTablePrefs.visibleColumnMap.actions" column-key="actions" fixed="right" label="操作" width="340" :min-width="240" :resizable="true">
           <template #default="{ row }">
             <el-button link type="primary" data-testid="audit-task-detail" @click="openTaskDetail(row)">详情</el-button>
-            <el-button link type="primary" :disabled="row.status !== 'SUCCESS'" @click="downloadTask(row.id)">下载</el-button>
-            <el-button link type="warning" data-testid="audit-task-archive" :disabled="!row.archivable" @click="archiveTask(row.id)">归档</el-button>
-            <el-button link type="warning" :disabled="row.status !== 'FAILED'" @click="retryTask(row.id)">重试</el-button>
-            <el-button link type="danger" data-testid="audit-task-delete" @click="removeTask(row.id)">删除</el-button>
+            <el-button v-permission="'audit:write'" link type="primary" :disabled="row.status !== 'SUCCESS'" @click="downloadTask(row.id)">下载</el-button>
+            <el-button v-permission="'audit:write'" link type="warning" data-testid="audit-task-archive" :disabled="!row.archivable" @click="archiveTask(row.id)">归档</el-button>
+            <el-button v-permission="'audit:write'" link type="warning" :disabled="row.status !== 'FAILED'" @click="retryTask(row.id)">重试</el-button>
+            <el-button v-permission="'audit:write'" link type="danger" data-testid="audit-task-delete" @click="removeTask(row.id)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>

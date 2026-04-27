@@ -16,6 +16,7 @@ import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
 import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
 import com.enterprise.auth.platform.security.DataScopeService;
 import com.enterprise.auth.platform.security.PasswordHasher;
+import com.enterprise.auth.platform.security.PlatformAdminSupport;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import com.enterprise.auth.platform.user.dto.CreateUserRequest;
 import com.enterprise.auth.platform.user.dto.RegisterRequest;
@@ -25,6 +26,7 @@ import com.enterprise.auth.platform.user.repository.UserRepository;
 import com.enterprise.auth.platform.user.service.management.UserManagementService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -44,6 +46,7 @@ public class AuthService {
     private final RegisterAttemptService registerAttemptService;
     private final RegistrationPolicyService registrationPolicyService;
     private final UserManagementService userManagementService;
+    private final PlatformAdminSupport platformAdminSupport;
     private final SecurityProperties securityProperties;
 
     public AuthService(
@@ -57,6 +60,7 @@ public class AuthService {
             RegisterAttemptService registerAttemptService,
             RegistrationPolicyService registrationPolicyService,
             UserManagementService userManagementService,
+            PlatformAdminSupport platformAdminSupport,
             SecurityProperties securityProperties
     ) {
         this.captchaService = captchaService;
@@ -69,6 +73,7 @@ public class AuthService {
         this.registerAttemptService = registerAttemptService;
         this.registrationPolicyService = registrationPolicyService;
         this.userManagementService = userManagementService;
+        this.platformAdminSupport = platformAdminSupport;
         this.securityProperties = securityProperties;
     }
 
@@ -107,6 +112,7 @@ public class AuthService {
             Instant expiresAt = now.plusSeconds(timeoutSeconds);
             SaSession tokenSession = StpUtil.getTokenSession();
             tokenSession.set("username", user.username());
+            tokenSession.set("userId", user.id());
             tokenSession.set("tenantId", user.tenantId());
             tokenSession.set("clientIp", clientIp);
             tokenSession.set("device", StringUtils.hasText(request.device()) ? request.device() : "unknown");
@@ -126,28 +132,87 @@ public class AuthService {
     }
 
     public void logout(String sessionId, String username, String tenantId) {
+        Map<String, Object> payload = sessionAuditPayload(sessionId);
         StpUtil.logoutByTokenValue(sessionId);
-        auditService.record("LOGOUT", username, tenantId, Map.of("sessionId", sessionId));
+        auditService.record("LOGOUT", username, tenantId, payload);
     }
 
-    public List<UserSessionResponse> sessions(UserAccount currentUser) {
+    public List<UserSessionResponse> sessions(UserAccount currentUser, String scope, String currentToken) {
+        boolean allTenant = "all".equals(scope)
+                && (currentUser.permissions().contains("session:write") || platformAdminSupport.isPlatformSuperAdmin(currentUser));
+        if (allTenant) {
+            return allSessions(currentUser, currentToken);
+        }
+        return ownSessions(currentUser, currentToken);
+    }
+
+    private List<UserSessionResponse> ownSessions(UserAccount currentUser, String currentToken) {
         return StpUtil.getTokenValueListByLoginId(currentUser.id()).stream()
-                .map(token -> toSessionResponse(token, currentUser))
+                .map(token -> toSessionResponse(token, currentUser, currentToken))
+                .filter(session -> session.active())
+                .sorted((a, b) -> Long.compare(b.lastAccessAt(), a.lastAccessAt()))
                 .toList();
+    }
+
+    private List<UserSessionResponse> allSessions(UserAccount currentUser, String currentToken) {
+        String tokenKeyPrefix = StpUtil.stpLogic.splicingKeyTokenValue("");
+        return StpUtil.stpLogic.searchTokenValue("", 0, 10000, false).stream()
+                .map(tokenKey -> removePrefix(tokenKey, tokenKeyPrefix))
+                .map(token -> safeSessionResponse(token, currentUser, currentToken))
+                .filter(session -> session != null)
+                .filter(session -> session.active())
+                .filter(session -> tenantVisible(currentUser, session))
+                .filter(session -> dataScopeService.canAccessUser(session.tenantId(), resolveUserId(session.sessionId())))
+                .sorted((a, b) -> Long.compare(b.lastAccessAt(), a.lastAccessAt()))
+                .toList();
+    }
+
+    private String removePrefix(String value, String prefix) {
+        if (value != null && prefix != null && value.startsWith(prefix)) {
+            return value.substring(prefix.length());
+        }
+        return value;
+    }
+
+    private boolean tenantVisible(UserAccount currentUser, UserSessionResponse session) {
+        if (platformAdminSupport.isPlatformSuperAdmin(currentUser)) {
+            return true;
+        }
+        return currentUser.tenantId().equals(session.tenantId());
+    }
+
+    private Long resolveUserId(String token) {
+        try {
+            Object loginId = StpUtil.stpLogic.getLoginIdByToken(token);
+            return loginId == null ? 0L : Long.parseLong(String.valueOf(loginId));
+        } catch (Exception e) {
+            return 0L;
+        }
+    }
+
+    private UserSessionResponse safeSessionResponse(String token, UserAccount fallbackUser, String currentToken) {
+        try {
+            return toSessionResponse(token, fallbackUser, currentToken);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public void forceOffline(UserAccount currentUser, String sessionId) {
         Long targetUserId = resolveLoginId(sessionId);
         String targetTenantId = sessionAttribute(sessionId, "tenantId", currentUser.tenantId());
+        Map<String, Object> payload = sessionAuditPayload(sessionId);
         boolean sameOwner = currentUser.id().equals(targetUserId);
         boolean canManage = currentUser.permissions().contains("session:write");
-        boolean sameTenant = currentUser.tenantId().equals(targetTenantId);
-        boolean visibleTarget = dataScopeService.canAccessUser(currentUser.tenantId(), targetUserId);
-        if (!sameOwner && (!canManage || !sameTenant || !visibleTarget)) {
+        boolean platformAdmin = platformAdminSupport.isPlatformSuperAdmin(currentUser);
+        boolean sameTenantOrPlatform = currentUser.tenantId().equals(targetTenantId) || platformAdmin;
+        boolean visibleTarget = platformAdmin || dataScopeService.canAccessUser(currentUser.tenantId(), targetUserId);
+        if (!sameOwner && (!canManage || !sameTenantOrPlatform || !visibleTarget)) {
             throw new BusinessException("ACCESS_DENIED", "无权操作此会话");
         }
         StpUtil.kickoutByTokenValue(sessionId);
-        auditService.record("SESSION_FORCED_OFFLINE", currentUser.username(), currentUser.tenantId(), Map.of("sessionId", sessionId));
+        payload.put("targetUserId", targetUserId);
+        auditService.record("SESSION_FORCED_OFFLINE", currentUser.username(), currentUser.tenantId(), payload);
     }
 
     public UserSummary register(RegisterRequest request, HttpServletRequest servletRequest) {
@@ -185,11 +250,12 @@ public class AuthService {
         }
     }
 
-    private UserSessionResponse toSessionResponse(String token, UserAccount fallbackUser) {
+    private UserSessionResponse toSessionResponse(String token, UserAccount fallbackUser, String currentToken) {
         SaSession tokenSession = StpUtil.getTokenSessionByToken(token);
         long issuedAt = sessionLong(tokenSession, "issuedAt", 0L);
         long expiresAt = sessionLong(tokenSession, "expiresAt", 0L);
         long lastAccessAt = sessionLong(tokenSession, "lastAccessAt", issuedAt);
+        boolean currentSession = token.equals(currentToken);
         return new UserSessionResponse(
                 token,
                 sessionString(tokenSession, "username", fallbackUser.username()),
@@ -199,7 +265,8 @@ public class AuthService {
                 issuedAt,
                 expiresAt,
                 lastAccessAt,
-                StpUtil.stpLogic.getLoginIdByToken(token) != null
+                StpUtil.stpLogic.getLoginIdByToken(token) != null,
+                currentSession
         );
     }
 
@@ -218,6 +285,39 @@ public class AuthService {
     private String sessionString(SaSession session, String key, String fallback) {
         Object value = session.get(key);
         return value == null ? fallback : String.valueOf(value);
+    }
+
+    private Map<String, Object> sessionAuditPayload(String sessionId) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("sessionId", sessionId);
+        try {
+            SaSession session = StpUtil.getTokenSessionByToken(sessionId);
+            Object userId = session.get("userId");
+            if (userId != null) {
+                payload.put("targetUserId", userId);
+            }
+            putIfText(payload, "targetUsername", sessionString(session, "username", ""));
+            putIfText(payload, "targetTenantId", sessionString(session, "tenantId", ""));
+            putIfText(payload, "targetClientIp", sessionString(session, "clientIp", ""));
+            putIfText(payload, "targetDevice", sessionString(session, "device", ""));
+            long issuedAt = sessionLong(session, "issuedAt", 0L);
+            long lastAccessAt = sessionLong(session, "lastAccessAt", 0L);
+            if (issuedAt > 0) {
+                payload.put("issuedAt", issuedAt);
+            }
+            if (lastAccessAt > 0) {
+                payload.put("lastAccessAt", lastAccessAt);
+            }
+        } catch (Exception ignored) {
+            // Keep logout/offline operations reliable even if token-session metadata has been cleaned.
+        }
+        return payload;
+    }
+
+    private void putIfText(Map<String, Object> payload, String key, String value) {
+        if (StringUtils.hasText(value)) {
+            payload.put(key, value);
+        }
     }
 
     private long sessionLong(SaSession session, String key, long fallback) {

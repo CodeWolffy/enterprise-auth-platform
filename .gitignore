@@ -11,3 +11,4 @@ Thumbs.db
 /data/
 /deploy
 /node_modules
+/.claude

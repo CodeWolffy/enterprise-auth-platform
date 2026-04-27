@@ -38,7 +38,7 @@
             <h4>字典管理</h4>
             <p>维护业务枚举、状态映射和基础字典条目。</p>
           </div>
-          <el-button type="primary" @click="goTo('settings-dicts')">进入字典管理</el-button>
+          <el-button type="primary" data-testid="settings-dicts-entry" @click="goTo('settings-dicts')">进入字典管理</el-button>
         </article>
 
         <article class="setting-card">
@@ -47,7 +47,7 @@
             <h4>参数管理</h4>
             <p>维护平台运行参数、业务配置项和策略型参数。</p>
           </div>
-          <el-button type="primary" @click="goTo('settings-configs')">进入参数管理</el-button>
+          <el-button type="primary" data-testid="settings-configs-entry" @click="goTo('settings-configs')">进入参数管理</el-button>
         </article>
 
         <article class="setting-card">
@@ -56,7 +56,7 @@
             <h4>公告管理</h4>
             <p>维护面向租户和运营人员的公告内容与发布时间。</p>
           </div>
-          <el-button type="primary" @click="goTo('settings-notices')">进入公告管理</el-button>
+          <el-button type="primary" data-testid="settings-notices-entry" @click="goTo('settings-notices')">进入公告管理</el-button>
         </article>
 
         <article class="setting-card">
@@ -65,7 +65,7 @@
             <h4>分类配置</h4>
             <p>维护字典分类和参数分类的匹配规则，并查看引用分析与趋势。</p>
           </div>
-          <el-button type="primary" @click="goTo('settings-categories')">进入分类配置</el-button>
+          <el-button type="primary" data-testid="settings-categories-entry" @click="goTo('settings-categories')">进入分类配置</el-button>
         </article>
 
         <article class="setting-card">
@@ -74,7 +74,7 @@
             <h4>套餐与能力</h4>
             <p>维护平台级租户套餐、能力目录，以及套餐与能力的绑定关系。</p>
           </div>
-          <el-button type="primary" @click="goTo('tenant-catalog')">进入套餐与能力</el-button>
+          <el-button type="primary" data-testid="tenant-catalog-entry" @click="goTo('tenant-catalog')">进入套餐与能力</el-button>
         </article>
 
         <article class="setting-card">
@@ -83,7 +83,7 @@
             <h4>菜单管理</h4>
             <p>维护统一资源树（目录/菜单/按钮/API），支持授权键、路由键、可见性与排序配置。</p>
           </div>
-          <el-button type="primary" @click="goTo('settings-resources')">进入菜单管理</el-button>
+          <el-button v-permission="'system:write'" type="primary" data-testid="settings-resources-entry" @click="goTo('settings-resources')">进入菜单管理</el-button>
         </article>
       </div>
     </section>

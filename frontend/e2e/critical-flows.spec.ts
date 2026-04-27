@@ -1,6 +1,18 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
-import { apiEnvelope, AUTH_STORAGE_KEY, defaultSnapshot, fulfillImage, fulfillJson, seedAuthSession } from './helpers'
+import { apiEnvelope, AUTH_STORAGE_KEY, defaultSnapshot, fulfillJson, seedAuthSession } from './helpers'
+
+const captchaSvg = btoa('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="160"><rect width="300" height="160" fill="#f8fafc"/></svg>')
+const sliderSvg = btoa('<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="48" height="48" fill="#60a5fa"/></svg>')
+const mockCaptchaPayload = {
+  captchaId: 'captcha-e2e',
+  backgroundImage: `data:image/svg+xml;base64,${captchaSvg}`,
+  sliderImage: `data:image/svg+xml;base64,${sliderSvg}`,
+  backgroundImageWidth: 300,
+  backgroundImageHeight: 160,
+  sliderImageWidth: 48,
+  sliderImageHeight: 48,
+}
 
 async function mockDashboardApis(page: Page) {
   await page.route('**/*', async (route) => {
@@ -46,10 +58,21 @@ async function mockDashboardApis(page: Page) {
 }
 
 async function fillLoginForm(page: Page) {
-  const inputs = page.locator('.login-form input')
-  await inputs.nth(0).fill('admin')
-  await inputs.nth(1).fill('Admin@123456')
-  await inputs.nth(2).fill('24682')
+  await page.locator('[data-testid="login-username"]').fill('admin')
+  await page.locator('[data-testid="login-password"]').fill('Admin@123456')
+}
+
+async function completeSliderCaptcha(page: Page) {
+  const handle = page.locator('[data-testid="captcha-handle"]')
+  await expect(handle).toBeVisible()
+  const box = await handle.boundingBox()
+  if (!box) {
+    throw new Error('captcha handle is not visible')
+  }
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(box.x + box.width / 2 + 180, box.y + box.height / 2, { steps: 12 })
+  await page.mouse.up()
 }
 
 test.describe('关键流程回归', () => {
@@ -68,10 +91,7 @@ test.describe('关键流程回归', () => {
       }
 
       if (url.pathname === '/api/auth/captcha' && method === 'GET') {
-        await fulfillImage(route, '<svg xmlns="http://www.w3.org/2000/svg"></svg>', 'image/svg+xml', {
-          'x-captcha-id': 'captcha-e2e',
-          'x-captcha-expires-at': String(Date.now() + 60000),
-        })
+        await fulfillJson(route, 200, apiEnvelope(mockCaptchaPayload))
         return
       }
 
@@ -82,6 +102,11 @@ test.describe('关键流程回归', () => {
           sessionId: 'session-e2e',
           expiresAt: Date.now() + 3600000,
         }))
+        return
+      }
+
+      if (url.pathname === '/api/auth/captcha/verify' && method === 'POST') {
+        await fulfillJson(route, 200, apiEnvelope({}))
         return
       }
 
@@ -124,14 +149,15 @@ test.describe('关键流程回归', () => {
     await page.goto('/login')
     await fillLoginForm(page)
     await page.locator('[data-testid="login-submit"]').click()
+    await completeSliderCaptcha(page)
 
     await expect.poll(() => loginPayload).toContain('"username":"admin"')
     await expect.poll(() => loginPayload).toContain('"password":"Admin@123456"')
     await expect.poll(() => loginPayload).toContain('"captchaId":"captcha-e2e"')
-    await expect.poll(() => loginPayload).toContain('"captchaCode":"24682"')
+    await expect.poll(() => loginPayload).toContain('"captchaCode":"{')
 
     await expect(page).toHaveURL(/\/dashboard$/)
-    await expect(page.locator('[data-testid="logout-button"]')).toBeVisible()
+    await expect(page.locator('[data-testid="user-menu-button"]')).toBeVisible()
   })
 
   test('会话恢复失败时清理本地状态并返回登录页', async ({ page }) => {
@@ -145,10 +171,7 @@ test.describe('关键流程回归', () => {
     })
 
     await page.route('**/api/auth/captcha', async (route) => {
-      await fulfillImage(route, '<svg xmlns="http://www.w3.org/2000/svg"></svg>', 'image/svg+xml', {
-        'x-captcha-id': 'captcha-restore',
-        'x-captcha-expires-at': String(Date.now() + 60000),
-      })
+      await fulfillJson(route, 200, apiEnvelope({ ...mockCaptchaPayload, captchaId: 'captcha-restore' }))
     })
 
     await page.goto('/login')
@@ -460,7 +483,7 @@ test.describe('关键流程回归', () => {
       await fulfillJson(route, 200, apiEnvelope({}))
     })
 
-    await page.goto('/system/settings/tenant-catalog')
+    await page.goto('/platform/tenant-catalog')
     await expect(page.getByText('套餐定义')).toBeVisible()
 
     await page.getByRole('button', { name: '列显示' }).first().click()

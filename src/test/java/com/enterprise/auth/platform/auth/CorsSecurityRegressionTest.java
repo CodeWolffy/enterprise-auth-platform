@@ -19,6 +19,8 @@ class CorsSecurityRegressionTest {
 
     private static final String ALLOWED_ORIGIN = "http://127.0.0.1:5173";
     private static final String LOCALHOST_ORIGIN = "http://localhost:5173";
+    private static final String LAN_ORIGIN = "http://192.168.1.9:5173";
+    private static final String VIRTUAL_NETWORK_ORIGIN = "http://198.18.0.1:5173";
 
     @Autowired
     private MockMvc mockMvc;
@@ -48,6 +50,23 @@ class CorsSecurityRegressionTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Access-Control-Allow-Origin", ALLOWED_ORIGIN))
                 .andExpect(header().string("Access-Control-Allow-Methods", containsString("POST")));
+    }
+
+    @Test
+    void apiCorsShouldAllowViteNetworkOriginsInDevelopment() throws Exception {
+        mockMvc.perform(options("/api/auth/captcha")
+                        .header("Origin", LAN_ORIGIN)
+                        .header("Access-Control-Request-Method", "GET")
+                        .header("Access-Control-Request-Headers", "content-type"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", LAN_ORIGIN));
+
+        mockMvc.perform(options("/api/auth/captcha")
+                        .header("Origin", VIRTUAL_NETWORK_ORIGIN)
+                        .header("Access-Control-Request-Method", "GET")
+                        .header("Access-Control-Request-Headers", "content-type"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", VIRTUAL_NETWORK_ORIGIN));
     }
 
     @Test

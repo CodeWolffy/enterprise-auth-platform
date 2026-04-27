@@ -38,7 +38,7 @@
 <span class="eyebrow">套餐</span>
               <h4>套餐定义</h4>
             </div>
-            <el-button type="primary" @click="openPackageDialog()">新增套餐</el-button>
+            <el-button v-permission="'tenant:write'" type="primary" @click="openPackageDialog()">新增套餐</el-button>
           </div>
           <div class="table-tools">
             <el-radio-group v-model="packageTablePrefs.density" size="small">
@@ -149,8 +149,8 @@
             >
               <template #default="{ row }">
                 <el-button link type="primary" @click="openPackageDetail(row)">详情</el-button>
-                <el-button link type="primary" @click="openPackageDialog(row)">编辑</el-button>
-                <el-button link type="danger" @click="removePackage(row)">删除</el-button>
+                <el-button v-permission="'tenant:write'" link type="primary" @click="openPackageDialog(row)">编辑</el-button>
+                <el-button v-permission="'tenant:write'" link type="danger" @click="removePackage(row)">删除</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -162,7 +162,7 @@
 <span class="eyebrow">能力</span>
               <h4>能力定义</h4>
             </div>
-            <el-button type="primary" @click="openCapabilityDialog()">新增能力</el-button>
+            <el-button v-permission="'tenant:write'" type="primary" @click="openCapabilityDialog()">新增能力</el-button>
           </div>
           <div class="table-tools">
             <el-radio-group v-model="capabilityTablePrefs.density" size="small">
@@ -255,8 +255,8 @@
             >
               <template #default="{ row }">
                 <el-button link type="primary" @click="openCapabilityDetail(row)">详情</el-button>
-                <el-button link type="primary" @click="openCapabilityDialog(row)">编辑</el-button>
-                <el-button link type="danger" @click="removeCapability(row)">删除</el-button>
+                <el-button v-permission="'tenant:write'" link type="primary" @click="openCapabilityDialog(row)">编辑</el-button>
+                <el-button v-permission="'tenant:write'" link type="danger" @click="removeCapability(row)">删除</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -309,7 +309,7 @@
       </el-form>
       <template #footer>
         <el-button @click="packageVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitPackage">保存</el-button>
+        <el-button v-permission="'tenant:write'" type="primary" @click="submitPackage">保存</el-button>
       </template>
     </el-dialog>
 
@@ -345,7 +345,7 @@
       </el-form>
       <template #footer>
         <el-button @click="capabilityVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitCapability">保存</el-button>
+        <el-button v-permission="'tenant:write'" type="primary" @click="submitCapability">保存</el-button>
       </template>
     </el-dialog>
 

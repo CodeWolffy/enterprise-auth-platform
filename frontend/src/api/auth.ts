@@ -50,8 +50,10 @@ export async function logoutCurrentSession() {
   await http.post('/api/auth/logout')
 }
 
-export async function querySessions() {
-  const { data } = await http.get<ApiResponse<UserSessionView[]>>('/api/auth/sessions')
+export async function querySessions(scope: 'own' | 'all' = 'own') {
+  const { data } = await http.get<ApiResponse<UserSessionView[]>>('/api/auth/sessions', {
+    params: { scope },
+  })
   return data.data
 }
 

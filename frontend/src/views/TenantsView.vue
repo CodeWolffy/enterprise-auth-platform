@@ -26,7 +26,7 @@
     <section class="dashboard-panel">
       <div class="panel-head">
         <div><span class="eyebrow">租户</span><h3>租户管理</h3></div>
-        <el-button type="primary" @click="openTenant()">新增租户</el-button>
+        <el-button v-permission="'tenant:write'" type="primary" @click="openTenant()">新增租户</el-button>
       </div>
 
       <AdvancedSearch @search="handleSearch" @reset="resetSearch">
@@ -136,9 +136,9 @@
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button link type="primary" @click="openHistory(row)">变更历史</el-button>
-            <el-button link type="primary" @click="openOverrides(row)">能力覆盖</el-button>
-            <el-button link type="primary" @click="openTenant(row)">编辑</el-button>
-            <el-button link type="danger" @click="removeTenant(row.tenantId)">删除</el-button>
+            <el-button v-permission="'tenant:write'" link type="primary" @click="openOverrides(row)">能力覆盖</el-button>
+            <el-button v-permission="'tenant:write'" link type="primary" @click="openTenant(row)">编辑</el-button>
+            <el-button v-permission="'tenant:write'" link type="danger" @click="removeTenant(row.tenantId)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -251,8 +251,8 @@
         <div class="override-bar">
           <span class="toolbar-tip">差异摘要：{{ overrideSummaryText }}</span>
           <div>
-            <el-button :disabled="overrideChangedCount === 0 && descriptionChangedCount === 0" @click="restoreAllOverrides">恢复全部默认</el-button>
-            <el-button type="primary" :loading="overrideSaving" @click="submitOverrides">保存覆盖</el-button>
+            <el-button v-permission="'tenant:write'" :disabled="overrideChangedCount === 0 && descriptionChangedCount === 0" @click="restoreAllOverrides">恢复全部默认</el-button>
+            <el-button v-permission="'tenant:write'" type="primary" :loading="overrideSaving" @click="submitOverrides">保存覆盖</el-button>
           </div>
         </div>
         <el-table :data="overrideForm" stripe>
@@ -279,7 +279,7 @@
           </el-table-column>
           <el-table-column fixed="right" label="操作" width="120">
             <template #default="{ $index }">
-              <el-button link type="primary" @click="restoreRowOverride($index)">恢复默认</el-button>
+              <el-button v-permission="'tenant:write'" link type="primary" @click="restoreRowOverride($index)">恢复默认</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -300,7 +300,7 @@
         <el-form-item label="生效能力集合"><el-select v-model="form.capabilityCodes" multiple filterable style="width: 100%"><el-option v-for="capability in capabilityOptions" :key="capability.capabilityCode" :label="`${capability.capabilityName} (${capability.capabilityCode})`" :value="capability.capabilityCode" /></el-select></el-form-item>
         <el-form-item label="运营备注"><el-input v-model="form.lifecycleNote" type="textarea" :rows="3" maxlength="200" show-word-limit /></el-form-item>
       </el-form>
-      <template #footer><el-button @click="visible = false">取消</el-button><el-button type="primary" @click="submit">保存</el-button></template>
+      <template #footer><el-button @click="visible = false">取消</el-button><el-button v-permission="'tenant:write'" type="primary" @click="submit">保存</el-button></template>
     </el-dialog>
   </div>
 </template>

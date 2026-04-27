@@ -80,7 +80,7 @@ class AuditControllerTest {
     void exportShouldSupportClientIpFilter() throws Exception {
                 long now = System.currentTimeMillis();
                 mockMvc.perform(get("/api/audit/events/export")
-                                .with(bearer(principal()))
+                                .with(bearer(principalWithWrite()))
                                 .header("X-Tenant-Id", "platform")
                                 .param("eventType", EVENT_TYPE)
                                 .param("clientIp", "10.10.10.10")
@@ -108,7 +108,7 @@ class AuditControllerTest {
     void shouldCreateAsyncExportTask() throws Exception {
         long now = System.currentTimeMillis();
         mockMvc.perform(post("/api/audit/exports")
-                        .with(bearer(principal()))
+                        .with(bearer(principalWithWrite()))
                         .header("X-Tenant-Id", "platform")
                         .param("eventType", EVENT_TYPE)
                         .param("clientIp", "10.10.10.10")
@@ -141,7 +141,7 @@ class AuditControllerTest {
         );
 
         mockMvc.perform(delete("/api/audit/exports/{taskId}", taskId)
-                        .with(bearer(principal()))
+                        .with(bearer(principalWithWrite()))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").doesNotExist());
@@ -152,7 +152,7 @@ class AuditControllerTest {
         );
 
         mockMvc.perform(delete("/api/audit/exports")
-                        .with(bearer(principal()))
+                        .with(bearer(principalWithWrite()))
                         .header("X-Tenant-Id", "platform")
                         .param("tenantId", "platform")
                         .param("status", "FAILED")
@@ -174,7 +174,7 @@ class AuditControllerTest {
         );
 
         mockMvc.perform(post("/api/audit/exports/{taskId}/archive", singleTaskId)
-                        .with(bearer(principal()))
+                        .with(bearer(principalWithWrite()))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("ARCHIVED"))
@@ -187,7 +187,7 @@ class AuditControllerTest {
         );
 
         mockMvc.perform(post("/api/audit/exports/archive")
-                        .with(bearer(principal()))
+                        .with(bearer(principalWithWrite()))
                         .header("X-Tenant-Id", "platform")
                         .param("tenantId", "platform")
                         .param("status", "SUCCESS")
@@ -211,7 +211,7 @@ class AuditControllerTest {
         );
 
         mockMvc.perform(post("/api/audit/exports/{taskId}/retry", taskId)
-                        .with(bearer(principal()))
+                        .with(bearer(principalWithWrite()))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").isNumber())

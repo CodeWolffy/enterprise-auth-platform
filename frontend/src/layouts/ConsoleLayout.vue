@@ -55,6 +55,9 @@
           </div>
 
           <div class="header-actions">
+            <el-tooltip content="在线设备管理" placement="bottom">
+              <el-icon class="action-icon" title="在线设备管理" data-testid="header-online-devices" @click="openSessions"><Monitor /></el-icon>
+            </el-tooltip>
             <el-icon class="action-icon" title="设置"><Setting /></el-icon>
             <el-icon class="action-icon" title="暗色模式" @click="toggleDark"><Moon /></el-icon>
             <el-icon class="action-icon" title="语言"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"><path fill="currentColor" d="M140 188h584v164h-76v-88H216v484h356v76H140z"/><path fill="currentColor" d="M400 340h-76C324 233.9 410 148 516 148c96 0 175.5 70.8 190.2 163.3l-75.1 11.3A116.2 116.2 0 0 0 516 224c-64.2 0-116 52-116 116m484 536H516V512h368z"/></svg></el-icon>
@@ -62,7 +65,7 @@
           </div>
 
           <el-dropdown trigger="click" @command="handleCommand">
-            <div class="avatar-container">
+            <div class="avatar-container" data-testid="user-menu-button">
               <div class="avatar-wrapper">
                 <el-avatar :size="28" class="user-avatar">{{ avatarName }}</el-avatar>
                 <div class="status-dot"></div>
@@ -71,7 +74,7 @@
             </div>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="logout">退出登录</el-dropdown-item>
+                <el-dropdown-item command="logout" data-testid="logout-button">退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -100,18 +103,18 @@
               @click="router.push(tag.path)"
             >
               <span class="tags-view-item-inner">
-                <el-icon class="tags-view-icon" v-if="tag.path === '/dashboard'"><HomeFilled /></el-icon>
-                <el-icon class="tags-view-icon" v-else-if="isMenuTag(tag)">
+                <el-icon v-if="tag.path === '/dashboard'" class="tags-view-icon"><HomeFilled /></el-icon>
+                <el-icon v-else-if="isMenuTag(tag)" class="tags-view-icon">
                   <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" aria-hidden="true">
                     <path fill="currentColor" d="M192 256h640v72H192zm0 220h640v72H192zm0 220h640v72H192z" />
                   </svg>
                 </el-icon>
-                <el-icon class="tags-view-icon" v-else><component :is="resolveTagIcon(tag)" /></el-icon>
+                <el-icon v-else class="tags-view-icon"><component :is="resolveTagIcon(tag)" /></el-icon>
                 <span class="tags-view-item-text">{{ tag.title }}</span>
                 <el-icon v-if="tag.path === '/dashboard'" class="tags-view-pin"><svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em"><path fill="currentColor" d="M640 192v256l128 192v64H544v256L512 992l-32-32V704H256v-64l128-192V192h-64v-64h448v64h-64zM384 192v271.04l-113.344 170.048L281.344 640h461.312l10.688-6.912L640 463.04V192H384z"/></svg></el-icon>
                 <el-icon v-if="tag.path !== '/dashboard'" class="tags-view-close" @click.stop="closeView(tag)"><Close /></el-icon>
               </span>
-              <span class="tags-view-divider" v-if="index !== visitedViews.length - 1 && route.path !== tag.path && route.path !== visitedViews[index + 1]?.path"></span>
+              <span v-if="index !== visitedViews.length - 1 && route.path !== tag.path && route.path !== visitedViews[index + 1]?.path" class="tags-view-divider"></span>
             </button>
           </div>
         </div>
@@ -141,14 +144,14 @@
 
       <el-main class="admin-main">
         <transition name="fade-transform" mode="out-in">
-          <div class="main-card">
+          <div v-show="route.name" class="main-card">
             <RouterView />
           </div>
         </transition>
       </el-main>
     </el-container>
 
-    <el-dialog v-model="sessionsVisible" title="在线设备管理" width="760px">
+    <el-dialog v-model="sessionsVisible" title="在线设备管理" width="860px">
       <el-alert
         title="可查看近期登录设备与会话状态，并可将不再使用的设备强制下线。"
         type="info"
@@ -156,7 +159,16 @@
         style="margin-bottom: 16px"
         :closable="false"
       />
-      <el-table :data="sessionsList" stripe>
+      <div class="session-dialog-toolbar">
+        <span>共 {{ sessionsList.length }} 个在线会话</span>
+        <el-button size="small" :loading="sessionsLoading" data-testid="session-dialog-refresh" @click="loadSessions">刷新</el-button>
+      </div>
+      <el-table v-loading="sessionsLoading" :data="sessionsList" stripe data-testid="session-dialog-table">
+        <el-table-column label="标记" width="90">
+          <template #default="{ row }">
+            <el-tag v-if="row.currentSession" type="success" effect="dark" size="small">当前</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="设备标识" min-width="180" show-overflow-tooltip>
           <template #default="{ row }">
             {{ formatDevice(row.device) }}
@@ -168,6 +180,16 @@
             {{ formatSessionTime(row.issuedAt) }}
           </template>
         </el-table-column>
+        <el-table-column label="最后访问时间" width="190">
+          <template #default="{ row }">
+            {{ formatSessionTime(row.lastAccessAt) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="过期时间" width="190">
+          <template #default="{ row }">
+            {{ formatSessionTime(row.expiresAt) }}
+          </template>
+        </el-table-column>
         <el-table-column label="状态" width="80">
           <template #default="{ row }">
             <el-tag :type="row.active ? 'success' : 'info'" effect="plain">{{ row.active ? '在线' : '已下线' }}</el-tag>
@@ -175,9 +197,12 @@
         </el-table-column>
         <el-table-column label="操作" width="100" fixed="right">
           <template #default="{ row }">
-            <el-button link type="danger" :disabled="!row.active" @click="kickSession(row.sessionId)">强制下线</el-button>
+            <el-button link type="danger" data-testid="session-dialog-force-offline" :disabled="!row.active || row.currentSession" @click="kickSession(row.sessionId)">强制下线</el-button>
           </template>
         </el-table-column>
+        <template #empty>
+          <el-empty description="暂无在线设备" />
+        </template>
       </el-table>
     </el-dialog>
   </el-container>
@@ -199,6 +224,7 @@ import {
   FullScreen,
   Histogram,
   HomeFilled,
+  Monitor,
   Moon,
   OfficeBuilding,
   Platform,
@@ -213,18 +239,16 @@ import AppNav from '@/components/AppNav.vue'
 import { useAuthStore } from '@/stores/auth'
 import { querySessions, forceOffline } from '@/api/auth'
 import { queryTenants } from '@/api/platform'
-import { useTheme } from '@/composables/useTheme'
 import { formatDateTime } from '@/utils/datetime'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
-const { setBrandColor, currentBrandColor } = useTheme()
 
 const isCollapse = ref(false)
-const themeColor = ref(currentBrandColor.value || '#409eff')
 const sessionsVisible = ref(false)
 const sessionsList = ref<any[]>([])
+const sessionsLoading = ref(false)
 const tagsScrollRef = ref<HTMLDivElement | null>(null)
 const isTagsOverflowing = ref(false)
 const canScrollTagsLeft = ref(false)
@@ -402,7 +426,7 @@ async function loadTenantOptions() {
     const page = await queryTenants({ page: 1, size: 200 }, { silentAuthFailure: true, suppressErrorMessage: true })
     tenantOptions.value = page.list
   } catch {
-    //
+    // Tenant selector is optional; header still works when tenant loading fails.
   }
 }
 
@@ -430,7 +454,12 @@ async function openSessions() {
 }
 
 async function loadSessions() {
-  sessionsList.value = await querySessions()
+  sessionsLoading.value = true
+  try {
+    sessionsList.value = await querySessions('own')
+  } finally {
+    sessionsLoading.value = false
+  }
 }
 
 async function kickSession(sessionId: string) {
@@ -440,11 +469,8 @@ async function kickSession(sessionId: string) {
     ElMessage.success('设备已下线')
     await loadSessions()
   } catch {
+    // User cancelled the confirmation dialog.
   }
-}
-
-function handleThemeChange(color: string | null) {
-  setBrandColor(color)
 }
 
 function formatSessionTime(epochMs?: number | null) {
@@ -578,6 +604,16 @@ function formatDevice(raw?: string) {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.session-dialog-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -4px 0 12px;
+  color: #606b7a;
+  font-size: 13px;
 }
 
 .search-capsule {

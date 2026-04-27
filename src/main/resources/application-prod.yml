@@ -24,3 +24,9 @@ app:
     session-ttl: ${APP_SECURITY_SESSION_TTL:7d}
     cookie-secure: true
     cookie-same-site: ${APP_SECURITY_COOKIE_SAME_SITE:Lax}
+
+sa-token:
+  active-timeout: ${APP_SECURITY_SESSION_IDLE_SECONDS:7200}
+  auto-renew: true
+  dynamic-active-timeout: true
+  max-login-count: ${APP_SECURITY_MAX_LOGIN_COUNT:10}

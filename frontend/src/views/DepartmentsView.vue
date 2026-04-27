@@ -31,7 +31,7 @@
         </div>
         <div class="panel-actions">
           <el-button @click="expandAll = !expandAll">{{ expandAll ? '收起全部' : '展开全部' }}</el-button>
-          <el-button type="primary" @click="openDepartment()">新增部门</el-button>
+          <el-button v-permission="'dept:write'" type="primary" @click="openDepartment()">新增部门</el-button>
         </div>
       </div>
 
@@ -118,9 +118,9 @@
         >
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
-            <el-button link type="primary" @click="openDepartment(row)">编辑</el-button>
-            <el-button link type="primary" @click="openChildDepartment(row)">新增子部门</el-button>
-            <el-button link type="danger" @click="removeDepartment(row.id)">删除</el-button>
+            <el-button v-permission="'dept:write'" link type="primary" @click="openDepartment(row)">编辑</el-button>
+            <el-button v-permission="'dept:write'" link type="primary" @click="openChildDepartment(row)">新增子部门</el-button>
+            <el-button v-permission="'dept:write'" link type="danger" @click="removeDepartment(row.id)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -184,7 +184,7 @@
       </el-form>
       <template #footer>
         <el-button @click="visible = false">取消</el-button>
-        <el-button type="primary" @click="submit">保存</el-button>
+        <el-button v-permission="'dept:write'" type="primary" @click="submit">保存</el-button>
       </template>
     </el-dialog>
   </div>

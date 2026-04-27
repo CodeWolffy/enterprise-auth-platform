@@ -31,13 +31,20 @@ function showError(message: string) {
   })
 }
 
-function redirectToLogin() {
+function redirectToLogin(reason?: string) {
   if (typeof window === 'undefined' || window.location.pathname === '/login') {
     return
   }
   const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
-  const redirect = current && current !== '/' ? `?redirect=${encodeURIComponent(current)}` : ''
-  window.location.href = `/login${redirect}`
+  const params = new URLSearchParams()
+  if (current && current !== '/') {
+    params.set('redirect', current)
+  }
+  if (reason) {
+    params.set('authReason', reason)
+  }
+  const query = params.toString()
+  window.location.href = `/login${query ? `?${query}` : ''}`
 }
 
 function isAuthEndpoint(url: string) {
@@ -80,15 +87,11 @@ http.interceptors.response.use(
 
     if (error.response?.status === 401 && !isAuthEndpoint(requestUrl)) {
       const code = error.response?.data?.code
+      const reason = typeof code === 'string' ? code : 'UNAUTHORIZED'
       authStore.clearSession()
       if (!silentAuthFailure) {
-        const message = code === 'SESSION_OFFLINE'
-          ? '当前账号已在其他地方下线'
-          : code === 'SESSION_EXPIRED'
-            ? '登录已过期，请重新登录'
-            : '请先登录'
-        showError(message)
-        redirectToLogin()
+        showError(authFailureMessage(reason))
+        redirectToLogin(reason)
       }
       return Promise.reject(error)
     }
@@ -107,3 +110,16 @@ http.interceptors.response.use(
     return Promise.reject(error)
   },
 )
+
+function authFailureMessage(code: string) {
+  if (code === 'SESSION_OFFLINE') {
+    return '当前账号已被强制下线，请重新登录'
+  }
+  if (code === 'SESSION_EXPIRED') {
+    return '登录已过期，请重新登录'
+  }
+  if (code === 'INVALID_TOKEN') {
+    return '登录凭证已失效，请重新登录'
+  }
+  return '请先登录'
+}

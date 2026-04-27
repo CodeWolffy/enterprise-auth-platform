@@ -19,7 +19,7 @@
           <span class="eyebrow">字典</span>
           <h3>字典管理</h3>
         </div>
-        <el-button type="primary" @click="openDict()">新增字典项</el-button>
+        <el-button v-permission="'system:write'" type="primary" @click="openDict()">新增字典项</el-button>
       </div>
 
       <AdvancedSearch @search="handleSearch" @reset="resetSearch">
@@ -136,8 +136,8 @@
         >
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
-            <el-button link type="primary" @click="openDict(row)">编辑</el-button>
-            <el-button link type="danger" @click="removeDict(row.id)">删除</el-button>
+            <el-button v-permission="'system:write'" link type="primary" @click="openDict(row)">编辑</el-button>
+            <el-button v-permission="'system:write'" link type="danger" @click="removeDict(row.id)">删除</el-button>
           </template>
         </el-table-column>
         <template #empty>
@@ -185,7 +185,7 @@
       </el-form>
       <template #footer>
         <el-button @click="visible = false">取消</el-button>
-        <el-button type="primary" @click="submit">保存</el-button>
+        <el-button v-permission="'system:write'" type="primary" @click="submit">保存</el-button>
       </template>
     </el-dialog>
   </div>

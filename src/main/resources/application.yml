@@ -46,9 +46,12 @@ sa-token:
   token-name: Authorization
   token-prefix: Bearer
   timeout: 604800
-  active-timeout: -1
+  active-timeout: ${APP_SECURITY_SESSION_IDLE_SECONDS:7200}
+  auto-renew: true
+  dynamic-active-timeout: true
   is-concurrent: true
   is-share: false
+  max-login-count: ${APP_SECURITY_MAX_LOGIN_COUNT:10}
   token-style: uuid
   is-read-cookie: false
   is-read-header: true
@@ -88,6 +91,7 @@ app:
     allowed-origins:
       - http://127.0.0.1:5173
       - http://localhost:5173
+      - http://*:5173
 
   security:
     session-ttl: 7d

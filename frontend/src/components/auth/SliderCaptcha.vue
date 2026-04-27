@@ -18,10 +18,11 @@
         </button>
       </div>
 
-<div ref="trackRef" class="captcha-track" :class="{ 'is-verifying': verifying }">
+<div ref="trackRef" class="captcha-track" :class="{ 'is-verifying': verifying }" data-testid="captcha-track">
     <div class="captcha-track__fill" :style="sliderTrackFillStyle"></div>
     <div
       class="captcha-track__handle"
+      data-testid="captcha-handle"
       :style="sliderButtonStyle"
       @mousedown="startDrag"
       @touchstart.prevent="startDrag"
