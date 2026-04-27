@@ -1,5 +1,8 @@
 package com.enterprise.auth.platform.user;
 
+import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.bind;
+import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.clear;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -21,9 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
+import com.enterprise.auth.platform.security.PasswordHasher;
 
 @SpringBootTest
 class UserDirectoryServiceTest {
@@ -46,7 +47,7 @@ class UserDirectoryServiceTest {
     private SysDeptMapper sysDeptMapper;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    private PasswordHasher passwordHasher;
 
     @Autowired
     private UserRepository userRepository;
@@ -70,7 +71,7 @@ class UserDirectoryServiceTest {
     @AfterEach
     void tearDown() {
         TenantContext.clear();
-        SecurityContextHolder.clearContext();
+        clear();
         deleteUser("platform", PLATFORM_TEST_USER);
         deleteUser("tenant-a", TENANT_TEST_USER);
         deleteUser("tenant-a", TENANT_OTHER_DEPT_USER);
@@ -84,9 +85,7 @@ class UserDirectoryServiceTest {
     void listUsersShouldRespectCurrentTenant() {
         TenantContext.setTenantId("tenant-a");
         UserAccount auditor = userRepository.findByUsername("tenant-a", "auditor").orElseThrow();
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(auditor, auditor.password(), auditor.getAuthorities())
-        );
+        bind(auditor);
         List<UserSummary> tenantUsers = userDirectoryService.listUsers();
         assertThat(tenantUsers).extracting(UserSummary::tenantId).containsOnly("tenant-a");
         assertThat(tenantUsers).extracting(UserSummary::username).contains("auditor");
@@ -96,9 +95,7 @@ class UserDirectoryServiceTest {
 
         TenantContext.setTenantId("platform");
         UserAccount admin = userRepository.findByUsername("platform", "admin").orElseThrow();
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(admin, admin.password(), admin.getAuthorities())
-        );
+        bind(admin);
         List<UserSummary> platformUsers = userDirectoryService.listUsers();
         assertThat(platformUsers).extracting(UserSummary::tenantId).containsOnly("platform");
         assertThat(platformUsers).extracting(UserSummary::username).contains(PLATFORM_TEST_USER);
@@ -109,9 +106,7 @@ class UserDirectoryServiceTest {
     void listUsersShouldApplyDeptAndChildrenScope() {
         TenantContext.setTenantId("tenant-a");
         UserAccount manager = loadScopedUser(TENANT_MANAGER_USER, DataScopeType.DEPT_AND_CHILDREN, Set.of());
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(manager, manager.password(), manager.getAuthorities())
-        );
+        bind(manager);
 
         List<UserSummary> users = userDirectoryService.listUsers();
 
@@ -125,9 +120,7 @@ class UserDirectoryServiceTest {
     void listUsersShouldApplyCustomScope() {
         TenantContext.setTenantId("tenant-a");
         UserAccount customScopedUser = loadScopedUser(TENANT_CUSTOM_SCOPE_USER, DataScopeType.CUSTOM, Set.of(3L));
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(customScopedUser, customScopedUser.password(), customScopedUser.getAuthorities())
-        );
+        bind(customScopedUser);
 
         List<UserSummary> users = userDirectoryService.listUsers();
 
@@ -143,7 +136,7 @@ class UserDirectoryServiceTest {
         entity.setDeptId(deptId);
         entity.setUsername(username);
         entity.setDisplayName(username);
-        entity.setPasswordHash(passwordEncoder.encode("UserTest@123"));
+        entity.setPasswordHash(passwordHasher.hash("UserTest@123"));
         entity.setEnabled(1);
         entity.setSessionVersion(1);
         sysUserMapper.insert(entity);

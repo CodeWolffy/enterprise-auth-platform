@@ -9,7 +9,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
-import org.springframework.security.access.prepost.PreAuthorize;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,14 +32,14 @@ public class TenantCatalogController {
 
     @Operation(summary = "查询套餐列表")
     @GetMapping("/packages")
-    @PreAuthorize("hasAuthority('tenant:read')")
+    @SaCheckPermission("tenant:read")
     public ApiResponse<List<TenantCatalogManagementService.TenantPackageView>> packages() {
         return ApiResponse.ok(tenantCatalogManagementService.packages());
     }
 
     @Operation(summary = "新增套餐")
     @PostMapping("/packages")
-    @PreAuthorize("hasAuthority('tenant:write')")
+    @SaCheckPermission("tenant:write")
     public ApiResponse<TenantCatalogManagementService.TenantPackageView> createPackage(
             @Valid @RequestBody TenantPackageCrudRequest request
     ) {
@@ -48,7 +48,7 @@ public class TenantCatalogController {
 
     @Operation(summary = "修改套餐")
     @PutMapping("/packages/{id}")
-    @PreAuthorize("hasAuthority('tenant:write')")
+    @SaCheckPermission("tenant:write")
     public ApiResponse<TenantCatalogManagementService.TenantPackageView> updatePackage(
             @Parameter(description = "套餐主键 ID") @PathVariable Long id,
             @Valid @RequestBody TenantPackageCrudRequest request
@@ -58,7 +58,7 @@ public class TenantCatalogController {
 
     @Operation(summary = "套餐变更影响分析")
     @GetMapping("/packages/{id}/impact")
-    @PreAuthorize("hasAuthority('tenant:read')")
+    @SaCheckPermission("tenant:read")
     public ApiResponse<TenantCatalogManagementService.TenantPackageImpactView> packageImpact(
             @Parameter(description = "套餐主键 ID") @PathVariable Long id
     ) {
@@ -67,7 +67,7 @@ public class TenantCatalogController {
 
     @Operation(summary = "删除套餐")
     @DeleteMapping("/packages/{id}")
-    @PreAuthorize("hasAuthority('tenant:write')")
+    @SaCheckPermission("tenant:write")
     public ApiResponse<Void> deletePackage(@Parameter(description = "套餐主键 ID") @PathVariable Long id) {
         tenantCatalogManagementService.deletePackage(id);
         return ApiResponse.ok();
@@ -75,14 +75,14 @@ public class TenantCatalogController {
 
     @Operation(summary = "查询能力列表")
     @GetMapping("/capabilities")
-    @PreAuthorize("hasAuthority('tenant:read')")
+    @SaCheckPermission("tenant:read")
     public ApiResponse<List<TenantCatalogManagementService.TenantCapabilityView>> capabilities() {
         return ApiResponse.ok(tenantCatalogManagementService.capabilities());
     }
 
     @Operation(summary = "新增能力")
     @PostMapping("/capabilities")
-    @PreAuthorize("hasAuthority('tenant:write')")
+    @SaCheckPermission("tenant:write")
     public ApiResponse<TenantCatalogManagementService.TenantCapabilityView> createCapability(
             @Valid @RequestBody TenantCapabilityCrudRequest request
     ) {
@@ -91,7 +91,7 @@ public class TenantCatalogController {
 
     @Operation(summary = "修改能力")
     @PutMapping("/capabilities/{id}")
-    @PreAuthorize("hasAuthority('tenant:write')")
+    @SaCheckPermission("tenant:write")
     public ApiResponse<TenantCatalogManagementService.TenantCapabilityView> updateCapability(
             @Parameter(description = "能力主键 ID") @PathVariable Long id,
             @Valid @RequestBody TenantCapabilityCrudRequest request
@@ -101,7 +101,7 @@ public class TenantCatalogController {
 
     @Operation(summary = "能力变更影响分析")
     @GetMapping("/capabilities/{id}/impact")
-    @PreAuthorize("hasAuthority('tenant:read')")
+    @SaCheckPermission("tenant:read")
     public ApiResponse<TenantCatalogManagementService.TenantCapabilityImpactView> capabilityImpact(
             @Parameter(description = "能力主键 ID") @PathVariable Long id
     ) {
@@ -110,7 +110,7 @@ public class TenantCatalogController {
 
     @Operation(summary = "删除能力")
     @DeleteMapping("/capabilities/{id}")
-    @PreAuthorize("hasAuthority('tenant:write')")
+    @SaCheckPermission("tenant:write")
     public ApiResponse<Void> deleteCapability(@Parameter(description = "能力主键 ID") @PathVariable Long id) {
         tenantCatalogManagementService.deleteCapability(id);
         return ApiResponse.ok();

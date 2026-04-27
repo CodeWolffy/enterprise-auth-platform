@@ -8,6 +8,7 @@ import { clearDynamicRoutes, registerDynamicRoutes } from '@/router'
 const storageKey = 'eap.frontend.auth'
 interface PersistedSession {
   authenticated: boolean
+  token: string
   expiresAt: number
   tenantId: string
   operatorTenantId?: string
@@ -16,6 +17,7 @@ interface PersistedSession {
 
 export const useAuthStore = defineStore('auth', () => {
   const authenticated = ref(false)
+  const token = ref('')
   const expiresAt = ref(0)
   const tenantId = ref('platform')
   const operatorTenantId = ref('platform')
@@ -25,6 +27,19 @@ export const useAuthStore = defineStore('auth', () => {
   const menuItems = computed(() => flattenMenuItems(snapshot.value?.menus ?? []))
   const canSwitchTenant = computed(() => Boolean(snapshot.value?.superAdmin))
 
+  function hasGrant(required: string | string[]) {
+    if (!required || (Array.isArray(required) && required.length === 0)) {
+      return true
+    }
+    if (snapshot.value?.superAdmin) {
+      return true
+    }
+    const grantSet = new Set(snapshot.value?.grants ?? [])
+    return Array.isArray(required)
+      ? required.some((grant) => grantSet.has(grant))
+      : grantSet.has(required)
+  }
+
   function restore() {
     const raw = sessionStorage.getItem(storageKey) ?? localStorage.getItem(storageKey)
     if (!raw) {
@@ -32,6 +47,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
     const parsed = JSON.parse(raw) as PersistedSession
     authenticated.value = parsed.authenticated
+    token.value = parsed.token || ''
     expiresAt.value = parsed.expiresAt
     tenantId.value = parsed.tenantId || 'platform'
     operatorTenantId.value = parsed.operatorTenantId || parsed.tenantId || 'platform'
@@ -45,6 +61,7 @@ export const useAuthStore = defineStore('auth', () => {
   function persist() {
     const payload: PersistedSession = {
       authenticated: authenticated.value,
+      token: token.value,
       expiresAt: expiresAt.value,
       tenantId: tenantId.value,
       operatorTenantId: operatorTenantId.value,
@@ -63,6 +80,7 @@ export const useAuthStore = defineStore('auth', () => {
   }) {
     const session = await loginWithPassword(payload)
     authenticated.value = true
+    token.value = session.token
     expiresAt.value = Number.isFinite(session.expiresAt) ? session.expiresAt : Date.now() + 7 * 24 * 60 * 60 * 1000
     operatorTenantId.value = session.tenantId || payload.tenantId || 'platform'
     tenantId.value = operatorTenantId.value
@@ -105,6 +123,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   function clearSession() {
     authenticated.value = false
+    token.value = ''
     expiresAt.value = 0
     tenantId.value = 'platform'
     operatorTenantId.value = 'platform'
@@ -158,6 +177,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     authenticated,
+    token,
     expiresAt,
     tenantId,
     operatorTenantId,
@@ -165,6 +185,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAuthenticated,
     menuItems,
     canSwitchTenant,
+    hasGrant,
     restore,
     bootstrapSnapshot,
     login,

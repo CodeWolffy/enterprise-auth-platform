@@ -1,7 +1,6 @@
 package com.enterprise.auth.platform.user;
 
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.bearer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -22,7 +21,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.enterprise.auth.platform.security.PasswordHasher;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
@@ -44,7 +43,7 @@ class UserControllerTest {
     private SysDeptMapper sysDeptMapper;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    private PasswordHasher passwordHasher;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -78,7 +77,7 @@ class UserControllerTest {
                 scopeUserId,
                 "tenant-a",
                 SCOPE_USER,
-                passwordEncoder.encode("UserTest@123"),
+                passwordHasher.hash("UserTest@123"),
                 true,
                 Set.of(),
                 Set.of("user:read"),
@@ -88,7 +87,7 @@ class UserControllerTest {
         );
 
         mockMvc.perform(get("/api/users")
-                        .with(user(principal))
+                        .with(bearer(principal))
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.records[?(@.username=='" + SCOPE_USER + "')]").exists())
@@ -102,7 +101,7 @@ class UserControllerTest {
                 scopeUserId,
                 "tenant-a",
                 SCOPE_USER,
-                passwordEncoder.encode("UserTest@123"),
+                passwordHasher.hash("UserTest@123"),
                 true,
                 Set.of(),
                 Set.of("user:write"),
@@ -112,8 +111,7 @@ class UserControllerTest {
         );
 
         mockMvc.perform(post("/api/users")
-                        .with(user(principal))
-                        .with(csrf())
+                        .with(bearer(principal))
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -137,7 +135,7 @@ class UserControllerTest {
                 scopeUserId,
                 "tenant-a",
                 SCOPE_USER,
-                passwordEncoder.encode("UserTest@123"),
+                passwordHasher.hash("UserTest@123"),
                 true,
                 Set.of(),
                 Set.of("user:write"),
@@ -147,8 +145,7 @@ class UserControllerTest {
         );
 
         mockMvc.perform(post("/api/users")
-                        .with(user(principal))
-                        .with(csrf())
+                        .with(bearer(principal))
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -172,7 +169,7 @@ class UserControllerTest {
                 scopeUserId,
                 "tenant-a",
                 SCOPE_USER,
-                passwordEncoder.encode("UserTest@123"),
+                passwordHasher.hash("UserTest@123"),
                 true,
                 Set.of(),
                 Set.of("user:write"),
@@ -182,8 +179,7 @@ class UserControllerTest {
         );
 
         mockMvc.perform(post("/api/users")
-                        .with(user(principal))
-                        .with(csrf())
+                        .with(bearer(principal))
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -207,7 +203,7 @@ class UserControllerTest {
                 scopeUserId,
                 "tenant-a",
                 SCOPE_USER,
-                passwordEncoder.encode("UserTest@123"),
+                passwordHasher.hash("UserTest@123"),
                 true,
                 Set.of(),
                 Set.of(),
@@ -217,7 +213,7 @@ class UserControllerTest {
         );
 
         mockMvc.perform(get("/api/users")
-                        .with(user(principal))
+                        .with(bearer(principal))
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"))
@@ -242,7 +238,7 @@ class UserControllerTest {
         entity.setDeptId(deptId);
         entity.setUsername(username);
         entity.setDisplayName(username);
-        entity.setPasswordHash(passwordEncoder.encode("UserTest@123"));
+        entity.setPasswordHash(passwordHasher.hash("UserTest@123"));
         entity.setEnabled(1);
         entity.setSessionVersion(1);
         sysUserMapper.insert(entity);

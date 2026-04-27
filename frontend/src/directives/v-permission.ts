@@ -14,24 +14,7 @@ function checkPermission(el: HTMLElement, binding: DirectiveBinding<string | str
   const authStore = useAuthStore()
   const requiredPermissions = binding.value
 
-  if (!requiredPermissions || (Array.isArray(requiredPermissions) && requiredPermissions.length === 0)) {
-    return
-  }
-
-  const grantSet = new Set(authStore.snapshot?.grants ?? [])
-
-  if (authStore.snapshot?.superAdmin) {
-    return
-  }
-
-  let hasPermission = false
-  if (Array.isArray(requiredPermissions)) {
-    hasPermission = requiredPermissions.some((perm) => grantSet.has(perm))
-  } else {
-    hasPermission = grantSet.has(requiredPermissions)
-  }
-
-  if (!hasPermission) {
+  if (!authStore.hasGrant(requiredPermissions)) {
     el.parentNode?.removeChild(el)
     el.style.display = 'none'
   }

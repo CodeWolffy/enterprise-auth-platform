@@ -30,43 +30,43 @@ const DYNAMIC_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = {
     path: 'system/users',
     name: 'users',
     component: () => import('@/views/UsersView.vue'),
-    meta: { title: '用户管理', routeKey: 'users' },
+    meta: { title: '用户管理', routeKey: 'users', requiresGrant: 'user:read' },
   },
   roles: {
     path: 'system/roles',
     name: 'roles',
     component: () => import('@/views/RolesView.vue'),
-    meta: { title: '角色管理', routeKey: 'roles' },
+    meta: { title: '角色管理', routeKey: 'roles', requiresGrant: 'role:read' },
   },
   depts: {
     path: 'system/depts',
     name: 'depts',
     component: () => import('@/views/DepartmentsView.vue'),
-    meta: { title: '部门管理', routeKey: 'depts' },
+    meta: { title: '部门管理', routeKey: 'depts', requiresGrant: 'dept:read' },
   },
   tenants: {
     path: 'platform/tenants',
     name: 'tenants',
     component: () => import('@/views/TenantsView.vue'),
-    meta: { title: '租户管理', routeKey: 'tenants' },
+    meta: { title: '租户管理', routeKey: 'tenants', requiresGrant: 'tenant:read' },
   },
   'online-users': {
     path: 'system/online-users',
     name: 'online-users',
     component: () => import('@/views/OnlineUsersView.vue'),
-    meta: { title: '在线用户', routeKey: 'online-users' },
+    meta: { title: '在线用户', routeKey: 'online-users', requiresGrant: 'auth:read' },
   },
   audit: {
     path: 'system/audit',
     name: 'audit',
     component: () => import('@/views/AuditView.vue'),
-    meta: { title: '安全审计', routeKey: 'audit' },
+    meta: { title: '安全审计', routeKey: 'audit', requiresGrant: 'audit:read' },
   },
   settings: {
     path: 'system/settings',
     name: 'settings',
     component: () => import('@/views/SystemManagementView.vue'),
-    meta: { title: '系统设置', routeKey: 'settings' },
+    meta: { title: '系统设置', routeKey: 'settings', requiresGrant: 'system:read' },
   },
   'settings-dicts': {
     path: 'system/settings/dicts',
@@ -78,7 +78,7 @@ const DYNAMIC_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = {
     path: 'platform/dicts',
     name: 'dicts',
     component: () => import('@/views/SystemDictsView.vue'),
-    meta: { title: '字典管理', routeKey: 'dicts' },
+    meta: { title: '字典管理', routeKey: 'dicts', requiresGrant: 'system:read' },
   },
   'settings-configs': {
     path: 'system/settings/configs',
@@ -90,7 +90,7 @@ const DYNAMIC_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = {
     path: 'platform/configs',
     name: 'configs',
     component: () => import('@/views/SystemConfigsView.vue'),
-    meta: { title: '参数管理', routeKey: 'configs' },
+    meta: { title: '参数管理', routeKey: 'configs', requiresGrant: 'system:read' },
   },
   'settings-notices': {
     path: 'system/settings/notices',
@@ -102,7 +102,7 @@ const DYNAMIC_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = {
     path: 'platform/notices',
     name: 'notices',
     component: () => import('@/views/SystemNoticesView.vue'),
-    meta: { title: '公告管理', routeKey: 'notices' },
+    meta: { title: '公告管理', routeKey: 'notices', requiresGrant: 'system:read' },
   },
   'settings-categories': {
     path: 'system/settings/categories',
@@ -114,13 +114,13 @@ const DYNAMIC_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = {
     path: 'platform/categories',
     name: 'categories',
     component: () => import('@/views/SystemCategoriesView.vue'),
-    meta: { title: '分类配置', routeKey: 'categories' },
+    meta: { title: '分类配置', routeKey: 'categories', requiresGrant: 'system:read' },
   },
   'tenant-catalog': {
     path: 'platform/tenant-catalog',
     name: 'tenant-catalog',
     component: () => import('@/views/TenantCatalogView.vue'),
-    meta: { title: '租户套餐', routeKey: 'tenant-catalog' },
+    meta: { title: '租户套餐', routeKey: 'tenant-catalog', requiresGrant: 'tenant:read' },
   },
   'settings-resources': {
     path: 'system/settings/resources',
@@ -132,7 +132,7 @@ const DYNAMIC_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = {
     path: 'system/resources',
     name: 'resources',
     component: () => import('@/views/ResourceManagementView.vue'),
-    meta: { title: '菜单管理', routeKey: 'resources' },
+    meta: { title: '菜单管理', routeKey: 'resources', requiresGrant: 'system:read' },
   },
 }
 
@@ -233,9 +233,8 @@ function isAllowedRoute(snapshot: PermissionSnapshot | null, to: RouteLocationNo
     return false
   }
 
-  const grantSet = new Set(snapshot.grants ?? [])
   const requiredGrant = String(to.meta.requiresGrant ?? '').trim()
-  if (requiredGrant && !grantSet.has(requiredGrant)) {
+  if (requiredGrant && !snapshot.superAdmin && !(snapshot.grants ?? []).includes(requiredGrant)) {
     return false
   }
 

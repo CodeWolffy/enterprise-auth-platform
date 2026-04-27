@@ -14,9 +14,6 @@ import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -26,26 +23,22 @@ public class DataScopeService {
     private final SysUserMapper sysUserMapper;
     private final SysDeptMapper sysDeptMapper;
     private final PlatformAdminSupport platformAdminSupport;
+    private final CurrentUserService currentUserService;
 
     public DataScopeService(
             SysUserMapper sysUserMapper,
             SysDeptMapper sysDeptMapper,
-            PlatformAdminSupport platformAdminSupport
+            PlatformAdminSupport platformAdminSupport,
+            CurrentUserService currentUserService
     ) {
         this.sysUserMapper = sysUserMapper;
         this.sysDeptMapper = sysDeptMapper;
         this.platformAdminSupport = platformAdminSupport;
+        this.currentUserService = currentUserService;
     }
 
     public Optional<UserAccount> currentUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated() || authentication instanceof AnonymousAuthenticationToken) {
-            return Optional.empty();
-        }
-        if (authentication.getPrincipal() instanceof UserAccount user) {
-            return Optional.of(user);
-        }
-        return Optional.empty();
+        return currentUserService.currentUser();
     }
 
     public List<SysUserEntity> filterUsers(String tenantId, List<SysUserEntity> users) {

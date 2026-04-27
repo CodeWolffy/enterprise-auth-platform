@@ -1,7 +1,6 @@
 package com.enterprise.auth.platform.tenant;
 
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.bearer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -70,7 +69,7 @@ class TenantControllerTest {
     @Test
     void currentTenantResolvesFromHeader() throws Exception {
         mockMvc.perform(get("/api/tenants/current")
-                        .with(user(principal("tenant:read")))
+                        .with(bearer(principal("tenant:read")))
                         .header("X-Tenant-Id", TENANT_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.tenantId").value(TENANT_ID));
@@ -80,7 +79,7 @@ class TenantControllerTest {
     void tenantHistoryShouldSupportFilters() throws Exception {
         long now = System.currentTimeMillis();
         mockMvc.perform(get("/api/tenants/{tenantId}/history", TENANT_ID)
-                        .with(user(principal("tenant:read")))
+                        .with(bearer(principal("tenant:read")))
                         .header("X-Tenant-Id", TENANT_ID)
                         .param("changeType", "STATUS")
                         .param("operator", "test")
@@ -96,7 +95,7 @@ class TenantControllerTest {
     void tenantHistorySummaryShouldReturnTrajectoryOverview() throws Exception {
         long now = System.currentTimeMillis();
         mockMvc.perform(get("/api/tenants/{tenantId}/history/summary", TENANT_ID)
-                        .with(user(principal("tenant:read")))
+                        .with(bearer(principal("tenant:read")))
                         .header("X-Tenant-Id", TENANT_ID)
                         .param("fromEpochMs", String.valueOf(now - SEVEN_DAYS_MS))
                         .param("toEpochMs", String.valueOf(now)))
@@ -110,7 +109,7 @@ class TenantControllerTest {
     @Test
     void tenantHistoryShouldRejectLocalDateTimeWithoutTimezone() throws Exception {
         mockMvc.perform(get("/api/tenants/{tenantId}/history", TENANT_ID)
-                        .with(user(principal("tenant:read")))
+                        .with(bearer(principal("tenant:read")))
                         .header("X-Tenant-Id", TENANT_ID)
                         .param("fromEpochMs", "2026-03-01T00:00:00")
                         .param("toEpochMs", "2026-03-31T23:59:59"))
@@ -120,8 +119,7 @@ class TenantControllerTest {
     @Test
     void tenantCapabilityOverridesShouldBeQueriedAndUpdated() throws Exception {
         mockMvc.perform(put("/api/tenants/{tenantId}/capability-overrides", TENANT_ID)
-                        .with(user(principal("tenant:write")))
-                        .with(csrf())
+                        .with(bearer(principal("tenant:write")))
                         .header("X-Tenant-Id", TENANT_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -144,7 +142,7 @@ class TenantControllerTest {
                 .andExpect(jsonPath("$.data.overrides[?(@.capabilityCode=='audit')].overrideEnabled").value(true));
 
         mockMvc.perform(get("/api/tenants/{tenantId}/capability-overrides", TENANT_ID)
-                        .with(user(principal("tenant:read")))
+                        .with(bearer(principal("tenant:read")))
                         .header("X-Tenant-Id", TENANT_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.tenantId").value(TENANT_ID))

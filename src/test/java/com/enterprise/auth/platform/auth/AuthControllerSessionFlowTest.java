@@ -1,27 +1,16 @@
 package com.enterprise.auth.platform.auth;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.enterprise.auth.platform.auth.model.UserSession;
 import com.enterprise.auth.platform.auth.service.CaptchaService;
-import com.enterprise.auth.platform.auth.store.SessionStore;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.servlet.http.Cookie;
-import java.time.Instant;
-import java.util.Comparator;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,7 +20,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.enterprise.auth.platform.security.PasswordHasher;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -56,7 +45,7 @@ class AuthControllerSessionFlowTest {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    private PasswordHasher passwordHasher;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -64,10 +53,6 @@ class AuthControllerSessionFlowTest {
     @MockitoBean
     private CaptchaService captchaService;
 
-    @MockitoBean
-    private SessionStore sessionStore;
-
-    private final Map<String, UserSession> sessions = new ConcurrentHashMap<>();
     private String previousPasswordHash;
 
     @BeforeEach
@@ -80,12 +65,11 @@ class AuthControllerSessionFlowTest {
         );
         jdbcTemplate.update(
                 "UPDATE sys_user SET password_hash = ? WHERE tenant_id = ? AND username = ? AND deleted = 0",
-                passwordEncoder.encode(ADMIN_PASSWORD),
+                passwordHasher.hash(ADMIN_PASSWORD),
                 "platform",
                 "admin"
         );
 
-        sessions.clear();
         when(captchaService.create()).thenReturn(new CaptchaService.CaptchaChallenge(
                 CAPTCHA_ID,
                 "background-base64",
@@ -96,33 +80,6 @@ class AuthControllerSessionFlowTest {
                 180
         ));
         doAnswer(invocation -> null).when(captchaService).validate(anyString(), anyString());
-        doAnswer(invocation -> {
-            UserSession session = invocation.getArgument(0);
-            sessions.put(session.sessionId(), session);
-            return null;
-        }).when(sessionStore).save(any(UserSession.class));
-        when(sessionStore.findBySessionId(anyString())).thenAnswer(invocation ->
-                Optional.ofNullable(sessions.get(invocation.getArgument(0))));
-        when(sessionStore.findByUserId(anyLong())).thenAnswer(invocation -> sessions.values().stream()
-                .filter(session -> session.userId().equals(invocation.getArgument(0)))
-                .sorted(Comparator.comparing(UserSession::issuedAt).reversed())
-                .toList());
-        doAnswer(invocation -> {
-            String sessionId = invocation.getArgument(0);
-            UserSession session = sessions.get(sessionId);
-            if (session != null) {
-                sessions.put(sessionId, session.deactivate(Instant.now()));
-            }
-            return null;
-        }).when(sessionStore).deactivate(anyString());
-        doAnswer(invocation -> {
-            String sessionId = invocation.getArgument(0);
-            UserSession session = sessions.get(sessionId);
-            if (session != null) {
-                sessions.put(sessionId, session.touch(Instant.now()));
-            }
-            return null;
-        }).when(sessionStore).touch(anyString());
     }
 
     @AfterEach
@@ -136,11 +93,10 @@ class AuthControllerSessionFlowTest {
             );
         }
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username = ?", "tenant-a", TENANT_USER);
-        sessions.clear();
     }
 
     @Test
-    void 登录应返回滑块验证码并完成完整会话流程() throws Exception {
+    void loginShouldReturnCaptchaAndCompleteBearerSessionFlow() throws Exception {
         mockMvc.perform(get("/api/auth/captcha"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"))
@@ -166,16 +122,16 @@ class AuthControllerSessionFlowTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.tenantId").value("platform"))
-                .andExpect(jsonPath("$.data.sessionId").isNotEmpty())
+                .andExpect(jsonPath("$.data.token").isNotEmpty())
                 .andReturn();
 
         JsonNode loginBody = objectMapper.readTree(loginResult.getResponse().getContentAsString());
-        String sessionId = loginBody.path("data").path("sessionId").asText();
-        Cookie sessionCookie = loginResult.getResponse().getCookie(AuthCookieConstants.SESSION_COOKIE);
-        Assertions.assertNotNull(sessionCookie, "缺少会话 Cookie");
+        String token = loginBody.path("data").path("token").asText();
+        Assertions.assertFalse(token.isBlank(), "missing bearer token");
+        String authorization = "Bearer " + token;
 
         mockMvc.perform(get("/api/auth/me")
-                        .cookie(sessionCookie)
+                        .header("Authorization", authorization)
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"))
@@ -184,28 +140,28 @@ class AuthControllerSessionFlowTest {
                 .andExpect(jsonPath("$.data.grants[?(@=='tenant:read')]").exists());
 
         mockMvc.perform(get("/api/auth/sessions")
-                        .cookie(sessionCookie)
+                        .header("Authorization", authorization)
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].sessionId").value(sessionId))
+                .andExpect(jsonPath("$.data[?(@.sessionId=='" + token + "')]").exists())
+                .andExpect(jsonPath("$.data[?(@.sessionId=='" + token + "' && @.lastAccessAt > 0)]").exists())
                 .andExpect(jsonPath("$.data[0].tenantId").value("platform"));
 
         mockMvc.perform(post("/api/auth/logout")
-                        .with(csrf())
-                        .cookie(sessionCookie)
+                        .header("Authorization", authorization)
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"));
 
         mockMvc.perform(get("/api/auth/me")
-                        .cookie(sessionCookie)
+                        .header("Authorization", authorization)
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("SESSION_EXPIRED"));
+                .andExpect(jsonPath("$.code").value("INVALID_TOKEN"));
     }
 
     @Test
-    void 登录应忽略已有Cookie并按用户名解析租户() throws Exception {
+    void loginShouldIgnoreExistingBearerAndResolveTenantByUsername() throws Exception {
         ensureTenantUser();
 
         MvcResult adminLoginResult = mockMvc.perform(post("/api/auth/login")
@@ -222,11 +178,12 @@ class AuthControllerSessionFlowTest {
                 .andExpect(status().isOk())
                 .andReturn();
 
-        Cookie adminSessionCookie = adminLoginResult.getResponse().getCookie(AuthCookieConstants.SESSION_COOKIE);
-        Assertions.assertNotNull(adminSessionCookie, "Missing admin session cookie");
+        String adminToken = objectMapper.readTree(adminLoginResult.getResponse().getContentAsString())
+                .path("data").path("token").asText();
+        Assertions.assertFalse(adminToken.isBlank(), "missing admin bearer token");
 
         mockMvc.perform(post("/api/auth/login")
-                        .cookie(adminSessionCookie)
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -255,7 +212,7 @@ class AuthControllerSessionFlowTest {
                 2L,
                 TENANT_USER,
                 TENANT_USER,
-                passwordEncoder.encode(TENANT_USER_PASSWORD),
+                passwordHasher.hash(TENANT_USER_PASSWORD),
                 1,
                 1,
                 "test",

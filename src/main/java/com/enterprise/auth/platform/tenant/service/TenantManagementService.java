@@ -24,6 +24,7 @@ import com.enterprise.auth.platform.persistence.mapper.SysTenantChangeLogMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysTenantPackageCapabilityMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysTenantPackageMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
+import com.enterprise.auth.platform.security.CurrentUserService;
 import com.enterprise.auth.platform.security.PlatformAdminSupport;
 import com.enterprise.auth.platform.security.SecuritySupport;
 import com.enterprise.auth.platform.tenant.TenantContext;
@@ -36,9 +37,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -58,6 +56,7 @@ public class TenantManagementService {
     private final CatalogService catalogService;
     private final AuditService auditService;
     private final PlatformAdminSupport platformAdminSupport;
+    private final CurrentUserService currentUserService;
 
     public TenantManagementService(
             SysTenantMapper sysTenantMapper,
@@ -71,7 +70,8 @@ public class TenantManagementService {
             SysTenantChangeLogMapper sysTenantChangeLogMapper,
             CatalogService catalogService,
             AuditService auditService,
-            PlatformAdminSupport platformAdminSupport
+            PlatformAdminSupport platformAdminSupport,
+            CurrentUserService currentUserService
     ) {
         this.sysTenantMapper = sysTenantMapper;
         this.sysUserMapper = sysUserMapper;
@@ -85,6 +85,7 @@ public class TenantManagementService {
         this.catalogService = catalogService;
         this.auditService = auditService;
         this.platformAdminSupport = platformAdminSupport;
+        this.currentUserService = currentUserService;
     }
 
     @Transactional
@@ -755,16 +756,7 @@ public class TenantManagementService {
     }
 
     private Optional<UserAccount> currentUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null
-                || !authentication.isAuthenticated()
-                || authentication instanceof AnonymousAuthenticationToken) {
-            return Optional.empty();
-        }
-        if (authentication.getPrincipal() instanceof UserAccount user) {
-            return Optional.of(user);
-        }
-        return Optional.empty();
+        return currentUserService.currentUser();
     }
 
     private boolean isPlatformSuperAdmin() {

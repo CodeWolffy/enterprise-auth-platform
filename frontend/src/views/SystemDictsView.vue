@@ -2,12 +2,12 @@
   <div class="panel-stack">
     <section class="dashboard-grid">
       <article class="stat-card">
-        <span class="eyebrow">Dict Items</span>
+        <span class="eyebrow">字典项</span>
         <strong>{{ total }}</strong>
         <span>当前筛选条件下的字典项总数</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Types</span>
+        <span class="eyebrow">类型</span>
         <strong>{{ dictTypeCount }}</strong>
         <span>当前页覆盖的字典类型数量</span>
       </article>
@@ -16,7 +16,7 @@
     <section class="dashboard-panel">
       <div class="panel-head">
         <div>
-          <span class="eyebrow">Dictionary</span>
+          <span class="eyebrow">字典</span>
           <h3>字典管理</h3>
         </div>
         <el-button type="primary" @click="openDict()">新增字典项</el-button>

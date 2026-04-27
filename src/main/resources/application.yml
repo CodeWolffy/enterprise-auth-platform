@@ -42,6 +42,19 @@ spring:
       client:
         enabled: false
 
+sa-token:
+  token-name: Authorization
+  token-prefix: Bearer
+  timeout: 604800
+  active-timeout: -1
+  is-concurrent: true
+  is-share: false
+  token-style: uuid
+  is-read-cookie: false
+  is-read-header: true
+  is-read-body: false
+  is-log: false
+
 management:
   endpoints:
     web:

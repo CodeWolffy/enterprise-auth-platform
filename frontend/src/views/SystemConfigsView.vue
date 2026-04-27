@@ -2,12 +2,12 @@
   <div class="panel-stack">
     <section class="dashboard-grid">
       <article class="stat-card">
-        <span class="eyebrow">Configs</span>
+        <span class="eyebrow">参数</span>
         <strong>{{ total }}</strong>
         <span>当前筛选条件下的参数项总数</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Operators</span>
+        <span class="eyebrow">操作人</span>
         <strong>{{ operatorCount }}</strong>
         <span>当前页涉及的创建人数</span>
       </article>
@@ -16,7 +16,7 @@
     <section class="dashboard-panel">
       <div class="panel-head">
         <div>
-          <span class="eyebrow">Config</span>
+          <span class="eyebrow">参数</span>
           <h3>参数管理</h3>
         </div>
         <el-button type="primary" @click="openConfig()">新增参数</el-button>

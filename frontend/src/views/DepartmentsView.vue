@@ -2,22 +2,22 @@
   <div class="panel-stack">
     <section class="dashboard-grid">
       <article class="stat-card">
-        <span class="eyebrow">Departments</span>
+        <span class="eyebrow">部门</span>
         <strong>{{ departments.length }}</strong>
         <span>当前可见部门总数</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Root</span>
+        <span class="eyebrow">顶级</span>
         <strong>{{ rootDepartmentCount }}</strong>
         <span>顶级部门数量</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Leaders</span>
+        <span class="eyebrow">负责人</span>
         <strong>{{ leaderBoundCount }}</strong>
         <span>已配置负责人部门数</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Leaf</span>
+        <span class="eyebrow">末级</span>
         <strong>{{ leafDepartmentCount }}</strong>
         <span>末级部门数量</span>
       </article>
@@ -26,7 +26,7 @@
     <section class="dashboard-panel">
       <div class="panel-head">
         <div>
-          <span class="eyebrow">Departments</span>
+<span class="eyebrow">部门</span>
           <h3>部门管理</h3>
         </div>
         <div class="panel-actions">

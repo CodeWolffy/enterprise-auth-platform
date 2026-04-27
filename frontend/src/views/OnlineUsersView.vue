@@ -2,22 +2,22 @@
   <div class="panel-stack">
     <section class="dashboard-grid">
       <article class="stat-card">
-        <span class="eyebrow">Sessions</span>
+        <span class="eyebrow">会话</span>
         <strong>{{ sessions.length }}</strong>
         <span>当前可见会话总数</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Online</span>
+        <span class="eyebrow">在线</span>
         <strong>{{ activeCount }}</strong>
         <span>仍处于在线状态的会话</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Tenants</span>
+        <span class="eyebrow">租户</span>
         <strong>{{ tenantCount }}</strong>
         <span>会话覆盖的租户数量</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Devices</span>
+        <span class="eyebrow">设备</span>
         <strong>{{ deviceCount }}</strong>
         <span>识别到的设备类型数量</span>
       </article>
@@ -26,7 +26,7 @@
     <section class="dashboard-panel">
       <div class="panel-head">
         <div>
-          <span class="eyebrow">Online Users</span>
+          <span class="eyebrow">在线用户</span>
           <h3>在线用户</h3>
         </div>
         <el-button type="primary" :loading="loading" @click="load">刷新</el-button>

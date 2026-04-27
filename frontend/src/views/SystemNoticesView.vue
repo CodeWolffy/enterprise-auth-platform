@@ -2,17 +2,17 @@
   <div class="panel-stack">
     <section class="dashboard-grid">
       <article class="stat-card">
-        <span class="eyebrow">Notices</span>
+        <span class="eyebrow">公告</span>
         <strong>{{ total }}</strong>
         <span>当前筛选条件下的公告总数</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Published</span>
+        <span class="eyebrow">已发布</span>
         <strong>{{ publishedCount }}</strong>
         <span>当前页已发布公告数量</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Draft</span>
+        <span class="eyebrow">草稿</span>
         <strong>{{ draftCount }}</strong>
         <span>当前页草稿数量</span>
       </article>
@@ -21,7 +21,7 @@
     <section class="dashboard-panel">
       <div class="panel-head">
         <div>
-          <span class="eyebrow">Notice</span>
+          <span class="eyebrow">公告</span>
           <h3>公告管理</h3>
         </div>
         <el-button type="primary" @click="openNotice()">新增公告</el-button>

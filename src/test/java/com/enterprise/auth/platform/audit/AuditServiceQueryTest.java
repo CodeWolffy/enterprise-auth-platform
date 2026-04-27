@@ -1,5 +1,8 @@
 package com.enterprise.auth.platform.audit;
 
+import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.bind;
+import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.clear;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.enterprise.auth.platform.audit.model.AuditQuery;
@@ -16,9 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.enterprise.auth.platform.security.PasswordHasher;
 
 @SpringBootTest
 class AuditServiceQueryTest {
@@ -37,12 +38,12 @@ class AuditServiceQueryTest {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    private PasswordHasher passwordHasher;
 
     @AfterEach
     void tearDown() {
         TenantContext.clear();
-        SecurityContextHolder.clearContext();
+        clear();
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username in (?, ?, ?)",
                 "tenant-a", AUDIT_SCOPE_USER, AUDIT_VISIBLE_USER, AUDIT_HIDDEN_USER);
     }
@@ -84,7 +85,7 @@ class AuditServiceQueryTest {
                 scopedUserId,
                 "tenant-a",
                 AUDIT_SCOPE_USER,
-                passwordEncoder.encode("AuditTest@123"),
+                passwordHasher.hash("AuditTest@123"),
                 true,
                 Set.of(),
                 Set.of("audit:read"),
@@ -92,9 +93,7 @@ class AuditServiceQueryTest {
                 DataScopeType.DEPT,
                 1
         );
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(principal, principal.password(), principal.getAuthorities())
-        );
+        bind(principal);
 
         auditService.record("AUDIT_SCOPE_TEST", AUDIT_VISIBLE_USER, "tenant-a", Map.of("bizId", "visible"));
         auditService.record("AUDIT_SCOPE_TEST", AUDIT_HIDDEN_USER, "tenant-a", Map.of("bizId", "hidden"));
@@ -123,7 +122,7 @@ class AuditServiceQueryTest {
         entity.setDeptId(deptId);
         entity.setUsername(username);
         entity.setDisplayName(username);
-        entity.setPasswordHash(passwordEncoder.encode("AuditTest@123"));
+        entity.setPasswordHash(passwordHasher.hash("AuditTest@123"));
         entity.setEnabled(1);
         entity.setSessionVersion(1);
         sysUserMapper.insert(entity);

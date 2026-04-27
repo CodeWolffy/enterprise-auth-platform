@@ -1,8 +1,7 @@
 package com.enterprise.auth.platform.security;
 
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import cn.dev33.satoken.exception.SaTokenContextException;
+import cn.dev33.satoken.stp.StpUtil;
 
 public final class SecuritySupport {
 
@@ -10,10 +9,16 @@ public final class SecuritySupport {
     }
 
     public static String currentOperator() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated() || authentication instanceof AnonymousAuthenticationToken) {
+        return AuthContextHolder.currentUser()
+                .map(user -> user.username())
+                .orElseGet(SecuritySupport::saTokenOperatorOrSystem);
+    }
+
+    private static String saTokenOperatorOrSystem() {
+        try {
+            return StpUtil.isLogin() ? String.valueOf(StpUtil.getLoginId()) : "system";
+        } catch (SaTokenContextException ignored) {
             return "system";
         }
-        return authentication.getName();
     }
 }

@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.common.web;
 
+import cn.dev33.satoken.stp.StpUtil;
 import com.enterprise.auth.platform.common.annotation.RateLimit;
 import com.enterprise.auth.platform.config.RateLimitProperties;
 import io.github.bucket4j.Bandwidth;
@@ -29,9 +30,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
 import org.springframework.lang.Nullable;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.util.matcher.IpAddressMatcher;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.method.HandlerMethod;
@@ -47,7 +45,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     private final RateLimitProperties properties;
     private final LettuceBasedProxyManager<String> proxyManager;
     private final RedisClient redisClient;
-    private final List<IpAddressMatcher> trustedProxyMatchers;
+    private final List<CidrMatcher> trustedProxyMatchers;
 
     @Autowired
     public RateLimitInterceptor(
@@ -73,7 +71,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         this.proxyManager = proxyManager;
         this.redisClient = redisClient;
         this.trustedProxyMatchers = properties.resolvedTrustedProxies().stream()
-                .map(IpAddressMatcher::new)
+                .map(CidrMatcher::new)
                 .toList();
     }
 
@@ -214,8 +212,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
     private String buildBucketKey(HttpServletRequest request, String rateLimitKey, RateLimit rateLimit) {
         String ip = resolveClientIp(request);
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String userId = authentication != null ? authentication.getName() : "anonymous";
+        String userId = StpUtil.isLogin() ? String.valueOf(StpUtil.getLoginId()) : "anonymous";
 
         return switch (rateLimit.strategy()) {
             case IP -> "ratelimit:" + rateLimitKey + ":ip:" + ip;
@@ -306,5 +303,48 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             LettuceBasedProxyManager<String> proxyManager,
             RedisClient redisClient
     ) {
+    }
+
+    private static final class CidrMatcher {
+        private final String cidr;
+
+        private CidrMatcher(String cidr) {
+            this.cidr = cidr;
+        }
+
+        private boolean matches(String address) {
+            if (!StringUtils.hasText(cidr) || !StringUtils.hasText(address)) {
+                return false;
+            }
+            if (!cidr.contains("/")) {
+                return cidr.equals(address);
+            }
+            String[] parts = cidr.split("/", 2);
+            if (parts.length != 2) {
+                return false;
+            }
+            try {
+                int prefix = Integer.parseInt(parts[1]);
+                if (parts[0].contains(":") || address.contains(":")) {
+                    return "::1".equals(parts[0]) && "::1".equals(address);
+                }
+                int mask = prefix == 0 ? 0 : -1 << (32 - prefix);
+                return (ipv4ToInt(parts[0]) & mask) == (ipv4ToInt(address) & mask);
+            } catch (RuntimeException ignored) {
+                return false;
+            }
+        }
+
+        private int ipv4ToInt(String ip) {
+            String[] octets = ip.split("\\.");
+            if (octets.length != 4) {
+                throw new IllegalArgumentException("Invalid IPv4 address");
+            }
+            int value = 0;
+            for (String octet : octets) {
+                value = (value << 8) | Integer.parseInt(octet);
+            }
+            return value;
+        }
     }
 }

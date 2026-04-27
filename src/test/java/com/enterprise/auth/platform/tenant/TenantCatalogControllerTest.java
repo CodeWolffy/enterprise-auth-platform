@@ -1,7 +1,6 @@
 package com.enterprise.auth.platform.tenant;
 
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.bearer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -19,7 +18,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.enterprise.auth.platform.security.PasswordHasher;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
@@ -36,7 +35,7 @@ class TenantCatalogControllerTest {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    private PasswordHasher passwordHasher;
 
     @AfterEach
     void tearDown() {
@@ -50,8 +49,7 @@ class TenantCatalogControllerTest {
         UserAccount principal = principal(Set.of("tenant:read", "tenant:write"));
 
         mockMvc.perform(post("/api/tenant-catalog/capabilities")
-                        .with(user(principal))
-                        .with(csrf())
+                        .with(bearer(principal))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -67,8 +65,7 @@ class TenantCatalogControllerTest {
                 .andExpect(jsonPath("$.data.capabilityCode").value(CAPABILITY_CODE));
 
         mockMvc.perform(post("/api/tenant-catalog/packages")
-                        .with(user(principal))
-                        .with(csrf())
+                        .with(bearer(principal))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -98,20 +95,19 @@ class TenantCatalogControllerTest {
         );
 
         mockMvc.perform(get("/api/tenant-catalog/capabilities")
-                        .with(user(principal))
+                        .with(bearer(principal))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[?(@.capabilityCode=='" + CAPABILITY_CODE + "')]").exists());
 
         mockMvc.perform(get("/api/tenant-catalog/packages")
-                        .with(user(principal))
+                        .with(bearer(principal))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[?(@.packageCode=='" + PACKAGE_CODE + "')]").exists());
 
         mockMvc.perform(put("/api/tenant-catalog/capabilities/{id}", capabilityId)
-                        .with(user(principal))
-                        .with(csrf())
+                        .with(bearer(principal))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -127,8 +123,7 @@ class TenantCatalogControllerTest {
                 .andExpect(jsonPath("$.data.capabilityName").value("测试能力已更新"));
 
         mockMvc.perform(put("/api/tenant-catalog/packages/{id}", packageId)
-                        .with(user(principal))
-                        .with(csrf())
+                        .with(bearer(principal))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -146,15 +141,13 @@ class TenantCatalogControllerTest {
                 .andExpect(jsonPath("$.data.packageName").value("测试套餐已更新"));
 
         mockMvc.perform(delete("/api/tenant-catalog/packages/{id}", packageId)
-                        .with(user(principal))
-                        .with(csrf())
+                        .with(bearer(principal))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
 
         mockMvc.perform(delete("/api/tenant-catalog/capabilities/{id}", capabilityId)
-                        .with(user(principal))
-                        .with(csrf())
+                        .with(bearer(principal))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
@@ -165,7 +158,7 @@ class TenantCatalogControllerTest {
                 1L,
                 "platform",
                 "admin",
-                passwordEncoder.encode("Admin@123456"),
+                passwordHasher.hash("Admin@123456"),
                 true,
                 Set.of("ADMIN"),
                 permissions,

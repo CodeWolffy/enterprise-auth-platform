@@ -1,7 +1,6 @@
 package com.enterprise.auth.platform.system;
 
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.bearer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -23,7 +22,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.enterprise.auth.platform.security.PasswordHasher;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
@@ -44,7 +43,7 @@ class SystemControllerTest {
     private MockMvc mockMvc;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    private PasswordHasher passwordHasher;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -116,7 +115,7 @@ class SystemControllerTest {
     @Test
     void dictListShouldApplyDataScope() throws Exception {
         mockMvc.perform(get("/api/system/dicts")
-                        .with(user(principal(Set.of("system:read"))))
+                        .with(bearer(principal(Set.of("system:read"))))
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.records[?(@.dictCode=='" + VISIBLE_DICT_CODE + "')]").exists())
@@ -126,7 +125,7 @@ class SystemControllerTest {
     @Test
     void dictListShouldSupportSortByDictCode() throws Exception {
         mockMvc.perform(get("/api/system/dicts")
-                        .with(user(principal(Set.of("system:read"))))
+                        .with(bearer(principal(Set.of("system:read"))))
                         .header("X-Tenant-Id", "tenant-a")
                         .param("sortBy", "dictCode")
                         .param("sortDirection", "asc")
@@ -139,7 +138,7 @@ class SystemControllerTest {
     @Test
     void dictListShouldSupportCategoryFilter() throws Exception {
         mockMvc.perform(get("/api/system/dicts")
-                        .with(user(principal(Set.of("system:read"))))
+                        .with(bearer(principal(Set.of("system:read"))))
                         .header("X-Tenant-Id", "tenant-a")
                         .param("category", "system"))
                 .andExpect(status().isOk())
@@ -150,8 +149,7 @@ class SystemControllerTest {
     @Test
     void updateHiddenDictShouldBeRejected() throws Exception {
         mockMvc.perform(put("/api/system/dicts/{id}", hiddenDictId)
-                        .with(user(principal(Set.of("system:write"))))
-                        .with(csrf())
+                        .with(bearer(principal(Set.of("system:write"))))
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -169,8 +167,7 @@ class SystemControllerTest {
     @Test
     void shouldCreateCategoryOption() throws Exception {
         mockMvc.perform(post("/api/system/categories/dict")
-                        .with(user(principal(Set.of("system:write"))))
-                        .with(csrf())
+                        .with(bearer(principal(Set.of("system:write"))))
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -185,13 +182,13 @@ class SystemControllerTest {
                 .andExpect(jsonPath("$.data.matchers[0]").value("system_scope*"));
 
         mockMvc.perform(get("/api/system/categories/dict")
-                        .with(user(principal(Set.of("system:read"))))
+                        .with(bearer(principal(Set.of("system:read"))))
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[?(@.code=='" + CATEGORY_CODE + "')]").exists());
 
         mockMvc.perform(get("/api/system/categories/dict/{code}/analysis", CATEGORY_CODE)
-                        .with(user(principal(Set.of("system:read"))))
+                        .with(bearer(principal(Set.of("system:read"))))
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.code").value(CATEGORY_CODE))
@@ -206,7 +203,7 @@ class SystemControllerTest {
                 scopeUserId,
                 "tenant-a",
                 SCOPE_USER,
-                passwordEncoder.encode("SystemUser@123"),
+                passwordHasher.hash("SystemUser@123"),
                 true,
                 Set.of(),
                 permissions,
@@ -234,7 +231,7 @@ class SystemControllerTest {
         entity.setDeptId(deptId);
         entity.setUsername(username);
         entity.setDisplayName(username);
-        entity.setPasswordHash(passwordEncoder.encode("SystemUser@123"));
+        entity.setPasswordHash(passwordHasher.hash("SystemUser@123"));
         entity.setEnabled(1);
         entity.setSessionVersion(1);
         sysUserMapper.insert(entity);

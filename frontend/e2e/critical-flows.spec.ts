@@ -75,15 +75,6 @@ test.describe('关键流程回归', () => {
         return
       }
 
-      if (url.pathname === '/api/auth/csrf' && method === 'GET') {
-        await fulfillJson(route, 200, apiEnvelope({
-          headerName: 'X-XSRF-TOKEN',
-          parameterName: '_csrf',
-          token: 'csrf-e2e-token',
-        }))
-        return
-      }
-
       if (url.pathname === '/api/auth/login' && method === 'POST') {
         loginPayload = request.postData() ?? ''
         await fulfillJson(route, 200, apiEnvelope({
@@ -217,15 +208,6 @@ test.describe('关键流程回归', () => {
         await route.continue()
         return
       }
-      if (url.pathname.startsWith('/api/auth/csrf') && method === 'GET') {
-        await fulfillJson(route, 200, apiEnvelope({
-          headerName: 'X-XSRF-TOKEN',
-          parameterName: '_csrf',
-          token: 'csrf-e2e-token',
-        }))
-        return
-      }
-
       if (url.pathname === '/api/audit/events' && method === 'GET') {
         await fulfillJson(route, 200, apiEnvelope({
           total: 1,
@@ -347,15 +329,6 @@ test.describe('关键流程回归', () => {
         await route.continue()
         return
       }
-      if (url.pathname.startsWith('/api/auth/csrf') && method === 'GET') {
-        await fulfillJson(route, 200, apiEnvelope({
-          headerName: 'X-XSRF-TOKEN',
-          parameterName: '_csrf',
-          token: 'csrf-e2e-token',
-        }))
-        return
-      }
-
       if (url.pathname === '/api/audit/events' && method === 'GET') {
         await fulfillJson(route, 200, apiEnvelope({
           total: 1,

@@ -11,7 +11,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
-import org.springframework.security.access.prepost.PreAuthorize;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -34,21 +34,21 @@ public class ResourceController {
 
     @Operation(summary = "查询资源树")
     @GetMapping("/tree")
-    @PreAuthorize("hasAuthority('system:read')")
+    @SaCheckPermission("system:read")
     public ApiResponse<List<ResourceTreeNode>> tree() {
         return ApiResponse.ok(resourceService.templateTree());
     }
 
     @Operation(summary = "新增资源")
     @PostMapping
-    @PreAuthorize("hasAuthority('system:write')")
+    @SaCheckPermission("system:write")
     public ApiResponse<ResourceTreeNode> create(@Valid @RequestBody CreateResourceRequest request) {
         return ApiResponse.ok(resourceService.createResource(request));
     }
 
     @Operation(summary = "修改资源")
     @PutMapping("/{resourceId}")
-    @PreAuthorize("hasAuthority('system:write')")
+    @SaCheckPermission("system:write")
     public ApiResponse<ResourceTreeNode> update(
             @Parameter(description = "资源 ID") @PathVariable Long resourceId,
             @Valid @RequestBody UpdateResourceRequest request
@@ -58,7 +58,7 @@ public class ResourceController {
 
     @Operation(summary = "删除资源")
     @DeleteMapping("/{resourceId}")
-    @PreAuthorize("hasAuthority('system:write')")
+    @SaCheckPermission("system:write")
     public ApiResponse<Void> delete(@Parameter(description = "资源 ID") @PathVariable Long resourceId) {
         resourceService.deleteResource(resourceId);
         return ApiResponse.ok();
@@ -66,7 +66,7 @@ public class ResourceController {
 
     @Operation(summary = "修改资源排序")
     @PutMapping("/{resourceId}/sort")
-    @PreAuthorize("hasAuthority('system:write')")
+    @SaCheckPermission("system:write")
     public ApiResponse<ResourceTreeNode> sort(
             @Parameter(description = "资源 ID") @PathVariable Long resourceId,
             @Valid @RequestBody SortResourceRequest request

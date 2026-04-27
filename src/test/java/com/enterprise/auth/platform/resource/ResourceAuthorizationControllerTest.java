@@ -1,8 +1,7 @@
 package com.enterprise.auth.platform.resource;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.bearer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -58,8 +57,7 @@ class ResourceAuthorizationControllerTest {
     @Test
     void updateResourceShouldRejectDescendantAsParent() throws Exception {
         mockMvc.perform(put("/api/resources/{resourceId}", 20L)
-                        .with(user(principal("platform", Set.of("system:write"))))
-                        .with(csrf())
+                        .with(bearer(principal("platform", Set.of("system:write"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -86,8 +84,7 @@ class ResourceAuthorizationControllerTest {
     @Test
     void createMenuShouldRequireRouteAndGrantFields() throws Exception {
         mockMvc.perform(post("/api/resources")
-                        .with(user(principal("platform", Set.of("system:write"))))
-                        .with(csrf())
+                        .with(bearer(principal("platform", Set.of("system:write"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -114,8 +111,7 @@ class ResourceAuthorizationControllerTest {
     @Test
     void createButtonShouldRequireMenuParentAndGrantKey() throws Exception {
         mockMvc.perform(post("/api/resources")
-                        .with(user(principal("platform", Set.of("system:write"))))
-                        .with(csrf())
+                        .with(bearer(principal("platform", Set.of("system:write"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -144,8 +140,7 @@ class ResourceAuthorizationControllerTest {
         Long roleId = createTempRole("tenant-a");
 
         mockMvc.perform(put("/api/roles/{roleId}/resources", roleId)
-                        .with(user(principal("tenant-a", Set.of("role:write"))))
-                        .with(csrf())
+                        .with(bearer(principal("tenant-a", Set.of("role:write"))))
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -159,7 +154,7 @@ class ResourceAuthorizationControllerTest {
                 .andExpect(jsonPath("$.data[?(@==24)]").exists());
 
         mockMvc.perform(get("/api/roles/{roleId}/resources", roleId)
-                        .with(user(principal("tenant-a", Set.of("role:read"))))
+                        .with(bearer(principal("tenant-a", Set.of("role:read"))))
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[?(@==1)]").exists())
@@ -172,8 +167,7 @@ class ResourceAuthorizationControllerTest {
         Long roleId = createTempRole("tenant-a");
 
         mockMvc.perform(put("/api/roles/{roleId}/resources", roleId)
-                        .with(user(principal("tenant-a", Set.of("role:write"))))
-                        .with(csrf())
+                        .with(bearer(principal("tenant-a", Set.of("role:write"))))
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -201,8 +195,7 @@ class ResourceAuthorizationControllerTest {
         Long roleId = createTempRole("tenant-a");
 
         mockMvc.perform(put("/api/roles/{roleId}/resources", roleId)
-                        .with(user(principal("tenant-a", Set.of("role:write"))))
-                        .with(csrf())
+                        .with(bearer(principal("tenant-a", Set.of("role:write"))))
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -229,8 +222,7 @@ class ResourceAuthorizationControllerTest {
     @Test
     void tenantResourceOverridesShouldUpdateAndQuery() throws Exception {
         mockMvc.perform(put("/api/tenants/{tenantId}/resource-overrides", "tenant-a")
-                        .with(user(principal("platform", Set.of("tenant:write"))))
-                        .with(csrf())
+                        .with(bearer(principal("platform", Set.of("tenant:write"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -265,7 +257,7 @@ class ResourceAuthorizationControllerTest {
         assertThat(visible).isEqualTo(0);
 
         mockMvc.perform(get("/api/tenants/{tenantId}/resource-overrides", "tenant-a")
-                        .with(user(principal("platform", Set.of("tenant:read"))))
+                        .with(bearer(principal("platform", Set.of("tenant:read"))))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[?(@.resourceId==25)]").exists());

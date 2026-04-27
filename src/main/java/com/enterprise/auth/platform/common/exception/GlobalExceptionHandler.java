@@ -1,5 +1,8 @@
 package com.enterprise.auth.platform.common.exception;
 
+import cn.dev33.satoken.exception.NotLoginException;
+import cn.dev33.satoken.exception.NotPermissionException;
+import cn.dev33.satoken.exception.SaTokenException;
 import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.common.api.ApiResponse;
 import com.enterprise.auth.platform.common.web.RateLimitInterceptor.RateLimitExceededException;
@@ -14,8 +17,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
@@ -49,6 +50,26 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(RATE_LIMITED_CODE, exception.getMessage()));
     }
 
+    @ExceptionHandler(NotLoginException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ApiResponse<Void> handleNotLogin(NotLoginException exception) {
+        return ApiResponse.fail(notLoginCode(exception), exception.getMessage());
+    }
+
+    @ExceptionHandler(NotPermissionException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ApiResponse<Void> handleDenied(NotPermissionException exception, HttpServletRequest request) {
+        recordSecurityDenyEvent(exception, request);
+        log.warn("Access denied {} {}: {}", request.getMethod(), request.getRequestURI(), exception.getMessage());
+        return ApiResponse.fail("ACCESS_DENIED", "无权限访问");
+    }
+
+    @ExceptionHandler(SaTokenException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ApiResponse<Void> handleSaToken(SaTokenException exception) {
+        return ApiResponse.fail("AUTH_ERROR", exception.getMessage());
+    }
+
     @ExceptionHandler({
             MethodArgumentNotValidException.class,
             BindException.class,
@@ -60,28 +81,16 @@ public class GlobalExceptionHandler {
         return ApiResponse.fail("VALIDATION_ERROR", validationMessage(exception));
     }
 
-    @ExceptionHandler(AccessDeniedException.class)
-    @ResponseStatus(HttpStatus.FORBIDDEN)
-    public ApiResponse<Void> handleDenied(AccessDeniedException exception, HttpServletRequest request) {
-        recordSecurityDenyEvent(exception, request);
-        if (exception instanceof CsrfException) {
-            log.warn("CSRF 校验失败 {} {}: {}", request.getMethod(), request.getRequestURI(), exception.getMessage());
-            return ApiResponse.fail(null, "CSRF 令牌不匹配或缺失");
-        }
-        log.warn("访问被拒绝 {} {}: {}", request.getMethod(), request.getRequestURI(), exception.getMessage());
-        return ApiResponse.fail("ACCESS_DENIED", "无权访问此资源");
-    }
-
     @ExceptionHandler(NoResourceFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ApiResponse<Void> handleNotFound(NoResourceFoundException exception) {
-        return ApiResponse.fail("RESOURCE_NOT_FOUND", "资源不存在");
+        return ApiResponse.fail("RESOURCE_NOT_FOUND", "资源未找到");
     }
 
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResponse<Void> handleUnexpected(Exception exception) {
-        log.error("未处理的服务器异常", exception);
+        log.error("Unhandled server exception", exception);
         return ApiResponse.fail("INTERNAL_ERROR", "服务器内部错误");
     }
 
@@ -99,21 +108,30 @@ public class GlobalExceptionHandler {
                     .orElse("请求参数校验失败");
         }
         if (exception instanceof MethodArgumentTypeMismatchException mismatchException) {
-            return mismatchException.getName() + ":参数格式不正确";
+            return mismatchException.getName() + ": 参数格式无效";
         }
-        return "请求参数校验失败";
+        return "Request validation failed";
     }
 
     private String fieldErrors(List<FieldError> fieldErrors) {
         if (fieldErrors == null || fieldErrors.isEmpty()) {
-            return "请求参数校验失败";
+return "请求参数校验失败";
         }
         return fieldErrors.stream()
                 .map(error -> error.getField() + ":" + error.getDefaultMessage())
                 .collect(Collectors.joining("; "));
     }
 
-    private void recordSecurityDenyEvent(AccessDeniedException exception, HttpServletRequest request) {
+    private String notLoginCode(NotLoginException exception) {
+        return switch (exception.getType()) {
+            case NotLoginException.TOKEN_TIMEOUT -> "SESSION_EXPIRED";
+            case NotLoginException.KICK_OUT, NotLoginException.BE_REPLACED -> "SESSION_OFFLINE";
+            case NotLoginException.INVALID_TOKEN, NotLoginException.NO_PREFIX -> "INVALID_TOKEN";
+            default -> "UNAUTHORIZED";
+        };
+    }
+
+    private void recordSecurityDenyEvent(Exception exception, HttpServletRequest request) {
         try {
             Principal principal = request.getUserPrincipal();
             String operator = principal == null ? "anonymous" : principal.getName();
@@ -121,14 +139,14 @@ public class GlobalExceptionHandler {
             Map<String, Object> payload = Map.of(
                     "method", request.getMethod(),
                     "path", request.getRequestURI(),
-                    "reason", exception instanceof CsrfException ? "csrf_failed" : "access_denied",
+                    "reason", "access_denied",
                     "origin", String.valueOf(request.getHeader("Origin")),
                     "referer", String.valueOf(request.getHeader("Referer")),
                     "userAgent", String.valueOf(request.getHeader("User-Agent"))
             );
             auditService.record("SECURITY_ACCESS_DENIED", operator, tenantId, payload);
-            } catch (Exception ignored) {
-            // 即使审计存储不可用，也要保持异常处理的健壮性。
+        } catch (Exception ignored) {
+            // Audit failures must not hide the original security response.
         }
     }
 }

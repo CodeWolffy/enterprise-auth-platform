@@ -14,6 +14,7 @@ import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
 import com.enterprise.auth.platform.persistence.mapper.SysUserRoleMapper;
 import com.enterprise.auth.platform.security.AuthPrincipalCacheService;
 import com.enterprise.auth.platform.security.DataScopeService;
+import com.enterprise.auth.platform.security.PasswordHasher;
 import com.enterprise.auth.platform.security.SecuritySupport;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import com.enterprise.auth.platform.user.dto.CreateUserRequest;
@@ -25,7 +26,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -36,7 +36,7 @@ public class UserManagementService {
     private final SysUserMapper sysUserMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
     private final SysRoleMapper sysRoleMapper;
-    private final PasswordEncoder passwordEncoder;
+    private final PasswordHasher passwordHasher;
     private final UserDirectoryService userDirectoryService;
     private final CatalogService catalogService;
     private final AuditService auditService;
@@ -47,7 +47,7 @@ public class UserManagementService {
             SysUserMapper sysUserMapper,
             SysUserRoleMapper sysUserRoleMapper,
             SysRoleMapper sysRoleMapper,
-            PasswordEncoder passwordEncoder,
+            PasswordHasher passwordHasher,
             UserDirectoryService userDirectoryService,
             CatalogService catalogService,
             AuditService auditService,
@@ -57,7 +57,7 @@ public class UserManagementService {
         this.sysUserMapper = sysUserMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
         this.sysRoleMapper = sysRoleMapper;
-        this.passwordEncoder = passwordEncoder;
+        this.passwordHasher = passwordHasher;
         this.userDirectoryService = userDirectoryService;
         this.catalogService = catalogService;
         this.auditService = auditService;
@@ -80,7 +80,7 @@ public class UserManagementService {
         entity.setDisplayName(StringUtils.hasText(request.displayName()) ? request.displayName() : request.username());
         entity.setMobile(request.mobile());
         entity.setEmail(request.email());
-        entity.setPasswordHash(passwordEncoder.encode(request.password()));
+        entity.setPasswordHash(passwordHasher.hash(request.password()));
         entity.setEnabled(Boolean.FALSE.equals(request.enabled()) ? 0 : 1);
         entity.setSessionVersion(1);
         entity.setPasswordUpdatedAt(TimeSupport.utcNowDateTime());
@@ -117,7 +117,7 @@ public class UserManagementService {
         }
         if (StringUtils.hasText(request.password())) {
             validatePassword(request.password());
-            entity.setPasswordHash(passwordEncoder.encode(request.password()));
+            entity.setPasswordHash(passwordHasher.hash(request.password()));
             entity.setSessionVersion((entity.getSessionVersion() == null ? 1 : entity.getSessionVersion()) + 1);
             entity.setPasswordUpdatedAt(TimeSupport.utcNowDateTime());
         }

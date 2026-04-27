@@ -1,5 +1,8 @@
 package com.enterprise.auth.platform.dept;
 
+import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.bind;
+import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.clear;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -20,9 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.enterprise.auth.platform.security.PasswordHasher;
 
 @SpringBootTest
 class DeptManagementServiceTest {
@@ -44,7 +45,7 @@ class DeptManagementServiceTest {
     private SysUserMapper sysUserMapper;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    private PasswordHasher passwordHasher;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -52,7 +53,7 @@ class DeptManagementServiceTest {
     @AfterEach
     void clearTenantContext() {
         TenantContext.clear();
-        SecurityContextHolder.clearContext();
+        clear();
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username IN (?, ?)", "tenant-a", SCOPE_USER, HIDDEN_LEADER);
         jdbcTemplate.update("DELETE FROM sys_dept WHERE tenant_id = ? AND dept_code = ?", "tenant-a", CHILD_DEPT_CODE);
     }
@@ -82,7 +83,7 @@ class DeptManagementServiceTest {
                 userId,
                 "tenant-a",
                 SCOPE_USER,
-                passwordEncoder.encode("DeptTest@123"),
+                passwordHasher.hash("DeptTest@123"),
                 true,
                 Set.of(),
                 Set.of("dept:read"),
@@ -90,9 +91,7 @@ class DeptManagementServiceTest {
                 DataScopeType.DEPT_AND_CHILDREN,
                 1
         );
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(principal, principal.password(), principal.getAuthorities())
-        );
+        bind(principal);
 
         assertThat(catalogService.departments()).extracting(CatalogService.DepartmentView::id)
                 .contains(2L, childDeptId)
@@ -108,7 +107,7 @@ class DeptManagementServiceTest {
                 userId,
                 "tenant-a",
                 SCOPE_USER,
-                passwordEncoder.encode("DeptTest@123"),
+                passwordHasher.hash("DeptTest@123"),
                 true,
                 Set.of(),
                 Set.of("dept:write"),
@@ -116,9 +115,7 @@ class DeptManagementServiceTest {
                 DataScopeType.DEPT,
                 1
         );
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(principal, principal.password(), principal.getAuthorities())
-        );
+        bind(principal);
 
         assertThatThrownBy(() -> deptManagementService.create(new DeptCrudRequest(3L, CHILD_DEPT_CODE, "隐藏子部门", null)))
                 .isInstanceOf(BusinessException.class)
@@ -153,7 +150,7 @@ class DeptManagementServiceTest {
         entity.setDeptId(2L);
         entity.setUsername(SCOPE_USER);
         entity.setDisplayName("部门权限测试用户");
-        entity.setPasswordHash(passwordEncoder.encode("DeptTest@123"));
+        entity.setPasswordHash(passwordHasher.hash("DeptTest@123"));
         entity.setEnabled(1);
         entity.setSessionVersion(1);
         sysUserMapper.insert(entity);
@@ -167,7 +164,7 @@ class DeptManagementServiceTest {
         entity.setDeptId(3L);
         entity.setUsername(HIDDEN_LEADER);
         entity.setDisplayName("隐藏负责人");
-        entity.setPasswordHash(passwordEncoder.encode("DeptTest@123"));
+        entity.setPasswordHash(passwordHasher.hash("DeptTest@123"));
         entity.setEnabled(1);
         entity.setSessionVersion(1);
         sysUserMapper.insert(entity);

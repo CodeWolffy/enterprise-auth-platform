@@ -1,7 +1,6 @@
 package com.enterprise.auth.platform.audit;
 
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.bearer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -20,7 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.enterprise.auth.platform.security.PasswordHasher;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
@@ -40,7 +39,7 @@ class AuditControllerTest {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    private PasswordHasher passwordHasher;
 
     @BeforeEach
     void setUp() {
@@ -67,7 +66,7 @@ class AuditControllerTest {
     @Test
     void listShouldSupportClientIpFilter() throws Exception {
         mockMvc.perform(get("/api/audit/events")
-                        .with(user(principal()))
+                        .with(bearer(principal()))
                         .header("X-Tenant-Id", "platform")
                         .param("eventType", EVENT_TYPE)
                         .param("clientIp", "10.10.10.10"))
@@ -81,7 +80,7 @@ class AuditControllerTest {
     void exportShouldSupportClientIpFilter() throws Exception {
                 long now = System.currentTimeMillis();
                 mockMvc.perform(get("/api/audit/events/export")
-                                .with(user(principal()))
+                                .with(bearer(principal()))
                                 .header("X-Tenant-Id", "platform")
                                 .param("eventType", EVENT_TYPE)
                                 .param("clientIp", "10.10.10.10")
@@ -97,7 +96,7 @@ class AuditControllerTest {
     @Test
     void eventsShouldRejectLocalDateTimeWithoutTimezone() throws Exception {
         mockMvc.perform(get("/api/audit/events")
-                        .with(user(principal()))
+                        .with(bearer(principal()))
                         .header("X-Tenant-Id", "platform")
                         .param("eventType", EVENT_TYPE)
                         .param("fromEpochMs", "2026-03-01T00:00:00")
@@ -109,8 +108,7 @@ class AuditControllerTest {
     void shouldCreateAsyncExportTask() throws Exception {
         long now = System.currentTimeMillis();
         mockMvc.perform(post("/api/audit/exports")
-                        .with(user(principal()))
-                        .with(csrf())
+                        .with(bearer(principal()))
                         .header("X-Tenant-Id", "platform")
                         .param("eventType", EVENT_TYPE)
                         .param("clientIp", "10.10.10.10")
@@ -123,7 +121,7 @@ class AuditControllerTest {
                 .andExpect(jsonPath("$.data.progressStage").isNotEmpty());
 
         mockMvc.perform(get("/api/audit/exports")
-                        .with(user(principal()))
+                        .with(bearer(principal()))
                         .header("X-Tenant-Id", "platform")
                         .param("tenantId", "platform"))
                 .andExpect(status().isOk())
@@ -143,8 +141,7 @@ class AuditControllerTest {
         );
 
         mockMvc.perform(delete("/api/audit/exports/{taskId}", taskId)
-                        .with(user(principal()))
-                        .with(csrf())
+                        .with(bearer(principal()))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").doesNotExist());
@@ -155,8 +152,7 @@ class AuditControllerTest {
         );
 
         mockMvc.perform(delete("/api/audit/exports")
-                        .with(user(principal()))
-                        .with(csrf())
+                        .with(bearer(principal()))
                         .header("X-Tenant-Id", "platform")
                         .param("tenantId", "platform")
                         .param("status", "FAILED")
@@ -178,8 +174,7 @@ class AuditControllerTest {
         );
 
         mockMvc.perform(post("/api/audit/exports/{taskId}/archive", singleTaskId)
-                        .with(user(principal()))
-                        .with(csrf())
+                        .with(bearer(principal()))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("ARCHIVED"))
@@ -192,8 +187,7 @@ class AuditControllerTest {
         );
 
         mockMvc.perform(post("/api/audit/exports/archive")
-                        .with(user(principal()))
-                        .with(csrf())
+                        .with(bearer(principal()))
                         .header("X-Tenant-Id", "platform")
                         .param("tenantId", "platform")
                         .param("status", "SUCCESS")
@@ -217,8 +211,7 @@ class AuditControllerTest {
         );
 
         mockMvc.perform(post("/api/audit/exports/{taskId}/retry", taskId)
-                        .with(user(principal()))
-                        .with(csrf())
+                        .with(bearer(principal()))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").isNumber())
@@ -228,15 +221,14 @@ class AuditControllerTest {
     @Test
     void shouldQueryAndUpdateExportPolicy() throws Exception {
         mockMvc.perform(get("/api/audit/exports/policy")
-                        .with(user(principalWithWrite()))
+                        .with(bearer(principalWithWrite()))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.retentionDays").isNumber())
                 .andExpect(jsonPath("$.data.maxTasks").isNumber());
 
         mockMvc.perform(put("/api/audit/exports/policy")
-                        .with(user(principalWithWrite()))
-                        .with(csrf())
+                        .with(bearer(principalWithWrite()))
                         .header("X-Tenant-Id", "platform")
                         .contentType("application/json")
                         .content("""
@@ -262,8 +254,7 @@ class AuditControllerTest {
         );
 
         mockMvc.perform(post("/api/audit/exports/governance")
-                        .with(user(principalWithWrite()))
-                        .with(csrf())
+                        .with(bearer(principalWithWrite()))
                         .header("X-Tenant-Id", "platform")
                         .param("tenantId", "platform")
                         .param("dryRun", "true"))
@@ -288,8 +279,7 @@ class AuditControllerTest {
         );
 
         mockMvc.perform(post("/api/audit/exports/governance")
-                        .with(user(principalWithWrite()))
-                        .with(csrf())
+                        .with(bearer(principalWithWrite()))
                         .header("X-Tenant-Id", "platform")
                         .param("tenantId", "platform"))
                 .andExpect(status().isOk())
@@ -311,7 +301,7 @@ class AuditControllerTest {
                 1L,
                 "platform",
                 "admin",
-                passwordEncoder.encode("AuditController@123"),
+                passwordHasher.hash("AuditController@123"),
                 true,
                 Set.of(),
                 Set.of("audit:read"),
@@ -326,7 +316,7 @@ class AuditControllerTest {
                 1L,
                 "platform",
                 "admin",
-                passwordEncoder.encode("AuditController@123"),
+                passwordHasher.hash("AuditController@123"),
                 true,
                 Set.of(),
                 Set.of("audit:read", "audit:write"),

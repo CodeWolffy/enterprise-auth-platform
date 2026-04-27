@@ -30,9 +30,9 @@ export interface MenuItem {
   children?: MenuItem[]
 }
 
-export interface CookieSessionResponse {
+export interface TokenSessionResponse {
   tenantId: string
-  sessionId: string
+  token: string
   expiresAt: number
 }
 
@@ -75,12 +75,6 @@ export interface CaptchaTrackPayload {
   left: number
   top: number
   trackList: CaptchaTrackPoint[]
-}
-
-export interface CsrfTokenResponse {
-  headerName: string
-  parameterName: string
-  token: string
 }
 
 export interface RegisterOptionsResponse {

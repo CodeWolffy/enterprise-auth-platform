@@ -1,7 +1,6 @@
 package com.enterprise.auth.platform.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -17,7 +16,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.enterprise.auth.platform.security.PasswordHasher;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = {
@@ -41,7 +40,7 @@ class AuthControllerRegisterTest {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    private PasswordHasher passwordHasher;
 
     private ConfigSnapshot previousDefaultTenantConfig;
     private ConfigSnapshot previousDefaultRoleCodesConfig;
@@ -91,7 +90,6 @@ class AuthControllerRegisterTest {
         String email = "register.ut@example.com";
 
         mockMvc.perform(post("/api/auth/register")
-                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registerPayload(username, "注册测试用户", rawPassword, mobile, email)))
                 .andExpect(status().isOk())
@@ -136,7 +134,7 @@ class AuthControllerRegisterTest {
         assertThat(count).isEqualTo(1);
         assertThat(passwordHash).isNotBlank();
         assertThat(passwordHash).isNotEqualTo(rawPassword);
-        assertThat(passwordEncoder.matches(rawPassword, passwordHash)).isTrue();
+        assertThat(passwordHasher.matches(rawPassword, passwordHash)).isTrue();
         assertThat(roleCount).isEqualTo(1);
     }
 
@@ -154,7 +152,6 @@ class AuthControllerRegisterTest {
         String username = nextUsername();
 
         mockMvc.perform(post("/api/auth/register")
-                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registerPayload(username, "弱密码用户", "weakpass", "13800002222", "weak.ut@example.com")))
                 .andExpect(status().isBadRequest())
@@ -174,14 +171,12 @@ class AuthControllerRegisterTest {
         String payload = registerPayload(username, "重复用户名用户", "Repeat123", "13800003333", "repeat.ut@example.com");
 
         mockMvc.perform(post("/api/auth/register")
-                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"));
 
         mockMvc.perform(post("/api/auth/register")
-                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(payload))
                 .andExpect(status().isBadRequest())
@@ -194,7 +189,6 @@ class AuthControllerRegisterTest {
         insertUser("platform", username);
 
         mockMvc.perform(post("/api/auth/register")
-                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registerPayload(username, "跨租户重复用户", "Repeat123", "13800005555", "repeat.cross.ut@example.com")))
                 .andExpect(status().isBadRequest())
@@ -207,21 +201,18 @@ class AuthControllerRegisterTest {
         String weakPayload = registerPayload(username, "限频用户", "weakpass", "13800004444", "limit.ut@example.com");
 
         mockMvc.perform(post("/api/auth/register")
-                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(weakPayload))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("PASSWORD_INVALID"));
 
         mockMvc.perform(post("/api/auth/register")
-                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(weakPayload))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("PASSWORD_INVALID"));
 
         mockMvc.perform(post("/api/auth/register")
-                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(weakPayload))
                 .andExpect(status().isBadRequest())
@@ -322,7 +313,7 @@ class AuthControllerRegisterTest {
                 1L,
                 username,
                 username,
-                passwordEncoder.encode("Repeat123"),
+                passwordHasher.hash("Repeat123"),
                 1,
                 1,
                 "test",

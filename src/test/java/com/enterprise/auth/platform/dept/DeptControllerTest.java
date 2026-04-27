@@ -1,7 +1,6 @@
 package com.enterprise.auth.platform.dept;
 
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.bearer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -22,7 +21,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.enterprise.auth.platform.security.PasswordHasher;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
@@ -42,7 +41,7 @@ class DeptControllerTest {
     private SysUserMapper sysUserMapper;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    private PasswordHasher passwordHasher;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -68,7 +67,7 @@ class DeptControllerTest {
                 scopeUserId,
                 "tenant-a",
                 SCOPE_USER,
-                passwordEncoder.encode("DeptTest@123"),
+                passwordHasher.hash("DeptTest@123"),
                 true,
                 Set.of(),
                 Set.of("dept:read"),
@@ -78,7 +77,7 @@ class DeptControllerTest {
         );
 
         mockMvc.perform(get("/api/depts")
-                        .with(user(principal))
+                        .with(bearer(principal))
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[?(@.id==2)]").exists())
@@ -92,7 +91,7 @@ class DeptControllerTest {
                 scopeUserId,
                 "tenant-a",
                 SCOPE_USER,
-                passwordEncoder.encode("DeptTest@123"),
+                passwordHasher.hash("DeptTest@123"),
                 true,
                 Set.of(),
                 Set.of("dept:write"),
@@ -102,8 +101,7 @@ class DeptControllerTest {
         );
 
         mockMvc.perform(post("/api/depts")
-                        .with(user(principal))
-                        .with(csrf())
+                        .with(bearer(principal))
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -137,7 +135,7 @@ class DeptControllerTest {
         entity.setDeptId(2L);
         entity.setUsername(SCOPE_USER);
         entity.setDisplayName("部门控制器测试用户");
-        entity.setPasswordHash(passwordEncoder.encode("DeptTest@123"));
+        entity.setPasswordHash(passwordHasher.hash("DeptTest@123"));
         entity.setEnabled(1);
         entity.setSessionVersion(1);
         sysUserMapper.insert(entity);

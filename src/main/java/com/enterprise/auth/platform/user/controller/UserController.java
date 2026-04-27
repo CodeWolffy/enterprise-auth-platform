@@ -14,7 +14,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
-import org.springframework.security.access.prepost.PreAuthorize;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -40,7 +40,7 @@ public class UserController {
 
     @Operation(summary = "分页查询用户列表")
     @GetMapping
-    @PreAuthorize("hasAuthority('user:read')")
+    @SaCheckPermission("user:read")
     public ApiResponse<PageResult<UserSummary>> list(
             @RequestParam(required = false) String username,
             @RequestParam(required = false) String mobile,
@@ -54,21 +54,21 @@ public class UserController {
 
     @Operation(summary = "查询用户已分配角色")
     @GetMapping("/{userId}/roles")
-    @PreAuthorize("hasAuthority('user:read')")
+    @SaCheckPermission("user:read")
     public ApiResponse<List<CatalogService.RoleView>> assignedRoles(@Parameter(description = "用户 ID") @PathVariable Long userId) {
         return ApiResponse.ok(userManagementService.listAssignedRoles(userId));
     }
 
     @Operation(summary = "新增用户")
     @PostMapping
-    @PreAuthorize("hasAuthority('user:write')")
+    @SaCheckPermission("user:write")
     public ApiResponse<UserSummary> create(@Valid @RequestBody CreateUserRequest request) {
         return ApiResponse.ok(userManagementService.create(request));
     }
 
     @Operation(summary = "修改用户")
     @PutMapping("/{userId}")
-    @PreAuthorize("hasAuthority('user:write')")
+    @SaCheckPermission("user:write")
     public ApiResponse<UserSummary> update(
             @Parameter(description = "用户 ID") @PathVariable Long userId,
             @Valid @RequestBody UpdateUserRequest request
@@ -78,7 +78,7 @@ public class UserController {
 
     @Operation(summary = "分配用户角色")
     @PutMapping("/{userId}/roles")
-    @PreAuthorize("hasAuthority('user:write')")
+    @SaCheckPermission("user:write")
     public ApiResponse<UserSummary> assignRoles(
             @Parameter(description = "用户 ID") @PathVariable Long userId,
             @Valid @RequestBody AssignRolesRequest request
@@ -88,7 +88,7 @@ public class UserController {
 
     @Operation(summary = "删除用户")
     @DeleteMapping("/{userId}")
-    @PreAuthorize("hasAuthority('user:write')")
+    @SaCheckPermission("user:write")
     public ApiResponse<Void> delete(@Parameter(description = "用户 ID") @PathVariable Long userId) {
         userManagementService.delete(userId);
         return ApiResponse.ok();

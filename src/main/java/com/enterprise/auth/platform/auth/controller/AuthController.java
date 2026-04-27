@@ -1,21 +1,19 @@
 package com.enterprise.auth.platform.auth.controller;
 
 import com.enterprise.auth.platform.auth.dto.CaptchaVerifyRequest;
-import com.enterprise.auth.platform.auth.dto.CookieSessionResponse;
-import com.enterprise.auth.platform.auth.dto.CsrfTokenResponse;
 import com.enterprise.auth.platform.auth.dto.LoginRequest;
 import com.enterprise.auth.platform.auth.dto.PermissionSnapshotResponse;
 import com.enterprise.auth.platform.auth.dto.RegisterOptionsResponse;
+import com.enterprise.auth.platform.auth.dto.TokenSessionResponse;
 import com.enterprise.auth.platform.auth.dto.UserSessionResponse;
-import com.enterprise.auth.platform.auth.model.SessionPrincipal;
 import com.enterprise.auth.platform.auth.service.AuthService;
 import com.enterprise.auth.platform.auth.service.CaptchaService;
 import com.enterprise.auth.platform.auth.service.PermissionSnapshotService;
 import com.enterprise.auth.platform.auth.service.RegistrationPolicyService;
-import com.enterprise.auth.platform.auth.service.SessionService;
 import com.enterprise.auth.platform.common.annotation.RateLimit;
 import com.enterprise.auth.platform.common.api.ApiResponse;
-import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.security.AuthContextHolder;
+import com.enterprise.auth.platform.security.CurrentUserService;
 import com.enterprise.auth.platform.user.dto.RegisterRequest;
 import com.enterprise.auth.platform.user.model.UserAccount;
 import com.enterprise.auth.platform.user.model.UserSummary;
@@ -23,11 +21,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.List;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -44,20 +39,20 @@ public class AuthController {
     private final AuthService authService;
     private final PermissionSnapshotService permissionSnapshotService;
     private final RegistrationPolicyService registrationPolicyService;
-    private final SessionService sessionService;
+    private final CurrentUserService currentUserService;
 
     public AuthController(
             CaptchaService captchaService,
             AuthService authService,
             PermissionSnapshotService permissionSnapshotService,
             RegistrationPolicyService registrationPolicyService,
-            SessionService sessionService
+            CurrentUserService currentUserService
     ) {
         this.captchaService = captchaService;
         this.authService = authService;
         this.permissionSnapshotService = permissionSnapshotService;
         this.registrationPolicyService = registrationPolicyService;
-        this.sessionService = sessionService;
+        this.currentUserService = currentUserService;
     }
 
     @Operation(summary = "获取登录验证码")
@@ -75,16 +70,6 @@ public class AuthController {
         return ApiResponse.ok();
     }
 
-    @Operation(summary = "获取 CSRF Token")
-    @GetMapping("/csrf")
-    public ApiResponse<CsrfTokenResponse> csrf(CsrfToken csrfToken) {
-        return ApiResponse.ok(new CsrfTokenResponse(
-                csrfToken.getHeaderName(),
-                csrfToken.getParameterName(),
-                csrfToken.getToken()
-        ));
-    }
-
     @Operation(summary = "获取注册默认配置")
     @GetMapping("/register/options")
     public ApiResponse<RegisterOptionsResponse> registerOptions() {
@@ -94,55 +79,43 @@ public class AuthController {
         ));
     }
 
-    @Operation(summary = "账号密码登录并写入Session Cookie")
+    @Operation(summary = "账号密码登录并写入 Sa-Token Cookie")
     @RateLimit(key = "login", strategy = RateLimit.Strategy.IP)
     @PostMapping("/login")
-    public ApiResponse<CookieSessionResponse> login(
+    public ApiResponse<TokenSessionResponse> login(
             @Valid @RequestBody LoginRequest request,
-            HttpServletRequest servletRequest,
-            HttpServletResponse servletResponse
+            HttpServletRequest servletRequest
     ) {
-        CookieSessionResponse session = authService.login(request, servletRequest);
-        sessionService.findSession(session.sessionId())
-                .ifPresent(userSession -> sessionService.writeSessionCookie(servletRequest, servletResponse, userSession));
-        return ApiResponse.ok(session);
+        return ApiResponse.ok(authService.login(request, servletRequest));
     }
 
     @Operation(summary = "退出登录")
     @PostMapping("/logout")
-    public ApiResponse<Void> logout(
-            Authentication authentication,
-            HttpServletRequest servletRequest,
-            HttpServletResponse servletResponse
-    ) {
-        sessionService.clearSessionCookie(servletRequest, servletResponse);
-        if (authentication != null
-                && authentication.getPrincipal() instanceof UserAccount user
-                && authentication.getDetails() instanceof SessionPrincipal session) {
-            authService.logout(session.sessionId(), user.username(), user.tenantId());
-        }
+    public ApiResponse<Void> logout() {
+        UserAccount user = currentUser();
+        AuthContextHolder.currentSession()
+                .ifPresent(session -> authService.logout(session.sessionId(), user.username(), user.tenantId()));
         return ApiResponse.ok();
     }
 
     @Operation(summary = "获取当前用户权限快照")
     @GetMapping("/me")
-    public ApiResponse<PermissionSnapshotResponse> me(Authentication authentication) {
-        return ApiResponse.ok(permissionSnapshotService.build(currentUser(authentication)));
+    public ApiResponse<PermissionSnapshotResponse> me() {
+        return ApiResponse.ok(permissionSnapshotService.build(currentUser()));
     }
 
     @Operation(summary = "获取当前用户在线会话")
     @GetMapping("/sessions")
-    public ApiResponse<List<UserSessionResponse>> sessions(Authentication authentication) {
-        return ApiResponse.ok(authService.sessions(currentUser(authentication)));
+    public ApiResponse<List<UserSessionResponse>> sessions() {
+        return ApiResponse.ok(authService.sessions(currentUser()));
     }
 
     @Operation(summary = "强制指定会话下线")
     @PostMapping("/sessions/{sessionId}/offline")
     public ApiResponse<Void> forceOffline(
-            @Parameter(description = "会话ID") @PathVariable String sessionId,
-            Authentication authentication
+            @Parameter(description = "会话ID") @PathVariable String sessionId
     ) {
-        authService.forceOffline(currentUser(authentication), sessionId);
+        authService.forceOffline(currentUser(), sessionId);
         return ApiResponse.ok();
     }
 
@@ -152,10 +125,7 @@ public class AuthController {
         return ApiResponse.ok(authService.register(request, servletRequest));
     }
 
-    private UserAccount currentUser(Authentication authentication) {
-        if (authentication == null || !(authentication.getPrincipal() instanceof UserAccount user)) {
-            throw new BusinessException("UNAUTHORIZED", "用户未登录");
-        }
-        return user;
+    private UserAccount currentUser() {
+        return currentUserService.requireCurrentUser();
     }
 }

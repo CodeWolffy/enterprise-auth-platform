@@ -2,22 +2,22 @@
   <div class="panel-stack">
     <section class="dashboard-grid">
       <article class="stat-card">
-        <span class="eyebrow">Records</span>
+        <span class="eyebrow">记录</span>
         <strong>{{ page.total }}</strong>
         <span>当前筛选条件下的审计记录总数</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Events</span>
+        <span class="eyebrow">事件</span>
         <strong>{{ eventTypeCount }}</strong>
         <span>当前页覆盖的事件类型数量</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Operators</span>
+        <span class="eyebrow">操作人</span>
         <strong>{{ operatorCount }}</strong>
         <span>当前页涉及的操作人数</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Requests</span>
+        <span class="eyebrow">请求</span>
         <strong>{{ requestCount }}</strong>
         <span>当前页涉及的请求数量</span>
       </article>
@@ -26,7 +26,7 @@
     <section class="dashboard-panel">
       <div class="panel-head">
         <div>
-          <span class="eyebrow">Audit</span>
+          <span class="eyebrow">审计</span>
           <h3>安全审计</h3>
         </div>
         <div class="panel-actions">
@@ -133,22 +133,22 @@
 
     <section class="dashboard-grid">
       <article class="stat-card">
-        <span class="eyebrow">Tasks</span>
+        <span class="eyebrow">任务</span>
         <strong>{{ exportTasks.total }}</strong>
         <span>当前筛选条件下的导出任务总数</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Success</span>
+        <span class="eyebrow">成功</span>
         <strong>{{ exportSuccessCount }}</strong>
         <span>当前页导出成功任务</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Archived</span>
+        <span class="eyebrow">已归档</span>
         <strong>{{ exportArchivedCount }}</strong>
         <span>当前页已归档任务</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Expiring</span>
+        <span class="eyebrow">即将到期</span>
         <strong>{{ exportExpiringSoonCount }}</strong>
         <span>当前页 24 小时内到期任务</span>
       </article>
@@ -157,7 +157,7 @@
     <section class="dashboard-panel">
       <div class="panel-head">
         <div>
-          <span class="eyebrow">Export Tasks</span>
+          <span class="eyebrow">导出任务</span>
           <h3>导出任务历史</h3>
           <p class="muted-line">
             当前保留策略：完成后保留 {{ exportPolicy.retentionDays }} 天，单租户最多保留 {{ exportPolicy.maxTasks }} 条任务。

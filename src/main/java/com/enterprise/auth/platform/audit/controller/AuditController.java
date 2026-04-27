@@ -24,7 +24,7 @@ import java.util.Map;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -53,7 +53,7 @@ public class AuditController {
 
     @Operation(summary = "分页查询审计事件")
     @GetMapping("/events")
-    @PreAuthorize("hasAuthority('audit:read')")
+    @SaCheckPermission("audit:read")
     public ApiResponse<AuditPage> events(
             @Parameter(description = "租户编码") @RequestParam(required = false) String tenantId,
             @Parameter(description = "事件类型") @RequestParam(required = false) String eventType,
@@ -73,7 +73,7 @@ public class AuditController {
     @Operation(summary = "导出审计事件")
     @RateLimit(key = "export", strategy = RateLimit.Strategy.USER)
     @GetMapping("/events/export")
-    @PreAuthorize("hasAuthority('audit:read')")
+    @SaCheckPermission("audit:read")
     public ResponseEntity<byte[]> export(
             @RequestParam(required = false) String tenantId,
             @RequestParam(required = false) String eventType,
@@ -122,7 +122,7 @@ public class AuditController {
     @Operation(summary = "创建异步审计导出任务")
     @RateLimit(key = "export", strategy = RateLimit.Strategy.USER)
     @PostMapping("/exports")
-    @PreAuthorize("hasAuthority('audit:read')")
+    @SaCheckPermission("audit:read")
     public ApiResponse<AuditExportTaskService.ExportTaskView> createExportTask(
             @RequestParam(required = false) String tenantId,
             @RequestParam(required = false) String eventType,
@@ -139,7 +139,7 @@ public class AuditController {
 
     @Operation(summary = "分页查询审计导出任务")
     @GetMapping("/exports")
-    @PreAuthorize("hasAuthority('audit:read')")
+    @SaCheckPermission("audit:read")
     public ApiResponse<PageResult<AuditExportTaskService.ExportTaskView>> exportTasks(
             @RequestParam(required = false) String tenantId,
             @RequestParam(required = false) String status,
@@ -152,7 +152,7 @@ public class AuditController {
 
     @Operation(summary = "查询审计导出保留策略")
     @GetMapping("/exports/policy")
-    @PreAuthorize("hasAuthority('audit:read')")
+    @SaCheckPermission("audit:read")
     public ApiResponse<AuditExportTaskService.ExportPolicy> exportPolicy(
             @RequestParam(required = false) String tenantId
     ) {
@@ -161,7 +161,7 @@ public class AuditController {
 
     @Operation(summary = "更新审计导出保留策略")
     @PutMapping("/exports/policy")
-    @PreAuthorize("hasAuthority('audit:write')")
+    @SaCheckPermission("audit:write")
     public ApiResponse<AuditExportTaskService.ExportPolicy> updateExportPolicy(
             @RequestParam(required = false) String tenantId,
             @RequestBody @jakarta.validation.Valid AuditExportPolicyRequest request
@@ -171,7 +171,7 @@ public class AuditController {
 
     @Operation(summary = "按策略执行审计导出治理")
     @PostMapping("/exports/governance")
-    @PreAuthorize("hasAuthority('audit:write')")
+    @SaCheckPermission("audit:write")
     public ApiResponse<AuditExportTaskService.GovernanceResult> governExportTasks(
             @RequestParam(required = false) String tenantId,
             @RequestParam(defaultValue = "false") boolean dryRun
@@ -181,7 +181,7 @@ public class AuditController {
 
     @Operation(summary = "下载异步审计导出文件")
     @GetMapping("/exports/{taskId}/download")
-    @PreAuthorize("hasAuthority('audit:read')")
+    @SaCheckPermission("audit:read")
     public ResponseEntity<byte[]> downloadExportTask(@PathVariable Long taskId) {
         AuditExportTaskService.DownloadFile file = auditExportTaskService.download(taskId);
         return ResponseEntity.ok()
@@ -192,14 +192,14 @@ public class AuditController {
 
     @Operation(summary = "归档单条异步审计导出任务")
     @PostMapping("/exports/{taskId}/archive")
-    @PreAuthorize("hasAuthority('audit:read')")
+    @SaCheckPermission("audit:read")
     public ApiResponse<AuditExportTaskService.ExportTaskView> archiveExportTask(@PathVariable Long taskId) {
         return ApiResponse.ok(auditExportTaskService.archive(taskId));
     }
 
     @Operation(summary = "批量归档异步审计导出任务")
     @PostMapping("/exports/archive")
-    @PreAuthorize("hasAuthority('audit:read')")
+    @SaCheckPermission("audit:read")
     public ApiResponse<Integer> archiveExportTasks(
             @RequestParam(required = false) String tenantId,
             @RequestParam(required = false) String status,
@@ -210,7 +210,7 @@ public class AuditController {
 
     @Operation(summary = "删除异步审计导出任务")
     @DeleteMapping("/exports/{taskId}")
-    @PreAuthorize("hasAuthority('audit:read')")
+    @SaCheckPermission("audit:read")
     public ApiResponse<Void> deleteExportTask(@PathVariable Long taskId) {
         auditExportTaskService.deleteTask(taskId);
         return ApiResponse.ok();
@@ -219,14 +219,14 @@ public class AuditController {
     @Operation(summary = "重试异步审计导出任务")
     @RateLimit(key = "export", strategy = RateLimit.Strategy.USER)
     @PostMapping("/exports/{taskId}/retry")
-    @PreAuthorize("hasAuthority('audit:read')")
+    @SaCheckPermission("audit:read")
     public ApiResponse<AuditExportTaskService.ExportTaskView> retryExportTask(@PathVariable Long taskId) {
         return ApiResponse.ok(auditExportTaskService.retry(taskId));
     }
 
     @Operation(summary = "清理异步审计导出任务")
     @DeleteMapping("/exports")
-    @PreAuthorize("hasAuthority('audit:read')")
+    @SaCheckPermission("audit:read")
     public ApiResponse<Integer> cleanupExportTasks(
             @RequestParam(required = false) String tenantId,
             @RequestParam(required = false) String status,

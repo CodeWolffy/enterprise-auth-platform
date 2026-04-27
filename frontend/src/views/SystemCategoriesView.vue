@@ -2,12 +2,12 @@
   <div class="panel-stack">
     <section class="dashboard-grid">
       <article class="stat-card">
-        <span class="eyebrow">Categories</span>
+        <span class="eyebrow">分类</span>
         <strong>{{ rows.length }}</strong>
         <span>当前分类条目总数</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Matchers</span>
+        <span class="eyebrow">匹配器</span>
         <strong>{{ matcherCount }}</strong>
         <span>当前页匹配规则总数</span>
       </article>
@@ -16,7 +16,7 @@
     <section class="dashboard-panel">
       <div class="panel-head">
         <div>
-          <span class="eyebrow">Categories</span>
+<span class="eyebrow">分类</span>
           <h3>分类配置管理</h3>
         </div>
         <el-button type="primary" @click="openDialog()">新增分类</el-button>

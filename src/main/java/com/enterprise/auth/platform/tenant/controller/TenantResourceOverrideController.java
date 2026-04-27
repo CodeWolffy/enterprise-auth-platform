@@ -9,7 +9,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
-import org.springframework.security.access.prepost.PreAuthorize;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -30,7 +30,7 @@ public class TenantResourceOverrideController {
 
     @Operation(summary = "查询租户资源覆盖")
     @GetMapping
-    @PreAuthorize("hasAuthority('tenant:read')")
+    @SaCheckPermission("tenant:read")
     public ApiResponse<List<TenantResourceOverrideItem>> list(
             @Parameter(description = "租户 ID") @PathVariable String tenantId
     ) {
@@ -39,7 +39,7 @@ public class TenantResourceOverrideController {
 
     @Operation(summary = "更新租户资源覆盖")
     @PutMapping
-    @PreAuthorize("hasAuthority('tenant:write')")
+    @SaCheckPermission("tenant:write")
     public ApiResponse<List<TenantResourceOverrideItem>> update(
             @Parameter(description = "租户 ID") @PathVariable String tenantId,
             @Valid @RequestBody UpdateTenantResourceOverridesRequest request

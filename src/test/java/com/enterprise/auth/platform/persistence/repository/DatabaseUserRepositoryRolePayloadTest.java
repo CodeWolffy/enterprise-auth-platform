@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.enterprise.auth.platform.security.PasswordHasher;
 
 @SpringBootTest
 class DatabaseUserRepositoryRolePayloadTest {
@@ -31,7 +31,7 @@ class DatabaseUserRepositoryRolePayloadTest {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    private PasswordHasher passwordHasher;
 
     @Autowired
     private RolePayloadCodec rolePayloadCodec;
@@ -96,7 +96,7 @@ class DatabaseUserRepositoryRolePayloadTest {
                 2L,
                 username,
                 "Role Payload User",
-                passwordEncoder.encode("UserTest@123"),
+                passwordHasher.hash("UserTest@123"),
                 1,
                 1,
                 "test",

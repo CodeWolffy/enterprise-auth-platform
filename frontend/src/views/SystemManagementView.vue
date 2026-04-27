@@ -2,22 +2,22 @@
   <div class="panel-stack">
     <section class="dashboard-grid">
       <article class="stat-card">
-        <span class="eyebrow">Dicts</span>
+        <span class="eyebrow">字典</span>
         <strong>{{ dictCount }}</strong>
         <span>当前可见字典条目数量</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Configs</span>
+        <span class="eyebrow">参数</span>
         <strong>{{ configCount }}</strong>
         <span>当前可见参数条目数量</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Notices</span>
+        <span class="eyebrow">公告</span>
         <strong>{{ noticeCount }}</strong>
         <span>当前公告数量</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Published</span>
+        <span class="eyebrow">已发布</span>
         <strong>{{ publishedNoticeCount }}</strong>
         <span>已发布公告数量</span>
       </article>
@@ -26,7 +26,7 @@
     <section class="dashboard-panel">
       <div class="panel-head">
         <div>
-          <span class="eyebrow">System Console</span>
+          <span class="eyebrow">系统控制台</span>
           <h3>系统管理工作台</h3>
         </div>
       </div>
@@ -34,7 +34,7 @@
       <div class="setting-grid">
         <article class="setting-card">
           <div>
-            <span class="eyebrow">Dictionary</span>
+            <span class="eyebrow">字典</span>
             <h4>字典管理</h4>
             <p>维护业务枚举、状态映射和基础字典条目。</p>
           </div>
@@ -43,7 +43,7 @@
 
         <article class="setting-card">
           <div>
-            <span class="eyebrow">Config</span>
+            <span class="eyebrow">参数</span>
             <h4>参数管理</h4>
             <p>维护平台运行参数、业务配置项和策略型参数。</p>
           </div>
@@ -52,7 +52,7 @@
 
         <article class="setting-card">
           <div>
-            <span class="eyebrow">Notice</span>
+            <span class="eyebrow">公告</span>
             <h4>公告管理</h4>
             <p>维护面向租户和运营人员的公告内容与发布时间。</p>
           </div>
@@ -61,7 +61,7 @@
 
         <article class="setting-card">
           <div>
-            <span class="eyebrow">Category</span>
+            <span class="eyebrow">分类</span>
             <h4>分类配置</h4>
             <p>维护字典分类和参数分类的匹配规则，并查看引用分析与趋势。</p>
           </div>
@@ -70,7 +70,7 @@
 
         <article class="setting-card">
           <div>
-            <span class="eyebrow">Tenant Catalog</span>
+            <span class="eyebrow">租户套餐</span>
             <h4>套餐与能力</h4>
             <p>维护平台级租户套餐、能力目录，以及套餐与能力的绑定关系。</p>
           </div>
@@ -79,7 +79,7 @@
 
         <article class="setting-card">
           <div>
-            <span class="eyebrow">Resource Auth</span>
+            <span class="eyebrow">资源授权</span>
             <h4>菜单管理</h4>
             <p>维护统一资源树（目录/菜单/按钮/API），支持授权键、路由键、可见性与排序配置。</p>
           </div>
@@ -91,7 +91,7 @@
     <section class="dashboard-panel">
       <div class="panel-head">
         <div>
-          <span class="eyebrow">Feature Flags</span>
+          <span class="eyebrow">功能开关</span>
           <h3>预留组件状态</h3>
         </div>
       </div>

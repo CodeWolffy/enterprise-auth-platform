@@ -2,40 +2,11 @@ import { http } from './http'
 import type {
   ApiResponse,
   CaptchaResponse,
-  CookieSessionResponse,
-  CsrfTokenResponse,
   PermissionSnapshot,
   RegisterOptionsResponse,
+  TokenSessionResponse,
   UserSessionView,
 } from '@/types/auth'
-
-let csrfReady = false
-let csrfPromise: Promise<void> | null = null
-
-async function ensureCsrfToken() {
-  if (csrfReady) {
-    return
-  }
-  if (csrfPromise) {
-    await csrfPromise
-    return
-  }
-  csrfPromise = (async () => {
-    const { data } = await http.get<ApiResponse<CsrfTokenResponse>>('/api/auth/csrf')
-    const headerName = data.data?.headerName || 'X-XSRF-TOKEN'
-    const token = data.data?.token || ''
-    if (!token) {
-      throw new Error('CSRF token missing')
-    }
-    http.defaults.headers.common[headerName] = token
-    csrfReady = true
-  })()
-  try {
-    await csrfPromise
-  } finally {
-    csrfPromise = null
-  }
-}
 
 export async function fetchPermissionSnapshot() {
   const { data } = await http.get<ApiResponse<PermissionSnapshot>>('/api/auth/me')
@@ -50,7 +21,7 @@ export async function fetchRegisterOptions() {
 export async function fetchCaptcha() {
   const { data } = await http.get<ApiResponse<CaptchaResponse>>('/api/auth/captcha')
   if (!data.data?.captchaId) {
-    throw new Error('Captcha id missing')
+    throw new Error('验证码 ID 缺失')
   }
   return data.data
 }
@@ -71,13 +42,11 @@ export async function loginWithPassword(payload: {
   tenantId?: string
   device?: string
 }) {
-  await ensureCsrfToken()
-  const { data } = await http.post<ApiResponse<CookieSessionResponse>>('/api/auth/login', payload)
+  const { data } = await http.post<ApiResponse<TokenSessionResponse>>('/api/auth/login', payload)
   return data.data
 }
 
 export async function logoutCurrentSession() {
-  await ensureCsrfToken()
   await http.post('/api/auth/logout')
 }
 
@@ -87,6 +56,5 @@ export async function querySessions() {
 }
 
 export async function forceOffline(sessionId: string) {
-  await ensureCsrfToken()
   await http.post(`/api/auth/sessions/${sessionId}/offline`)
 }

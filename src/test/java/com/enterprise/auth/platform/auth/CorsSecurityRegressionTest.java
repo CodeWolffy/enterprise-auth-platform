@@ -18,13 +18,14 @@ import org.springframework.test.web.servlet.MockMvc;
 class CorsSecurityRegressionTest {
 
     private static final String ALLOWED_ORIGIN = "http://127.0.0.1:5173";
+    private static final String LOCALHOST_ORIGIN = "http://localhost:5173";
 
     @Autowired
     private MockMvc mockMvc;
 
     @Test
     void apiCorsShouldAllowConfiguredFrontendOrigin() throws Exception {
-        mockMvc.perform(get("/api/auth/csrf")
+        mockMvc.perform(get("/api/auth/register/options")
                         .header("Origin", ALLOWED_ORIGIN))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Access-Control-Allow-Origin", ALLOWED_ORIGIN));
@@ -32,7 +33,7 @@ class CorsSecurityRegressionTest {
 
     @Test
     void apiCorsShouldRejectNullOrigin() throws Exception {
-        mockMvc.perform(get("/api/auth/csrf")
+        mockMvc.perform(get("/api/auth/register/options")
                         .header("Origin", "null"))
                 .andExpect(status().isForbidden())
                 .andExpect(content().string(containsString("Invalid CORS request")));
@@ -43,9 +44,20 @@ class CorsSecurityRegressionTest {
         mockMvc.perform(options("/api/auth/login")
                         .header("Origin", ALLOWED_ORIGIN)
                         .header("Access-Control-Request-Method", "POST")
-                        .header("Access-Control-Request-Headers", "content-type,x-xsrf-token"))
+                        .header("Access-Control-Request-Headers", "content-type,authorization,x-tenant-id"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Access-Control-Allow-Origin", ALLOWED_ORIGIN))
                 .andExpect(header().string("Access-Control-Allow-Methods", containsString("POST")));
+    }
+
+    @Test
+    void protectedApiPreflightShouldBypassAuthentication() throws Exception {
+        mockMvc.perform(options("/api/auth/me")
+                        .header("Origin", LOCALHOST_ORIGIN)
+                        .header("Access-Control-Request-Method", "GET")
+                        .header("Access-Control-Request-Headers", "authorization,x-tenant-id"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", LOCALHOST_ORIGIN))
+                .andExpect(header().string("Access-Control-Allow-Methods", containsString("GET")));
     }
 }

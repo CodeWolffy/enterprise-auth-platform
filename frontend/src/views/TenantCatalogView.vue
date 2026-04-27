@@ -2,22 +2,22 @@
   <div class="panel-stack">
     <section class="dashboard-grid">
       <article class="stat-card">
-        <span class="eyebrow">Packages</span>
+        <span class="eyebrow">套餐</span>
         <strong>{{ packages.length }}</strong>
         <span>当前定义的租户套餐</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Capabilities</span>
+        <span class="eyebrow">能力</span>
         <strong>{{ capabilities.length }}</strong>
         <span>当前定义的租户能力</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Enabled Packages</span>
+        <span class="eyebrow">启用套餐</span>
         <strong>{{ enabledPackageCount }}</strong>
         <span>启用中的套餐数量</span>
       </article>
       <article class="stat-card">
-        <span class="eyebrow">Enabled Capabilities</span>
+        <span class="eyebrow">启用能力</span>
         <strong>{{ enabledCapabilityCount }}</strong>
         <span>启用中的能力数量</span>
       </article>
@@ -26,7 +26,7 @@
     <section class="dashboard-panel">
       <div class="panel-head">
         <div>
-          <span class="eyebrow">Tenant Catalog</span>
+          <span class="eyebrow">租户套餐</span>
           <h3>租户套餐与能力</h3>
         </div>
       </div>
@@ -35,7 +35,7 @@
         <el-tab-pane label="套餐管理" name="packages">
           <div class="panel-head sub-head">
             <div>
-              <span class="eyebrow">Packages</span>
+<span class="eyebrow">套餐</span>
               <h4>套餐定义</h4>
             </div>
             <el-button type="primary" @click="openPackageDialog()">新增套餐</el-button>
@@ -159,7 +159,7 @@
         <el-tab-pane label="能力管理" name="capabilities">
           <div class="panel-head sub-head">
             <div>
-              <span class="eyebrow">Capabilities</span>
+<span class="eyebrow">能力</span>
               <h4>能力定义</h4>
             </div>
             <el-button type="primary" @click="openCapabilityDialog()">新增能力</el-button>

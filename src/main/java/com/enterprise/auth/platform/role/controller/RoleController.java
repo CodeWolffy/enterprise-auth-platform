@@ -12,7 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Set;
-import org.springframework.security.access.prepost.PreAuthorize;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,28 +37,28 @@ public class RoleController {
 
     @Operation(summary = "查询角色列表")
     @GetMapping
-    @PreAuthorize("hasAuthority('role:read')")
+    @SaCheckPermission("role:read")
     public ApiResponse<List<CatalogService.RoleView>> list() {
         return ApiResponse.ok(catalogService.roles());
     }
 
     @Operation(summary = "查询角色已分配资源")
     @GetMapping("/{roleId}/resources")
-    @PreAuthorize("hasAuthority('role:read')")
+    @SaCheckPermission("role:read")
     public ApiResponse<Set<Long>> assignedResources(@Parameter(description = "角色 ID") @PathVariable Long roleId) {
         return ApiResponse.ok(roleManagementService.listAssignedResources(roleId));
     }
 
     @Operation(summary = "新增角色")
     @PostMapping
-    @PreAuthorize("hasAuthority('role:write')")
+    @SaCheckPermission("role:write")
     public ApiResponse<CatalogService.RoleView> create(@Valid @RequestBody CreateRoleRequest request) {
         return ApiResponse.ok(roleManagementService.create(request));
     }
 
     @Operation(summary = "修改角色")
     @PutMapping("/{roleId}")
-    @PreAuthorize("hasAuthority('role:write')")
+    @SaCheckPermission("role:write")
     public ApiResponse<CatalogService.RoleView> update(
             @Parameter(description = "角色 ID") @PathVariable Long roleId,
             @Valid @RequestBody UpdateRoleRequest request
@@ -68,7 +68,7 @@ public class RoleController {
 
     @Operation(summary = "分配角色资源")
     @PutMapping("/{roleId}/resources")
-    @PreAuthorize("hasAuthority('role:write')")
+    @SaCheckPermission("role:write")
     public ApiResponse<Set<Long>> assignResources(
             @Parameter(description = "角色 ID") @PathVariable Long roleId,
             @Valid @RequestBody AssignResourcesRequest request
@@ -78,7 +78,7 @@ public class RoleController {
 
     @Operation(summary = "删除角色")
     @DeleteMapping("/{roleId}")
-    @PreAuthorize("hasAuthority('role:write')")
+    @SaCheckPermission("role:write")
     public ApiResponse<Void> delete(@Parameter(description = "角色 ID") @PathVariable Long roleId) {
         roleManagementService.delete(roleId);
         return ApiResponse.ok();

@@ -1,5 +1,8 @@
 package com.enterprise.auth.platform.user;
 
+import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.bind;
+import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.clear;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -18,9 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.enterprise.auth.platform.security.PasswordHasher;
 
 @SpringBootTest
 class UserManagementServiceTest {
@@ -37,7 +38,7 @@ class UserManagementServiceTest {
     private SysUserMapper sysUserMapper;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    private PasswordHasher passwordHasher;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -45,7 +46,7 @@ class UserManagementServiceTest {
     @AfterEach
     void tearDown() {
         TenantContext.clear();
-        SecurityContextHolder.clearContext();
+        clear();
         jdbcTemplate.update(
                 "DELETE FROM sys_user WHERE tenant_id = ? AND username IN (?, ?, ?, ?)",
                 "tenant-a",
@@ -131,7 +132,7 @@ class UserManagementServiceTest {
         entity.setDeptId(deptId);
         entity.setUsername(username);
         entity.setDisplayName(username);
-        entity.setPasswordHash(passwordEncoder.encode("UserTest@123"));
+        entity.setPasswordHash(passwordHasher.hash("UserTest@123"));
         entity.setEnabled(1);
         entity.setSessionVersion(1);
         sysUserMapper.insert(entity);
@@ -143,7 +144,7 @@ class UserManagementServiceTest {
                 userId,
                 "tenant-a",
                 SCOPE_USER,
-                passwordEncoder.encode("UserTest@123"),
+                passwordHasher.hash("UserTest@123"),
                 true,
                 Set.of(),
                 Set.of(permission),
@@ -151,8 +152,6 @@ class UserManagementServiceTest {
                 DataScopeType.DEPT,
                 1
         );
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(principal, principal.password(), principal.getAuthorities())
-        );
+        bind(principal);
     }
 }

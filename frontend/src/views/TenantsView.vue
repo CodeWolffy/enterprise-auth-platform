@@ -25,7 +25,7 @@
 
     <section class="dashboard-panel">
       <div class="panel-head">
-        <div><span class="eyebrow">Tenants</span><h3>租户管理</h3></div>
+        <div><span class="eyebrow">租户</span><h3>租户管理</h3></div>
         <el-button type="primary" @click="openTenant()">新增租户</el-button>
       </div>
 
