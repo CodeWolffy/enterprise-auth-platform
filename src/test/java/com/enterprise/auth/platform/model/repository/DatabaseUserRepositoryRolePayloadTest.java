@@ -1,4 +1,4 @@
-﻿package com.enterprise.auth.platform.model.repository;
+package com.enterprise.auth.platform.model.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

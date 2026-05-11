@@ -1,4 +1,4 @@
-﻿package com.enterprise.auth.platform.common.exception;
+package com.enterprise.auth.platform.common.exception;
 
 import cn.dev33.satoken.exception.NotLoginException;
 import cn.dev33.satoken.exception.NotPermissionException;

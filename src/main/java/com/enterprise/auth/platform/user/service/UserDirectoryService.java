@@ -1,4 +1,4 @@
-﻿package com.enterprise.auth.platform.user.service;
+package com.enterprise.auth.platform.user.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.model.DataScopeType;

@@ -1,4 +1,4 @@
-package com.enterprise.auth.platform.common.web;
+package com.enterprise.auth.platform.web;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.enterprise.auth.platform.common.annotation.RateLimit;

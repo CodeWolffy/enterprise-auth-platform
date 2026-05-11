@@ -1,4 +1,4 @@
-﻿package com.enterprise.auth.platform.user.service.management;
+package com.enterprise.auth.platform.user.service.management;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;

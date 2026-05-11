@@ -1,4 +1,4 @@
-package com.enterprise.auth.platform.common.web;
+package com.enterprise.auth.platform.web;
 
 import java.time.Instant;
 import java.time.LocalDateTime;

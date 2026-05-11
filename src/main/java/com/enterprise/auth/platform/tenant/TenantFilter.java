@@ -1,4 +1,4 @@
-﻿package com.enterprise.auth.platform.tenant;
+package com.enterprise.auth.platform.tenant;
 
 import com.enterprise.auth.platform.web.RequestContext;
 import jakarta.servlet.FilterChain;

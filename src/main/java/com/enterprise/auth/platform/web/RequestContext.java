@@ -1,4 +1,4 @@
-package com.enterprise.auth.platform.common.web;
+package com.enterprise.auth.platform.web;
 
 public final class RequestContext {
 

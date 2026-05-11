@@ -1,4 +1,4 @@
-﻿package com.enterprise.auth.platform.model.mapper;
+package com.enterprise.auth.platform.model.mapper;
 
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;

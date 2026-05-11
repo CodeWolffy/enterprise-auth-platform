@@ -1,4 +1,4 @@
-﻿package com.enterprise.auth.platform.model.entity;
+package com.enterprise.auth.platform.model.entity;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.IdType;

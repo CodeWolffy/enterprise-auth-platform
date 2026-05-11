@@ -1,4 +1,4 @@
-﻿package com.enterprise.auth.platform.user;
+package com.enterprise.auth.platform.user;
 
 import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.bind;
 import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.clear;

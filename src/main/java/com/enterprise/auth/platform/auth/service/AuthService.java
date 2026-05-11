@@ -1,4 +1,4 @@
-﻿package com.enterprise.auth.platform.auth.service;
+package com.enterprise.auth.platform.auth.service;
 
 import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.SaLoginModel;

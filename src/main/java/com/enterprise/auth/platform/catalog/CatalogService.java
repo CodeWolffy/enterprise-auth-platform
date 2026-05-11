@@ -1,4 +1,4 @@
-﻿package com.enterprise.auth.platform.catalog;
+package com.enterprise.auth.platform.catalog;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.exception.BusinessException;

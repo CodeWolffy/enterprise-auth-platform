@@ -1,4 +1,4 @@
-﻿package com.enterprise.auth.platform.audit.service;
+package com.enterprise.auth.platform.audit.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.audit.model.AuditEvent;

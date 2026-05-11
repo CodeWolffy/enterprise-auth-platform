@@ -1,9 +1,10 @@
-﻿package com.enterprise.auth.platform.config.web;
+package com.enterprise.auth.platform.config.web;
 
 import cn.dev33.satoken.context.SaHolder;
 import cn.dev33.satoken.interceptor.SaInterceptor;
 import cn.dev33.satoken.stp.StpUtil;
 import com.enterprise.auth.platform.web.RateLimitInterceptor;
+import com.enterprise.auth.platform.config.rate.RateLimitProperties;
 import com.enterprise.auth.platform.security.SaTokenUserContextInterceptor;
 import java.util.List;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

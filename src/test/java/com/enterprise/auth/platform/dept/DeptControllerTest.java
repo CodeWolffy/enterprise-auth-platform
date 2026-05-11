@@ -1,4 +1,4 @@
-﻿package com.enterprise.auth.platform.dept;
+package com.enterprise.auth.platform.dept;
 
 import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.bearer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;

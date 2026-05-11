@@ -1,4 +1,4 @@
-﻿package com.enterprise.auth.platform.config.mybatis;
+package com.enterprise.auth.platform.config.mybatis;
 
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.handler.TenantLineHandler;
