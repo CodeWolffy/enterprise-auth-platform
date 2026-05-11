@@ -1,4 +1,4 @@
-package com.enterprise.auth.platform.system;
+﻿package com.enterprise.auth.platform.system;
 
 import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.bearer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -8,10 +8,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.enterprise.auth.platform.common.model.DataScopeType;
-import com.enterprise.auth.platform.persistence.entity.SysDeptEntity;
-import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
-import com.enterprise.auth.platform.persistence.mapper.SysDeptMapper;
-import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
+import com.enterprise.auth.platform.model.entity.SysDeptEntity;
+import com.enterprise.auth.platform.model.entity.SysUserEntity;
+import com.enterprise.auth.platform.model.mapper.SysDeptMapper;
+import com.enterprise.auth.platform.model.mapper.SysUserMapper;
 import com.enterprise.auth.platform.user.model.UserAccount;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;

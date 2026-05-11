@@ -1,4 +1,4 @@
-package com.enterprise.auth.platform.audit.service;
+﻿package com.enterprise.auth.platform.audit.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.audit.model.AuditEvent;
@@ -6,9 +6,9 @@ import com.enterprise.auth.platform.audit.model.AuditPage;
 import com.enterprise.auth.platform.audit.model.AuditQuery;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.time.TimeSupport;
-import com.enterprise.auth.platform.common.web.RequestContext;
-import com.enterprise.auth.platform.persistence.entity.SysAuditLogEntity;
-import com.enterprise.auth.platform.persistence.mapper.SysAuditLogMapper;
+import com.enterprise.auth.platform.web.RequestContext;
+import com.enterprise.auth.platform.model.entity.SysAuditLogEntity;
+import com.enterprise.auth.platform.model.mapper.SysAuditLogMapper;
 import com.enterprise.auth.platform.security.DataScopeService;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import com.fasterxml.jackson.core.type.TypeReference;

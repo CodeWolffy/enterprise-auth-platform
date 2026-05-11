@@ -1,4 +1,4 @@
-package com.enterprise.auth.platform.audit;
+﻿package com.enterprise.auth.platform.audit;
 
 import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.bind;
 import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.clear;
@@ -8,8 +8,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.enterprise.auth.platform.audit.model.AuditQuery;
 import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.common.model.DataScopeType;
-import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
-import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
+import com.enterprise.auth.platform.model.entity.SysUserEntity;
+import com.enterprise.auth.platform.model.mapper.SysUserMapper;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import com.enterprise.auth.platform.user.model.UserAccount;
 import java.util.Map;

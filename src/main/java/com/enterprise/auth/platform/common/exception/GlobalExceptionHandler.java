@@ -1,11 +1,11 @@
-package com.enterprise.auth.platform.common.exception;
+﻿package com.enterprise.auth.platform.common.exception;
 
 import cn.dev33.satoken.exception.NotLoginException;
 import cn.dev33.satoken.exception.NotPermissionException;
 import cn.dev33.satoken.exception.SaTokenException;
 import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.common.api.ApiResponse;
-import com.enterprise.auth.platform.common.web.RateLimitInterceptor.RateLimitExceededException;
+import com.enterprise.auth.platform.web.RateLimitInterceptor.RateLimitExceededException;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -24,6 +24,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -67,7 +68,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(SaTokenException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ApiResponse<Void> handleSaToken(SaTokenException exception) {
-        return ApiResponse.fail("AUTH_ERROR", exception.getMessage());
+        log.warn("Sa-Token authentication error: {}", exception.getMessage());
+        return ApiResponse.fail("AUTH_ERROR", "Authentication failed");
     }
 
     @ExceptionHandler({
@@ -87,9 +89,18 @@ public class GlobalExceptionHandler {
         return ApiResponse.fail("RESOURCE_NOT_FOUND", "资源未找到");
     }
 
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleClientAbort(AsyncRequestNotUsableException exception) {
+        log.debug("Client disconnected before the response could be written: {}", exception.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResponse<Void> handleUnexpected(Exception exception) {
+        if (isClientAbort(exception)) {
+            log.debug("Client disconnected before the response could be written: {}", exception.getMessage());
+            return null;
+        }
         log.error("Unhandled server exception", exception);
         return ApiResponse.fail("INTERNAL_ERROR", "服务器内部错误");
     }
@@ -129,6 +140,27 @@ return "请求参数校验失败";
             case NotLoginException.INVALID_TOKEN, NotLoginException.NO_PREFIX -> "INVALID_TOKEN";
             default -> "UNAUTHORIZED";
         };
+    }
+
+    private boolean isClientAbort(Throwable exception) {
+        Throwable current = exception;
+        while (current != null) {
+            String className = current.getClass().getName();
+            if (className.equals("org.apache.catalina.connector.ClientAbortException")
+                    || className.equals("org.eclipse.jetty.io.EofException")
+                    || className.equals("java.io.EOFException")) {
+                return true;
+            }
+            String message = current.getMessage();
+            if (message != null && (
+                    message.contains("Broken pipe")
+                            || message.contains("Connection reset")
+                            || message.contains("你的主机中的软件中止了一个已建立的连接"))) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private void recordSecurityDenyEvent(Exception exception, HttpServletRequest request) {

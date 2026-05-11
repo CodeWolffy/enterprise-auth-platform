@@ -4,6 +4,7 @@ import type {
   CaptchaResponse,
   PermissionSnapshot,
   RegisterOptionsResponse,
+  SessionPageResult,
   TokenSessionResponse,
   UserSessionView,
 } from '@/types/auth'
@@ -50,7 +51,13 @@ export async function logoutCurrentSession() {
   await http.post('/api/auth/logout')
 }
 
-export async function querySessions(scope: 'own' | 'all' = 'own') {
+export async function querySessions(scope: 'own' | 'all' = 'own', params?: { page?: number; size?: number }) {
+  if (scope === 'all' && params) {
+    const { data } = await http.get<ApiResponse<SessionPageResult>>('/api/auth/sessions', {
+      params: { scope, ...params },
+    })
+    return data.data
+  }
   const { data } = await http.get<ApiResponse<UserSessionView[]>>('/api/auth/sessions', {
     params: { scope },
   })

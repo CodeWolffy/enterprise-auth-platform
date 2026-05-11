@@ -1,8 +1,10 @@
 package com.enterprise.auth.platform.security;
 
 import cn.dev33.satoken.exception.SaTokenContextException;
+import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
 import com.enterprise.auth.platform.auth.model.SessionPrincipal;
+import com.enterprise.auth.platform.auth.service.SessionIndexService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.tenant.TenantProperties;
 import com.enterprise.auth.platform.user.model.UserAccount;
@@ -21,15 +23,18 @@ public class CurrentUserService {
     private final ObjectProvider<UserRepository> userRepository;
     private final TenantProperties tenantProperties;
     private final PlatformAdminSupport platformAdminSupport;
+    private final SessionIndexService sessionIndexService;
 
     public CurrentUserService(
             ObjectProvider<UserRepository> userRepository,
             TenantProperties tenantProperties,
-            PlatformAdminSupport platformAdminSupport
+            PlatformAdminSupport platformAdminSupport,
+            SessionIndexService sessionIndexService
     ) {
         this.userRepository = userRepository;
         this.tenantProperties = tenantProperties;
         this.platformAdminSupport = platformAdminSupport;
+        this.sessionIndexService = sessionIndexService;
     }
 
     public Optional<UserAccount> currentUser() {
@@ -56,17 +61,49 @@ public class CurrentUserService {
                 return Optional.empty();
             }
             long userId = StpUtil.getLoginIdAsLong();
-            UserAccount user = Optional.ofNullable((UserAccount) StpUtil.getTokenSession().get("testUser"))
-                    .or(() -> userRepository.getObject().findById(userId))
-                    .orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "User not found"));
+            SaSession tokenSession = StpUtil.getTokenSession();
+            UserAccount user = userRepository.getObject().findById(userId)
+                    .orElseThrow(() -> {
+                        kickoutCurrentToken();
+                        StpUtil.checkLogin();
+                        return new BusinessException("USER_NOT_FOUND", "User not found");
+            });
             if (!user.enabled()) {
-                StpUtil.logout(userId);
-                throw new BusinessException("USER_DISABLED", "User is disabled");
+                StpUtil.kickout(userId);
+                StpUtil.checkLogin();
+            }
+            int tokenSessionVersion = sessionInt(tokenSession, "sessionVersion", user.sessionVersion());
+            if (tokenSessionVersion != user.sessionVersion()) {
+                kickoutCurrentToken();
+                StpUtil.checkLogin();
             }
             return Optional.of(user);
         } catch (SaTokenContextException ignored) {
             return Optional.empty();
         }
+    }
+
+    private void kickoutCurrentToken() {
+        String tokenValue = StpUtil.getTokenValue();
+        if (StringUtils.hasText(tokenValue)) {
+            StpUtil.kickoutByTokenValue(tokenValue);
+            sessionIndexService.remove(tokenValue);
+        }
+    }
+
+    private int sessionInt(SaSession session, String key, int fallback) {
+        Object value = session.get(key);
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value != null) {
+            try {
+                return Integer.parseInt(String.valueOf(value));
+            } catch (NumberFormatException ignored) {
+                return fallback;
+            }
+        }
+        return fallback;
     }
 
     private String resolveRequestedTenant(HttpServletRequest request) {

@@ -1,4 +1,4 @@
-package com.enterprise.auth.platform.audit.service;
+﻿package com.enterprise.auth.platform.audit.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.audit.dto.AuditExportPolicyRequest;
@@ -8,10 +8,10 @@ import com.enterprise.auth.platform.audit.model.AuditQuery;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.model.PageResult;
 import com.enterprise.auth.platform.common.time.TimeSupport;
-import com.enterprise.auth.platform.persistence.entity.SysAuditExportPolicyEntity;
-import com.enterprise.auth.platform.persistence.entity.SysAuditExportTaskEntity;
-import com.enterprise.auth.platform.persistence.mapper.SysAuditExportPolicyMapper;
-import com.enterprise.auth.platform.persistence.mapper.SysAuditExportTaskMapper;
+import com.enterprise.auth.platform.model.entity.SysAuditExportPolicyEntity;
+import com.enterprise.auth.platform.model.entity.SysAuditExportTaskEntity;
+import com.enterprise.auth.platform.model.mapper.SysAuditExportPolicyMapper;
+import com.enterprise.auth.platform.model.mapper.SysAuditExportTaskMapper;
 import com.enterprise.auth.platform.security.SecuritySupport;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import com.fasterxml.jackson.core.type.TypeReference;

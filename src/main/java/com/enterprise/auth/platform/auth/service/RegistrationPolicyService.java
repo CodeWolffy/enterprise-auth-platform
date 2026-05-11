@@ -1,8 +1,8 @@
-package com.enterprise.auth.platform.auth.service;
+﻿package com.enterprise.auth.platform.auth.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.enterprise.auth.platform.persistence.entity.SysConfigEntity;
-import com.enterprise.auth.platform.persistence.mapper.SysConfigMapper;
+import com.enterprise.auth.platform.model.entity.SysConfigEntity;
+import com.enterprise.auth.platform.model.mapper.SysConfigMapper;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import com.enterprise.auth.platform.tenant.TenantProperties;
 import java.util.Arrays;

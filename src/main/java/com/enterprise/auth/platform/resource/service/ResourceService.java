@@ -1,18 +1,18 @@
-package com.enterprise.auth.platform.resource.service;
+﻿package com.enterprise.auth.platform.resource.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.model.MenuNode;
 import com.enterprise.auth.platform.common.model.ResourceType;
-import com.enterprise.auth.platform.persistence.entity.SysResourceEntity;
-import com.enterprise.auth.platform.persistence.entity.SysRoleEntity;
-import com.enterprise.auth.platform.persistence.entity.SysRoleResourceEntity;
-import com.enterprise.auth.platform.persistence.entity.SysTenantResourceOverrideEntity;
-import com.enterprise.auth.platform.persistence.mapper.SysResourceMapper;
-import com.enterprise.auth.platform.persistence.mapper.SysRoleMapper;
-import com.enterprise.auth.platform.persistence.mapper.SysRoleResourceMapper;
-import com.enterprise.auth.platform.persistence.mapper.SysTenantResourceOverrideMapper;
+import com.enterprise.auth.platform.model.entity.SysResourceEntity;
+import com.enterprise.auth.platform.model.entity.SysRoleEntity;
+import com.enterprise.auth.platform.model.entity.SysRoleResourceEntity;
+import com.enterprise.auth.platform.model.entity.SysTenantResourceOverrideEntity;
+import com.enterprise.auth.platform.model.mapper.SysResourceMapper;
+import com.enterprise.auth.platform.model.mapper.SysRoleMapper;
+import com.enterprise.auth.platform.model.mapper.SysRoleResourceMapper;
+import com.enterprise.auth.platform.model.mapper.SysTenantResourceOverrideMapper;
 import com.enterprise.auth.platform.resource.dto.CreateResourceRequest;
 import com.enterprise.auth.platform.resource.dto.UpdateResourceRequest;
 import com.enterprise.auth.platform.resource.model.ResourceTreeNode;

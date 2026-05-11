@@ -1,14 +1,14 @@
-package com.enterprise.auth.platform.dept.service;
+﻿package com.enterprise.auth.platform.dept.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.audit.service.AuditService;
 import com.enterprise.auth.platform.catalog.CatalogService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.dept.dto.DeptCrudRequest;
-import com.enterprise.auth.platform.persistence.entity.SysDeptEntity;
-import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
-import com.enterprise.auth.platform.persistence.mapper.SysDeptMapper;
-import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
+import com.enterprise.auth.platform.model.entity.SysDeptEntity;
+import com.enterprise.auth.platform.model.entity.SysUserEntity;
+import com.enterprise.auth.platform.model.mapper.SysDeptMapper;
+import com.enterprise.auth.platform.model.mapper.SysUserMapper;
 import com.enterprise.auth.platform.security.DataScopeService;
 import com.enterprise.auth.platform.security.SecuritySupport;
 import com.enterprise.auth.platform.tenant.TenantContext;

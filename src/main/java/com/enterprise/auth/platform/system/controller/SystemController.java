@@ -2,7 +2,7 @@ package com.enterprise.auth.platform.system.controller;
 
 import com.enterprise.auth.platform.common.api.ApiResponse;
 import com.enterprise.auth.platform.common.model.PageResult;
-import com.enterprise.auth.platform.config.FeatureToggleProperties;
+import com.enterprise.auth.platform.config.feature.FeatureToggleProperties;
 import com.enterprise.auth.platform.system.dto.ConfigCrudRequest;
 import com.enterprise.auth.platform.system.dto.CategoryConfigRequest;
 import com.enterprise.auth.platform.system.dto.DictCrudRequest;

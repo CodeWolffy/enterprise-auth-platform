@@ -12,6 +12,7 @@ import com.enterprise.auth.platform.auth.service.PermissionSnapshotService;
 import com.enterprise.auth.platform.auth.service.RegistrationPolicyService;
 import com.enterprise.auth.platform.common.annotation.RateLimit;
 import com.enterprise.auth.platform.common.api.ApiResponse;
+import com.enterprise.auth.platform.common.model.PageResult;
 import com.enterprise.auth.platform.security.AuthContextHolder;
 import com.enterprise.auth.platform.security.CurrentUserService;
 import com.enterprise.auth.platform.user.dto.RegisterRequest;
@@ -106,13 +107,18 @@ public class AuthController {
         return ApiResponse.ok(permissionSnapshotService.build(currentUser()));
     }
 
-    @Operation(summary = "获取当前用户在线会话")
-    @GetMapping("/sessions")
-    public ApiResponse<List<UserSessionResponse>> sessions(
-            @Parameter(description = "查询范围: own(仅自己) 或 all(全租户)") @RequestParam(defaultValue = "own") String scope
-    ) {
-        return ApiResponse.ok(authService.sessions(currentUser(), scope, StpUtil.getTokenValue()));
+  @Operation(summary = "获取当前用户在线会话")
+  @GetMapping("/sessions")
+  public ApiResponse<Object> sessions(
+      @Parameter(description = "查询范围: own(仅自己) 或 all(全租户)") @RequestParam(defaultValue = "own") String scope,
+      @Parameter(description = "页码，scope=all 时生效") @RequestParam(required = false) Integer page,
+      @Parameter(description = "每页数量，scope=all 时生效") @RequestParam(required = false) Integer size
+  ) {
+    if ("all".equals(scope)) {
+      return ApiResponse.ok(authService.sessions(currentUser(), scope, StpUtil.getTokenValue(), page, size));
     }
+    return ApiResponse.ok(authService.sessions(currentUser(), scope, StpUtil.getTokenValue(), page, size).records());
+  }
 
     @Operation(summary = "强制指定会话下线")
     @PostMapping("/sessions/{sessionId}/offline")

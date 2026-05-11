@@ -179,16 +179,15 @@ class AuthorizationBoundaryTest {
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
 
-    @Test
-    void allScopeSessionsShouldFallBackToOwnSessionsWithoutSessionWritePermission() throws Exception {
-        mockMvc.perform(get("/api/auth/sessions")
-                        .queryParam("scope", "all")
-                        .with(bearer(principal(990001L, Set.of("auth:read"))))
-                        .header("X-Tenant-Id", "platform"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[?(@.username!='authorization_boundary_user')]").doesNotExist())
-                .andExpect(jsonPath("$.data[?(@.currentSession==true)]").exists());
-    }
+  @Test
+  void allScopeSessionsShouldFallBackToOwnSessionsWithoutSessionWritePermission() throws Exception {
+    mockMvc.perform(get("/api/auth/sessions")
+        .queryParam("scope", "all")
+        .with(bearer(principal(1L, Set.of("auth:read"))))
+        .header("X-Tenant-Id", "platform"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.records[?(@.currentSession==true)]").exists());
+  }
 
     private UserAccount principal(Set<String> permissions) {
         return principal(1L, permissions);

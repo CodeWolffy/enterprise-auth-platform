@@ -235,7 +235,7 @@ import {
   User,
   Close,
 } from '@element-plus/icons-vue'
-import AppNav from '@/components/AppNav.vue'
+import AppNav from '@/components/common/AppNav.vue'
 import { useAuthStore } from '@/stores/auth'
 import { querySessions, forceOffline } from '@/api/auth'
 import { queryTenants } from '@/api/platform'

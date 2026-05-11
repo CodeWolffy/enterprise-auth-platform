@@ -12,6 +12,7 @@ import com.enterprise.auth.platform.auth.service.CaptchaService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
+import cn.dev33.satoken.stp.StpUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +23,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import com.enterprise.auth.platform.security.PasswordHasher;
+import com.enterprise.auth.platform.security.AuthPrincipalCacheService;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -52,18 +54,28 @@ class AuthControllerSessionFlowTest {
     private PasswordHasher passwordHasher;
 
     @Autowired
+    private AuthPrincipalCacheService authPrincipalCacheService;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     @MockitoBean
     private CaptchaService captchaService;
 
     private String previousPasswordHash;
+    private Integer previousSessionVersion;
 
     @BeforeEach
     void setUp() {
         previousPasswordHash = jdbcTemplate.queryForObject(
                 "SELECT password_hash FROM sys_user WHERE tenant_id = ? AND username = ? AND deleted = 0",
                 String.class,
+                "platform",
+                "admin"
+        );
+        previousSessionVersion = jdbcTemplate.queryForObject(
+                "SELECT session_version FROM sys_user WHERE tenant_id = ? AND username = ? AND deleted = 0",
+                Integer.class,
                 "platform",
                 "admin"
         );
@@ -92,6 +104,14 @@ class AuthControllerSessionFlowTest {
             jdbcTemplate.update(
                     "UPDATE sys_user SET password_hash = ? WHERE tenant_id = ? AND username = ? AND deleted = 0",
                     previousPasswordHash,
+                    "platform",
+                    "admin"
+            );
+        }
+        if (previousSessionVersion != null) {
+            jdbcTemplate.update(
+                    "UPDATE sys_user SET session_version = ? WHERE tenant_id = ? AND username = ? AND deleted = 0",
+                    previousSessionVersion,
                     "platform",
                     "admin"
             );
@@ -215,14 +235,42 @@ class AuthControllerSessionFlowTest {
         MvcResult loginResult = loginAsAdmin();
         String token = extractToken(loginResult);
 
-        mockMvc.perform(post("/api/auth/sessions/{sessionId}/offline", token)
-                        .header("Authorization", "Bearer " + token)
-                        .header("X-Tenant-Id", ADMIN_TENANT))
-                .andExpect(status().isOk());
+        StpUtil.kickoutByTokenValue(token);
 
         mockMvc.perform(get("/api/auth/me")
                         .header("Authorization", "Bearer " + token)
                         .header("X-Tenant-Id", ADMIN_TENANT))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("SESSION_OFFLINE"));
+    }
+
+    @Test
+    void changedSessionVersionShouldKickExistingToken() throws Exception {
+        MvcResult loginResult = loginAsAdmin();
+        String token = extractToken(loginResult);
+        jdbcTemplate.update(
+                "UPDATE sys_user SET session_version = session_version + 1 WHERE tenant_id = ? AND username = ? AND deleted = 0",
+                ADMIN_TENANT,
+                ADMIN_USERNAME
+        );
+        authPrincipalCacheService.evictByUser(1L, ADMIN_TENANT, ADMIN_USERNAME);
+
+        mockMvc.perform(get("/api/auth/me")
+                        .header("Authorization", "Bearer " + token)
+                        .header("X-Tenant-Id", ADMIN_TENANT))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("SESSION_OFFLINE"));
+    }
+
+    @Test
+    void tokenUsedFromDifferentClientIpShouldBeKicked() throws Exception {
+        MvcResult loginResult = loginAsAdmin();
+        String token = extractToken(loginResult);
+
+        mockMvc.perform(get("/api/auth/me")
+                        .header("Authorization", "Bearer " + token)
+                        .header("X-Tenant-Id", ADMIN_TENANT)
+                        .header("X-Forwarded-For", "203.0.113.10"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("SESSION_OFFLINE"));
     }
@@ -277,30 +325,54 @@ class AuthControllerSessionFlowTest {
         Assertions.assertEquals(ADMIN_TENANT, current.path("tenantId").asText());
     }
 
-    @Test
-    void sessionsAllScopeShouldReturnTenantSessions() throws Exception {
-        ensureTenantUser();
-        MvcResult adminLogin = loginAsAdmin();
-        MvcResult tenantLogin = loginAs(TENANT_USER, TENANT_USER_PASSWORD, TENANT_A);
-        String adminToken = extractToken(adminLogin);
-        String tenantToken = extractToken(tenantLogin);
+  @Test
+  void sessionsAllScopeShouldReturnTenantSessions() throws Exception {
+    ensureTenantUser();
+    MvcResult adminLogin = loginAsAdmin();
+    MvcResult tenantLogin = loginAs(TENANT_USER, TENANT_USER_PASSWORD, TENANT_A);
+    String adminToken = extractToken(adminLogin);
+    String tenantToken = extractToken(tenantLogin);
 
-        MvcResult response = mockMvc.perform(get("/api/auth/sessions?scope=all")
-                        .header("Authorization", "Bearer " + adminToken)
-                        .header("X-Tenant-Id", ADMIN_TENANT))
-                .andExpect(status().isOk())
-                .andReturn();
-        JsonNode sessions = dataArray(response);
-        Assertions.assertTrue(sessions.size() >= 2, "all scope should include visible active sessions");
-        Assertions.assertEquals(ADMIN_TENANT, sessionByToken(response, adminToken).path("tenantId").asText());
-        Assertions.assertEquals(TENANT_A, sessionByToken(response, tenantToken).path("tenantId").asText());
-        for (JsonNode session : sessions) {
-            Assertions.assertTrue(session.path("active").asBoolean(), "all scope should only return active sessions");
-        }
+    MvcResult response = mockMvc.perform(get("/api/auth/sessions?scope=all&page=1&size=50")
+        .header("Authorization", "Bearer " + adminToken)
+        .header("X-Tenant-Id", ADMIN_TENANT))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.total").isNumber())
+        .andExpect(jsonPath("$.data.page").value(1))
+        .andExpect(jsonPath("$.data.records").isArray())
+        .andReturn();
+    JsonNode sessions = pageRecords(response);
+    Assertions.assertTrue(sessions.size() >= 2, "all scope should include visible active sessions");
+    Assertions.assertEquals(ADMIN_TENANT, sessionByTokenFromPage(response, adminToken).path("tenantId").asText());
+    Assertions.assertEquals(TENANT_A, sessionByTokenFromPage(response, tenantToken).path("tenantId").asText());
+    for (JsonNode session : sessions) {
+      Assertions.assertTrue(session.path("active").asBoolean(), "all scope should only return active sessions");
     }
+  }
 
-    @Test
-    void forceOfflineNonexistentSessionShouldFail() throws Exception {
+  @Test
+  void sessionsAllScopePaginationShouldRespectPageAndSize() throws Exception {
+    MvcResult loginResult = loginAsAdmin();
+    String adminToken = extractToken(loginResult);
+
+    mockMvc.perform(get("/api/auth/sessions?scope=all&page=1&size=1")
+        .header("Authorization", "Bearer " + adminToken)
+        .header("X-Tenant-Id", ADMIN_TENANT))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.page").value(1))
+        .andExpect(jsonPath("$.data.size").value(1))
+        .andExpect(jsonPath("$.data.records.length()").value(1));
+
+    mockMvc.perform(get("/api/auth/sessions?scope=all&page=2&size=1")
+        .header("Authorization", "Bearer " + adminToken)
+        .header("X-Tenant-Id", ADMIN_TENANT))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.page").value(2))
+        .andExpect(jsonPath("$.data.size").value(1));
+  }
+
+  @Test
+  void forceOfflineNonexistentSessionShouldFail() throws Exception {
         MvcResult loginResult = loginAsAdmin();
         String token = extractToken(loginResult);
 
@@ -364,11 +436,27 @@ class AuthControllerSessionFlowTest {
         }
     }
 
-    private JsonNode dataArray(MvcResult result) throws Exception {
-        JsonNode data = objectMapper.readTree(result.getResponse().getContentAsString()).path("data");
-        Assertions.assertTrue(data.isArray(), "response data should be an array");
-        return data;
+  private JsonNode dataArray(MvcResult result) throws Exception {
+    JsonNode data = objectMapper.readTree(result.getResponse().getContentAsString()).path("data");
+    Assertions.assertTrue(data.isArray(), "response data should be an array");
+    return data;
+  }
+
+  private JsonNode pageRecords(MvcResult result) throws Exception {
+    JsonNode data = objectMapper.readTree(result.getResponse().getContentAsString()).path("data");
+    JsonNode records = data.path("records");
+    Assertions.assertTrue(records.isArray(), "page response data.records should be an array");
+    return records;
+  }
+
+  private JsonNode sessionByTokenFromPage(MvcResult result, String token) throws Exception {
+    for (JsonNode session : pageRecords(result)) {
+      if (token.equals(session.path("sessionId").asText())) {
+        return session;
+      }
     }
+    throw new AssertionError("session not found in page: " + token);
+  }
 
     private JsonNode sessionByToken(MvcResult result, String token) throws Exception {
         for (JsonNode session : dataArray(result)) {

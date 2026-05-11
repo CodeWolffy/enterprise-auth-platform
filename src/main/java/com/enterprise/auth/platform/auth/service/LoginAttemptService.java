@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.auth.service;
 
 import com.enterprise.auth.platform.audit.service.AuditService;
-import com.enterprise.auth.platform.config.SecurityRedisProperties;
+import com.enterprise.auth.platform.config.security.SecurityRedisProperties;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Map;

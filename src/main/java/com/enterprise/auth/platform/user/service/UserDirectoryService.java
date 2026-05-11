@@ -1,14 +1,14 @@
-package com.enterprise.auth.platform.user.service;
+﻿package com.enterprise.auth.platform.user.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.model.DataScopeType;
 import com.enterprise.auth.platform.common.model.PageResult;
-import com.enterprise.auth.platform.persistence.entity.SysRoleEntity;
-import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
-import com.enterprise.auth.platform.persistence.entity.SysUserRoleEntity;
-import com.enterprise.auth.platform.persistence.mapper.SysRoleMapper;
-import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
-import com.enterprise.auth.platform.persistence.mapper.SysUserRoleMapper;
+import com.enterprise.auth.platform.model.entity.SysRoleEntity;
+import com.enterprise.auth.platform.model.entity.SysUserEntity;
+import com.enterprise.auth.platform.model.entity.SysUserRoleEntity;
+import com.enterprise.auth.platform.model.mapper.SysRoleMapper;
+import com.enterprise.auth.platform.model.mapper.SysUserMapper;
+import com.enterprise.auth.platform.model.mapper.SysUserRoleMapper;
 import com.enterprise.auth.platform.resource.service.ResourceService;
 import com.enterprise.auth.platform.security.DataScopeService;
 import com.enterprise.auth.platform.tenant.TenantContext;

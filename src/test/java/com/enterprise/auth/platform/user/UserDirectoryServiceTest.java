@@ -1,4 +1,4 @@
-package com.enterprise.auth.platform.user;
+﻿package com.enterprise.auth.platform.user;
 
 import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.bind;
 import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.clear;
@@ -7,10 +7,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.model.DataScopeType;
-import com.enterprise.auth.platform.persistence.entity.SysDeptEntity;
-import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
-import com.enterprise.auth.platform.persistence.mapper.SysDeptMapper;
-import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
+import com.enterprise.auth.platform.model.entity.SysDeptEntity;
+import com.enterprise.auth.platform.model.entity.SysUserEntity;
+import com.enterprise.auth.platform.model.mapper.SysDeptMapper;
+import com.enterprise.auth.platform.model.mapper.SysUserMapper;
 import com.enterprise.auth.platform.tenant.TenantContext;
 import com.enterprise.auth.platform.user.model.UserAccount;
 import com.enterprise.auth.platform.user.model.UserSummary;

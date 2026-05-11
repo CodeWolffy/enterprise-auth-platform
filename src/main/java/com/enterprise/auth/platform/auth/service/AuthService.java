@@ -1,4 +1,4 @@
-package com.enterprise.auth.platform.auth.service;
+﻿package com.enterprise.auth.platform.auth.service;
 
 import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.SaLoginModel;
@@ -8,12 +8,14 @@ import com.enterprise.auth.platform.auth.dto.LoginRequest;
 import com.enterprise.auth.platform.auth.dto.TokenSessionResponse;
 import com.enterprise.auth.platform.auth.dto.UserSessionResponse;
 import com.enterprise.auth.platform.auth.service.LoginAttemptService.LoginFailureResult;
+import com.enterprise.auth.platform.auth.service.SessionIndexService.Page;
 import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.common.model.PageResult;
 import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.common.validator.PasswordValidator;
-import com.enterprise.auth.platform.config.SecurityProperties;
-import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
-import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
+import com.enterprise.auth.platform.config.security.SecurityProperties;
+import com.enterprise.auth.platform.model.entity.SysUserEntity;
+import com.enterprise.auth.platform.model.mapper.SysUserMapper;
 import com.enterprise.auth.platform.security.DataScopeService;
 import com.enterprise.auth.platform.security.PasswordHasher;
 import com.enterprise.auth.platform.security.PlatformAdminSupport;
@@ -36,6 +38,8 @@ import org.springframework.util.StringUtils;
 @Service
 public class AuthService {
 
+    private static final int SESSION_RESULT_LIMIT = 200;
+
     private final CaptchaService captchaService;
     private final PasswordHasher passwordHasher;
     private final UserRepository userRepository;
@@ -48,6 +52,7 @@ public class AuthService {
     private final UserManagementService userManagementService;
     private final PlatformAdminSupport platformAdminSupport;
     private final SecurityProperties securityProperties;
+    private final SessionIndexService sessionIndexService;
 
     public AuthService(
             CaptchaService captchaService,
@@ -61,7 +66,8 @@ public class AuthService {
             RegistrationPolicyService registrationPolicyService,
             UserManagementService userManagementService,
             PlatformAdminSupport platformAdminSupport,
-            SecurityProperties securityProperties
+            SecurityProperties securityProperties,
+            SessionIndexService sessionIndexService
     ) {
         this.captchaService = captchaService;
         this.passwordHasher = passwordHasher;
@@ -75,6 +81,7 @@ public class AuthService {
         this.userManagementService = userManagementService;
         this.platformAdminSupport = platformAdminSupport;
         this.securityProperties = securityProperties;
+        this.sessionIndexService = sessionIndexService;
     }
 
     public TokenSessionResponse login(LoginRequest request, HttpServletRequest servletRequest) {
@@ -114,10 +121,23 @@ public class AuthService {
             tokenSession.set("username", user.username());
             tokenSession.set("userId", user.id());
             tokenSession.set("tenantId", user.tenantId());
+            tokenSession.set("sessionVersion", user.sessionVersion());
+            tokenSession.set("roles", user.roles());
+            tokenSession.set("permissions", user.permissions());
             tokenSession.set("clientIp", clientIp);
             tokenSession.set("device", StringUtils.hasText(request.device()) ? request.device() : "unknown");
             tokenSession.set("issuedAt", now.toEpochMilli());
             tokenSession.set("expiresAt", expiresAt.toEpochMilli());
+            sessionIndexService.register(
+                    tokenValue,
+                    user.id(),
+                    user.username(),
+                    user.tenantId(),
+                    clientIp,
+                    StringUtils.hasText(request.device()) ? request.device() : "unknown",
+                    now.toEpochMilli(),
+                    expiresAt.toEpochMilli()
+            );
 
             updateLastLogin(user.id(), clientIp);
             auditService.record("LOGIN_SUCCESS", user.username(), user.tenantId(), Map.of("sessionId", tokenValue, "clientIp", clientIp));
@@ -134,38 +154,80 @@ public class AuthService {
     public void logout(String sessionId, String username, String tenantId) {
         Map<String, Object> payload = sessionAuditPayload(sessionId);
         StpUtil.logoutByTokenValue(sessionId);
+        sessionIndexService.remove(sessionId);
         auditService.record("LOGOUT", username, tenantId, payload);
     }
 
-    public List<UserSessionResponse> sessions(UserAccount currentUser, String scope, String currentToken) {
-        boolean allTenant = "all".equals(scope)
-                && (currentUser.permissions().contains("session:write") || platformAdminSupport.isPlatformSuperAdmin(currentUser));
-        if (allTenant) {
-            return allSessions(currentUser, currentToken);
-        }
-        return ownSessions(currentUser, currentToken);
+  public List<UserSessionResponse> sessions(UserAccount currentUser, String scope, String currentToken) {
+    return sessions(currentUser, scope, currentToken, null, null).records();
+  }
+
+  public PageResult<UserSessionResponse> sessions(UserAccount currentUser, String scope, String currentToken, Integer page, Integer size) {
+    boolean allTenant = "all".equals(scope)
+        && (currentUser.permissions().contains("session:write") || platformAdminSupport.isPlatformSuperAdmin(currentUser));
+    if (allTenant) {
+      return allSessions(currentUser, currentToken, page, size);
     }
+    List<UserSessionResponse> own = ownSessions(currentUser, currentToken);
+    return PageResult.of(own.size(), 1, own.size(), own);
+  }
 
     private List<UserSessionResponse> ownSessions(UserAccount currentUser, String currentToken) {
         return StpUtil.getTokenValueListByLoginId(currentUser.id()).stream()
-                .map(token -> toSessionResponse(token, currentUser, currentToken))
+                .map(token -> safeSessionResponse(token, currentUser, currentToken))
+                .filter(session -> session != null)
                 .filter(session -> session.active())
                 .sorted((a, b) -> Long.compare(b.lastAccessAt(), a.lastAccessAt()))
                 .toList();
     }
 
-    private List<UserSessionResponse> allSessions(UserAccount currentUser, String currentToken) {
-        String tokenKeyPrefix = StpUtil.stpLogic.splicingKeyTokenValue("");
-        return StpUtil.stpLogic.searchTokenValue("", 0, 10000, false).stream()
-                .map(tokenKey -> removePrefix(tokenKey, tokenKeyPrefix))
-                .map(token -> safeSessionResponse(token, currentUser, currentToken))
-                .filter(session -> session != null)
-                .filter(session -> session.active())
-                .filter(session -> tenantVisible(currentUser, session))
-                .filter(session -> dataScopeService.canAccessUser(session.tenantId(), resolveUserId(session.sessionId())))
-                .sorted((a, b) -> Long.compare(b.lastAccessAt(), a.lastAccessAt()))
-                .toList();
+  private PageResult<UserSessionResponse> allSessions(UserAccount currentUser, String currentToken, Integer page, Integer size) {
+    boolean platformAdmin = platformAdminSupport.isPlatformSuperAdmin(currentUser);
+    int effectivePage = (page != null && page > 0) ? page : 1;
+    int effectiveSize = (size != null && size > 0) ? size : 10;
+    int scanMultiplier = Math.min(effectiveSize * 3, SESSION_RESULT_LIMIT);
+    Page indexPage = sessionIndexService.page(effectivePage - 1, scanMultiplier)
+        .orElseGet(() -> new Page(0, List.of()));
+    if (indexPage.records().isEmpty()) {
+      List<UserSessionResponse> own = ownSessions(currentUser, currentToken);
+      return PageResult.of(own.size(), 1, own.size(), own);
     }
+    List<UserSessionResponse> sessions = indexPage.records().stream()
+        .filter(entry -> entry != null)
+        .filter(entry -> tenantVisible(currentUser, entry.response()))
+        .filter(entry -> platformAdmin || canAccessSessionUser(currentUser, entry))
+        .map(entry -> withCurrentSession(entry.response(), currentToken))
+        .map(this::withActiveState)
+        .peek(session -> {
+          if (!session.active()) {
+            sessionIndexService.remove(session.sessionId());
+          }
+        })
+        .filter(UserSessionResponse::active)
+        .sorted((a, b) -> Long.compare(b.lastAccessAt(), a.lastAccessAt()))
+        .limit(effectiveSize)
+        .toList();
+    boolean hasCurrentSession = sessions.stream().anyMatch(UserSessionResponse::currentSession);
+    if (!hasCurrentSession) {
+      List<UserSessionResponse> ownSessions = ownSessions(currentUser, currentToken);
+      if (!ownSessions.isEmpty()) {
+        sessions = java.util.stream.Stream.concat(ownSessions.stream(), sessions.stream())
+            .collect(java.util.stream.Collectors.toMap(
+                UserSessionResponse::sessionId,
+                session -> session,
+                (left, right) -> left,
+                java.util.LinkedHashMap::new
+            ))
+            .values()
+            .stream()
+            .sorted((a, b) -> Long.compare(b.lastAccessAt(), a.lastAccessAt()))
+            .limit(effectiveSize)
+            .toList();
+      }
+    }
+    long total = indexPage.total();
+    return PageResult.of(total, effectivePage, effectiveSize, sessions);
+  }
 
     private String removePrefix(String value, String prefix) {
         if (value != null && prefix != null && value.startsWith(prefix)) {
@@ -181,20 +243,61 @@ public class AuthService {
         return currentUser.tenantId().equals(session.tenantId());
     }
 
-    private Long resolveUserId(String token) {
-        try {
-            Object loginId = StpUtil.stpLogic.getLoginIdByToken(token);
-            return loginId == null ? 0L : Long.parseLong(String.valueOf(loginId));
-        } catch (Exception e) {
-            return 0L;
-        }
-    }
-
     private UserSessionResponse safeSessionResponse(String token, UserAccount fallbackUser, String currentToken) {
         try {
             return toSessionResponse(token, fallbackUser, currentToken);
         } catch (Exception e) {
+            sessionIndexService.remove(token);
             return null;
+        }
+    }
+
+    private boolean canAccessSessionUser(UserAccount currentUser, SessionIndexService.IndexedSession entry) {
+        if (currentUser.id().equals(entry.userId())) {
+            return true;
+        }
+        try {
+            return dataScopeService.canAccessUser(entry.response().tenantId(), entry.userId());
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private UserSessionResponse withCurrentSession(UserSessionResponse session, String currentToken) {
+        return new UserSessionResponse(
+                session.sessionId(),
+                session.username(),
+                session.tenantId(),
+                session.clientIp(),
+                session.device(),
+                session.issuedAt(),
+                session.expiresAt(),
+                session.lastAccessAt(),
+                session.active(),
+                session.sessionId().equals(currentToken)
+        );
+    }
+
+    private UserSessionResponse withActiveState(UserSessionResponse session) {
+        return new UserSessionResponse(
+                session.sessionId(),
+                session.username(),
+                session.tenantId(),
+                session.clientIp(),
+                session.device(),
+                session.issuedAt(),
+                session.expiresAt(),
+                session.lastAccessAt(),
+                isSessionActive(session.sessionId()),
+                session.currentSession()
+        );
+    }
+
+    private boolean isSessionActive(String token) {
+        try {
+            return StpUtil.stpLogic.getLoginIdByToken(token) != null;
+        } catch (Exception ignored) {
+            return false;
         }
     }
 
@@ -211,6 +314,7 @@ public class AuthService {
             throw new BusinessException("ACCESS_DENIED", "无权操作此会话");
         }
         StpUtil.kickoutByTokenValue(sessionId);
+        sessionIndexService.remove(sessionId);
         payload.put("targetUserId", targetUserId);
         auditService.record("SESSION_FORCED_OFFLINE", currentUser.username(), currentUser.tenantId(), payload);
     }

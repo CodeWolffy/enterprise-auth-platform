@@ -1,17 +1,19 @@
-package com.enterprise.auth.platform.user.service.management;
+﻿package com.enterprise.auth.platform.user.service.management;
 
+import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.audit.service.AuditService;
+import com.enterprise.auth.platform.auth.service.SessionIndexService;
 import com.enterprise.auth.platform.catalog.CatalogService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.time.TimeSupport;
 import com.enterprise.auth.platform.common.validator.PasswordValidator;
-import com.enterprise.auth.platform.persistence.entity.SysRoleEntity;
-import com.enterprise.auth.platform.persistence.entity.SysUserEntity;
-import com.enterprise.auth.platform.persistence.entity.SysUserRoleEntity;
-import com.enterprise.auth.platform.persistence.mapper.SysRoleMapper;
-import com.enterprise.auth.platform.persistence.mapper.SysUserMapper;
-import com.enterprise.auth.platform.persistence.mapper.SysUserRoleMapper;
+import com.enterprise.auth.platform.model.entity.SysRoleEntity;
+import com.enterprise.auth.platform.model.entity.SysUserEntity;
+import com.enterprise.auth.platform.model.entity.SysUserRoleEntity;
+import com.enterprise.auth.platform.model.mapper.SysRoleMapper;
+import com.enterprise.auth.platform.model.mapper.SysUserMapper;
+import com.enterprise.auth.platform.model.mapper.SysUserRoleMapper;
 import com.enterprise.auth.platform.security.AuthPrincipalCacheService;
 import com.enterprise.auth.platform.security.DataScopeService;
 import com.enterprise.auth.platform.security.PasswordHasher;
@@ -42,6 +44,7 @@ public class UserManagementService {
     private final AuditService auditService;
     private final DataScopeService dataScopeService;
     private final AuthPrincipalCacheService authPrincipalCacheService;
+    private final SessionIndexService sessionIndexService;
 
     public UserManagementService(
             SysUserMapper sysUserMapper,
@@ -52,7 +55,8 @@ public class UserManagementService {
             CatalogService catalogService,
             AuditService auditService,
             DataScopeService dataScopeService,
-            AuthPrincipalCacheService authPrincipalCacheService
+            AuthPrincipalCacheService authPrincipalCacheService,
+            SessionIndexService sessionIndexService
     ) {
         this.sysUserMapper = sysUserMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
@@ -63,6 +67,7 @@ public class UserManagementService {
         this.auditService = auditService;
         this.dataScopeService = dataScopeService;
         this.authPrincipalCacheService = authPrincipalCacheService;
+        this.sessionIndexService = sessionIndexService;
     }
 
     @Transactional
@@ -112,7 +117,9 @@ public class UserManagementService {
         entity.setMobile(request.mobile());
         entity.setEmail(request.email());
         entity.setDeptId(request.deptId());
+        boolean invalidateSessions = false;
         if (request.enabled() != null) {
+            invalidateSessions = !request.enabled() && (entity.getEnabled() == null || entity.getEnabled() == 1);
             entity.setEnabled(request.enabled() ? 1 : 0);
         }
         if (StringUtils.hasText(request.password())) {
@@ -120,6 +127,7 @@ public class UserManagementService {
             entity.setPasswordHash(passwordHasher.hash(request.password()));
             entity.setSessionVersion((entity.getSessionVersion() == null ? 1 : entity.getSessionVersion()) + 1);
             entity.setPasswordUpdatedAt(TimeSupport.utcNowDateTime());
+            invalidateSessions = true;
         }
         sysUserMapper.updateById(entity);
 
@@ -127,6 +135,9 @@ public class UserManagementService {
             syncUserRoles(tenantId, entity.getId(), request.roleCodes());
         }
         authPrincipalCacheService.evictByUser(entity.getId(), tenantId, entity.getUsername());
+        if (invalidateSessions) {
+            kickoutUserSessions(entity.getId());
+        }
         auditService.record("USER_UPDATED", operator, tenantId, Map.of("userId", entity.getId(), "username", entity.getUsername()));
         return loadSummary(entity.getId(), tenantId);
     }
@@ -179,7 +190,15 @@ public class UserManagementService {
         sysUserMapper.updateById(entity);
         sysUserMapper.deleteById(entity.getId());
         authPrincipalCacheService.evictByUser(entity.getId(), tenantId, entity.getUsername());
+        kickoutUserSessions(entity.getId());
         auditService.record("USER_DELETED", operator, tenantId, Map.of("userId", userId, "username", entity.getUsername()));
+    }
+
+    private void kickoutUserSessions(Long userId) {
+        if (userId != null) {
+            StpUtil.kickout(userId);
+            sessionIndexService.removeUser(userId);
+        }
     }
 
     private void syncUserRoles(String tenantId, Long userId, Set<String> roleCodes) {

@@ -5,7 +5,9 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.enterprise.auth.platform.user.model.UserAccount;
 import com.enterprise.auth.platform.user.repository.UserRepository;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
@@ -20,14 +22,22 @@ public class SaTokenPermissionProvider implements StpInterface {
 
     @Override
     public List<String> getPermissionList(Object loginId, String loginType) {
-        return currentTokenUser().or(() -> loadUser(loginId))
+        Optional<List<String>> sessionPermissions = currentTokenList("permissions");
+        if (sessionPermissions.isPresent()) {
+            return sessionPermissions.get();
+        }
+        return loadUser(loginId)
                 .map(user -> new ArrayList<>(user.permissions()))
                 .orElseGet(ArrayList::new);
     }
 
     @Override
     public List<String> getRoleList(Object loginId, String loginType) {
-        return currentTokenUser().or(() -> loadUser(loginId))
+        Optional<List<String>> sessionRoles = currentTokenList("roles");
+        if (sessionRoles.isPresent()) {
+            return sessionRoles.get();
+        }
+        return loadUser(loginId)
                 .map(user -> new ArrayList<>(user.roles()))
                 .orElseGet(ArrayList::new);
     }
@@ -43,14 +53,21 @@ public class SaTokenPermissionProvider implements StpInterface {
         }
     }
 
-    private java.util.Optional<UserAccount> currentTokenUser() {
+    private Optional<List<String>> currentTokenList(String key) {
         try {
-            if (!StpUtil.isLogin()) {
-                return java.util.Optional.empty();
+            String tokenValue = StpUtil.getTokenValue();
+            if (tokenValue == null || tokenValue.isBlank()) {
+                return Optional.empty();
             }
-            return java.util.Optional.ofNullable((UserAccount) StpUtil.getTokenSession().get("testUser"));
+            Object value = StpUtil.getTokenSessionByToken(tokenValue).get(key);
+            if (value instanceof Collection<?> collection) {
+                return Optional.of(collection.stream()
+                        .map(String::valueOf)
+                        .toList());
+            }
+            return Optional.empty();
         } catch (RuntimeException ignored) {
-            return java.util.Optional.empty();
+            return Optional.empty();
         }
     }
 }

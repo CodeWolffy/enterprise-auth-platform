@@ -17,9 +17,12 @@ public final class SaTokenMockMvcSupport {
         return request -> {
             String token = StpUtil.createLoginSession(user.id(), new SaLoginModel().setDevice("mockmvc"));
             SaSession tokenSession = StpUtil.getTokenSessionByToken(token);
-            tokenSession.set("testUser", user);
             tokenSession.set("username", user.username());
+            tokenSession.set("userId", user.id());
             tokenSession.set("tenantId", user.tenantId());
+            tokenSession.set("sessionVersion", user.sessionVersion());
+            tokenSession.set("roles", user.roles());
+            tokenSession.set("permissions", user.permissions());
             tokenSession.set("clientIp", "127.0.0.1");
             tokenSession.set("device", "mockmvc");
             long now = System.currentTimeMillis();

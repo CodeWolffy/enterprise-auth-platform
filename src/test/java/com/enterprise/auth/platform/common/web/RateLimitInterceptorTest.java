@@ -2,7 +2,7 @@ package com.enterprise.auth.platform.common.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.enterprise.auth.platform.config.RateLimitProperties;
+import com.enterprise.auth.platform.config.rate.RateLimitProperties;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
