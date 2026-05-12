@@ -2,8 +2,8 @@ package com.enterprise.auth.platform.security;
 
 import cn.dev33.satoken.stp.StpInterface;
 import cn.dev33.satoken.stp.StpUtil;
-import com.enterprise.auth.platform.user.model.UserAccount;
-import com.enterprise.auth.platform.user.repository.UserRepository;
+import com.enterprise.auth.platform.dto.model.UserAccount;
+import com.enterprise.auth.platform.dao.repository.UserRepository;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;

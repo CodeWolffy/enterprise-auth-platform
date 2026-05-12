@@ -8,7 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.enterprise.auth.platform.auth.service.CaptchaService;
+import com.enterprise.auth.platform.service.CaptchaService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
@@ -95,7 +95,7 @@ class AuthControllerSessionFlowTest {
                 64,
                 180
         ));
-        doAnswer(invocation -> null).when(captchaService).validate(anyString(), anyString());
+        doAnswer(invocation -> null).when(captchaService).secondaryVerify(anyString());
     }
 
     @AfterEach

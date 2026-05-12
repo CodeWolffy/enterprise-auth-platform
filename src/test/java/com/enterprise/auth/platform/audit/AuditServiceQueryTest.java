@@ -5,13 +5,13 @@ import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.clear;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.enterprise.auth.platform.audit.model.AuditQuery;
-import com.enterprise.auth.platform.audit.service.AuditService;
-import com.enterprise.auth.platform.common.model.DataScopeType;
-import com.enterprise.auth.platform.model.entity.SysUserEntity;
-import com.enterprise.auth.platform.model.mapper.SysUserMapper;
-import com.enterprise.auth.platform.tenant.TenantContext;
-import com.enterprise.auth.platform.user.model.UserAccount;
+import com.enterprise.auth.platform.dto.req.AuditQuery;
+import com.enterprise.auth.platform.service.AuditService;
+import com.enterprise.auth.platform.dto.model.DataScopeType;
+import com.enterprise.auth.platform.dao.entity.SysUserEntity;
+import com.enterprise.auth.platform.dao.mapper.SysUserMapper;
+import com.enterprise.auth.platform.common.TenantContext;
+import com.enterprise.auth.platform.dto.model.UserAccount;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;

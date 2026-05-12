@@ -6,12 +6,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.enterprise.auth.platform.common.model.DataScopeType;
-import com.enterprise.auth.platform.model.entity.SysDeptEntity;
-import com.enterprise.auth.platform.model.entity.SysUserEntity;
-import com.enterprise.auth.platform.model.mapper.SysDeptMapper;
-import com.enterprise.auth.platform.model.mapper.SysUserMapper;
-import com.enterprise.auth.platform.user.model.UserAccount;
+import com.enterprise.auth.platform.dto.model.DataScopeType;
+import com.enterprise.auth.platform.dao.entity.SysDeptEntity;
+import com.enterprise.auth.platform.dao.entity.SysUserEntity;
+import com.enterprise.auth.platform.dao.mapper.SysDeptMapper;
+import com.enterprise.auth.platform.dao.mapper.SysUserMapper;
+import com.enterprise.auth.platform.dto.model.UserAccount;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

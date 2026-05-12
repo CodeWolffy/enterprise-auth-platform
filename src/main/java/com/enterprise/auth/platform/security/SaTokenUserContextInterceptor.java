@@ -1,8 +1,8 @@
 package com.enterprise.auth.platform.security;
 
 import cn.dev33.satoken.stp.StpUtil;
-import com.enterprise.auth.platform.auth.service.SessionIndexService;
-import com.enterprise.auth.platform.tenant.TenantContext;
+import com.enterprise.auth.platform.service.SessionIndexService;
+import com.enterprise.auth.platform.common.TenantContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Instant;

@@ -1,12 +1,12 @@
 package com.enterprise.auth.platform;
 
-import com.enterprise.auth.platform.config.cache.AppCacheProperties;
-import com.enterprise.auth.platform.config.feature.FeatureToggleProperties;
-import com.enterprise.auth.platform.config.web.FrontendProperties;
-import com.enterprise.auth.platform.config.feature.RegistrationProperties;
-import com.enterprise.auth.platform.config.security.SecurityRedisProperties;
-import com.enterprise.auth.platform.config.security.SecurityProperties;
-import com.enterprise.auth.platform.tenant.TenantProperties;
+import com.enterprise.auth.platform.config.AppCacheProperties;
+import com.enterprise.auth.platform.config.FeatureToggleProperties;
+import com.enterprise.auth.platform.config.FrontendProperties;
+import com.enterprise.auth.platform.config.RegistrationProperties;
+import com.enterprise.auth.platform.config.SecurityRedisProperties;
+import com.enterprise.auth.platform.config.SecurityProperties;
+import com.enterprise.auth.platform.config.TenantProperties;
 import java.util.TimeZone;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

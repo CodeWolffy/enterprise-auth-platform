@@ -3,9 +3,9 @@ package com.enterprise.auth.platform.user;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.enterprise.auth.platform.common.exception.BusinessException;
-import com.enterprise.auth.platform.user.dto.CreateUserRequest;
-import com.enterprise.auth.platform.user.service.management.UserManagementService;
+import com.enterprise.auth.platform.common.convention.exception.BusinessException;
+import com.enterprise.auth.platform.dto.req.CreateUserRequest;
+import com.enterprise.auth.platform.service.UserManagementService;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;

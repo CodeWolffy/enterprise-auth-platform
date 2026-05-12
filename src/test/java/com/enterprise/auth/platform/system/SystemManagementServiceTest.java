@@ -2,9 +2,9 @@ package com.enterprise.auth.platform.system;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.enterprise.auth.platform.system.dto.DictCrudRequest;
-import com.enterprise.auth.platform.system.service.SystemManagementService;
-import com.enterprise.auth.platform.tenant.TenantContext;
+import com.enterprise.auth.platform.dto.req.DictCrudRequest;
+import com.enterprise.auth.platform.service.SystemManagementService;
+import com.enterprise.auth.platform.common.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
