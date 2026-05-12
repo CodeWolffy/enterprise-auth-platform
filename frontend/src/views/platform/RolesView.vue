@@ -294,7 +294,7 @@ import {
   queryResourceTree,
   queryRoles,
   updateRole,
-} from '@/api/platform'
+} from '@/api/modules'
 import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { DepartmentView, ResourceTreeNode, RoleView, ResourceType } from '@/types/auth'
 

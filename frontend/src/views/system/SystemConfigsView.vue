@@ -194,7 +194,7 @@ import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AdvancedSearch from '@/components/common/AdvancedSearch.vue'
 import type { FormInstance, FormRules } from 'element-plus'
-import { createConfig, deleteConfig, queryCategories, queryConfigs, updateConfig } from '@/api/system'
+import { createConfig, deleteConfig, queryCategories, queryConfigs, updateConfig } from '@/api/modules'
 import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { CategoryOption, ConfigView } from '@/types/auth'
 

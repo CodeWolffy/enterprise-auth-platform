@@ -353,7 +353,7 @@ import {
   queryAuditExportTasks,
   retryAuditExportTask,
   updateAuditExportPolicy,
-} from '@/api/platform'
+} from '@/api/modules'
 import type { AuditExportPolicy, AuditExportTask, AuditPage } from '@/types/auth'
 
 const query = reactive({

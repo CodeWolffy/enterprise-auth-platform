@@ -27,4 +27,3 @@ test-results
 blob-report
 
 e2e/**/*.png
-e2e/visual-baseline.spec.ts-snapshots/

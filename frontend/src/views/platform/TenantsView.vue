@@ -319,8 +319,8 @@ import {
   queryTenants,
   updateTenant,
   updateTenantCapabilityOverrides,
-} from '@/api/platform'
-import { queryTenantCapabilities, queryTenantPackages } from '@/api/tenantCatalog'
+} from '@/api/modules'
+import { queryTenantCapabilities, queryTenantPackages } from '@/api/modules'
 import { useTablePreferences } from '@/composables/useTablePreferences'
 import type {
   TenantCapabilityOverrideItemView,

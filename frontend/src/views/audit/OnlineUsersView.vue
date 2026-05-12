@@ -111,7 +111,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { forceOffline, querySessions } from '@/api/auth'
+import { forceOffline, querySessions } from '@/api/modules'
 import type { SessionPageResult, UserSessionView } from '@/types/auth'
 import { formatDateTime } from '@/utils/datetime'
 
@@ -129,9 +129,10 @@ const statusOptions = [
 const queryParams = reactive({ page: 1, size: 10 })
 
 const totalSessions = computed(() => pageData.value.total)
+const records = computed(() => pageData.value.records ?? [])
 const pageRecords = computed(() => {
   const search = keyword.value.toLowerCase()
-  return pageData.value.records.filter((item) => {
+  return records.value.filter((item) => {
     if (statusFilter.value === 'active' && !item.active) return false
     if (statusFilter.value === 'inactive' && item.active) return false
     if (!search) return true
@@ -144,18 +145,35 @@ const pageRecords = computed(() => {
     ].some((value) => String(value ?? '').toLowerCase().includes(search))
   })
 })
-const activeCount = computed(() => pageData.value.records.filter((item) => item.active).length)
-const tenantCount = computed(() => new Set(pageData.value.records.map((item) => item.tenantId).filter(Boolean)).size)
-const deviceCount = computed(() => new Set(pageData.value.records.map((item) => formatDevice(item.device))).size)
+const activeCount = computed(() => records.value.filter((item) => item.active).length)
+const tenantCount = computed(() => new Set(records.value.map((item) => item.tenantId).filter(Boolean)).size)
+const deviceCount = computed(() => new Set(records.value.map((item) => formatDevice(item.device))).size)
 
 void load()
+
+function normalizeSessionPage(result: SessionPageResult | UserSessionView[]): SessionPageResult {
+  if (Array.isArray(result)) {
+    return {
+      total: result.length,
+      page: queryParams.page,
+      size: queryParams.size,
+      records: result,
+    }
+  }
+  return {
+    total: result.total ?? result.records?.length ?? 0,
+    page: result.page ?? queryParams.page,
+    size: result.size ?? queryParams.size,
+    records: result.records ?? [],
+  }
+}
 
 async function load() {
   loading.value = true
   loadError.value = ''
   try {
-    const result = await querySessions('all', { page: queryParams.page, size: queryParams.size }) as SessionPageResult
-    pageData.value = result
+    const result = await querySessions('all', { page: queryParams.page, size: queryParams.size }) as SessionPageResult | UserSessionView[]
+    pageData.value = normalizeSessionPage(result)
   } catch {
     pageData.value = { total: 0, page: 1, size: queryParams.size, records: [] }
     loadError.value = '在线用户数据加载失败，请稍后重试。'

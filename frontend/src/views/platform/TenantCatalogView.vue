@@ -446,7 +446,7 @@ import {
   queryTenantPackages,
   updateTenantCapability,
   updateTenantPackage,
-} from '@/api/tenantCatalog'
+} from '@/api/modules'
 import type { TenantCapabilityView, TenantPackageView } from '@/types/auth'
 
 const activeTab = ref<'packages' | 'capabilities'>('packages')

@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { ElMessage } from 'element-plus'
-import { fetchPermissionSnapshot, loginWithPassword, logoutCurrentSession } from '@/api/auth'
+import { fetchPermissionSnapshot, loginWithPassword, logoutCurrentSession } from '@/api/modules'
 import type { MenuItem, PermissionSnapshot } from '@/types/auth'
 import { clearDynamicRoutes, registerDynamicRoutes } from '@/router'
 

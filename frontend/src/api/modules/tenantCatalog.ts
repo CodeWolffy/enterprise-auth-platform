@@ -1,4 +1,4 @@
-import { http } from './http'
+import { http } from '../http'
 import type { ApiResponse, TenantCapabilityView, TenantPackageView } from '@/types/auth'
 
 export interface TenantPackagePayload {

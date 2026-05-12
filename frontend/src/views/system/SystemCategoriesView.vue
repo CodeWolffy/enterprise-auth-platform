@@ -187,7 +187,7 @@
 import { computed, nextTick, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import { createCategoryOption, deleteCategoryOption, queryCategoryAnalysis, queryCategoryOptions, updateCategoryOption } from '@/api/system'
+import { createCategoryOption, deleteCategoryOption, queryCategoryAnalysis, queryCategoryOptions, updateCategoryOption } from '@/api/modules'
 import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { CategoryAnalysis, CategoryOption } from '@/types/auth'
 import { formatDateTime } from '@/utils/datetime'

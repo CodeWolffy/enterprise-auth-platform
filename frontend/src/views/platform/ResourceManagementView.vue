@@ -257,7 +257,7 @@ import {
   queryResourceTree,
   sortResource,
   updateResource,
-} from '@/api/platform'
+} from '@/api/modules'
 import type { ResourceTreeNode, ResourceType } from '@/types/auth'
 
 type ParentOption = {

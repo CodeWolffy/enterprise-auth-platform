@@ -4,6 +4,7 @@ spring:
       on-profile: prod
 
   datasource:
+    url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     hikari:
@@ -14,6 +15,13 @@ spring:
       validation-timeout: ${DB_POOL_VALIDATION_TIMEOUT:5000}
       idle-timeout: ${DB_POOL_IDLE_TIMEOUT:600000}
       max-lifetime: ${DB_POOL_MAX_LIFETIME:1800000}
+
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
 
 app:
   frontend:

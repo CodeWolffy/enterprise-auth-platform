@@ -17,6 +17,28 @@ jobs:
   backend:
     name: backend-quality-and-tests
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: enterprise_auth_platform
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,7 +50,17 @@ jobs:
           java-version: '17'
           cache: maven
 
+      - name: Initialize backend test database
+        run: docker exec -i ${{ job.services.mysql.id }} mysql -uroot -proot enterprise_auth_platform < src/main/resources/database/enterprise_auth_platform.sql
+
       - name: Run backend quality gates and tests
+        env:
+          TEST_DB_URL: jdbc:mysql://127.0.0.1:3306/enterprise_auth_platform?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+          TEST_DB_USERNAME: root
+          TEST_DB_PASSWORD: root
+          TEST_REDIS_HOST: 127.0.0.1
+          TEST_REDIS_PORT: '6379'
+          TEST_REDIS_DATABASE: '8'
         run: mvn -B -ntp verify
 
       - name: Upload JaCoCo report

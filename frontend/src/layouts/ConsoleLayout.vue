@@ -237,8 +237,7 @@ import {
 } from '@element-plus/icons-vue'
 import AppNav from '@/components/common/AppNav.vue'
 import { useAuthStore } from '@/stores/auth'
-import { querySessions, forceOffline } from '@/api/auth'
-import { queryTenants } from '@/api/platform'
+import { forceOffline, querySessions, queryTenants } from '@/api/modules'
 import { formatDateTime } from '@/utils/datetime'
 
 const route = useRoute()

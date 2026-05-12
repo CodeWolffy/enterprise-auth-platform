@@ -1,4 +1,4 @@
-import { http } from './http'
+import { http } from '../http'
 import type { ApiResponse, CategoryAnalysis, CategoryOption, ConfigView, DictView, FeatureFlags, NoticeView } from '@/types/auth'
 
 export interface PageResult<T> {

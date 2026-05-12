@@ -6,6 +6,15 @@ on:
       - 'frontend/**'
       - '.github/workflows/frontend-visual-regression.yml'
   workflow_dispatch:
+    inputs:
+      update_snapshots:
+        description: 'Generate updated visual snapshots instead of comparing existing baselines'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 jobs:
   visual-baseline:
@@ -30,7 +39,26 @@ jobs:
       - name: Install Playwright (Chromium)
         run: npx playwright install --with-deps chromium
 
-      - name: Generate visual snapshots
+      - name: Check visual baseline availability
+        id: visual-baselines
+        shell: bash
+        run: |
+          if compgen -G "e2e/visual-baseline.spec.ts-snapshots/*-chromium-linux.png" > /dev/null; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run visual regression checks
+        if: (github.event_name != 'workflow_dispatch' || inputs.update_snapshots == 'false') && steps.visual-baselines.outputs.available == 'true'
+        run: npm run test:visual
+
+      - name: Generate initial visual snapshots
+        if: (github.event_name != 'workflow_dispatch' || inputs.update_snapshots == 'false') && steps.visual-baselines.outputs.available == 'false'
+        run: npm run test:visual:update
+
+      - name: Generate updated visual snapshots
+        if: github.event_name == 'workflow_dispatch' && inputs.update_snapshots == 'true'
         run: npm run test:visual:update
 
       - name: Upload playwright report

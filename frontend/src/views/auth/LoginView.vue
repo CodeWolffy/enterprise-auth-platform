@@ -109,7 +109,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import SliderCaptcha from '@/components/auth/SliderCaptcha.vue'
-import { fetchCaptcha, verifyCaptcha } from '@/api/auth'
+import { fetchCaptcha, verifyCaptcha } from '@/api/modules'
 import { useAuthStore } from '@/stores/auth'
 import type { CaptchaTrackPayload } from '@/types/auth'
 

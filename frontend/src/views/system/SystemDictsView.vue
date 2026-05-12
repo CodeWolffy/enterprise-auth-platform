@@ -196,7 +196,7 @@ import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AdvancedSearch from '@/components/common/AdvancedSearch.vue'
 import type { FormInstance, FormRules } from 'element-plus'
-import { createDict, deleteDict, queryCategories, queryDicts, updateDict } from '@/api/system'
+import { createDict, deleteDict, queryCategories, queryDicts, updateDict } from '@/api/modules'
 import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { CategoryOption, DictView } from '@/types/auth'
 

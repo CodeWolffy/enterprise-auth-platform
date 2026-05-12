@@ -111,7 +111,7 @@
 ### ⚠️ 潜在风险点
 
 #### 【高风险】P1 - 配置文件明文密码泄露
-[application.yml](file:///e:/Myproject/enterprise-auth-platform/src/main/resources/application.yml) 中数据库密码 `123456` 和 Redis 密码 `zhu123456@` 明文存储，且 Redis 地址为公网 IP `139.196.7.151`。
+[application.yml](file:///e:/Myproject/enterprise-auth-platform/src/main/resources/application.yml) 曾包含明文数据库密码、Redis 密码和外部 Redis 地址。当前配置已改为通过环境变量覆盖，归档记录不再保留原始敏感值。
 
 **风险**：源码泄露即导致基础设施被直接入侵。公网暴露的 Redis 即使有密码也面临暴力破解风险。
 

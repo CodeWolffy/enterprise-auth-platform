@@ -111,7 +111,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { queryConfigs, queryDicts, queryFeatures, queryNotices } from '@/api/system'
+import { queryConfigs, queryDicts, queryFeatures, queryNotices } from '@/api/modules'
 import type { FeatureFlags } from '@/types/auth'
 
 const router = useRouter()

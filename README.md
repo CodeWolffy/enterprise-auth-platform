@@ -33,8 +33,9 @@
 
 ### 后端
 
-- Spring Boot 3.2.5
-- Spring Security
+- Spring Boot 3.5.11
+- Sa-Token
+- Spring Security Crypto
 - MyBatis-Plus
 - MySQL 8.0 + HikariCP
 - Redis / Redisson
@@ -243,10 +244,23 @@ npm run dev
 
 ## 本地依赖与配置
 
-- MySQL：`127.0.0.1:3306`
-- Redis：`127.0.0.1:6379`
+- MySQL：默认 `127.0.0.1:3306`，账号 `root`，密码 `123456`
+- Redis：默认 `139.196.7.151:6379`，database `8`
 - 默认数据库与安全配置：`src/main/resources/application.yml`
 - 生产配置补充：`src/main/resources/application-prod.yml`
+
+本地或部署环境可通过环境变量覆盖敏感连接信息：
+
+- `DB_URL`
+- `DB_USERNAME`
+- `DB_PASSWORD`
+- `REDIS_HOST`
+- `REDIS_PORT`
+- `REDIS_PASSWORD`
+- `REDIS_DATABASE`
+- `APP_FRONTEND_ALLOWED_ORIGIN`
+- `APP_SECURITY_SESSION_IDLE_SECONDS`
+- `APP_SECURITY_MAX_LOGIN_COUNT`
 
 数据库脚本：
 
@@ -261,6 +275,19 @@ mvn "-Dmaven.repo.local=.m2repo" compile
 mvn "-Dmaven.repo.local=.m2repo" test
 mvn "-Dmaven.repo.local=.m2repo" verify
 ```
+
+后端测试依赖已初始化的 MySQL 与可连接 Redis。`src/test/resources/application.yml` 已内置本地默认值；如需切换到其他环境，可用 `TEST_*` 环境变量覆盖：
+
+```powershell
+$env:TEST_DB_URL='jdbc:mysql://127.0.0.1:3306/enterprise_auth_platform?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true'
+$env:TEST_DB_USERNAME='root'
+$env:TEST_DB_PASSWORD='123456'
+$env:TEST_REDIS_HOST='139.196.7.151'
+$env:TEST_REDIS_PORT='6379'
+mvn "-Dmaven.repo.local=.m2repo" test
+```
+
+数据库结构和基础数据使用 `src/main/resources/database/enterprise_auth_platform.sql` 初始化。
 
 ### 前端
 
@@ -291,74 +318,28 @@ npm run test:visual:update
 
 ## 视觉快照策略
 
-- 不提交 `frontend/e2e/visual-baseline.spec.ts-snapshots/`
-- CI 中动态生成视觉快照
-- 快照与报告统一作为 Artifact 上传
+- 视觉快照由 CI 或本地 `npm run test:visual:update` 生成，统一作为 Artifact 或本地临时产物处理，不提交源码。
+- `playwright-report/`、`test-results/` 与 `frontend/e2e/**/*.png` 均不提交源码。
+- 如需人工确认 UI 变化，从 CI Artifact 下载快照对比，确认后再单独决定是否建立受控基线策略。
 
-## 最近进展（2026-03-23）
+## 最近进展（2026-05-12）
 
-### 已完成
-- 前端统一抽屉模板扩展至更多管理页。
-- `ConsentsView` 与 `TenantCatalogView` 补齐表格偏好能力（列显隐、列宽记忆、密度切换、恢复默认）。
-- 新增 E2E 回归覆盖上述关键流程。
-- 新增 CORS 回归测试：`CorsSecurityRegressionTest`（允许配置域名、拒绝 `null` Origin、不影响登录表单）。
-- 后端新增：
-  - 套餐/能力 impact-analysis 接口。
-  - OAuth2 client/scope linkage 联动引导接口。
-  - 审计导出自动治理接口与自动触发机制。
-- 后端回归测试补齐：`AuditControllerTest` 覆盖治理接口 `dryRun` 与执行模式。
-- 新增主 CI 工作流：后端 `mvn verify`、前端 `lint/build`、前端 E2E。
+- 项目结构整理：根目录 Node 残留依赖文件已移除，前端依赖收敛到 `frontend/`。
+- 配置安全整理：DB/Redis 连接信息改为环境变量覆盖，测试配置统一为 YAML。
+- 文档整理：过时 OAuth2/OIDC 与旧 Session-Cookie 文档已归档到 `docs/archive/`。
+- 前端 API 结构统一：业务 API 统一放入 `frontend/src/api/modules/`，业务代码统一从 `@/api/modules` 导入。
+- CI 视觉回归改为默认对比模式，基线更新只在人工确认时执行。
 
-### 待继续（2026-03-27 更新）
-一、安全性增强 🔴 高优先级
-| 序号 | 功能 | 说明 |
-|-----|------|------|
-| 1 | 密码策略加强 | ✅ 已实现（最少8位，包含字母和数字） |
-| 2 | 登录增强 | ✅ 已实现（LoginAttemptService） |
-| 3 | 会话管理 | ✅ 部分实现（会话超时、强制下线） |
-| 4 | 敏感数据脱敏 | 日志/返回中敏感信息（手机号、身份证）掩码 |
-| 5 | API 限流 | 防止暴力请求 |
-| 6 | 安全日志 | 记录安全相关事件（非法访问、权限绕过尝试） |
+## 后续方向
 
-二、功能完善 🟡 中优先级
-| 序号 | 功能 | 说明 |
-|-----|------|------|
-| 1 | ~~第三方登录~~ | 🚫 暂不做（微信、钉钉、企业微信 OAuth 集成） |
-| 2 | ~~短信/邮箱验证码登录~~ | 🚫 暂不做 |
-| 3 | 用户注册 | ✅ 已实现（自助注册，默认分配到 tenant-a 租户） |
-| 4 | ~~权限委托~~ | 🚫 暂不做 |
-| 5 | 消息通知中心 | ✅ 已实现（公告管理） |
-| 6 | 数据导入导出 | 用户、部门等批量导入导出（审计导出已实现） |
-
-三、性能优化 🟡 中优先级
-| 序号 | 功能 | 说明 |
-|-----|------|------|
-| 1 | 多级缓存 | 本地缓存 + Redis 二级缓存 |
-| 2 | 数据库优化 | 关键查询索引优化、慢查询监控 |
-| 3 | 分布式部署 | 支持多实例部署、会话共享 |
-| 4 | 前端优化 | 懒加载、路由分包 |
-| 5 | 异步任务队列 | 重要任务异步化 |
-
-四、运维支持 🟢 低优先级
-| 序号 | 功能 | 说明 |
-|-----|------|------|
-| 1 | 监控接入 | Spring Boot Admin 完善 |
-| 2 | 配置中心 | Nacos 配置管理（项目已预留依赖） |
-| 3 | 网关 | Spring Cloud Gateway（项目已预留依赖） |
-| 4 | 分布式事务 | Seata（项目已预留依赖） |
----
-
-
-
-## 最近改造结果
-
-- 已切换主登录链路到 Sa-Token Header Token
-- 已移除前后端 OAuth Client / Scope / Consent 管理入口
-- 已移除后端 JWT / Authorization Server 主路径依赖
-- 已切换资源授权模型（`sys_resource` + `sys_role_resource` + `sys_tenant_resource_override`）
-- 已移除自定义部门旧表运行时依赖，角色数据范围改为 `data_scope_value_json`
+- 安全增强：敏感字段脱敏、异常登录风控、高价值操作二次确认或防重放。
+- 功能完善：用户/部门批量导入导出、通知中心增强、租户目录影响分析持续完善。
+- 性能优化：关键查询索引、慢查询治理、缓存命中率观测、前端路由分包。
+- 运维支持：监控接入、配置中心、网关和分布式任务能力按需启用。
 
 ## 说明
 
-- 本 README 以当前代码现状为准
-- 如果历史截图、旧设计稿或旧文档与这里不一致，以代码和本文件为准
+- 本 README 以当前代码现状为准。
+- 认证与会话策略以 `docs/security-auth.md` 为准。
+- 部署前检查以 `DEPLOYMENT_CHECKLIST.md` 为准。
+- 过时 OAuth2/OIDC 与旧 Session-Cookie 资料已归档到 `docs/archive/`，仅作为历史背景参考。

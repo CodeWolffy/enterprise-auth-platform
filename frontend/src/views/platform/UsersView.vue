@@ -276,7 +276,7 @@ import {
   queryRoles,
   queryUsers,
   updateUser,
-} from '@/api/platform'
+} from '@/api/modules'
 import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { RoleView, UserSummary } from '@/types/auth'
 import { useAuthStore } from '@/stores/auth'

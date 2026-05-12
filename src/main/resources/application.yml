@@ -6,9 +6,9 @@ spring:
     name: enterprise-auth-platform
 
   datasource:
-    url: jdbc:mysql://127.0.0.1:3306/enterprise_auth_platform?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
-    username: root
-    password: 123456
+    url: ${DB_URL:jdbc:mysql://127.0.0.1:3306/enterprise_auth_platform?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:123456}
     driver-class-name: com.mysql.cj.jdbc.Driver
     type: com.zaxxer.hikari.HikariDataSource
     hikari:
@@ -22,10 +22,10 @@ spring:
 
   data:
     redis:
-      host: 139.196.7.151
-      port: 6379
-      password: zhu123456@
-      database: 8
+      host: ${REDIS_HOST:139.196.7.151}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:zhu123456@}
+      database: ${REDIS_DATABASE:8}
       lettuce:
         pool:
           max-active: 8

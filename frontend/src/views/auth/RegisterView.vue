@@ -139,7 +139,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { fetchRegisterOptions } from '@/api/auth'
+import { fetchRegisterOptions } from '@/api/modules'
 import { http } from '@/api/http'
 
 type SceneStatus = 'idle' | 'error' | 'success'
