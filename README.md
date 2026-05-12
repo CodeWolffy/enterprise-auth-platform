@@ -219,15 +219,17 @@
 
 ### 后端
 
+首次本地启动前，先按“本地依赖与配置”复制并填写 `src/main/resources/application-local.yml`。
+
 ```bash
-mvn spring-boot:run
+mvn spring-boot:run "-Dspring-boot.run.profiles=local"
 ```
 
 或：
 
 ```bash
 mvn clean package
-java -jar target/enterprise-auth-platform-0.0.1-SNAPSHOT.jar
+java -jar target/enterprise-auth-platform-0.0.1-SNAPSHOT.jar --spring.profiles.active=local
 ```
 
 默认端口：`8080`
@@ -244,12 +246,18 @@ npm run dev
 
 ## 本地依赖与配置
 
-- MySQL：默认 `127.0.0.1:3306`，账号 `root`，密码 `123456`
-- Redis：默认 `139.196.7.151:6379`，database `8`
-- 默认数据库与安全配置：`src/main/resources/application.yml`
-- 生产配置补充：`src/main/resources/application-prod.yml`
+- 默认运行配置：`src/main/resources/application.yml`，不包含 DB/Redis 明文默认值，必须通过环境变量注入。
+- 生产配置补充：`src/main/resources/application-prod.yml`。
+- 本地开发样例：`src/main/resources/application-local.example.yml`。如需本地 profile，复制为 `src/main/resources/application-local.yml` 后按本机环境填写；该文件已加入 `.gitignore`，不要提交。
 
-本地或部署环境可通过环境变量覆盖敏感连接信息：
+本地启动示例：
+
+```powershell
+Copy-Item src/main/resources/application-local.example.yml src/main/resources/application-local.yml
+mvn spring-boot:run "-Dspring-boot.run.profiles=local"
+```
+
+也可以直接通过环境变量提供连接信息：
 
 - `DB_URL`
 - `DB_USERNAME`
@@ -258,7 +266,7 @@ npm run dev
 - `REDIS_PORT`
 - `REDIS_PASSWORD`
 - `REDIS_DATABASE`
-- `APP_FRONTEND_ALLOWED_ORIGIN`
+- `APP_CORS_ALLOWED_ORIGIN`
 - `APP_SECURITY_SESSION_IDLE_SECONDS`
 - `APP_SECURITY_MAX_LOGIN_COUNT`
 
@@ -276,14 +284,15 @@ mvn "-Dmaven.repo.local=.m2repo" test
 mvn "-Dmaven.repo.local=.m2repo" verify
 ```
 
-后端测试依赖已初始化的 MySQL 与可连接 Redis。`src/test/resources/application.yml` 已内置本地默认值；如需切换到其他环境，可用 `TEST_*` 环境变量覆盖：
+后端测试依赖已初始化的 MySQL 与可连接 Redis。`src/test/resources/application.yml` 默认使用本机 MySQL/Redis 且不内置密码；如需切换到其他环境，可用 `TEST_*` 环境变量覆盖：
 
 ```powershell
 $env:TEST_DB_URL='jdbc:mysql://127.0.0.1:3306/enterprise_auth_platform?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true'
 $env:TEST_DB_USERNAME='root'
-$env:TEST_DB_PASSWORD='123456'
-$env:TEST_REDIS_HOST='139.196.7.151'
+$env:TEST_DB_PASSWORD='<your-local-password>'
+$env:TEST_REDIS_HOST='127.0.0.1'
 $env:TEST_REDIS_PORT='6379'
+$env:TEST_REDIS_PASSWORD=''
 mvn "-Dmaven.repo.local=.m2repo" test
 ```
 

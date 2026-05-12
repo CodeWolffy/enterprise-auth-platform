@@ -24,9 +24,9 @@ spring:
       database: ${REDIS_DATABASE:0}
 
 app:
-  frontend:
+  cors:
     allowed-origins:
-      - ${APP_FRONTEND_ALLOWED_ORIGIN}
+      - ${APP_CORS_ALLOWED_ORIGIN}
 
   security:
     session-ttl: ${APP_SECURITY_SESSION_TTL:7d}

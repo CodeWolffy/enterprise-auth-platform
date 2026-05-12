@@ -33,7 +33,10 @@ class CaptchaServiceRedisTest {
         vo.setTemplateImageWidth(64);
         vo.setTemplateImageHeight(180);
         vo.setType("SLIDER");
-        when(app.generateCaptcha(CaptchaTypeConstant.SLIDER)).thenReturn(mock(cloud.tianai.captcha.common.response.ApiResponse.class));
+        ApiResponse<ImageCaptchaVO> response = mock(ApiResponse.class);
+        when(response.isSuccess()).thenReturn(true);
+        when(response.getData()).thenReturn(vo);
+        when(app.generateCaptcha(CaptchaTypeConstant.SLIDER)).thenReturn(response);
 
         CaptchaService.CaptchaChallenge challenge = captchaService.create();
 

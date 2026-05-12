@@ -2,7 +2,6 @@ package com.enterprise.auth.platform.controller;
 
 import com.enterprise.auth.platform.common.convention.result.ApiResponse;
 import com.enterprise.auth.platform.dto.model.PageResult;
-import com.enterprise.auth.platform.config.FeatureToggleProperties;
 import com.enterprise.auth.platform.dto.req.ConfigCrudRequest;
 import com.enterprise.auth.platform.dto.req.CategoryConfigRequest;
 import com.enterprise.auth.platform.dto.req.DictCrudRequest;
@@ -31,28 +30,23 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/system")
 public class SystemController {
 
-    private final FeatureToggleProperties featureToggleProperties;
     private final SystemManagementService systemManagementService;
 
-    public SystemController(
-            FeatureToggleProperties featureToggleProperties,
-            SystemManagementService systemManagementService
-    ) {
-        this.featureToggleProperties = featureToggleProperties;
+    public SystemController(SystemManagementService systemManagementService) {
         this.systemManagementService = systemManagementService;
     }
 
-    @Operation(summary = "查询预留组件开关")
+    @Operation(summary = "查询预留组件状态")
     @GetMapping("/features")
     @SaCheckPermission("system:read")
     public ApiResponse<Map<String, Boolean>> features() {
         Map<String, Boolean> features = new LinkedHashMap<>();
-        features.put("gatewayEnabled", featureToggleProperties.gatewayEnabled());
-        features.put("nacosEnabled", featureToggleProperties.nacosEnabled());
-        features.put("mqEnabled", featureToggleProperties.mqEnabled());
-        features.put("seataEnabled", featureToggleProperties.seataEnabled());
-        features.put("jobEnabled", featureToggleProperties.jobEnabled());
-        features.put("lokiEnabled", featureToggleProperties.lokiEnabled());
+        features.put("gatewayEnabled", false);
+        features.put("nacosEnabled", false);
+        features.put("mqEnabled", false);
+        features.put("seataEnabled", false);
+        features.put("jobEnabled", false);
+        features.put("lokiEnabled", false);
         return ApiResponse.ok(features);
     }
 

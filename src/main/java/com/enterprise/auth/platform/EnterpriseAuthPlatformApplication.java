@@ -1,12 +1,5 @@
 package com.enterprise.auth.platform;
 
-import com.enterprise.auth.platform.config.AppCacheProperties;
-import com.enterprise.auth.platform.config.FeatureToggleProperties;
-import com.enterprise.auth.platform.config.FrontendProperties;
-import com.enterprise.auth.platform.config.RegistrationProperties;
-import com.enterprise.auth.platform.config.SecurityRedisProperties;
-import com.enterprise.auth.platform.config.SecurityProperties;
-import com.enterprise.auth.platform.config.TenantProperties;
 import java.util.TimeZone;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -15,15 +8,7 @@ import org.springframework.cache.annotation.EnableCaching;
 
 @EnableCaching
 @SpringBootApplication
-@ConfigurationPropertiesScan(basePackageClasses = {
-        SecurityProperties.class,
-        AppCacheProperties.class,
-        SecurityRedisProperties.class,
-        FeatureToggleProperties.class,
-        FrontendProperties.class,
-        RegistrationProperties.class,
-        TenantProperties.class
-})
+@ConfigurationPropertiesScan
 public class EnterpriseAuthPlatformApplication {
 
     public static void main(String[] args) {

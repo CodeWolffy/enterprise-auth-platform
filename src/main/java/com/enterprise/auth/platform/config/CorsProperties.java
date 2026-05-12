@@ -3,8 +3,8 @@ package com.enterprise.auth.platform.config;
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-@ConfigurationProperties(prefix = "app.frontend")
-public record FrontendProperties(
+@ConfigurationProperties(prefix = "app.cors")
+public record CorsProperties(
         List<String> allowedOrigins
 ) {
 

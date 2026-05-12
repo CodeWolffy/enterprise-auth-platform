@@ -1,13 +1,8 @@
 package com.enterprise.auth.platform.config;
 
-import cn.dev33.satoken.context.SaHolder;
-import cn.dev33.satoken.interceptor.SaInterceptor;
-import cn.dev33.satoken.stp.StpUtil;
 import com.enterprise.auth.platform.common.convention.web.RateLimitInterceptor;
-import com.enterprise.auth.platform.config.RateLimitProperties;
 import com.enterprise.auth.platform.security.SaTokenUserContextInterceptor;
 import java.util.List;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
@@ -15,7 +10,6 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
-@EnableConfigurationProperties(RateLimitProperties.class)
 public class WebMvcConfig implements WebMvcConfigurer {
 
     private static final List<String> PUBLIC_PATHS = List.of(
@@ -36,23 +30,23 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     private final ObjectProvider<RateLimitInterceptor> rateLimitInterceptor;
     private final SaTokenUserContextInterceptor userContextInterceptor;
-    private final FrontendProperties frontendProperties;
+    private final CorsProperties corsProperties;
 
     public WebMvcConfig(
             ObjectProvider<RateLimitInterceptor> rateLimitInterceptor,
             SaTokenUserContextInterceptor userContextInterceptor,
-            FrontendProperties frontendProperties
+            CorsProperties corsProperties
     ) {
         this.rateLimitInterceptor = rateLimitInterceptor;
         this.userContextInterceptor = userContextInterceptor;
-        this.frontendProperties = frontendProperties;
+        this.corsProperties = corsProperties;
     }
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(new SaInterceptor(handle -> {
-                    if (!"OPTIONS".equalsIgnoreCase(SaHolder.getRequest().getMethod())) {
-                        StpUtil.checkLogin();
+        registry.addInterceptor(new cn.dev33.satoken.interceptor.SaInterceptor(handle -> {
+                    if (!"OPTIONS".equalsIgnoreCase(cn.dev33.satoken.context.SaHolder.getRequest().getMethod())) {
+                        cn.dev33.satoken.stp.StpUtil.checkLogin();
                     }
                 }))
                 .addPathPatterns("/api/**")
@@ -66,7 +60,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        List<String> allowedOrigins = frontendProperties.resolvedAllowedOrigins();
+        List<String> allowedOrigins = corsProperties.resolvedAllowedOrigins();
         if (allowedOrigins.isEmpty()) {
             return;
         }
@@ -74,6 +68,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .allowedOriginPatterns(allowedOrigins.toArray(String[]::new))
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
                 .allowedHeaders("*")
+                .exposedHeaders("Authorization", "X-Request-Id")
                 .allowCredentials(true)
                 .maxAge(3600);
     }

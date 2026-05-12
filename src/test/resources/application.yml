@@ -2,20 +2,20 @@ spring:
   datasource:
     url: ${TEST_DB_URL:jdbc:mysql://127.0.0.1:3306/enterprise_auth_platform?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true}
     username: ${TEST_DB_USERNAME:root}
-    password: ${TEST_DB_PASSWORD:123456}
+    password: ${TEST_DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
     type: com.zaxxer.hikari.HikariDataSource
   data:
     redis:
-      host: ${TEST_REDIS_HOST:139.196.7.151}
+      host: ${TEST_REDIS_HOST:127.0.0.1}
       port: ${TEST_REDIS_PORT:6379}
-      password: ${TEST_REDIS_PASSWORD:zhu123456@}
+      password: ${TEST_REDIS_PASSWORD:}
       database: ${TEST_REDIS_DATABASE:8}
   cache:
     type: simple
 
 app:
-  frontend:
+  cors:
     allowed-origins:
       - http://127.0.0.1:5173
       - http://localhost:5173
@@ -46,7 +46,13 @@ app:
     enabled: false
 
 sa-token:
+  token-name: Authorization
+  token-prefix: Bearer
+  timeout: 604800
   active-timeout: 7200
   auto-renew: true
   dynamic-active-timeout: true
+  is-read-cookie: false
+  is-read-header: true
+  is-read-body: false
   max-login-count: 10

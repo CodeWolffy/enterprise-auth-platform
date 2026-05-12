@@ -1,6 +1,6 @@
 package com.enterprise.auth.platform.common;
 
-import com.enterprise.auth.platform.config.SecurityRedisProperties;
+import com.enterprise.auth.platform.config.SecurityProperties;
 import java.time.Duration;
 import java.util.Locale;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -10,14 +10,14 @@ import org.springframework.util.StringUtils;
 @Component
 public class RateLimitSupport {
 
-    private final SecurityRedisProperties redisProperties;
+    private final SecurityProperties securityProperties;
 
-    public RateLimitSupport(SecurityRedisProperties redisProperties) {
-        this.redisProperties = redisProperties;
+    public RateLimitSupport(SecurityProperties securityProperties) {
+        this.securityProperties = securityProperties;
     }
 
     public String buildKey(String namespace, String... parts) {
-        StringBuilder sb = new StringBuilder(redisProperties.resolvedNamespacePrefix());
+        StringBuilder sb = new StringBuilder(securityProperties.resolvedRedis().resolvedNamespacePrefix());
         sb.append(namespace);
         for (String part : parts) {
             sb.append(':').append(normalizeKeyPart(part));

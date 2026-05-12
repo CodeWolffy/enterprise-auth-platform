@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.cache.CacheManager;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import com.enterprise.auth.platform.security.PasswordHasher;
@@ -29,7 +30,10 @@ import org.springframework.test.web.servlet.MockMvc;
 class DeptControllerTest {
 
     private static final String SCOPE_USER = "dept_controller_scope_ut";
+    private static final String SCOPE_ROLE = "DEPT_CONTROLLER_SCOPE_ROLE_UT";
+    private static final String PARENT_DEPT_CODE = "DEPT_CONTROLLER_PARENT_UT";
     private static final String CHILD_DEPT_CODE = "DEPT_CONTROLLER_CHILD_UT";
+    private static final String HIDDEN_DEPT_CODE = "DEPT_CONTROLLER_HIDDEN_UT";
 
     @Autowired
     private MockMvc mockMvc;
@@ -46,19 +50,32 @@ class DeptControllerTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private CacheManager cacheManager;
+
+    private Long parentDeptId;
     private Long childDeptId;
+    private Long hiddenDeptId;
     private Long scopeUserId;
 
     @BeforeEach
     void setUp() {
-        childDeptId = ensureDept();
+        clearCaches();
+        parentDeptId = ensureDept(PARENT_DEPT_CODE, "部门控制器测试父部门", null);
+        childDeptId = ensureDept(CHILD_DEPT_CODE, "部门控制器测试子部门", parentDeptId);
+        hiddenDeptId = ensureDept(HIDDEN_DEPT_CODE, "部门控制器测试隐藏部门", null);
         scopeUserId = ensureUser();
+        ensureDeptScopeRole(scopeUserId);
+        clearCaches();
     }
 
     @AfterEach
     void tearDown() {
+        jdbcTemplate.update("DELETE FROM sys_user_role WHERE tenant_id = ? AND user_id = ?", "tenant-a", scopeUserId);
+        jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id = ? AND role_code = ?", "tenant-a", SCOPE_ROLE);
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username = ?", "tenant-a", SCOPE_USER);
-        jdbcTemplate.update("DELETE FROM sys_dept WHERE tenant_id = ? AND dept_code = ?", "tenant-a", CHILD_DEPT_CODE);
+        jdbcTemplate.update("DELETE FROM sys_dept WHERE tenant_id = ? AND dept_code IN (?, ?, ?)", "tenant-a", PARENT_DEPT_CODE, CHILD_DEPT_CODE, HIDDEN_DEPT_CODE);
+        clearCaches();
     }
 
     @Test
@@ -80,9 +97,9 @@ class DeptControllerTest {
                         .with(bearer(principal))
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[?(@.id==2)]").exists())
+                .andExpect(jsonPath("$.data[?(@.id==" + parentDeptId + ")]").exists())
                 .andExpect(jsonPath("$.data[?(@.id==" + childDeptId + ")]").exists())
-                .andExpect(jsonPath("$.data[?(@.id==3)]").doesNotExist());
+                .andExpect(jsonPath("$.data[?(@.id==" + hiddenDeptId + ")]").doesNotExist());
     }
 
     @Test
@@ -106,24 +123,24 @@ class DeptControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "parentId": 3,
+                                  "parentId": %d,
                                   "deptCode": "DEPT_HIDDEN_PARENT_UT",
                                   "deptName": "越权部门",
                                   "leaderUserId": null
                                 }
-                                """))
+                                """.formatted(hiddenDeptId)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"))
                 .andExpect(jsonPath("$.message").value("无权使用该父级部门"));
     }
 
-    private Long ensureDept() {
-        jdbcTemplate.update("DELETE FROM sys_dept WHERE tenant_id = ? AND dept_code = ?", "tenant-a", CHILD_DEPT_CODE);
+    private Long ensureDept(String deptCode, String deptName, Long parentId) {
+        jdbcTemplate.update("DELETE FROM sys_dept WHERE tenant_id = ? AND dept_code = ?", "tenant-a", deptCode);
         SysDeptEntity entity = new SysDeptEntity();
         entity.setTenantId("tenant-a");
-        entity.setDeptCode(CHILD_DEPT_CODE);
-        entity.setDeptName("部门控制器测试子部门");
-        entity.setParentId(2L);
+        entity.setDeptCode(deptCode);
+        entity.setDeptName(deptName);
+        entity.setParentId(parentId);
         sysDeptMapper.insert(entity);
         return entity.getId();
     }
@@ -132,7 +149,7 @@ class DeptControllerTest {
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username = ?", "tenant-a", SCOPE_USER);
         SysUserEntity entity = new SysUserEntity();
         entity.setTenantId("tenant-a");
-        entity.setDeptId(2L);
+        entity.setDeptId(parentDeptId);
         entity.setUsername(SCOPE_USER);
         entity.setDisplayName("部门控制器测试用户");
         entity.setPasswordHash(passwordHasher.hash("DeptTest@123"));
@@ -140,5 +157,31 @@ class DeptControllerTest {
         entity.setSessionVersion(1);
         sysUserMapper.insert(entity);
         return entity.getId();
+    }
+
+    private void ensureDeptScopeRole(Long userId) {
+        jdbcTemplate.update("DELETE FROM sys_user_role WHERE tenant_id = ? AND user_id = ?", "tenant-a", userId);
+        jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id = ? AND role_code = ?", "tenant-a", SCOPE_ROLE);
+        jdbcTemplate.update(
+                "INSERT INTO sys_role(tenant_id, role_code, role_name, data_scope_type, deleted, created_at, updated_at) VALUES(?,?,?,?,0,NOW(),NOW())",
+                "tenant-a", SCOPE_ROLE, "部门控制器测试角色", "DEPT_AND_CHILDREN"
+        );
+        Long roleId = jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_role WHERE tenant_id = ? AND role_code = ?",
+                Long.class,
+                "tenant-a",
+                SCOPE_ROLE
+        );
+        jdbcTemplate.update(
+                "INSERT INTO sys_user_role(tenant_id, user_id, role_id, created_at, updated_at) VALUES(?,?,?,?,?)",
+                "tenant-a", userId, roleId, java.time.LocalDateTime.now(), java.time.LocalDateTime.now()
+        );
+    }
+
+    private void clearCaches() {
+        var cache = cacheManager.getCache("auth:principal");
+        if (cache != null) {
+            cache.clear();
+        }
     }
 }

@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.cache.CacheManager;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import com.enterprise.auth.platform.security.PasswordHasher;
@@ -31,7 +32,10 @@ class UserControllerTest {
     private static final String SCOPE_USER = "user_controller_scope_ut";
     private static final String VISIBLE_USER = "user_controller_visible_ut";
     private static final String HIDDEN_USER = "user_controller_hidden_ut";
+    private static final String SCOPE_ROLE = "USER_CONTROLLER_SCOPE_ROLE_UT";
+    private static final String PARENT_DEPT_CODE = "USER_CONTROLLER_PARENT_UT";
     private static final String CHILD_DEPT_CODE = "USER_CONTROLLER_CHILD_UT";
+    private static final String HIDDEN_DEPT_CODE = "USER_CONTROLLER_HIDDEN_UT";
 
     @Autowired
     private MockMvc mockMvc;
@@ -48,19 +52,31 @@ class UserControllerTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private CacheManager cacheManager;
+
+    private Long parentDeptId;
     private Long childDeptId;
+    private Long hiddenDeptId;
     private Long scopeUserId;
 
     @BeforeEach
     void setUp() {
-        childDeptId = ensureDept();
-        scopeUserId = ensureUser(SCOPE_USER, 2L);
+        clearCaches();
+        parentDeptId = ensureDept(PARENT_DEPT_CODE, "User Controller Parent Dept", null);
+        childDeptId = ensureDept(CHILD_DEPT_CODE, "User Controller Child Dept", parentDeptId);
+        hiddenDeptId = ensureDept(HIDDEN_DEPT_CODE, "User Controller Hidden Dept", null);
+        scopeUserId = ensureUser(SCOPE_USER, parentDeptId);
         ensureUser(VISIBLE_USER, childDeptId);
-        ensureUser(HIDDEN_USER, 3L);
+        ensureUser(HIDDEN_USER, hiddenDeptId);
+        ensureUserScopeRole(scopeUserId);
+        clearCaches();
     }
 
     @AfterEach
     void tearDown() {
+        jdbcTemplate.update("DELETE FROM sys_user_role WHERE tenant_id = ? AND user_id = ?", "tenant-a", scopeUserId);
+        jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id = ? AND role_code = ?", "tenant-a", SCOPE_ROLE);
         jdbcTemplate.update(
                 "DELETE FROM sys_user WHERE tenant_id = ? AND username IN (?, ?, ?)",
                 "tenant-a",
@@ -68,7 +84,8 @@ class UserControllerTest {
                 VISIBLE_USER,
                 HIDDEN_USER
         );
-        jdbcTemplate.update("DELETE FROM sys_dept WHERE tenant_id = ? AND dept_code = ?", "tenant-a", CHILD_DEPT_CODE);
+        jdbcTemplate.update("DELETE FROM sys_dept WHERE tenant_id = ? AND dept_code IN (?, ?, ?)", "tenant-a", PARENT_DEPT_CODE, CHILD_DEPT_CODE, HIDDEN_DEPT_CODE);
+        clearCaches();
     }
 
     @Test
@@ -119,11 +136,11 @@ class UserControllerTest {
                                   "username": "blocked_user_ut",
                                   "displayName": "Blocked User",
                                   "password": "UserTest@123",
-                                  "deptId": 3,
+                                  "deptId": %d,
                                   "enabled": true,
                                   "roleCodes": []
                                 }
-                                """))
+                                """.formatted(hiddenDeptId)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"))
                 .andExpect(jsonPath("$.message").exists());
@@ -220,13 +237,13 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.message").exists());
     }
 
-    private Long ensureDept() {
-        jdbcTemplate.update("DELETE FROM sys_dept WHERE tenant_id = ? AND dept_code = ?", "tenant-a", CHILD_DEPT_CODE);
+    private Long ensureDept(String deptCode, String deptName, Long parentId) {
+        jdbcTemplate.update("DELETE FROM sys_dept WHERE tenant_id = ? AND dept_code = ?", "tenant-a", deptCode);
         SysDeptEntity entity = new SysDeptEntity();
         entity.setTenantId("tenant-a");
-        entity.setDeptCode(CHILD_DEPT_CODE);
-        entity.setDeptName("User Controller Child Dept");
-        entity.setParentId(2L);
+        entity.setDeptCode(deptCode);
+        entity.setDeptName(deptName);
+        entity.setParentId(parentId);
         sysDeptMapper.insert(entity);
         return entity.getId();
     }
@@ -243,5 +260,31 @@ class UserControllerTest {
         entity.setSessionVersion(1);
         sysUserMapper.insert(entity);
         return entity.getId();
+    }
+
+    private void ensureUserScopeRole(Long userId) {
+        jdbcTemplate.update("DELETE FROM sys_user_role WHERE tenant_id = ? AND user_id = ?", "tenant-a", userId);
+        jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id = ? AND role_code = ?", "tenant-a", SCOPE_ROLE);
+        jdbcTemplate.update(
+                "INSERT INTO sys_role(tenant_id, role_code, role_name, data_scope_type, deleted, created_at, updated_at) VALUES(?,?,?,?,0,NOW(),NOW())",
+                "tenant-a", SCOPE_ROLE, "用户控制器测试角色", "DEPT_AND_CHILDREN"
+        );
+        Long roleId = jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_role WHERE tenant_id = ? AND role_code = ?",
+                Long.class,
+                "tenant-a",
+                SCOPE_ROLE
+        );
+        jdbcTemplate.update(
+                "INSERT INTO sys_user_role(tenant_id, user_id, role_id, created_at, updated_at) VALUES(?,?,?,?,?)",
+                "tenant-a", userId, roleId, java.time.LocalDateTime.now(), java.time.LocalDateTime.now()
+        );
+    }
+
+    private void clearCaches() {
+        var cache = cacheManager.getCache("auth:principal");
+        if (cache != null) {
+            cache.clear();
+        }
     }
 }

@@ -52,14 +52,16 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             RateLimitProperties properties,
             RedisProperties redisProperties
     ) {
-        this(properties, buildInfrastructure(redisProperties));
+        this(properties, tryBuildInfrastructure(redisProperties));
     }
 
     private RateLimitInterceptor(
             RateLimitProperties properties,
-            RedisInfrastructure infrastructure
+            @Nullable RedisInfrastructure infrastructure
     ) {
-        this(properties, infrastructure.proxyManager(), infrastructure.redisClient());
+        this(properties,
+                infrastructure == null ? null : infrastructure.proxyManager(),
+                infrastructure == null ? null : infrastructure.redisClient());
     }
 
     RateLimitInterceptor(
@@ -75,30 +77,55 @@ public class RateLimitInterceptor implements HandlerInterceptor {
                 .toList();
     }
 
+    private static RedisInfrastructure tryBuildInfrastructure(RedisProperties redisProperties) {
+        try {
+            return buildInfrastructure(redisProperties);
+        } catch (Exception e) {
+            log.warn("限流 Redis 初始化失败，应用继续启动并按限流 failure-mode 处理请求: {}", e.getMessage());
+            return null;
+        }
+    }
+
     private static RedisInfrastructure buildInfrastructure(RedisProperties redisProperties) {
         RedisClient redisClient = RedisClient.create(buildRedisURI(redisProperties));
-        RedisCodec<String, byte[]> codec = RedisCodec.of(StringCodec.UTF8, ByteArrayCodec.INSTANCE);
-        StatefulRedisConnection<String, byte[]> connection = redisClient.connect(codec);
-        LettuceBasedProxyManager<String> proxyManager = LettuceBasedProxyManager.builderFor(connection)
-                .withClientSideConfig(ClientSideConfig.getDefault()
-                        .withExpirationAfterWriteStrategy(
-                                ExpirationAfterWriteStrategy.basedOnTimeForRefillingBucketUpToMax(Duration.ofMinutes(10))
-                        ))
-                .build();
-        return new RedisInfrastructure(proxyManager, redisClient);
+        try {
+            RedisCodec<String, byte[]> codec = RedisCodec.of(StringCodec.UTF8, ByteArrayCodec.INSTANCE);
+            StatefulRedisConnection<String, byte[]> connection = redisClient.connect(codec);
+            LettuceBasedProxyManager<String> proxyManager = LettuceBasedProxyManager.builderFor(connection)
+                    .withClientSideConfig(ClientSideConfig.getDefault()
+                            .withExpirationAfterWriteStrategy(
+                                    ExpirationAfterWriteStrategy.basedOnTimeForRefillingBucketUpToMax(Duration.ofMinutes(10))
+                            ))
+                    .build();
+            return new RedisInfrastructure(proxyManager, redisClient);
+        } catch (RuntimeException e) {
+            redisClient.shutdown();
+            throw e;
+        }
     }
 
     private static RedisURI buildRedisURI(RedisProperties redisProperties) {
+        String host = redisProperties.getHost();
+        if (!StringUtils.hasText(host) || isUnresolvedPlaceholder(host)) {
+            throw new IllegalStateException("Redis host is not configured");
+        }
+
         RedisURI.Builder builder = RedisURI.builder()
-                .withHost(redisProperties.getHost() != null ? redisProperties.getHost() : "127.0.0.1")
+                .withHost(host.trim())
                 .withPort(redisProperties.getPort())
                 .withDatabase(redisProperties.getDatabase());
 
-        if (StringUtils.hasText(redisProperties.getPassword())) {
-            builder.withPassword(redisProperties.getPassword().toCharArray());
+        String password = redisProperties.getPassword();
+        if (StringUtils.hasText(password) && !isUnresolvedPlaceholder(password)) {
+            builder.withPassword(password.toCharArray());
         }
 
         return builder.build();
+    }
+
+    private static boolean isUnresolvedPlaceholder(String value) {
+        String trimmed = value.trim();
+        return trimmed.startsWith("${") && trimmed.endsWith("}");
     }
 
     @PreDestroy

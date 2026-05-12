@@ -35,7 +35,7 @@
 
 ## 4. 前端跨域来源
 
-- [ ] `app.frontend.allowed-origins` 或 `APP_FRONTEND_ALLOWED_ORIGIN` 仅配置真实前端域名
+- [ ] `app.cors.allowed-origins` 或 `APP_CORS_ALLOWED_ORIGIN` 仅配置真实前端域名
 - [ ] 生产环境不包含 `null`、测试域名或无边界通配符
 - [ ] 协议、主机、端口与真实访问地址一致
 - [ ] 多环境分别核对 staging/prod 配置
@@ -59,6 +59,8 @@
 
 ## 7. 安全与观测
 
+- [ ] `src/main/resources/application.yml` 与 `application-prod.yml` 未包含真实 DB/Redis 密码或公网 Redis 默认值
+- [ ] 本地私有配置仅写入 `src/main/resources/application-local.yml`，且该文件已被 `.gitignore` 忽略
 - [ ] 生产环境未提交真实 DB/Redis 密码到源码
 - [ ] 生产环境 `allowed-origins` 已收敛
 - [ ] `/actuator/health` 可访问且返回 UP

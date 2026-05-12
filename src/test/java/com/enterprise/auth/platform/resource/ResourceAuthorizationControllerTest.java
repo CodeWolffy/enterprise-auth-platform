@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.resource;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.bearer;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -27,6 +27,8 @@ import org.springframework.test.web.servlet.MockMvc;
 class ResourceAuthorizationControllerTest {
 
     private static final String TEMP_ROLE_PREFIX = "RESOURCE_AUTH_V2_UT_";
+    private static final String PLATFORM_USER = "resource_auth_platform_user_ut";
+    private static final String TENANT_USER = "resource_auth_tenant_user_ut";
 
     @Autowired
     private MockMvc mockMvc;
@@ -52,6 +54,7 @@ class ResourceAuthorizationControllerTest {
                 "tenant-a",
                 25L
         );
+        jdbcTemplate.update("DELETE FROM sys_user WHERE username IN (?, ?)", PLATFORM_USER, TENANT_USER);
     }
 
     @Test
@@ -290,11 +293,13 @@ class ResourceAuthorizationControllerTest {
     }
 
     private UserAccount principal(String tenantId, Set<String> permissions) {
+        String username = "platform".equals(tenantId) ? PLATFORM_USER : TENANT_USER;
+        Long userId = ensureLoginUser(tenantId, username);
         LinkedHashSet<String> grants = new LinkedHashSet<>(permissions);
         return new UserAccount(
-                1L,
+                userId,
                 tenantId,
-                "tester",
+                username,
                 "{noop}ignored",
                 true,
                 Set.of("ADMIN"),
@@ -302,6 +307,30 @@ class ResourceAuthorizationControllerTest {
                 Set.of(),
                 DataScopeType.ALL,
                 1
+        );
+    }
+
+    private Long ensureLoginUser(String tenantId, String username) {
+        jdbcTemplate.update("DELETE FROM sys_user WHERE username = ?", username);
+        jdbcTemplate.update(
+                """
+                INSERT INTO sys_user (
+                    tenant_id, dept_id, username, password_hash, enabled, session_version,
+                    display_name, created_by, updated_by, deleted
+                ) VALUES (?, ?, ?, ?, 1, 1, ?, ?, ?, 0)
+                """,
+                tenantId,
+                null,
+                username,
+                "{noop}ignored",
+                username,
+                "tester",
+                "tester"
+        );
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_user WHERE username = ?",
+                Long.class,
+                username
         );
     }
 }

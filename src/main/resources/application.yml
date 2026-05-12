@@ -6,9 +6,9 @@ spring:
     name: enterprise-auth-platform
 
   datasource:
-    url: ${DB_URL:jdbc:mysql://127.0.0.1:3306/enterprise_auth_platform?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true}
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:123456}
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
     type: com.zaxxer.hikari.HikariDataSource
     hikari:
@@ -22,10 +22,10 @@ spring:
 
   data:
     redis:
-      host: ${REDIS_HOST:139.196.7.151}
+      host: ${REDIS_HOST}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:zhu123456@}
-      database: ${REDIS_DATABASE:8}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
       lettuce:
         pool:
           max-active: 8
@@ -87,7 +87,7 @@ captcha:
     keyPrefix: "eap:captcha:secondary"
 
 app:
-  frontend:
+  cors:
     allowed-origins:
       - http://127.0.0.1:5173
       - http://localhost:5173
@@ -155,14 +155,6 @@ app:
     system-configs-ttl: 30m
     system-categories-all-ttl: 60m
     system-categories-target-ttl: 60m
-
-  features:
-    gateway-enabled: false
-    nacos-enabled: false
-    mq-enabled: false
-    seata-enabled: false
-    job-enabled: false
-    loki-enabled: false
 
 logging:
   pattern:

@@ -2,7 +2,6 @@ package com.enterprise.auth.platform.service;
 
 import com.enterprise.auth.platform.dto.resp.UserSessionResponse;
 import com.enterprise.auth.platform.config.SecurityProperties;
-import com.enterprise.auth.platform.config.SecurityRedisProperties;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
@@ -23,16 +22,13 @@ public class SessionIndexService {
     private static final String SESSION_META_PREFIX = "session:meta:";
 
     private final StringRedisTemplate redisTemplate;
-    private final SecurityRedisProperties redisProperties;
     private final SecurityProperties securityProperties;
 
     public SessionIndexService(
             StringRedisTemplate redisTemplate,
-            SecurityRedisProperties redisProperties,
             SecurityProperties securityProperties
     ) {
         this.redisTemplate = redisTemplate;
-        this.redisProperties = redisProperties;
         this.securityProperties = securityProperties;
     }
 
@@ -195,7 +191,7 @@ public class SessionIndexService {
     }
 
     private String allSessionsKey() {
-        return redisProperties.resolvedNamespacePrefix() + ALL_SESSIONS_KEY;
+        return securityProperties.resolvedRedis().resolvedNamespacePrefix() + ALL_SESSIONS_KEY;
     }
 
     private String userSessionsKey(Long userId) {
@@ -203,11 +199,11 @@ public class SessionIndexService {
     }
 
     private String userSessionsKey(String userId) {
-        return redisProperties.resolvedNamespacePrefix() + USER_SESSIONS_PREFIX + userId;
+        return securityProperties.resolvedRedis().resolvedNamespacePrefix() + USER_SESSIONS_PREFIX + userId;
     }
 
     private String sessionMetaKey(String token) {
-        return redisProperties.resolvedNamespacePrefix() + SESSION_META_PREFIX + token;
+        return securityProperties.resolvedRedis().resolvedNamespacePrefix() + SESSION_META_PREFIX + token;
     }
 
     private String valueOrEmpty(String value) {

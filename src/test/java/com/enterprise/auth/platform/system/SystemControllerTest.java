@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.cache.CacheManager;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import com.enterprise.auth.platform.security.PasswordHasher;
@@ -54,13 +55,18 @@ class SystemControllerTest {
     @Autowired
     private SysDeptMapper sysDeptMapper;
 
+    @Autowired
+    private CacheManager cacheManager;
+
     private Long scopeUserId;
     private Long hiddenDictId;
 
     @BeforeEach
     void setUp() {
+        clearCaches();
         Long childDeptId = ensureDept();
         scopeUserId = ensureUser(SCOPE_USER, 2L);
+        ensureSystemScopeRole(scopeUserId);
         ensureUser(VISIBLE_USER, childDeptId);
         ensureUser(HIDDEN_USER, 3L);
 
@@ -107,9 +113,26 @@ class SystemControllerTest {
                 ALPHA_DICT_CODE,
                 OMEGA_DICT_CODE
         );
+        jdbcTemplate.update("DELETE ur FROM sys_user_role ur JOIN sys_user u ON ur.user_id = u.id WHERE ur.tenant_id = ? AND u.username IN (?, ?, ?)", "tenant-a", SCOPE_USER, VISIBLE_USER, HIDDEN_USER);
+        jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id = ? AND role_code = ?", "tenant-a", "SYSTEM_SCOPE_ROLE_UT");
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username IN (?, ?, ?)", "tenant-a", SCOPE_USER, VISIBLE_USER, HIDDEN_USER);
         jdbcTemplate.update("DELETE FROM sys_dept WHERE tenant_id = ? AND dept_code = ?", "tenant-a", CHILD_DEPT_CODE);
         jdbcTemplate.update("DELETE FROM sys_category_rule WHERE tenant_id = ? AND target_type = ? AND category_code = ?", "tenant-a", "dict", CATEGORY_CODE);
+        clearCaches();
+    }
+
+    @Test
+    void reservedComponentStatusShouldRemainCompatible() throws Exception {
+        mockMvc.perform(get("/api/system/features")
+                        .with(bearer(principal(Set.of("system:read"))))
+                        .header("X-Tenant-Id", "tenant-a"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.gatewayEnabled").value(false))
+                .andExpect(jsonPath("$.data.nacosEnabled").value(false))
+                .andExpect(jsonPath("$.data.mqEnabled").value(false))
+                .andExpect(jsonPath("$.data.seataEnabled").value(false))
+                .andExpect(jsonPath("$.data.jobEnabled").value(false))
+                .andExpect(jsonPath("$.data.lokiEnabled").value(false));
     }
 
     @Test
@@ -236,5 +259,33 @@ class SystemControllerTest {
         entity.setSessionVersion(1);
         sysUserMapper.insert(entity);
         return entity.getId();
+    }
+
+    private void ensureSystemScopeRole(Long userId) {
+        jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id = ? AND role_code = ?", "tenant-a", "SYSTEM_SCOPE_ROLE_UT");
+        jdbcTemplate.update(
+                "INSERT INTO sys_role(tenant_id, role_code, role_name, data_scope_type, deleted, created_at, updated_at) VALUES(?,?,?,?,0,NOW(),NOW())",
+                "tenant-a", "SYSTEM_SCOPE_ROLE_UT", "系统管理测试角色", "DEPT_AND_CHILDREN"
+        );
+        Long roleId = jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_role WHERE tenant_id = ? AND role_code = ?",
+                Long.class,
+                "tenant-a",
+                "SYSTEM_SCOPE_ROLE_UT"
+        );
+        jdbcTemplate.update("DELETE FROM sys_user_role WHERE tenant_id = ? AND user_id = ?", "tenant-a", userId);
+        jdbcTemplate.update(
+                "INSERT INTO sys_user_role(tenant_id, user_id, role_id, created_at, updated_at) VALUES(?,?,?,?,?)",
+                "tenant-a", userId, roleId, java.time.LocalDateTime.now(), java.time.LocalDateTime.now()
+        );
+    }
+
+    private void clearCaches() {
+        for (String cacheName : java.util.List.of("auth:principal", "system:dicts", "system:categories:all", "system:categories:target")) {
+            var cache = cacheManager.getCache(cacheName);
+            if (cache != null) {
+                cache.clear();
+            }
+        }
     }
 }
