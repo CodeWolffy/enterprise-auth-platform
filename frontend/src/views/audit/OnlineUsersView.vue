@@ -32,7 +32,7 @@
         <el-button type="primary" :loading="loading" data-testid="online-users-refresh" @click="load">刷新</el-button>
       </div>
 
-      <div class="session-toolbar">
+      <div class="content-toolbar">
         <el-input v-model.trim="keyword" placeholder="搜索用户、租户、IP 或设备" clearable @clear="load" @keyup.enter="doSearch" />
         <el-radio-group v-model="statusFilter" size="small">
           <el-radio-button v-for="item in statusOptions" :key="item.value" :value="item.value">
@@ -222,29 +222,3 @@ function formatDevice(raw?: string | null) {
   return raw
 }
 </script>
-
-<style scoped lang="scss">
-.session-toolbar {
-  display: grid;
-  grid-template-columns: minmax(240px, 360px) auto;
-  gap: 12px;
-  align-items: center;
-  margin: -4px 0 12px;
-}
-
-.panel-result {
-  margin: 12px 0 8px;
-}
-
-.pagination-wrap {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
-}
-
-@media (max-width: 760px) {
-  .session-toolbar {
-    grid-template-columns: 1fr;
-  }
-}
-</style>

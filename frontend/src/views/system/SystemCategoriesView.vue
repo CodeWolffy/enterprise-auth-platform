@@ -322,7 +322,7 @@ function renderTrendChart() {
         type: 'bar',
         data: analysis.value.trend.map((item) => item.count),
         itemStyle: {
-          color: '#2563eb',
+          color: '#1677ff',
           borderRadius: [6, 6, 0, 0],
         },
       },
@@ -349,34 +349,8 @@ function onCategoryHeaderDragEnd(newWidth: number, _oldWidth: number, column: { 
   margin-top: 20px;
 }
 
-.payload-pre {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
 .trend-chart {
   width: 100%;
   height: 260px;
 }
-
-.table-tools {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 10px;
-  margin: -4px 0 10px;
-}
-
-.column-chooser {
-  display: grid;
-  gap: 8px;
-  max-height: 280px;
-  overflow: auto;
-}
-
-.panel-result {
-  margin: 12px 0 8px;
-}
 </style>
-

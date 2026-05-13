@@ -129,6 +129,9 @@
             <el-button v-permission="'role:write'" link type="danger" @click="removeRole(row.id)">删除</el-button>
           </template>
         </el-table-column>
+        <template #empty>
+          <el-empty description="暂无角色数据" />
+        </template>
       </el-table>
 
       <div class="pagination-wrap">
@@ -698,17 +701,6 @@ function onRoleHeaderDragEnd(newWidth: number, _oldWidth: number, column: { prop
   gap: 12px;
 }
 
-.assignment-toolbar__meta {
-  color: #64748b;
-  font-size: 13px;
-}
-
-.resource-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
 .resource-node {
   width: 100%;
   display: flex;
@@ -732,14 +724,15 @@ function onRoleHeaderDragEnd(newWidth: number, _oldWidth: number, column: { prop
   margin-top: 20px;
   padding: 16px;
   border-radius: 16px;
-  background: rgba(248, 250, 252, 0.9);
+  border: 1px solid var(--line);
+  background: var(--bg-card-muted);
 }
 
 .tree-panel__head {
   display: flex;
   justify-content: space-between;
   margin-bottom: 12px;
-  color: #475569;
+  color: var(--text-soft);
 }
 
 .scope-tags {
@@ -747,26 +740,5 @@ function onRoleHeaderDragEnd(newWidth: number, _oldWidth: number, column: { prop
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 16px;
-}
-
-.pagination-wrap {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
-}
-
-.table-tools {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 10px;
-  margin: -4px 0 10px;
-}
-
-.column-chooser {
-  display: grid;
-  gap: 8px;
-  max-height: 280px;
-  overflow: auto;
 }
 </style>

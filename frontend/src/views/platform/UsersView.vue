@@ -145,6 +145,9 @@
             <el-button v-permission="'user:write'" link type="danger" data-testid="users-delete" @click="removeUser(row.id)">删除</el-button>
           </template>
         </el-table-column>
+        <template #empty>
+          <el-empty description="暂无用户数据" />
+        </template>
       </el-table>
 
       <div class="pagination-wrap">
@@ -513,30 +516,3 @@ function onUserHeaderDragEnd(newWidth: number, _oldWidth: number, column: { prop
   userTablePrefs.setColumnWidth(key, newWidth)
 }
 </script>
-
-<style scoped lang="scss">
-.detail-tip {
-  margin-top: 20px;
-}
-
-.pagination-wrap {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
-}
-
-.table-tools {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 10px;
-  margin: -4px 0 10px;
-}
-
-.column-chooser {
-  display: grid;
-  gap: 8px;
-  max-height: 280px;
-  overflow: auto;
-}
-</style>

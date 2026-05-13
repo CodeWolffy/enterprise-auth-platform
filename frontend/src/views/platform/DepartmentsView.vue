@@ -123,6 +123,9 @@
             <el-button v-permission="'dept:write'" link type="danger" @click="removeDepartment(row.id)">删除</el-button>
           </template>
         </el-table-column>
+        <template #empty>
+          <el-empty description="暂无部门数据" />
+        </template>
       </el-table>
     </section>
 
@@ -401,31 +404,7 @@ function onDepartmentHeaderDragEnd(newWidth: number, _oldWidth: number, column: 
 </script>
 
 <style scoped lang="scss">
-.panel-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.detail-tip {
-  margin-top: 20px;
-}
-
 .tree-table :deep(.el-table__row .cell) {
   min-height: 24px;
-}
-
-.table-tools {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 10px;
-  margin: -4px 0 10px;
-}
-
-.column-chooser {
-  display: grid;
-  gap: 8px;
-  max-height: 280px;
-  overflow: auto;
 }
 </style>

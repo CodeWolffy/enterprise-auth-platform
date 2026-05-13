@@ -158,31 +158,3 @@ function goTo(
   void router.push({ name })
 }
 </script>
-
-<style scoped lang="scss">
-.setting-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
-}
-
-.setting-card {
-  display: grid;
-  gap: 16px;
-  padding: 20px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 20px;
-  background: rgba(248, 250, 252, 0.88);
-
-  h4 {
-    margin: 8px 0;
-    font-size: 18px;
-  }
-
-  p {
-    margin: 0;
-    color: #475569;
-    line-height: 1.6;
-  }
-}
-</style>

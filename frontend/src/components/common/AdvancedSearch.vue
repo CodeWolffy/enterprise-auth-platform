@@ -1,5 +1,5 @@
 <template>
-  <el-form :inline="true" class="advanced-search" @submit.prevent="$emit('search')">
+  <el-form :inline="true" class="advanced-search content-toolbar" @submit.prevent="$emit('search')">
     <div class="advanced-search__fields">
       <slot></slot>
     </div>
@@ -22,21 +22,14 @@ defineEmits<{
 
 <style scoped lang="scss">
 .advanced-search {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  background-color: var(--el-fill-color-blank);
-  padding: 16px 20px;
-  border-radius: 8px;
-  margin-bottom: 16px;
-  border: 1px solid var(--el-border-color-light);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  width: 100%;
 
   &__fields {
     display: flex;
     flex-wrap: wrap;
-    flex: 1;
-    gap: 16px;
+    flex: 1 1 520px;
+    gap: 12px 16px;
+    min-width: 0;
 
     :deep(.el-form-item) {
       margin-bottom: 0;
@@ -47,10 +40,26 @@ defineEmits<{
   &__actions {
     display: flex;
     align-items: flex-end;
+    margin-left: auto;
 
     :deep(.el-form-item) {
       margin-bottom: 0;
       margin-right: 0;
+    }
+  }
+}
+
+@media (max-width: 860px) {
+  .advanced-search {
+    display: grid;
+
+    &__fields,
+    &__actions {
+      width: 100%;
+    }
+
+    &__fields {
+      display: grid;
     }
   }
 }

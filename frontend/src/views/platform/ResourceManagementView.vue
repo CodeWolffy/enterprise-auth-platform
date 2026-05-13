@@ -139,6 +139,9 @@
             </div>
           </template>
         </el-table-column>
+        <template #empty>
+          <el-empty description="暂无菜单或权限节点" />
+        </template>
       </el-table>
     </section>
 
@@ -671,71 +674,9 @@ function blankToNull(value?: string | null) {
 </script>
 
 <style scoped lang="scss">
-.resource-summary-strip {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.summary-tile {
-  min-height: 74px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 8px;
-  background: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 18px;
-  color: #334155;
-  cursor: pointer;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
-}
-
-.summary-tile:hover,
-.summary-tile.active {
-  border-color: rgba(37, 99, 235, 0.32);
-  background: #f8fbff;
-}
-
-.summary-tile span {
-  font-size: 13px;
-  color: #64748b;
-}
-
-.summary-tile strong {
-  font-size: 26px;
-  color: #0f172a;
-}
-
-.resource-panel {
-  overflow: hidden;
-}
-
-.resource-panel__head {
-  align-items: flex-start;
-}
-
-.resource-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.resource-toolbar__search {
-  width: 340px;
-}
-
 .menu-permission-table {
   width: 100%;
   margin-top: 8px;
-}
-
-.menu-permission-table :deep(.el-table__header th) {
-  background: #eef6f5;
-  color: #164e63;
-  font-weight: 700;
 }
 
 .menu-permission-table :deep(.el-table__row) {
@@ -743,29 +684,29 @@ function blankToNull(value?: string | null) {
 }
 
 .menu-permission-table :deep(.resource-row--leaf) {
-  background: #fcfcfd;
+  background: var(--bg-card-muted);
 }
 
 .menu-permission-table :deep(.resource-row--depth-1 > td:first-child) {
-  box-shadow: inset 3px 0 0 #dbeafe;
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .menu-permission-table :deep(.resource-row--depth-2 > td:first-child) {
-  box-shadow: inset 3px 0 0 #ccfbf1;
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent-2) 28%, transparent);
 }
 
 .menu-permission-table :deep(.resource-row--depth-3 > td:first-child),
 .menu-permission-table :deep(.resource-row--depth-4 > td:first-child) {
-  box-shadow: inset 3px 0 0 #dcfce7;
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent-2) 22%, transparent);
 }
 
 .menu-permission-table :deep(.resource-row--depth-2) {
-  background: #fbfdff;
+  background: var(--accent-soft);
 }
 
 .menu-permission-table :deep(.resource-row--depth-3),
 .menu-permission-table :deep(.resource-row--depth-4) {
-  background: #fcfffd;
+  background: var(--accent-2-soft);
 }
 
 .menu-permission-table :deep(.el-table__cell) {
@@ -791,8 +732,8 @@ function blankToNull(value?: string | null) {
   top: 4px;
   bottom: 4px;
   width: 14px;
-  border-left: 1px solid #cbd5e1;
-  border-bottom: 1px solid #cbd5e1;
+  border-left: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line-strong);
   border-bottom-left-radius: 6px;
 }
 
@@ -800,26 +741,26 @@ function blankToNull(value?: string | null) {
   width: 32px;
   height: 32px;
   flex: 0 0 32px;
-  border-radius: 8px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
-  color: #475569;
-  background: #f1f5f9;
+  color: var(--text-soft);
+  background: var(--bg-card-muted);
 }
 
 .node-icon--menu {
-  color: #2563eb;
-  background: #eff6ff;
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .node-icon--button {
-  color: #15803d;
-  background: #f0fdf4;
+  color: var(--accent-2);
+  background: var(--accent-2-soft);
 }
 
 .node-icon--api {
-  color: #b45309;
-  background: #fffbeb;
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 12%, #fff);
 }
 
 .node-title__text {
@@ -834,7 +775,7 @@ function blankToNull(value?: string | null) {
 }
 
 .node-title strong {
-  color: #1f2937;
+  color: var(--text-main);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -843,7 +784,7 @@ function blankToNull(value?: string | null) {
 .node-title small {
   display: block;
   margin-top: 3px;
-  color: #64748b;
+  color: var(--text-soft);
   line-height: 1.3;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -861,35 +802,35 @@ function blankToNull(value?: string | null) {
   align-items: center;
   gap: 8px;
   min-width: 0;
-  color: #475569;
+  color: var(--text-soft);
 }
 
 .meta-label {
   width: 34px;
   flex: 0 0 34px;
-  color: #94a3b8;
+  color: var(--text-soft);
   font-size: 12px;
 }
 
 .meta-line code {
-  border-radius: 6px;
-  background: #f1f5f9;
-  color: #334155;
+  border-radius: 8px;
+  background: var(--bg-card-muted);
+  color: var(--text-main);
   padding: 2px 7px;
   font-family: Consolas, 'Courier New', monospace;
   font-size: 12px;
 }
 
 .meta-empty {
-  color: #cbd5e1;
+  color: var(--text-soft);
 }
 
 .route-chip {
   flex: 0 0 auto;
-  border: 1px solid #dbeafe;
-  border-radius: 6px;
-  color: #2563eb;
-  background: #eff6ff;
+  border: 1px solid rgba(22, 119, 255, 0.2);
+  border-radius: 8px;
+  color: var(--accent);
+  background: var(--accent-soft);
   padding: 1px 7px;
   font-size: 12px;
 }
@@ -911,7 +852,7 @@ function blankToNull(value?: string | null) {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: #64748b;
+  color: var(--text-soft);
   font-size: 12px;
 }
 
@@ -920,15 +861,15 @@ function blankToNull(value?: string | null) {
   width: 7px;
   height: 7px;
   border-radius: 999px;
-  background: #cbd5e1;
+  background: var(--line-strong);
 }
 
 .status-dot.is-on::before {
-  background: #22c55e;
+  background: var(--success);
 }
 
 .status-dot.is-off::before {
-  background: #ef4444;
+  background: var(--danger);
 }
 
 .row-actions {
@@ -942,19 +883,8 @@ function blankToNull(value?: string | null) {
 }
 
 @media (max-width: 1100px) {
-  .resource-summary-strip {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .resource-toolbar,
-  .resource-toolbar__search {
+  .menu-permission-table :deep(.el-input-number--small) {
     width: 100%;
-  }
-}
-
-@media (max-width: 720px) {
-  .resource-summary-strip {
-    grid-template-columns: 1fr;
   }
 }
 </style>

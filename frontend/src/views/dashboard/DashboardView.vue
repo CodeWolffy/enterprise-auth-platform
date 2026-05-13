@@ -125,17 +125,17 @@ async function renderChart() {
         radius: ['48%', '72%'],
         itemStyle: {
           borderRadius: 18,
-          borderColor: '#fff8ef',
+          borderColor: '#ffffff',
           borderWidth: 6,
         },
         label: {
-          color: '#2f2a24',
+          color: '#1f2937',
           formatter: '{b}\n{c}',
         },
         data: [
-          { name: '角色', value: authStore.snapshot.roles.length, itemStyle: { color: '#0f766e' } },
-          { name: '权限', value: authStore.snapshot.grants.length, itemStyle: { color: '#c96b29' } },
-          { name: '菜单', value: authStore.snapshot.menus.length, itemStyle: { color: '#355c7d' } },
+          { name: '角色', value: authStore.snapshot.roles.length, itemStyle: { color: '#1677ff' } },
+          { name: '权限', value: authStore.snapshot.grants.length, itemStyle: { color: '#14b8a6' } },
+          { name: '菜单', value: authStore.snapshot.menus.length, itemStyle: { color: '#16c784' } },
         ],
       },
     ],
@@ -179,13 +179,9 @@ watch(() => authStore.snapshot, () => {
 .insight-card {
   display: grid;
   gap: 4px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid rgba(57, 44, 28, 0.1);
-  background: rgba(255, 255, 255, 0.6);
 
   span {
-    color: #6b5f51;
+    color: var(--text-soft);
     font-size: 12px;
   }
 
@@ -198,8 +194,8 @@ watch(() => authStore.snapshot, () => {
 .insight-tags {
   padding: 12px;
   border-radius: 12px;
-  border: 1px solid rgba(57, 44, 28, 0.1);
-  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--line);
+  background: var(--bg-card-muted);
   display: grid;
   gap: 10px;
 }
@@ -216,10 +212,6 @@ watch(() => authStore.snapshot, () => {
 }
 
 .snapshot-block {
-  padding: 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(57, 44, 28, 0.1);
-  background: rgba(255, 255, 255, 0.55);
   display: grid;
   gap: 10px;
 
@@ -228,7 +220,7 @@ watch(() => authStore.snapshot, () => {
     font-size: 13px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #6b5f51;
+    color: var(--text-soft);
   }
 
   p {

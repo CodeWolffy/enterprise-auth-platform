@@ -651,29 +651,4 @@ function onCapabilityHeaderDragEnd(newWidth: number, _oldWidth: number, column: 
   margin-right: 6px;
   margin-bottom: 6px;
 }
-
-.detail-block {
-  margin-top: 16px;
-}
-
-.table-tools {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 10px;
-  margin: -4px 0 10px;
-}
-
-.column-chooser {
-  display: grid;
-  gap: 8px;
-  max-height: 280px;
-  overflow: auto;
-}
-
-.tag-wrap {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
 </style>

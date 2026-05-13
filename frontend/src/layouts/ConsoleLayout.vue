@@ -144,7 +144,7 @@
 
       <el-main class="admin-main">
         <transition name="fade-transform" mode="out-in">
-          <div v-show="route.name" class="main-card">
+          <div v-show="route.name" class="main-card console-content--management">
             <RouterView />
           </div>
         </transition>
@@ -924,9 +924,9 @@ function formatDevice(raw?: string) {
 }
 
 .main-card {
-  background: #fff;
+  background: transparent;
   min-height: calc(100vh - 114px);
-  border-radius: 4px;
+  border-radius: 0;
   padding: 16px;
 }
 

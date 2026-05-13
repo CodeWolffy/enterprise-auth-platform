@@ -114,6 +114,9 @@
             </el-popover>
           </template>
         </el-table-column>
+        <template #empty>
+          <el-empty description="暂无审计记录" />
+        </template>
       </el-table>
 
       <div class="footer-bar">
@@ -286,6 +289,9 @@
             <el-button v-permission="'audit:write'" link type="danger" data-testid="audit-task-delete" @click="removeTask(row.id)">删除</el-button>
           </template>
         </el-table-column>
+        <template #empty>
+          <el-empty description="暂无导出任务" />
+        </template>
       </el-table>
 
       <div class="footer-bar">
@@ -698,69 +704,3 @@ function onExportHeaderDragEnd(newWidth: number, _oldWidth: number, column: { pr
   exportTablePrefs.setColumnWidth(key, newWidth)
 }
 </script>
-
-<style scoped lang="scss">
-.panel-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.footer-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 16px;
-}
-
-.json-pre {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
-.progress-cell {
-  display: grid;
-  gap: 6px;
-}
-
-.progress-text {
-  font-size: 12px;
-  color: #64748b;
-}
-
-.retention-cell {
-  display: grid;
-  gap: 8px;
-}
-
-.retention-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.muted-line {
-  margin: 6px 0 0;
-  font-size: 13px;
-  color: #64748b;
-}
-
-.detail-block {
-  margin-top: 16px;
-}
-
-.table-tools {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 10px;
-  margin: -4px 0 10px;
-}
-
-.column-chooser {
-  display: grid;
-  gap: 8px;
-  max-height: 280px;
-  overflow: auto;
-}
-</style>

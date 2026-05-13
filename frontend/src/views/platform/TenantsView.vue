@@ -141,6 +141,9 @@
             <el-button v-permission="'tenant:write'" link type="danger" @click="removeTenant(row.tenantId)">删除</el-button>
           </template>
         </el-table-column>
+        <template #empty>
+          <el-empty description="暂无租户数据" />
+        </template>
       </el-table>
 
       <div class="pagination-wrap">
@@ -668,20 +671,3 @@ function onTenantHeaderDragEnd(newWidth: number, _oldWidth: number, column: { pr
   tenantTablePrefs.setColumnWidth(key, newWidth)
 }
 </script>
-
-<style scoped lang="scss">
-.pagination-wrap{display:flex;justify-content:flex-end;margin-top:16px}.history-insight{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:16px 0}.insight-card{display:grid;gap:6px;padding:14px 16px;border-radius:14px;background:rgba(241,245,249,.92);color:#475569}.insight-card strong{font-size:24px;color:#0f172a}.tag-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}.timeline-item{display:grid;gap:6px}.timeline-item span,.toolbar-tip{color:#64748b}.override-bar{display:flex;justify-content:space-between;align-items:center;margin:16px 0}
-.table-tools {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 10px;
-  margin: -4px 0 10px;
-}
-.column-chooser {
-  display: grid;
-  gap: 8px;
-  max-height: 280px;
-  overflow: auto;
-}
-</style>

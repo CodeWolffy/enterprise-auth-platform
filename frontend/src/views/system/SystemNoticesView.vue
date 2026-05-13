@@ -379,30 +379,3 @@ function onNoticeHeaderDragEnd(newWidth: number, _oldWidth: number, column: { pr
   noticeTablePrefs.setColumnWidth(key, newWidth)
 }
 </script>
-
-<style scoped lang="scss">
-.pagination-wrap {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
-}
-
-.table-tools {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 10px;
-  margin: -4px 0 10px;
-}
-
-.column-chooser {
-  display: grid;
-  gap: 8px;
-  max-height: 280px;
-  overflow: auto;
-}
-
-.panel-result {
-  margin: 12px 0 8px;
-}
-</style>
