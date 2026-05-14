@@ -26,16 +26,17 @@
         </div>
 
         <div class="header-right">
-          <div class="tenant-selector">
+          <div v-if="canLoadTenants" class="tenant-selector">
             <span class="tenant-label">当前租户:</span>
             <el-select
-              v-if="canLoadTenants"
               :model-value="authStore.tenantId"
               placeholder="切换租户"
               size="small"
               filterable
+              :loading="tenantSwitching"
+              :disabled="tenantSwitching"
               class="borderless-select"
-              style="width: 120px; margin: 0 8px;"
+              :style="{ width: tenantSelectWidth, margin: '0 8px' }"
               @change="handleTenantChange"
             >
               <el-option
@@ -45,7 +46,6 @@
                 :value="tenant.tenantId"
               />
             </el-select>
-            <span v-else class="tenant-value">{{ authStore.tenantId }}</span>
           </div>
 
           <div class="search-capsule">
@@ -142,10 +142,10 @@
         </div>
       </div>
 
-      <el-main class="admin-main">
+      <el-main v-loading="tenantSwitching" class="admin-main" element-loading-text="租户切换中">
         <transition name="fade-transform" mode="out-in">
           <div v-show="route.name" class="main-card console-content--management">
-            <RouterView />
+            <RouterView :key="routerViewKey" />
           </div>
         </transition>
       </el-main>
@@ -238,6 +238,7 @@ import {
 import AppNav from '@/components/common/AppNav.vue'
 import { useAuthStore } from '@/stores/auth'
 import { forceOffline, querySessions, queryTenants } from '@/api/modules'
+import { isAllowedRoute, resolveFirstAllowedPath } from '@/router/route-access'
 import { formatDateTime } from '@/utils/datetime'
 
 const route = useRoute()
@@ -248,6 +249,8 @@ const isCollapse = ref(false)
 const sessionsVisible = ref(false)
 const sessionsList = ref<any[]>([])
 const sessionsLoading = ref(false)
+const tenantSwitching = computed(() => authStore.tenantSwitching)
+const routerViewRefreshKey = ref(0)
 const tagsScrollRef = ref<HTMLDivElement | null>(null)
 const isTagsOverflowing = ref(false)
 const canScrollTagsLeft = ref(false)
@@ -267,6 +270,7 @@ const avatarName = computed(() => {
   const name = authStore.snapshot?.username || 'U'
   return name.charAt(0).toUpperCase()
 })
+const routerViewKey = computed(() => `${route.fullPath}:${authStore.tenantId}:${routerViewRefreshKey.value}`)
 
 // tags view simplified
 const CACHED_VIEWS_KEY = 'ea_visited_views_cache'
@@ -404,6 +408,12 @@ const tenantOptions = ref<Array<{ tenantId: string; name: string }>>([])
 const canLoadTenants = computed(() => {
   return authStore.canSwitchTenant && Boolean(authStore.snapshot?.grants.includes('tenant:read'))
 })
+const tenantSelectWidth = computed(() => {
+  const longestOptionLength = tenantOptions.value.reduce((longest, tenant) => {
+    return Math.max(longest, `${tenant.name} (${tenant.tenantId})`.length)
+  }, 0)
+  return `${Math.min(Math.max(longestOptionLength * 8 + 44, 140), 260)}px`
+})
 
 onMounted(() => {
   if (canLoadTenants.value) {
@@ -423,17 +433,62 @@ onBeforeUnmount(() => {
 async function loadTenantOptions() {
   try {
     const page = await queryTenants({ page: 1, size: 200 }, { silentAuthFailure: true, suppressErrorMessage: true })
-    tenantOptions.value = page.list
+    tenantOptions.value = page.records ?? []
   } catch {
     // Tenant selector is optional; header still works when tenant loading fails.
   }
 }
 
 async function handleTenantChange(newTenantId: string) {
-  if (newTenantId === authStore.tenantId) return
-  authStore.switchTenant(newTenantId)
-  ElMessage.success(`已切换到租户 ${newTenantId}`)
-  setTimeout(() => window.location.reload(), 300)
+  const targetTenantId = newTenantId.trim()
+  if (!targetTenantId || targetTenantId === authStore.tenantId || tenantSwitching.value) return
+  try {
+    await authStore.switchTenant(targetTenantId)
+    const redirected = await settleRouteAfterTenantSwitch()
+    if (!redirected) {
+      ElMessage.success(`已切换到租户 ${authStore.tenantId}`)
+    }
+  } catch {
+    ElMessage.error('租户切换失败，请稍后重试')
+  }
+}
+
+async function settleRouteAfterTenantSwitch() {
+  const snapshot = authStore.snapshot
+  pruneVisitedViewsBySnapshot()
+  if (isAllowedRoute(snapshot, route)) {
+    routerViewRefreshKey.value += 1
+    await nextTick()
+    scrollActiveTagIntoView()
+    return false
+  }
+
+  const fallbackPath = resolveFirstAllowedPath(snapshot) || '/dashboard'
+  if (fallbackPath !== route.path) {
+    await router.replace(fallbackPath)
+    ElMessage.warning('当前页面在新租户下不可用，已跳转')
+    return true
+  }
+  routerViewRefreshKey.value += 1
+  await nextTick()
+  scrollActiveTagIntoView()
+  return false
+}
+
+function pruneVisitedViewsBySnapshot() {
+  const snapshot = authStore.snapshot
+  const nextViews = visitedViews.value.filter((tag) => {
+    const resolved = router.resolve(tag.path)
+    return resolved.name !== 'not-found' && isAllowedRoute(snapshot, resolved)
+  })
+  if (nextViews.length > 0) {
+    visitedViews.value = nextViews
+  } else {
+    const fallbackPath = resolveFirstAllowedPath(snapshot) || '/dashboard'
+    const fallbackRoute = router.resolve(fallbackPath)
+    visitedViews.value = [{ path: fallbackPath, title: String(fallbackRoute.meta.title ?? '控制台') }]
+  }
+  nextTick(updateTagsScrollState)
 }
 
 function handleCommand(command: string) {
@@ -455,7 +510,8 @@ async function openSessions() {
 async function loadSessions() {
   sessionsLoading.value = true
   try {
-    sessionsList.value = await querySessions('own')
+    const sessions = await querySessions('own')
+    sessionsList.value = Array.isArray(sessions) ? sessions : sessions.records
   } finally {
     sessionsLoading.value = false
   }

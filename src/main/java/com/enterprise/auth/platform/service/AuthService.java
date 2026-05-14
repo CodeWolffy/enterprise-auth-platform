@@ -1,11 +1,12 @@
 package com.enterprise.auth.platform.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.SaLoginModel;
 import cn.dev33.satoken.stp.StpUtil;
-import com.enterprise.auth.platform.service.AuditService;
 import com.enterprise.auth.platform.dto.req.LoginRequest;
 import com.enterprise.auth.platform.dto.resp.TokenSessionResponse;
+import com.enterprise.auth.platform.dto.resp.PermissionSnapshotResponse;
 import com.enterprise.auth.platform.dto.resp.UserSessionResponse;
 import com.enterprise.auth.platform.service.LoginAttemptService.LoginFailureResult;
 import com.enterprise.auth.platform.service.SessionIndexService.Page;
@@ -14,8 +15,11 @@ import com.enterprise.auth.platform.dto.model.PageResult;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.PasswordValidator;
 import com.enterprise.auth.platform.config.SecurityProperties;
+import com.enterprise.auth.platform.dao.entity.SysTenantEntity;
 import com.enterprise.auth.platform.dao.entity.SysUserEntity;
+import com.enterprise.auth.platform.dao.mapper.SysTenantMapper;
 import com.enterprise.auth.platform.dao.mapper.SysUserMapper;
+import com.enterprise.auth.platform.security.AuthContextHolder;
 import com.enterprise.auth.platform.security.DataScopeService;
 import com.enterprise.auth.platform.security.PasswordHasher;
 import com.enterprise.auth.platform.security.PlatformAdminSupport;
@@ -25,7 +29,6 @@ import com.enterprise.auth.platform.dto.req.RegisterRequest;
 import com.enterprise.auth.platform.dto.model.UserAccount;
 import com.enterprise.auth.platform.dto.resp.UserSummary;
 import com.enterprise.auth.platform.dao.repository.UserRepository;
-import com.enterprise.auth.platform.service.UserManagementService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -53,6 +56,8 @@ public class AuthService {
     private final PlatformAdminSupport platformAdminSupport;
     private final SecurityProperties securityProperties;
     private final SessionIndexService sessionIndexService;
+    private final PermissionSnapshotService permissionSnapshotService;
+    private final SysTenantMapper sysTenantMapper;
 
     public AuthService(
             CaptchaService captchaService,
@@ -67,7 +72,9 @@ public class AuthService {
             UserManagementService userManagementService,
             PlatformAdminSupport platformAdminSupport,
             SecurityProperties securityProperties,
-            SessionIndexService sessionIndexService
+            SessionIndexService sessionIndexService,
+            PermissionSnapshotService permissionSnapshotService,
+            SysTenantMapper sysTenantMapper
     ) {
         this.captchaService = captchaService;
         this.passwordHasher = passwordHasher;
@@ -82,6 +89,8 @@ public class AuthService {
         this.platformAdminSupport = platformAdminSupport;
         this.securityProperties = securityProperties;
         this.sessionIndexService = sessionIndexService;
+        this.permissionSnapshotService = permissionSnapshotService;
+        this.sysTenantMapper = sysTenantMapper;
     }
 
     public TokenSessionResponse login(LoginRequest request, HttpServletRequest servletRequest) {
@@ -121,9 +130,8 @@ public class AuthService {
             tokenSession.set("username", user.username());
             tokenSession.set("userId", user.id());
             tokenSession.set("tenantId", user.tenantId());
+            tokenSession.set("activeTenantId", user.tenantId());
             tokenSession.set("sessionVersion", user.sessionVersion());
-            tokenSession.set("roles", user.roles());
-            tokenSession.set("permissions", user.permissions());
             tokenSession.set("clientIp", clientIp);
             tokenSession.set("device", StringUtils.hasText(request.device()) ? request.device() : "unknown");
             tokenSession.set("issuedAt", now.toEpochMilli());
@@ -156,6 +164,68 @@ public class AuthService {
         StpUtil.logoutByTokenValue(sessionId);
         sessionIndexService.remove(sessionId);
         auditService.record("LOGOUT", username, tenantId, payload);
+    }
+
+    public PermissionSnapshotResponse switchTenant(UserAccount currentUser, String targetTenantId) {
+        String normalizedTargetTenantId = StringUtils.hasText(targetTenantId) ? targetTenantId.trim() : "";
+        if (!StringUtils.hasText(normalizedTargetTenantId)) {
+            throw new BusinessException("VALIDATION_ERROR", "目标租户不能为空");
+        }
+        if (!platformAdminSupport.canSwitchTenant(currentUser, normalizedTargetTenantId)) {
+            throw new BusinessException("ACCESS_DENIED", "无权切换到目标租户");
+        }
+        SysTenantEntity tenant = sysTenantMapper.selectOne(new LambdaQueryWrapper<SysTenantEntity>()
+                .eq(SysTenantEntity::getTenantId, normalizedTargetTenantId)
+                .eq(SysTenantEntity::getDeleted, 0)
+                .last("limit 1"));
+        if (tenant == null) {
+            throw new BusinessException("TENANT_NOT_FOUND", "租户不存在");
+        }
+        if (tenant.getTenantStatus() == null || tenant.getTenantStatus() != 1) {
+            throw new BusinessException("TENANT_DISABLED", "租户已停用");
+        }
+
+        SaSession tokenSession = StpUtil.getTokenSession();
+        String fromTenantId = sessionString(tokenSession, "activeTenantId", currentUser.tenantId());
+        String sessionId = StpUtil.getTokenValue();
+
+        String previousTenantId = TenantContext.getTenantId();
+        boolean switched = false;
+        try {
+            tokenSession.set("activeTenantId", normalizedTargetTenantId);
+            tokenSession.delete("permissions");
+            tokenSession.delete("roles");
+            switched = true;
+            TenantContext.setTenantId(normalizedTargetTenantId);
+            AuthContextHolder.set(currentUser, new com.enterprise.auth.platform.dto.model.SessionPrincipal(
+                    sessionId,
+                    normalizedTargetTenantId,
+                    currentUser.tenantId()
+            ));
+            PermissionSnapshotResponse snapshot = permissionSnapshotService.build(currentUser);
+            sessionIndexService.updateActiveTenant(sessionId, normalizedTargetTenantId);
+            auditService.record("TENANT_SWITCH", currentUser.username(), normalizedTargetTenantId, Map.of(
+                    "sessionId", sessionId,
+                    "operatorTenantId", currentUser.tenantId(),
+                    "fromTenantId", fromTenantId,
+                    "targetTenantId", normalizedTargetTenantId
+            ));
+            return snapshot;
+        } catch (RuntimeException ex) {
+            if (switched) {
+                tokenSession.set("activeTenantId", fromTenantId);
+                tokenSession.delete("permissions");
+                tokenSession.delete("roles");
+                sessionIndexService.updateActiveTenant(sessionId, fromTenantId);
+            }
+            throw ex;
+        } finally {
+            if (StringUtils.hasText(previousTenantId)) {
+                TenantContext.setTenantId(previousTenantId);
+            } else {
+                TenantContext.clear();
+            }
+        }
     }
 
   public List<UserSessionResponse> sessions(UserAccount currentUser, String scope, String currentToken) {
@@ -268,6 +338,7 @@ public class AuthService {
                 session.sessionId(),
                 session.username(),
                 session.tenantId(),
+                session.activeTenantId(),
                 session.clientIp(),
                 session.device(),
                 session.issuedAt(),
@@ -283,6 +354,7 @@ public class AuthService {
                 session.sessionId(),
                 session.username(),
                 session.tenantId(),
+                session.activeTenantId(),
                 session.clientIp(),
                 session.device(),
                 session.issuedAt(),
@@ -364,6 +436,7 @@ public class AuthService {
                 token,
                 sessionString(tokenSession, "username", fallbackUser.username()),
                 sessionString(tokenSession, "tenantId", fallbackUser.tenantId()),
+                sessionString(tokenSession, "activeTenantId", sessionString(tokenSession, "tenantId", fallbackUser.tenantId())),
                 sessionString(tokenSession, "clientIp", ""),
                 sessionString(tokenSession, "device", "unknown"),
                 issuedAt,

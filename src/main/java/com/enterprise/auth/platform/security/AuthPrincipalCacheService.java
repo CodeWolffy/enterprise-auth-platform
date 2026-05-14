@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.security;
 
+import com.enterprise.auth.platform.common.TenantContext;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Component;
@@ -24,6 +25,14 @@ public class AuthPrincipalCacheService {
         return "id:" + userId;
     }
 
+    public static String currentTenantIdKey(Long userId) {
+        return idKey(TenantContext.getTenantId(), userId);
+    }
+
+    public static String idKey(String tenantId, Long userId) {
+        return "id:" + (StringUtils.hasText(tenantId) ? tenantId : "") + ":" + userId;
+    }
+
     public void evictByUser(Long userId, String tenantId, String username) {
         Cache cache = cacheManager.getCache(CACHE_NAME);
         if (cache == null) {
@@ -31,6 +40,7 @@ public class AuthPrincipalCacheService {
         }
         if (userId != null) {
             cache.evict(idKey(userId));
+            cache.evict(idKey(tenantId, userId));
         }
         if (StringUtils.hasText(tenantId) && StringUtils.hasText(username)) {
             cache.evict(usernameKey(tenantId, username));

@@ -107,6 +107,14 @@ public class AuthController {
         return ApiResponse.ok(permissionSnapshotService.build(currentUser()));
     }
 
+    @Operation(summary = "切换当前会话活跃租户")
+    @PostMapping("/tenants/{tenantId}/switch")
+    public ApiResponse<PermissionSnapshotResponse> switchTenant(
+            @Parameter(description = "目标租户ID") @PathVariable String tenantId
+    ) {
+        return ApiResponse.ok(authService.switchTenant(currentUser(), tenantId));
+    }
+
   @Operation(summary = "获取当前用户在线会话")
   @GetMapping("/sessions")
   public ApiResponse<Object> sessions(

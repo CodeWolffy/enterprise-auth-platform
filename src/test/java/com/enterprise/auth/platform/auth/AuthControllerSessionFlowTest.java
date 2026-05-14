@@ -12,6 +12,8 @@ import com.enterprise.auth.platform.service.CaptchaService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
+import cn.dev33.satoken.SaManager;
+import cn.dev33.satoken.dao.SaTokenDaoDefaultImpl;
 import cn.dev33.satoken.stp.StpUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -96,6 +98,7 @@ class AuthControllerSessionFlowTest {
                 180
         ));
         doAnswer(invocation -> null).when(captchaService).secondaryVerify(anyString());
+        clearAuthState();
     }
 
     @AfterEach
@@ -118,6 +121,20 @@ class AuthControllerSessionFlowTest {
         }
         jdbcTemplate.update("DELETE FROM sys_user_role WHERE tenant_id = ? AND user_id IN (SELECT id FROM sys_user WHERE tenant_id = ? AND username = ?)", "tenant-a", "tenant-a", TENANT_USER);
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username = ?", "tenant-a", TENANT_USER);
+        jdbcTemplate.update("DELETE FROM sys_tenant_resource_override WHERE tenant_id = ? AND resource_id = ? AND title_override = ?", TENANT_A, 10L, "租户A总览");
+        jdbcTemplate.update("DELETE FROM sys_dict WHERE tenant_id = ? AND dict_type = ? AND dict_code = ?", TENANT_A, "tenant_context_audit", "tenant_context_audit_ut");
+        jdbcTemplate.update("DELETE FROM sys_audit_log WHERE request_id = ?", "tenant-context-audit-ut");
+        jdbcTemplate.update("DELETE FROM sys_audit_log WHERE request_id = ?", "tenant-switch-ut");
+        clearAuthState();
+    }
+
+    private void clearAuthState() {
+        authPrincipalCacheService.evictAll();
+        if (SaManager.getSaTokenDao() instanceof SaTokenDaoDefaultImpl localDao && localDao.timedCache != null) {
+            for (String key : List.copyOf(localDao.timedCache.keySet())) {
+                localDao.deleteObject(key);
+            }
+        }
     }
 
     @Test
@@ -231,6 +248,157 @@ class AuthControllerSessionFlowTest {
     }
 
     @Test
+    void platformAdminMeShouldUseSwitchedTenantSnapshot() throws Exception {
+        jdbcTemplate.update(
+                "INSERT INTO sys_tenant_resource_override (tenant_id, resource_id, enabled, visible, title_override, created_by, updated_by) " +
+                        "VALUES (?, ?, ?, ?, ?, 'test', 'test') " +
+                        "ON DUPLICATE KEY UPDATE enabled = VALUES(enabled), visible = VALUES(visible), title_override = VALUES(title_override), updated_by = VALUES(updated_by)",
+                TENANT_A,
+                10L,
+                0,
+                0,
+                "租户A总览"
+        );
+
+        String token = extractToken(loginAsAdmin());
+        mockMvc.perform(post("/api/auth/tenants/{tenantId}/switch", TENANT_A)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/auth/me")
+                        .header("Authorization", "Bearer " + token)
+                        .header("X-Tenant-Id", ADMIN_TENANT))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.username").value(ADMIN_USERNAME))
+                .andExpect(jsonPath("$.data.tenantId").value(TENANT_A))
+                .andExpect(jsonPath("$.data.operatorTenantId").value(ADMIN_TENANT))
+                .andExpect(jsonPath("$.data.superAdmin").value(true))
+                .andExpect(jsonPath("$.data.menus[?(@.code=='dashboard')]").doesNotExist())
+                .andExpect(jsonPath("$.data.menus[?(@.code=='audit')]").exists());
+    }
+
+    @Test
+    void platformAdminSwitchTenantShouldPersistActiveTenantAndAudit() throws Exception {
+        String token = extractToken(loginAsAdmin());
+        String requestId = "tenant-switch-ut";
+
+        mockMvc.perform(post("/api/auth/tenants/{tenantId}/switch", TENANT_A)
+                        .header("Authorization", "Bearer " + token)
+                        .header("X-Request-Id", requestId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.username").value(ADMIN_USERNAME))
+                .andExpect(jsonPath("$.data.tenantId").value(TENANT_A))
+                .andExpect(jsonPath("$.data.operatorTenantId").value(ADMIN_TENANT))
+                .andExpect(jsonPath("$.data.superAdmin").value(true));
+
+        mockMvc.perform(get("/api/tenants/current")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.tenantId").value(TENANT_A));
+
+        JsonNode payload = latestAuditPayload("TENANT_SWITCH", requestId);
+        Assertions.assertEquals(ADMIN_TENANT, payload.path("operatorTenantId").asText());
+        Assertions.assertEquals(ADMIN_TENANT, payload.path("fromTenantId").asText());
+        Assertions.assertEquals(TENANT_A, payload.path("activeTenantId").asText());
+        Assertions.assertEquals(TENANT_A, payload.path("targetTenantId").asText());
+        Assertions.assertEquals(token, payload.path("sessionId").asText());
+    }
+
+    @Test
+    void platformAdminSwitchTenantShouldRejectMissingTenant() throws Exception {
+        String token = extractToken(loginAsAdmin());
+
+        mockMvc.perform(post("/api/auth/tenants/{tenantId}/switch", "missing-tenant-ut")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("TENANT_NOT_FOUND"));
+    }
+
+    @Test
+    void platformAdminSwitchTenantShouldRejectDisabledTenant() throws Exception {
+        String token = extractToken(loginAsAdmin());
+        Integer previousStatus = jdbcTemplate.queryForObject(
+                "SELECT tenant_status FROM sys_tenant WHERE tenant_id = ? AND deleted = 0",
+                Integer.class,
+                TENANT_A
+        );
+        try {
+            jdbcTemplate.update("UPDATE sys_tenant SET tenant_status = 0 WHERE tenant_id = ? AND deleted = 0", TENANT_A);
+
+            mockMvc.perform(post("/api/auth/tenants/{tenantId}/switch", TENANT_A)
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("TENANT_DISABLED"));
+        } finally {
+            jdbcTemplate.update("UPDATE sys_tenant SET tenant_status = ? WHERE tenant_id = ? AND deleted = 0", previousStatus, TENANT_A);
+        }
+    }
+
+    @Test
+    void tenantUserSwitchTenantShouldRejectOtherTenant() throws Exception {
+        ensureTenantUser();
+        String token = extractToken(loginAs(TENANT_USER, TENANT_USER_PASSWORD, TENANT_A));
+
+        mockMvc.perform(post("/api/auth/tenants/{tenantId}/switch", ADMIN_TENANT)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+    }
+
+    @Test
+    void tenantUserMeShouldIgnoreForgedTenantHeader() throws Exception {
+        ensureTenantUser();
+        String token = extractToken(loginAs(TENANT_USER, TENANT_USER_PASSWORD, TENANT_A));
+
+        mockMvc.perform(get("/api/auth/me")
+                        .header("Authorization", "Bearer " + token)
+                        .header("X-Tenant-Id", ADMIN_TENANT))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.username").value(TENANT_USER))
+                .andExpect(jsonPath("$.data.tenantId").value(TENANT_A))
+                .andExpect(jsonPath("$.data.operatorTenantId").value(TENANT_A))
+                .andExpect(jsonPath("$.data.superAdmin").value(false))
+                .andExpect(jsonPath("$.data.grants[?(@=='tenant:read')]").doesNotExist())
+                .andExpect(jsonPath("$.data.grants[?(@=='audit:read')]").exists());
+    }
+
+    @Test
+    void auditPayloadShouldIncludeEffectiveTenantContext() throws Exception {
+        String token = extractToken(loginAsAdmin());
+        String requestId = "tenant-context-audit-ut";
+        String dictCode = "tenant_context_audit_ut";
+
+        mockMvc.perform(post("/api/auth/tenants/{tenantId}/switch", TENANT_A)
+                        .header("Authorization", "Bearer " + token)
+                        .header("X-Request-Id", requestId))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/system/dicts")
+                        .header("Authorization", "Bearer " + token)
+                        .header("X-Tenant-Id", ADMIN_TENANT)
+                        .header("X-Request-Id", requestId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "dictType": "tenant_context_audit",
+                                  "dictCode": "%s",
+                                  "dictValue": "Tenant Context Audit"
+                                }
+                                """.formatted(dictCode)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"));
+
+        JsonNode payload = latestAuditPayload("DICT_CREATED", requestId);
+        Assertions.assertEquals(TENANT_A, payload.path("activeTenantId").asText());
+        Assertions.assertEquals(ADMIN_TENANT, payload.path("operatorTenantId").asText());
+        Assertions.assertEquals(ADMIN_USERNAME, payload.path("operator").asText());
+        Assertions.assertEquals(requestId, payload.path("requestId").asText());
+    }
+
+    @Test
     void kickedTokenShouldReturnSessionOffline() throws Exception {
         MvcResult loginResult = loginAsAdmin();
         String token = extractToken(loginResult);
@@ -323,6 +491,7 @@ class AuthControllerSessionFlowTest {
         JsonNode current = sessionByToken(response, token);
         Assertions.assertTrue(current.path("active").asBoolean(), "current session should be active");
         Assertions.assertEquals(ADMIN_TENANT, current.path("tenantId").asText());
+        Assertions.assertEquals(ADMIN_TENANT, current.path("activeTenantId").asText());
     }
 
   @Test
@@ -343,8 +512,12 @@ class AuthControllerSessionFlowTest {
         .andReturn();
     JsonNode sessions = pageRecords(response);
     Assertions.assertTrue(sessions.size() >= 2, "all scope should include visible active sessions");
-    Assertions.assertEquals(ADMIN_TENANT, sessionByTokenFromPage(response, adminToken).path("tenantId").asText());
-    Assertions.assertEquals(TENANT_A, sessionByTokenFromPage(response, tenantToken).path("tenantId").asText());
+    JsonNode adminSession = sessionByTokenFromPage(response, adminToken);
+    JsonNode tenantSession = sessionByTokenFromPage(response, tenantToken);
+    Assertions.assertEquals(ADMIN_TENANT, adminSession.path("tenantId").asText());
+    Assertions.assertEquals(ADMIN_TENANT, adminSession.path("activeTenantId").asText());
+    Assertions.assertEquals(TENANT_A, tenantSession.path("tenantId").asText());
+    Assertions.assertEquals(TENANT_A, tenantSession.path("activeTenantId").asText());
     for (JsonNode session : sessions) {
       Assertions.assertTrue(session.path("active").asBoolean(), "all scope should only return active sessions");
     }
@@ -481,6 +654,23 @@ class AuthControllerSessionFlowTest {
                 "%" + sessionId + "%"
         );
         Assertions.assertFalse(payloads.isEmpty(), "missing audit event " + eventType + " for session " + sessionId);
+        return objectMapper.readTree(payloads.get(0));
+    }
+
+    private JsonNode latestAuditPayload(String eventType, String requestId) throws Exception {
+        List<String> payloads = jdbcTemplate.queryForList(
+                """
+                SELECT payload_json
+                FROM sys_audit_log
+                WHERE event_type = ? AND request_id = ?
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                String.class,
+                eventType,
+                requestId
+        );
+        Assertions.assertFalse(payloads.isEmpty(), "missing audit event " + eventType + " for request " + requestId);
         return objectMapper.readTree(payloads.get(0));
     }
 

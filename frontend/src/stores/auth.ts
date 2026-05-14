@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { ElMessage } from 'element-plus'
-import { fetchPermissionSnapshot, loginWithPassword, logoutCurrentSession } from '@/api/modules'
+import { fetchPermissionSnapshot, loginWithPassword, logoutCurrentSession, switchTenant as switchTenantSession } from '@/api/modules'
 import type { MenuItem, PermissionSnapshot } from '@/types/auth'
 import { clearDynamicRoutes, registerDynamicRoutes } from '@/router'
 
@@ -22,6 +22,8 @@ export const useAuthStore = defineStore('auth', () => {
   const tenantId = ref('platform')
   const operatorTenantId = ref('platform')
   const snapshot = ref<PermissionSnapshot | null>(null)
+  const tenantSwitching = ref(false)
+  let tenantSwitchRequestId = 0
 
   const isAuthenticated = computed(() => authenticated.value)
   const menuItems = computed(() => flattenMenuItems(snapshot.value?.menus ?? []))
@@ -108,16 +110,40 @@ export const useAuthStore = defineStore('auth', () => {
     if (!canSwitchTenant.value) {
       throw new Error('当前账号不支持租户切换')
     }
-    const previousTenantId = tenantId.value
-    tenantId.value = trimmed
+    if (tenantSwitching.value) {
+      throw new Error('租户切换正在进行')
+    }
+
+    const requestId = ++tenantSwitchRequestId
+    const previousSession = {
+      tenantId: tenantId.value,
+      operatorTenantId: operatorTenantId.value,
+      snapshot: snapshot.value,
+    }
+
+    tenantSwitching.value = true
     try {
-      snapshot.value = await fetchPermissionSnapshot()
+      const nextSnapshot = await switchTenantSession(trimmed)
+      if (requestId !== tenantSwitchRequestId) {
+        return
+      }
+      snapshot.value = nextSnapshot
       syncTenantFromSnapshot()
       registerDynamicRoutes(snapshot.value)
       persist()
     } catch (error) {
-      tenantId.value = previousTenantId
+      if (requestId === tenantSwitchRequestId) {
+        tenantId.value = previousSession.tenantId
+        operatorTenantId.value = previousSession.operatorTenantId
+        snapshot.value = previousSession.snapshot
+        registerDynamicRoutes(snapshot.value)
+        persist()
+      }
       throw error
+    } finally {
+      if (requestId === tenantSwitchRequestId) {
+        tenantSwitching.value = false
+      }
     }
   }
 
@@ -182,6 +208,7 @@ export const useAuthStore = defineStore('auth', () => {
     tenantId,
     operatorTenantId,
     snapshot,
+    tenantSwitching,
     isAuthenticated,
     menuItems,
     canSwitchTenant,

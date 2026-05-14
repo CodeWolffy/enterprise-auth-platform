@@ -5,12 +5,13 @@ import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
 import com.enterprise.auth.platform.dto.model.SessionPrincipal;
 import com.enterprise.auth.platform.service.SessionIndexService;
+import com.enterprise.auth.platform.common.TenantContext;
 import com.enterprise.auth.platform.common.convention.exception.BusinessException;
-import com.enterprise.auth.platform.config.TenantProperties;
 import com.enterprise.auth.platform.dto.model.UserAccount;
 import com.enterprise.auth.platform.dao.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Optional;
+import java.util.function.Supplier;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -18,21 +19,16 @@ import org.springframework.util.StringUtils;
 @Service
 public class CurrentUserService {
 
-    private static final String TENANT_ID_PARAM = "tenantId";
-
     private final ObjectProvider<UserRepository> userRepository;
-    private final TenantProperties tenantProperties;
     private final PlatformAdminSupport platformAdminSupport;
     private final SessionIndexService sessionIndexService;
 
     public CurrentUserService(
             ObjectProvider<UserRepository> userRepository,
-            TenantProperties tenantProperties,
             PlatformAdminSupport platformAdminSupport,
             SessionIndexService sessionIndexService
     ) {
         this.userRepository = userRepository;
-        this.tenantProperties = tenantProperties;
         this.platformAdminSupport = platformAdminSupport;
         this.sessionIndexService = sessionIndexService;
     }
@@ -48,8 +44,15 @@ public class CurrentUserService {
     public SessionPrincipal bindRequestContext(HttpServletRequest request) {
         UserAccount user = loadLoggedInUser()
                 .orElseThrow(() -> new BusinessException("UNAUTHORIZED", "User is not logged in"));
-        String requestedTenantId = resolveRequestedTenant(request);
-        String effectiveTenantId = platformAdminSupport.resolveEffectiveTenant(user, requestedTenantId);
+        SaSession tokenSession = StpUtil.getTokenSession();
+        String sessionTenantId = sessionString(tokenSession, "activeTenantId");
+        if (!StringUtils.hasText(sessionTenantId)) {
+            sessionTenantId = sessionString(tokenSession, "tenantId");
+        }
+        String effectiveTenantId = platformAdminSupport.resolveEffectiveTenant(user, sessionTenantId);
+        if (!effectiveTenantId.equals(sessionString(tokenSession, "activeTenantId"))) {
+            tokenSession.set("activeTenantId", effectiveTenantId);
+        }
         SessionPrincipal principal = new SessionPrincipal(StpUtil.getTokenValue(), effectiveTenantId, user.tenantId());
         AuthContextHolder.set(user, principal);
         return principal;
@@ -62,7 +65,8 @@ public class CurrentUserService {
             }
             long userId = StpUtil.getLoginIdAsLong();
             SaSession tokenSession = StpUtil.getTokenSession();
-            UserAccount user = userRepository.getObject().findById(userId)
+            String loginTenantId = sessionString(tokenSession, "tenantId");
+            UserAccount user = runWithTenant(loginTenantId, () -> userRepository.getObject().findById(userId))
                     .orElseThrow(() -> {
                         kickoutCurrentToken();
                         StpUtil.checkLogin();
@@ -106,11 +110,25 @@ public class CurrentUserService {
         return fallback;
     }
 
-    private String resolveRequestedTenant(HttpServletRequest request) {
-        String tenantId = request.getHeader(tenantProperties.headerName());
+    private <T> T runWithTenant(String tenantId, Supplier<T> supplier) {
         if (!StringUtils.hasText(tenantId)) {
-            tenantId = request.getParameter(TENANT_ID_PARAM);
+            return supplier.get();
         }
-        return tenantId;
+        String previousTenantId = TenantContext.getTenantId();
+        try {
+            TenantContext.setTenantId(tenantId);
+            return supplier.get();
+        } finally {
+            if (StringUtils.hasText(previousTenantId)) {
+                TenantContext.setTenantId(previousTenantId);
+            } else {
+                TenantContext.clear();
+            }
+        }
+    }
+
+    private String sessionString(SaSession session, String key) {
+        Object value = session.get(key);
+        return value == null ? null : String.valueOf(value);
     }
 }

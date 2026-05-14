@@ -13,7 +13,6 @@ import com.enterprise.auth.platform.service.RolePayloadCodec;
 import com.enterprise.auth.platform.service.ResourceService;
 import com.enterprise.auth.platform.security.AuthPrincipalCacheService;
 import com.enterprise.auth.platform.dto.model.UserAccount;
-import com.enterprise.auth.platform.dao.repository.UserRepository;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -62,7 +61,7 @@ public class DatabaseUserRepository implements UserRepository {
     }
 
     @Override
-    @Cacheable(value = "auth:principal", key = "T(com.enterprise.auth.platform.security.AuthPrincipalCacheService).idKey(#id)", unless = "#result == null")
+    @Cacheable(value = "auth:principal", key = "T(com.enterprise.auth.platform.security.AuthPrincipalCacheService).currentTenantIdKey(#id)", unless = "#result == null")
     public Optional<UserAccount> findById(Long id) {
         SysUserEntity entity = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>()
                 .eq(SysUserEntity::getId, id)

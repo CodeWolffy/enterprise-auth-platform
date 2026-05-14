@@ -29,7 +29,8 @@ public class SaTokenUserContextInterceptor implements HandlerInterceptor {
             long lastAccessAt = Instant.now().toEpochMilli();
             StpUtil.getTokenSession().set("lastAccessAt", lastAccessAt);
             String token = StpUtil.getTokenValue();
-            if (!sessionIndexService.touch(token, lastAccessAt)) {
+            boolean touched = sessionIndexService.touch(token, lastAccessAt);
+            if (!touched) {
                 AuthContextHolder.currentUser().ifPresent(user -> sessionIndexService.register(
                         token,
                         user.id(),
@@ -42,6 +43,7 @@ public class SaTokenUserContextInterceptor implements HandlerInterceptor {
                 ));
                 sessionIndexService.touch(token, lastAccessAt);
             }
+            sessionIndexService.updateActiveTenant(token, principal.tenantId());
             TenantContext.setTenantId(principal.tenantId());
         }
         return true;
@@ -50,6 +52,7 @@ public class SaTokenUserContextInterceptor implements HandlerInterceptor {
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
         AuthContextHolder.clear();
+        TenantContext.clear();
     }
 
     private void enforceClientIpBinding(HttpServletRequest request) {

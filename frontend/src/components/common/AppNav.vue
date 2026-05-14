@@ -43,6 +43,7 @@ import {
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { resolveRoutePath } from '@/router/route-access'
 import type { MenuItem } from '@/types/auth'
 
 defineProps<{
@@ -53,23 +54,6 @@ const route = useRoute()
 const authStore = useAuthStore()
 
 const activePath = computed(() => route.path)
-
-const ROUTE_KEY_PATH_MAP: Record<string, string> = {
-  dashboard: '/dashboard',
-  users: '/system/users',
-  roles: '/system/roles',
-  depts: '/system/depts',
-  'online-users': '/system/online-users',
-  tenants: '/platform/tenants',
-  audit: '/system/audit',
-  settings: '/system/settings',
-  dicts: '/platform/dicts',
-  configs: '/platform/configs',
-  notices: '/platform/notices',
-  categories: '/platform/categories',
-  'tenant-catalog': '/platform/tenant-catalog',
-  resources: '/system/resources',
-}
 
 const iconMap: Record<string, any> = {
   dashboard: Monitor,
@@ -140,7 +124,7 @@ function buildLinks(nodes: MenuItem[]): NavLink[] {
 
   for (const node of nodes) {
     const routeKey = node.routeKey?.trim() || node.code?.trim() || ''
-    const path = routeKey ? ROUTE_KEY_PATH_MAP[routeKey] : ''
+    const path = resolveRoutePath(routeKey)
     const children = buildLinks(node.children ?? [])
     if (!path && !children.length) {
       continue

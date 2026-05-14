@@ -35,6 +35,7 @@ export interface UserSessionView {
   sessionId: string
   username: string
   tenantId: string
+  activeTenantId?: string | null
   clientIp?: string | null
   device?: string | null
   issuedAt?: number | null

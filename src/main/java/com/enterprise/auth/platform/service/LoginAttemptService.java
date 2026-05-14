@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.service;
 
-import com.enterprise.auth.platform.service.AuditService;
 import com.enterprise.auth.platform.common.RateLimitSupport;
+import com.enterprise.auth.platform.config.RateLimitProperties;
 import java.time.Duration;
 import java.util.Map;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -15,19 +15,25 @@ public class LoginAttemptService {
 
     private final StringRedisTemplate stringRedisTemplate;
     private final RateLimitSupport rateLimitSupport;
+    private final RateLimitProperties rateLimitProperties;
     private final AuditService auditService;
 
     public LoginAttemptService(
             StringRedisTemplate stringRedisTemplate,
             RateLimitSupport rateLimitSupport,
+            RateLimitProperties rateLimitProperties,
             AuditService auditService
     ) {
         this.stringRedisTemplate = stringRedisTemplate;
         this.rateLimitSupport = rateLimitSupport;
+        this.rateLimitProperties = rateLimitProperties;
         this.auditService = auditService;
     }
 
     public boolean isLocked(String tenantId, String username) {
+        if (!rateLimitProperties.enabled()) {
+            return false;
+        }
         return Boolean.TRUE.equals(stringRedisTemplate.hasKey(lockKey(tenantId, username)));
     }
 
@@ -37,6 +43,11 @@ public class LoginAttemptService {
     }
 
     public LoginFailureResult recordFailure(String tenantId, String username, String reason, String clientIp) {
+        if (!rateLimitProperties.enabled()) {
+            auditService.record("LOGIN_FAILED", username, tenantId, Map.of("reason", reason, "clientIp", clientIp));
+            return new LoginFailureResult(false, MAX_LOGIN_FAILURES);
+        }
+
         String failKey = failKey(tenantId, username);
         String lockKey = lockKey(tenantId, username);
         Long fails = stringRedisTemplate.opsForValue().increment(failKey);
@@ -58,6 +69,9 @@ public class LoginAttemptService {
     }
 
     public void clearFailures(String tenantId, String username) {
+        if (!rateLimitProperties.enabled()) {
+            return;
+        }
         stringRedisTemplate.delete(failKey(tenantId, username));
         stringRedisTemplate.delete(lockKey(tenantId, username));
     }

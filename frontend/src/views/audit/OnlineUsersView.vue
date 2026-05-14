@@ -54,7 +54,12 @@
             <el-tag v-if="row.currentSession" type="success" effect="dark" size="small">当前会话</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="tenantId" label="租户" min-width="130" />
+        <el-table-column prop="tenantId" label="登录租户" min-width="130" />
+        <el-table-column label="活跃租户" min-width="130">
+          <template #default="{ row }">
+            {{ row.activeTenantId || row.tenantId }}
+          </template>
+        </el-table-column>
         <el-table-column prop="clientIp" label="登录 IP" min-width="130" />
         <el-table-column label="设备" min-width="170" show-overflow-tooltip>
           <template #default="{ row }">
@@ -139,6 +144,7 @@ const pageRecords = computed(() => {
     return [
       item.username,
       item.tenantId,
+      item.activeTenantId,
       item.clientIp,
       item.device,
       formatDevice(item.device),

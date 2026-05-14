@@ -20,6 +20,7 @@ public final class SaTokenMockMvcSupport {
             tokenSession.set("username", user.username());
             tokenSession.set("userId", user.id());
             tokenSession.set("tenantId", user.tenantId());
+            tokenSession.set("activeTenantId", user.tenantId());
             tokenSession.set("sessionVersion", user.sessionVersion());
             tokenSession.set("roles", user.roles());
             tokenSession.set("permissions", user.permissions());

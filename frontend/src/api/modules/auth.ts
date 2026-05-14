@@ -14,6 +14,11 @@ export async function fetchPermissionSnapshot() {
   return data.data
 }
 
+export async function switchTenant(targetTenantId: string) {
+  const { data } = await http.post<ApiResponse<PermissionSnapshot>>(`/api/auth/tenants/${encodeURIComponent(targetTenantId)}/switch`)
+  return data.data
+}
+
 export async function fetchRegisterOptions() {
   const { data } = await http.get<ApiResponse<RegisterOptionsResponse>>('/api/auth/register/options')
   return data.data

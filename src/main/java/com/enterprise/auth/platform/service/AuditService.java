@@ -9,6 +9,7 @@ import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.convention.web.RequestContext;
 import com.enterprise.auth.platform.dao.entity.SysAuditLogEntity;
 import com.enterprise.auth.platform.dao.mapper.SysAuditLogMapper;
+import com.enterprise.auth.platform.security.AuthContextHolder;
 import com.enterprise.auth.platform.security.DataScopeService;
 import com.enterprise.auth.platform.common.TenantContext;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -42,7 +43,7 @@ public class AuditService {
 
     public void record(String type, String operator, String tenantId, Map<String, Object> details) {
         String resolvedTenantId = StringUtils.hasText(tenantId) ? tenantId : "platform";
-        Map<String, Object> enrichedDetails = enrichDetails(details);
+        Map<String, Object> enrichedDetails = enrichDetails(details, operator, resolvedTenantId);
 
         SysAuditLogEntity entity = new SysAuditLogEntity();
         entity.setTenantId(resolvedTenantId);
@@ -141,13 +142,22 @@ public class AuditService {
         return new AuditPage(total, page, size, records);
     }
 
-    private Map<String, Object> enrichDetails(Map<String, Object> details) {
+    private Map<String, Object> enrichDetails(Map<String, Object> details, String operator, String resolvedTenantId) {
         Map<String, Object> enriched = new LinkedHashMap<>();
         if (details != null) {
             enriched.putAll(details);
         }
+        String activeTenantId = StringUtils.hasText(TenantContext.getTenantId()) ? TenantContext.getTenantId() : resolvedTenantId;
+        String operatorTenantId = AuthContextHolder.currentSession()
+                .map(session -> session.operatorTenantId())
+                .filter(StringUtils::hasText)
+                .orElse(activeTenantId);
         enriched.putIfAbsent("requestId", RequestContext.getRequestId());
         enriched.putIfAbsent("clientIp", RequestContext.getClientIp());
+        enriched.putIfAbsent("operator", operator);
+        enriched.putIfAbsent("activeTenantId", activeTenantId);
+        enriched.putIfAbsent("operatorTenantId", operatorTenantId);
+        enriched.putIfAbsent("targetTenantId", resolvedTenantId);
         return enriched;
     }
 

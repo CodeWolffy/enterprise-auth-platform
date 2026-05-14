@@ -97,7 +97,9 @@ export async function seedAuthSession(page: Page, snapshot: MockPermissionSnapsh
   }
   await page.addInitScript(
     ({ key, value }) => {
-      window.sessionStorage.setItem(key, JSON.stringify(value))
+      if (!window.sessionStorage.getItem(key)) {
+        window.sessionStorage.setItem(key, JSON.stringify(value))
+      }
     },
     { key: AUTH_STORAGE_KEY, value: payload },
   )

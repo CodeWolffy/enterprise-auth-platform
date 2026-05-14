@@ -1,8 +1,9 @@
-﻿import { createRouter, createWebHistory, type RouteLocationNormalized, type RouteRecordRaw } from 'vue-router'
+﻿import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import type { MenuItem, PermissionSnapshot } from '@/types/auth'
+import type { PermissionSnapshot } from '@/types/auth'
 import { useAuthStore } from '@/stores/auth'
+import { collectAllowedRouteKeys, isAllowedRoute, resolveFirstAllowedPath } from './route-access'
 
 const PUBLIC_ROUTES: RouteRecordRaw[] = [
   {
@@ -136,23 +137,6 @@ const DYNAMIC_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = {
   },
 }
 
-const ROUTE_KEY_PATH_MAP: Record<string, string> = {
-  dashboard: '/dashboard',
-  users: '/system/users',
-  roles: '/system/roles',
-  depts: '/system/depts',
-  'online-users': '/system/online-users',
-  tenants: '/platform/tenants',
-  audit: '/system/audit',
-  settings: '/system/settings',
-  dicts: '/platform/dicts',
-  configs: '/platform/configs',
-  notices: '/platform/notices',
-  categories: '/platform/categories',
-  'tenant-catalog': '/platform/tenant-catalog',
-  resources: '/system/resources',
-}
-
 const SHELL_ROUTE: RouteRecordRaw = {
   path: '/',
   name: 'console-shell',
@@ -227,79 +211,6 @@ router.beforeEach(async (to) => {
 router.afterEach((to) => {
   document.title = `${String(to.meta.title ?? 'Console')} | Enterprise Auth Platform`
 })
-
-function isAllowedRoute(snapshot: PermissionSnapshot | null, to: RouteLocationNormalized) {
-  if (!snapshot) {
-    return false
-  }
-
-  const requiredGrant = String(to.meta.requiresGrant ?? '').trim()
-  if (requiredGrant && !snapshot.superAdmin && !(snapshot.grants ?? []).includes(requiredGrant)) {
-    return false
-  }
-
-  const routeKey = String(to.meta.routeKey ?? '').trim()
-  if (!routeKey) {
-    return true
-  }
-
-  const routeKeys = collectAllowedRouteKeys(snapshot.menus ?? [])
-  return routeKeys.has(routeKey)
-}
-
-function resolveFirstAllowedPath(snapshot: PermissionSnapshot | null) {
-  if (!snapshot) {
-    return null
-  }
-  const routeKeys = collectAllowedRouteKeys(snapshot.menus ?? [])
-  const menuList = flattenMenuTree(snapshot.menus ?? [])
-  for (const menu of menuList) {
-    const routeKey = menu.routeKey?.trim()
-    if (!routeKey || !routeKeys.has(routeKey)) {
-      continue
-    }
-    const path = ROUTE_KEY_PATH_MAP[routeKey]
-    if (path) {
-      return path
-    }
-  }
-  return routeKeys.has('dashboard') ? '/dashboard' : null
-}
-
-function collectAllowedRouteKeys(menus: MenuItem[]) {
-  const routeKeys = new Set<string>()
-  const walk = (items: MenuItem[]) => {
-    for (const item of items) {
-      const routeKey = item.routeKey?.trim()
-      if (routeKey) {
-        if (Object.hasOwn(DYNAMIC_ROUTE_DEFINITIONS, routeKey)) {
-          routeKeys.add(routeKey)
-        } else {
-          console.warn('[auth] 后端菜单快照中存在未知的路由键:', routeKey)
-        }
-      }
-      if (item.children?.length) {
-        walk(item.children)
-      }
-    }
-  }
-  walk(menus)
-  return routeKeys
-}
-
-function flattenMenuTree(menus: MenuItem[]) {
-  const result: MenuItem[] = []
-  const walk = (items: MenuItem[]) => {
-    for (const item of items) {
-      result.push(item)
-      if (item.children?.length) {
-        walk(item.children)
-      }
-    }
-  }
-  walk(menus)
-  return result
-}
 
 function registerDynamicRoutes(snapshot?: PermissionSnapshot | null) {
   if (!snapshot) {

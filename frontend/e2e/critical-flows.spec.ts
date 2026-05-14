@@ -199,6 +199,282 @@ test.describe('关键流程回归', () => {
       .toBeNull()
   })
 
+  test('超级管理员可以切换租户并在刷新前持久化目标权限快照', async ({ page }) => {
+    const platformSnapshot = defaultSnapshot()
+    const tenantSnapshot = {
+      ...defaultSnapshot(),
+      tenantId: 'tenant-a',
+      operatorTenantId: 'platform',
+    }
+    let switchRequestPath = ''
+    let meRequestCount = 0
+
+    await seedAuthSession(page, platformSnapshot)
+
+    await page.route('**/*', async (route) => {
+      const request = route.request()
+      const url = new URL(request.url())
+      const method = request.method()
+      if (!url.pathname.startsWith('/api/')) {
+        await route.continue()
+        return
+      }
+
+      if (url.pathname === '/api/tenants' && method === 'GET') {
+        await fulfillJson(route, 200, apiEnvelope({
+          total: 2,
+          page: 1,
+          size: 200,
+          records: [
+            { tenantId: 'platform', name: '平台租户', platformLevel: true, tenantStatus: 1 },
+            { tenantId: 'tenant-a', name: '租户 A', platformLevel: false, tenantStatus: 1 },
+          ],
+        }))
+        return
+      }
+
+      if (/^\/api\/auth\/tenants\/[^/]+\/switch$/.test(url.pathname) && method === 'POST') {
+        switchRequestPath = url.pathname
+        await new Promise((resolve) => setTimeout(resolve, 650))
+        await fulfillJson(route, 200, apiEnvelope(tenantSnapshot))
+        return
+      }
+
+      if (url.pathname === '/api/auth/me' && method === 'GET') {
+        meRequestCount += 1
+        await fulfillJson(route, 200, apiEnvelope(platformSnapshot))
+        return
+      }
+
+      await fulfillJson(route, 200, apiEnvelope({}))
+    })
+
+    await page.goto('/dashboard')
+    await expect(page.locator('.tenant-selector .el-select')).toBeVisible()
+
+    await page.locator('.tenant-selector .el-select').click()
+    const targetTenantOption = page.locator('.el-select-dropdown__item').filter({ hasText: '租户 A (tenant-a)' })
+    await expect(targetTenantOption).toBeVisible()
+    await targetTenantOption.click()
+
+    await expect.poll(() => switchRequestPath).toBe('/api/auth/tenants/tenant-a/switch')
+    expect(meRequestCount).toBe(0)
+    await expect
+      .poll(async () =>
+        page.evaluate((key) => {
+          const raw = window.sessionStorage.getItem(key)
+          return raw ? JSON.parse(raw).tenantId : null
+        }, AUTH_STORAGE_KEY),
+      )
+      .toBe('tenant-a')
+    await expect
+      .poll(async () =>
+        page.evaluate((key) => {
+          const raw = window.sessionStorage.getItem(key)
+          return raw ? JSON.parse(raw).snapshot?.tenantId : null
+        }, AUTH_STORAGE_KEY),
+      )
+      .toBe('tenant-a')
+    await expect(page.locator('.tenant-selector')).toContainText('tenant-a')
+  })
+
+  test('切换租户后按新租户菜单归位且不整页刷新', async ({ page }) => {
+    const platformSnapshot = defaultSnapshot()
+    const tenantSnapshot = {
+      ...defaultSnapshot(),
+      tenantId: 'tenant-a',
+      operatorTenantId: 'platform',
+      grants: ['tenant:read', 'audit:read'],
+      menus: [
+        { id: 25, code: 'audit', title: '安全审计', path: '/system/audit', component: 'AuditView', routeKey: 'audit' },
+      ],
+    }
+
+    await page.addInitScript(() => {
+      const reloadCountKey = '__eap_reload_count__'
+      const current = Number(window.sessionStorage.getItem(reloadCountKey) || '0')
+      window.sessionStorage.setItem(reloadCountKey, String(current + 1))
+    })
+    await seedAuthSession(page, platformSnapshot)
+
+    await page.route('**/*', async (route) => {
+      const request = route.request()
+      const url = new URL(request.url())
+      const method = request.method()
+      if (!url.pathname.startsWith('/api/')) {
+        await route.continue()
+        return
+      }
+
+      if (url.pathname === '/api/tenants' && method === 'GET') {
+        await fulfillJson(route, 200, apiEnvelope({
+          total: 2,
+          page: 1,
+          size: 200,
+          records: [
+            { tenantId: 'platform', name: '平台租户', platformLevel: true, tenantStatus: 1 },
+            { tenantId: 'tenant-a', name: '租户 A', platformLevel: false, tenantStatus: 1 },
+          ],
+        }))
+        return
+      }
+
+      if (url.pathname === '/api/users' && method === 'GET') {
+        await fulfillJson(route, 200, apiEnvelope({
+          total: 1,
+          page: 1,
+          size: 10,
+          records: [
+            { id: 1, tenantId: 'platform', username: 'admin', displayName: '管理员', enabled: true, roles: ['ADMIN'] },
+          ],
+        }))
+        return
+      }
+
+      if (url.pathname === '/api/roles' && method === 'GET') {
+        await fulfillJson(route, 200, apiEnvelope([]))
+        return
+      }
+
+      if (/^\/api\/auth\/tenants\/[^/]+\/switch$/.test(url.pathname) && method === 'POST') {
+        await fulfillJson(route, 200, apiEnvelope(tenantSnapshot))
+        return
+      }
+
+      if (url.pathname === '/api/audit/events' && method === 'GET') {
+        await fulfillJson(route, 200, apiEnvelope({ total: 0, page: 1, size: 20, records: [] }))
+        return
+      }
+
+      if (url.pathname === '/api/audit/exports/policy' && method === 'GET') {
+        await fulfillJson(route, 200, apiEnvelope({ retentionDays: 7, maxTasks: 100 }))
+        return
+      }
+
+      if (url.pathname === '/api/audit/exports' && method === 'GET') {
+        await fulfillJson(route, 200, apiEnvelope({ total: 0, page: 1, size: 10, records: [] }))
+        return
+      }
+
+      await fulfillJson(route, 200, apiEnvelope({}))
+    })
+
+    await page.goto('/system/users')
+    await expect(page).toHaveURL(/\/system\/users$/)
+    await expect(page.locator('.sidebar-menu')).toContainText('用户管理')
+
+    await page.locator('.tenant-selector .el-select').click()
+    await page.locator('.el-select-dropdown__item').filter({ hasText: '租户 A (tenant-a)' }).click()
+
+    await expect(page).toHaveURL(/\/system\/audit$/)
+    await expect(page.locator('.sidebar-menu')).toContainText('安全审计')
+    await expect(page.locator('.sidebar-menu')).not.toContainText('用户管理')
+    await expect
+      .poll(async () => page.evaluate(() => window.sessionStorage.getItem('__eap_reload_count__')))
+      .toBe('1')
+  })
+
+  test('切换租户失败时恢复旧租户、旧快照和当前路由', async ({ page }) => {
+    const platformSnapshot = defaultSnapshot()
+
+    await seedAuthSession(page, platformSnapshot)
+
+    await page.route('**/*', async (route) => {
+      const request = route.request()
+      const url = new URL(request.url())
+      const method = request.method()
+      if (!url.pathname.startsWith('/api/')) {
+        await route.continue()
+        return
+      }
+
+      if (url.pathname === '/api/tenants' && method === 'GET') {
+        await fulfillJson(route, 200, apiEnvelope({
+          total: 2,
+          page: 1,
+          size: 200,
+          records: [
+            { tenantId: 'platform', name: '平台租户', platformLevel: true, tenantStatus: 1 },
+            { tenantId: 'tenant-a', name: '租户 A', platformLevel: false, tenantStatus: 1 },
+          ],
+        }))
+        return
+      }
+
+      if (/^\/api\/auth\/tenants\/[^/]+\/switch$/.test(url.pathname) && method === 'POST') {
+        await fulfillJson(route, 400, {
+          code: 'TENANT_DISABLED',
+          success: false,
+          data: null,
+          message: '租户已停用',
+        })
+        return
+      }
+
+      await fulfillJson(route, 200, apiEnvelope({}))
+    })
+
+    await page.goto('/dashboard')
+    await page.locator('.tenant-selector .el-select').click()
+    await page.locator('.el-select-dropdown__item').filter({ hasText: '租户 A (tenant-a)' }).click()
+
+    await expect(page).toHaveURL(/\/dashboard$/)
+    await expect
+      .poll(async () =>
+        page.evaluate((key) => {
+          const raw = window.sessionStorage.getItem(key)
+          return raw ? JSON.parse(raw) : null
+        }, AUTH_STORAGE_KEY),
+      )
+      .toMatchObject({
+        tenantId: 'platform',
+        operatorTenantId: 'platform',
+        snapshot: { tenantId: 'platform' },
+      })
+    await expect(page.locator('.tenant-selector')).toContainText('platform')
+  })
+
+  test('非管理员用户不显示租户选择器', async ({ page }) => {
+    const tenantSnapshot = {
+      ...defaultSnapshot(),
+      tenantId: 'tenant-a',
+      operatorTenantId: 'tenant-a',
+      superAdmin: false,
+      grants: ['audit:read'],
+      menus: [
+        { id: 25, code: 'audit', title: '安全审计', path: '/system/audit', component: 'AuditView', routeKey: 'audit' },
+      ],
+    }
+
+    await seedAuthSession(page, tenantSnapshot)
+    await page.route('**/*', async (route) => {
+      const request = route.request()
+      const url = new URL(request.url())
+      const method = request.method()
+      if (!url.pathname.startsWith('/api/')) {
+        await route.continue()
+        return
+      }
+      if (url.pathname === '/api/audit/events' && method === 'GET') {
+        await fulfillJson(route, 200, apiEnvelope({ total: 0, page: 1, size: 20, records: [] }))
+        return
+      }
+      if (url.pathname === '/api/audit/exports/policy' && method === 'GET') {
+        await fulfillJson(route, 200, apiEnvelope({ retentionDays: 7, maxTasks: 100 }))
+        return
+      }
+      if (url.pathname === '/api/audit/exports' && method === 'GET') {
+        await fulfillJson(route, 200, apiEnvelope({ total: 0, page: 1, size: 10, records: [] }))
+        return
+      }
+      await fulfillJson(route, 200, apiEnvelope({}))
+    })
+
+    await page.goto('/system/audit')
+
+    await expect(page.locator('.tenant-selector')).toHaveCount(0)
+  })
+
   test('导出任务链路：查看详情、归档、删除', async ({ page }) => {
     await seedAuthSession(page)
 
