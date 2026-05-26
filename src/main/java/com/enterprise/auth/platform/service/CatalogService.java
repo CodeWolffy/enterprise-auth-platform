@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.enterprise.auth.platform.common.convention.exception.BusinessException;
+import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.dto.model.DataScopeType;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.dao.entity.SysDeptEntity;
@@ -19,8 +19,8 @@ import com.enterprise.auth.platform.dao.mapper.SysTenantMapper;
 import com.enterprise.auth.platform.dao.mapper.SysTenantPackageCapabilityMapper;
 import com.enterprise.auth.platform.dao.mapper.SysTenantPackageMapper;
 import com.enterprise.auth.platform.service.RolePayloadCodec;
-import com.enterprise.auth.platform.security.DataScopeService;
-import com.enterprise.auth.platform.common.TenantContext;
+import com.enterprise.auth.platform.common.authz.DataScopeService;
+import com.enterprise.auth.platform.common.context.TenantContext;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.LinkedHashMap;
 import java.util.List;

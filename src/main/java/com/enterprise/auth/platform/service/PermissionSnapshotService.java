@@ -2,8 +2,8 @@ package com.enterprise.auth.platform.service;
 
 import com.enterprise.auth.platform.dto.resp.PermissionSnapshotResponse;
 import com.enterprise.auth.platform.service.ResourceService;
-import com.enterprise.auth.platform.security.PlatformAdminSupport;
-import com.enterprise.auth.platform.common.TenantContext;
+import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
+import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.dto.model.UserAccount;
 import java.util.List;
 import java.util.Set;

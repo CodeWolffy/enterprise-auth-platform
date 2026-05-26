@@ -2,7 +2,7 @@ package com.enterprise.auth.platform.common.database;
 
 import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
 import com.enterprise.auth.platform.common.TimeSupport;
-import com.enterprise.auth.platform.security.SecuritySupport;
+import com.enterprise.auth.platform.common.authz.SecuritySupport;
 import java.time.LocalDateTime;
 import org.apache.ibatis.reflection.MetaObject;
 import org.springframework.stereotype.Component;

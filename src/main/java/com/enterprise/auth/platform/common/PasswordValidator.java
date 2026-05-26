@@ -1,6 +1,6 @@
 package com.enterprise.auth.platform.common;
 
-import com.enterprise.auth.platform.common.convention.exception.BusinessException;
+import com.enterprise.auth.platform.common.exception.BusinessException;
 import java.util.regex.Pattern;
 
 public class PasswordValidator {

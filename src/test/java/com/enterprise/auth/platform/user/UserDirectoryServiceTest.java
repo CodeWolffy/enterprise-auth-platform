@@ -11,7 +11,7 @@ import com.enterprise.auth.platform.dao.entity.SysDeptEntity;
 import com.enterprise.auth.platform.dao.entity.SysUserEntity;
 import com.enterprise.auth.platform.dao.mapper.SysDeptMapper;
 import com.enterprise.auth.platform.dao.mapper.SysUserMapper;
-import com.enterprise.auth.platform.common.TenantContext;
+import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.dto.model.UserAccount;
 import com.enterprise.auth.platform.dto.resp.UserSummary;
 import com.enterprise.auth.platform.dao.repository.UserRepository;

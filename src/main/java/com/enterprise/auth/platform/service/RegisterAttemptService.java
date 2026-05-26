@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.service;
 
 import com.enterprise.auth.platform.service.AuditService;
-import com.enterprise.auth.platform.common.convention.exception.BusinessException;
+import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.RateLimitSupport;
 import com.enterprise.auth.platform.config.RegistrationProperties;
 import java.time.Duration;

@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.enterprise.auth.platform.dto.req.DictCrudRequest;
 import com.enterprise.auth.platform.service.SystemManagementService;
-import com.enterprise.auth.platform.common.TenantContext;
+import com.enterprise.auth.platform.common.context.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

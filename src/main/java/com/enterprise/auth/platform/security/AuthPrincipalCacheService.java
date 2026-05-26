@@ -1,6 +1,6 @@
 package com.enterprise.auth.platform.security;
 
-import com.enterprise.auth.platform.common.TenantContext;
+import com.enterprise.auth.platform.common.context.TenantContext;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Component;

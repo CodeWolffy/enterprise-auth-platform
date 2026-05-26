@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.controller;
 
 import com.enterprise.auth.platform.service.CatalogService;
-import com.enterprise.auth.platform.common.convention.result.ApiResponse;
+import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.dto.req.AssignResourcesRequest;
 import com.enterprise.auth.platform.dto.req.CreateRoleRequest;
 import com.enterprise.auth.platform.dto.req.CreateRoleRequest;

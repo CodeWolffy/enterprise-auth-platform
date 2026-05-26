@@ -6,11 +6,11 @@ import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.clear;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.enterprise.auth.platform.common.convention.exception.BusinessException;
+import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.dto.model.DataScopeType;
 import com.enterprise.auth.platform.dao.entity.SysUserEntity;
 import com.enterprise.auth.platform.dao.mapper.SysUserMapper;
-import com.enterprise.auth.platform.common.TenantContext;
+import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.dto.req.CreateUserRequest;
 import com.enterprise.auth.platform.dto.req.CreateUserRequest;
 import com.enterprise.auth.platform.dto.model.UserAccount;

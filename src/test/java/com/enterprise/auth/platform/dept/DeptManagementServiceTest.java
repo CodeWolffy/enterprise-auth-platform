@@ -7,7 +7,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.enterprise.auth.platform.service.CatalogService;
-import com.enterprise.auth.platform.common.convention.exception.BusinessException;
+import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.dto.model.DataScopeType;
 import com.enterprise.auth.platform.dto.req.DeptCrudRequest;
 import com.enterprise.auth.platform.service.DeptManagementService;
@@ -15,7 +15,7 @@ import com.enterprise.auth.platform.dao.entity.SysDeptEntity;
 import com.enterprise.auth.platform.dao.entity.SysUserEntity;
 import com.enterprise.auth.platform.dao.mapper.SysDeptMapper;
 import com.enterprise.auth.platform.dao.mapper.SysUserMapper;
-import com.enterprise.auth.platform.common.TenantContext;
+import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.dto.model.UserAccount;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;

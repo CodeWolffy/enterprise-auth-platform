@@ -1,0 +1,1 @@
+package com.enterprise.auth.platform.modules.dept.application;

@@ -1,6 +1,6 @@
 package com.enterprise.auth.platform.controller;
 
-import com.enterprise.auth.platform.common.convention.result.ApiResponse;
+import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.dto.model.PageResult;
 import com.enterprise.auth.platform.dto.req.ConfigCrudRequest;
 import com.enterprise.auth.platform.dto.req.CategoryConfigRequest;

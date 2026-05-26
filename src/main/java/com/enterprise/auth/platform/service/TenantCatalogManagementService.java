@@ -2,7 +2,7 @@ package com.enterprise.auth.platform.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.service.AuditService;
-import com.enterprise.auth.platform.common.convention.exception.BusinessException;
+import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.dao.entity.SysTenantCapabilityEntity;
 import com.enterprise.auth.platform.dao.entity.SysTenantCapabilityOverrideEntity;
@@ -14,8 +14,8 @@ import com.enterprise.auth.platform.dao.mapper.SysTenantCapabilityOverrideMapper
 import com.enterprise.auth.platform.dao.mapper.SysTenantMapper;
 import com.enterprise.auth.platform.dao.mapper.SysTenantPackageCapabilityMapper;
 import com.enterprise.auth.platform.dao.mapper.SysTenantPackageMapper;
-import com.enterprise.auth.platform.security.SecuritySupport;
-import com.enterprise.auth.platform.common.TenantContext;
+import com.enterprise.auth.platform.common.authz.SecuritySupport;
+import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.dto.req.TenantCapabilityCrudRequest;
 import com.enterprise.auth.platform.dto.req.TenantPackageCrudRequest;
 import io.swagger.v3.oas.annotations.media.Schema;

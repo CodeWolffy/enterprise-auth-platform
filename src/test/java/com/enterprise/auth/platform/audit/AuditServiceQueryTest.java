@@ -10,7 +10,7 @@ import com.enterprise.auth.platform.service.AuditService;
 import com.enterprise.auth.platform.dto.model.DataScopeType;
 import com.enterprise.auth.platform.dao.entity.SysUserEntity;
 import com.enterprise.auth.platform.dao.mapper.SysUserMapper;
-import com.enterprise.auth.platform.common.TenantContext;
+import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.dto.model.UserAccount;
 import java.util.Map;
 import java.util.Set;

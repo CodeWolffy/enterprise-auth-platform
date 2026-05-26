@@ -4,7 +4,7 @@ import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.SaLoginModel;
 import cn.dev33.satoken.stp.StpUtil;
 import com.enterprise.auth.platform.dto.model.SessionPrincipal;
-import com.enterprise.auth.platform.security.AuthContextHolder;
+import com.enterprise.auth.platform.common.context.AuthContextHolder;
 import com.enterprise.auth.platform.dto.model.UserAccount;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 

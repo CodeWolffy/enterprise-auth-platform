@@ -3,7 +3,7 @@ package com.enterprise.auth.platform.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.dao.entity.SysConfigEntity;
 import com.enterprise.auth.platform.dao.mapper.SysConfigMapper;
-import com.enterprise.auth.platform.common.TenantContext;
+import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.config.TenantProperties;
 import java.util.Arrays;
 import java.util.Collections;

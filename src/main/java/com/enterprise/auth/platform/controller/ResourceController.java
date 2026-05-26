@@ -1,6 +1,6 @@
 package com.enterprise.auth.platform.controller;
 
-import com.enterprise.auth.platform.common.convention.result.ApiResponse;
+import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.dto.req.CreateResourceRequest;
 import com.enterprise.auth.platform.dto.req.SortResourceRequest;
 import com.enterprise.auth.platform.dto.req.CreateResourceRequest;

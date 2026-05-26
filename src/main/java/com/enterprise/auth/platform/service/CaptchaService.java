@@ -7,7 +7,7 @@ import cloud.tianai.captcha.spring.plugins.secondary.SecondaryVerificationApplic
 import cloud.tianai.captcha.validator.common.model.dto.ImageCaptchaTrack;
 import com.enterprise.auth.platform.dto.req.CaptchaVerifyRequest;
 import com.enterprise.auth.platform.dto.resp.SliderCaptchaResponse;
-import com.enterprise.auth.platform.common.convention.exception.BusinessException;
+import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
