@@ -15,10 +15,6 @@ public class ResourceQueryFacade {
         this.resourceService = resourceService;
     }
 
-    public Set<String> resolveGrantKeys(String activeTenantId, Set<String> roleCodes, boolean superAdmin) {
-        return resourceService.resolveGrantKeys(activeTenantId, roleCodes, superAdmin);
-    }
-
     public List<MenuNode> resolveMenuTree(String activeTenantId, Set<String> roleCodes, boolean superAdmin) {
         return resourceService.resolveMenuTree(activeTenantId, roleCodes, superAdmin);
     }

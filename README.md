@@ -325,6 +325,13 @@ npm run test:visual
 npm run test:visual:update
 ```
 
+## 基座扩展文档
+
+- 新增业务模块：参考 `docs/基座扩展指南.md`
+- 模块边界和依赖方向：参考 `docs/模块边界规范.md`
+- 新项目复用初始化：参考 `docs/新项目初始化清单.md`
+- 认证、会话、权限、租户切换：参考 `docs/security-auth.md`
+
 ## CI
 
 - 主 CI：`.github/workflows/ci.yml`

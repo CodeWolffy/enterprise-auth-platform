@@ -1,10 +1,10 @@
 package com.enterprise.auth.platform.controller;
 
-import com.enterprise.auth.platform.service.CatalogService;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.dto.req.AssignResourcesRequest;
 import com.enterprise.auth.platform.dto.req.CreateRoleRequest;
-import com.enterprise.auth.platform.dto.req.CreateRoleRequest;
+import com.enterprise.auth.platform.modules.role.application.RoleGrantQueryFacade;
+import com.enterprise.auth.platform.service.CatalogService;
 import com.enterprise.auth.platform.service.RoleManagementService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -29,10 +29,16 @@ public class RoleController {
 
     private final CatalogService catalogService;
     private final RoleManagementService roleManagementService;
+    private final RoleGrantQueryFacade roleGrantQueryFacade;
 
-    public RoleController(CatalogService catalogService, RoleManagementService roleManagementService) {
+    public RoleController(
+            CatalogService catalogService,
+            RoleManagementService roleManagementService,
+            RoleGrantQueryFacade roleGrantQueryFacade
+    ) {
         this.catalogService = catalogService;
         this.roleManagementService = roleManagementService;
+        this.roleGrantQueryFacade = roleGrantQueryFacade;
     }
 
     @Operation(summary = "查询角色列表")
@@ -46,7 +52,7 @@ public class RoleController {
     @GetMapping("/{roleId}/resources")
     @SaCheckPermission("role:read")
     public ApiResponse<Set<Long>> assignedResources(@Parameter(description = "角色 ID") @PathVariable Long roleId) {
-        return ApiResponse.ok(roleManagementService.listAssignedResources(roleId));
+        return ApiResponse.ok(roleGrantQueryFacade.listRoleResourceIds(roleId));
     }
 
     @Operation(summary = "新增角色")

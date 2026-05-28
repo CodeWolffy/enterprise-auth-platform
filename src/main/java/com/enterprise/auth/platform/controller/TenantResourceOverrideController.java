@@ -2,8 +2,9 @@ package com.enterprise.auth.platform.controller;
 
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.dto.model.TenantResourceOverrideItem;
-import com.enterprise.auth.platform.service.ResourceService;
 import com.enterprise.auth.platform.dto.req.UpdateTenantResourceOverridesRequest;
+import com.enterprise.auth.platform.modules.tenant.application.TenantResourcePolicyFacade;
+import com.enterprise.auth.platform.service.ResourceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,9 +23,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/tenants/{tenantId}/resource-overrides")
 public class TenantResourceOverrideController {
 
+    private final TenantResourcePolicyFacade tenantResourcePolicyFacade;
     private final ResourceService resourceService;
 
-    public TenantResourceOverrideController(ResourceService resourceService) {
+    public TenantResourceOverrideController(
+            TenantResourcePolicyFacade tenantResourcePolicyFacade,
+            ResourceService resourceService
+    ) {
+        this.tenantResourcePolicyFacade = tenantResourcePolicyFacade;
         this.resourceService = resourceService;
     }
 
@@ -34,7 +40,7 @@ public class TenantResourceOverrideController {
     public ApiResponse<List<TenantResourceOverrideItem>> list(
             @Parameter(description = "租户 ID") @PathVariable String tenantId
     ) {
-        return ApiResponse.ok(resourceService.listTenantOverrides(tenantId));
+        return ApiResponse.ok(tenantResourcePolicyFacade.listTenantOverrides(tenantId));
     }
 
     @Operation(summary = "更新租户资源覆盖")

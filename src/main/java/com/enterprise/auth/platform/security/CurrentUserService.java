@@ -12,7 +12,9 @@ import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.dto.model.UserAccount;
 import com.enterprise.auth.platform.dao.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.LinkedHashSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -55,8 +57,9 @@ public class CurrentUserService {
         if (!effectiveTenantId.equals(sessionString(tokenSession, "activeTenantId"))) {
             tokenSession.set("activeTenantId", effectiveTenantId);
         }
-        SessionPrincipal principal = new SessionPrincipal(StpUtil.getTokenValue(), effectiveTenantId, user.tenantId());
-        AuthContextHolder.set(user, principal);
+        UserAccount effectiveUser = mergeSessionAuthorities(user, tokenSession);
+        SessionPrincipal principal = new SessionPrincipal(StpUtil.getTokenValue(), effectiveTenantId, effectiveUser.tenantId());
+        AuthContextHolder.set(effectiveUser, principal);
         return principal;
     }
 
@@ -74,16 +77,17 @@ public class CurrentUserService {
                         StpUtil.checkLogin();
                         return new BusinessException("USER_NOT_FOUND", "User not found");
             });
-            if (!user.enabled()) {
+            UserAccount effectiveUser = mergeSessionAuthorities(user, tokenSession);
+            if (!effectiveUser.enabled()) {
                 StpUtil.kickout(userId);
                 StpUtil.checkLogin();
             }
-            int tokenSessionVersion = sessionInt(tokenSession, "sessionVersion", user.sessionVersion());
-            if (tokenSessionVersion != user.sessionVersion()) {
+            int tokenSessionVersion = sessionInt(tokenSession, "sessionVersion", effectiveUser.sessionVersion());
+            if (tokenSessionVersion != effectiveUser.sessionVersion()) {
                 kickoutCurrentToken();
                 StpUtil.checkLogin();
             }
-            return Optional.of(user);
+            return Optional.of(effectiveUser);
         } catch (SaTokenContextException ignored) {
             return Optional.empty();
         }
@@ -97,19 +101,36 @@ public class CurrentUserService {
         }
     }
 
-    private int sessionInt(SaSession session, String key, int fallback) {
-        Object value = session.get(key);
-        if (value instanceof Number number) {
-            return number.intValue();
-        }
-        if (value != null) {
-            try {
-                return Integer.parseInt(String.valueOf(value));
-            } catch (NumberFormatException ignored) {
-                return fallback;
+    private UserAccount mergeSessionAuthorities(UserAccount user, SaSession tokenSession) {
+        Set<String> roles = mergeStringSet(user.roles(), tokenSession.get("roles"));
+        Set<String> permissions = mergeStringSet(user.permissions(), tokenSession.get("permissions"));
+        return new UserAccount(
+                user.id(),
+                user.tenantId(),
+                user.username(),
+                user.password(),
+                user.enabled(),
+                roles,
+                permissions,
+                user.customDeptIds(),
+                user.dataScopeType(),
+                user.sessionVersion()
+        );
+    }
+
+    private Set<String> mergeStringSet(Set<String> base, Object sessionValue) {
+        LinkedHashSet<String> merged = new LinkedHashSet<>(base);
+        if (sessionValue instanceof Iterable<?> iterable) {
+            for (Object item : iterable) {
+                if (item != null) {
+                    String value = String.valueOf(item).trim();
+                    if (StringUtils.hasText(value)) {
+                        merged.add(value);
+                    }
+                }
             }
         }
-        return fallback;
+        return Set.copyOf(merged);
     }
 
     private <T> T runWithTenant(String tenantId, Supplier<T> supplier) {
@@ -127,6 +148,21 @@ public class CurrentUserService {
                 TenantContext.clear();
             }
         }
+    }
+
+    private int sessionInt(SaSession session, String key, int fallback) {
+        Object value = session.get(key);
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value instanceof String text && StringUtils.hasText(text)) {
+            try {
+                return Integer.parseInt(text.trim());
+            } catch (NumberFormatException ignored) {
+                return fallback;
+            }
+        }
+        return fallback;
     }
 
     private String sessionString(SaSession session, String key) {

@@ -1,10 +1,12 @@
-﻿import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+﻿import { createRouter, createWebHistory, type RouteRecordName, type RouteRecordRaw } from 'vue-router'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import type { PermissionSnapshot } from '@/types/auth'
 import { useAuthStore } from '@/stores/auth'
-import { APP_ROUTE_DEFINITIONS } from '@/app/registry/module-manifest'
+import { APP_ROUTE_MANIFESTS, type AppRouteManifest } from '@/app/registry/module-manifest'
 import { collectAllowedRouteKeys, isAllowedRoute, resolveFirstAllowedPath } from './route-access'
+
+const CONSOLE_SHELL_ROUTE_NAME = 'console-shell'
 
 const PUBLIC_ROUTES: RouteRecordRaw[] = [
   {
@@ -23,7 +25,7 @@ const PUBLIC_ROUTES: RouteRecordRaw[] = [
 
 const SHELL_ROUTE: RouteRecordRaw = {
   path: '/',
-  name: 'console-shell',
+  name: CONSOLE_SHELL_ROUTE_NAME,
   component: () => import('@/layouts/ConsoleLayout.vue'),
   children: [
     {
@@ -32,7 +34,6 @@ const SHELL_ROUTE: RouteRecordRaw = {
       redirect: '/dashboard',
       meta: { hidden: true },
     },
-    ...Object.values(APP_ROUTE_DEFINITIONS),
   ],
 }
 
@@ -77,6 +78,10 @@ router.beforeEach(async (to) => {
   }
 
   if (to.name === 'not-found') {
+    const resolvedRoute = router.resolve(to.fullPath)
+    if (resolvedRoute.name !== 'not-found') {
+      return { path: to.path, query: to.query, hash: to.hash, replace: true }
+    }
     return true
   }
 
@@ -96,15 +101,58 @@ router.afterEach((to) => {
   document.title = `${String(to.meta.title ?? 'Console')} | Enterprise Auth Platform`
 })
 
+const dynamicRouteNames = new Set<RouteRecordName>()
+
 function registerDynamicRoutes(snapshot?: PermissionSnapshot | null) {
+  clearDynamicRoutes()
   if (!snapshot) {
     return
   }
-  collectAllowedRouteKeys(snapshot.menus ?? [])
+
+  const allowedRouteKeys = collectAllowedRouteKeys(snapshot.menus ?? [])
+  for (const manifest of APP_ROUTE_MANIFESTS) {
+    if (!canRegisterRoute(manifest, snapshot, allowedRouteKeys)) {
+      continue
+    }
+    router.addRoute(CONSOLE_SHELL_ROUTE_NAME, toRouteRecord(manifest))
+    dynamicRouteNames.add(manifest.name)
+  }
 }
 
 function clearDynamicRoutes() {
-  // 静态路由注册，此处留空
+  for (const routeName of dynamicRouteNames) {
+    if (router.hasRoute(routeName)) {
+      router.removeRoute(routeName)
+    }
+  }
+  dynamicRouteNames.clear()
+}
+
+function canRegisterRoute(
+  manifest: AppRouteManifest,
+  snapshot: PermissionSnapshot,
+  allowedRouteKeys: Set<string>,
+) {
+  if (manifest.routeKey) {
+    return allowedRouteKeys.has(manifest.routeKey)
+  }
+  const requiredGrant = manifest.requiredGrant?.trim()
+  return !requiredGrant || snapshot.superAdmin || (snapshot.grants ?? []).includes(requiredGrant)
+}
+
+function toRouteRecord(manifest: AppRouteManifest): RouteRecordRaw {
+  return {
+    path: manifest.path,
+    name: manifest.name,
+    component: manifest.component,
+    meta: {
+      title: manifest.title,
+      routeKey: manifest.routeKey,
+      requiresGrant: manifest.requiredGrant,
+      hidden: manifest.hidden,
+      icon: manifest.icon,
+    },
+  }
 }
 
 export { registerDynamicRoutes, clearDynamicRoutes }
