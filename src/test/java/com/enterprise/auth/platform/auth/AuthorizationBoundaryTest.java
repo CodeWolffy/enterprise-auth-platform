@@ -179,6 +179,26 @@ class AuthorizationBoundaryTest {
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
 
+    @Test
+    void permissionSnapshotShouldExposeStableMenuAndGrantContract() throws Exception {
+        mockMvc.perform(get("/api/auth/me")
+                        .with(bearer(principal(1L, Set.of("ADMIN"), Set.of())))
+                        .header("X-Tenant-Id", "platform"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.userId").value(1))
+                .andExpect(jsonPath("$.data.username").value("admin"))
+                .andExpect(jsonPath("$.data.tenantId").value("platform"))
+                .andExpect(jsonPath("$.data.operatorTenantId").value("platform"))
+                .andExpect(jsonPath("$.data.roles[?(@ == 'ADMIN')]").exists())
+                .andExpect(jsonPath("$.data.grants[?(@ == 'user:read')]").exists())
+                .andExpect(jsonPath("$.data.menus").isArray())
+                .andExpect(jsonPath("$.data.menus..routeKey").exists())
+                .andExpect(jsonPath("$.data.menus..path").exists())
+                .andExpect(jsonPath("$.data.menus..component").exists())
+                .andExpect(jsonPath("$.data.superAdmin").value(true));
+    }
+
   @Test
   void allScopeSessionsShouldFallBackToOwnSessionsWithoutSessionWritePermission() throws Exception {
     mockMvc.perform(get("/api/auth/sessions")
@@ -194,13 +214,17 @@ class AuthorizationBoundaryTest {
     }
 
     private UserAccount principal(long userId, Set<String> permissions) {
+        return principal(userId, Set.of(), permissions);
+    }
+
+    private UserAccount principal(long userId, Set<String> roles, Set<String> permissions) {
         return new UserAccount(
                 userId,
                 "platform",
                 "authorization_boundary_user",
                 passwordHasher.hash("Boundary@123"),
                 true,
-                Set.of(),
+                roles,
                 permissions,
                 Set.of(),
                 DataScopeType.ALL,

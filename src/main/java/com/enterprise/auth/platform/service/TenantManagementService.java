@@ -1,8 +1,6 @@
 package com.enterprise.auth.platform.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.enterprise.auth.platform.service.AuditService;
-import com.enterprise.auth.platform.service.CatalogService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.dto.model.PageResult;
 import com.enterprise.auth.platform.common.TimeSupport;
@@ -14,28 +12,23 @@ import com.enterprise.auth.platform.dao.entity.SysTenantEntity;
 import com.enterprise.auth.platform.dao.entity.SysUserEntity;
 import com.enterprise.auth.platform.dao.entity.SysTenantPackageCapabilityEntity;
 import com.enterprise.auth.platform.dao.entity.SysTenantPackageEntity;
-import com.enterprise.auth.platform.dao.entity.SysTenantChangeLogEntity;
 import com.enterprise.auth.platform.dao.mapper.SysDeptMapper;
 import com.enterprise.auth.platform.dao.mapper.SysRoleMapper;
 import com.enterprise.auth.platform.dao.mapper.SysTenantCapabilityMapper;
 import com.enterprise.auth.platform.dao.mapper.SysTenantCapabilityOverrideMapper;
 import com.enterprise.auth.platform.dao.mapper.SysTenantMapper;
-import com.enterprise.auth.platform.dao.mapper.SysTenantChangeLogMapper;
 import com.enterprise.auth.platform.dao.mapper.SysTenantPackageCapabilityMapper;
 import com.enterprise.auth.platform.dao.mapper.SysTenantPackageMapper;
 import com.enterprise.auth.platform.dao.mapper.SysUserMapper;
-import com.enterprise.auth.platform.security.CurrentUserService;
-import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
+import com.enterprise.auth.platform.modules.tenant.application.TenantAccessPolicy;
+import com.enterprise.auth.platform.modules.tenant.application.TenantChangeLogApplicationService;
 import com.enterprise.auth.platform.common.authz.SecuritySupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.dto.req.CreateTenantRequest;
 import com.enterprise.auth.platform.dto.req.UpdateTenantCapabilityOverridesRequest;
-import com.enterprise.auth.platform.dto.req.CreateTenantRequest;
-import com.enterprise.auth.platform.dto.model.UserAccount;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.Supplier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,11 +45,10 @@ public class TenantManagementService {
     private final SysTenantCapabilityMapper sysTenantCapabilityMapper;
     private final SysTenantPackageCapabilityMapper sysTenantPackageCapabilityMapper;
     private final SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper;
-    private final SysTenantChangeLogMapper sysTenantChangeLogMapper;
     private final CatalogService catalogService;
     private final AuditService auditService;
-    private final PlatformAdminSupport platformAdminSupport;
-    private final CurrentUserService currentUserService;
+    private final TenantAccessPolicy tenantAccessPolicy;
+    private final TenantChangeLogApplicationService tenantChangeLogApplicationService;
 
     public TenantManagementService(
             SysTenantMapper sysTenantMapper,
@@ -67,11 +59,10 @@ public class TenantManagementService {
             SysTenantCapabilityMapper sysTenantCapabilityMapper,
             SysTenantPackageCapabilityMapper sysTenantPackageCapabilityMapper,
             SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper,
-            SysTenantChangeLogMapper sysTenantChangeLogMapper,
             CatalogService catalogService,
             AuditService auditService,
-            PlatformAdminSupport platformAdminSupport,
-            CurrentUserService currentUserService
+            TenantAccessPolicy tenantAccessPolicy,
+            TenantChangeLogApplicationService tenantChangeLogApplicationService
     ) {
         this.sysTenantMapper = sysTenantMapper;
         this.sysUserMapper = sysUserMapper;
@@ -81,11 +72,10 @@ public class TenantManagementService {
         this.sysTenantCapabilityMapper = sysTenantCapabilityMapper;
         this.sysTenantPackageCapabilityMapper = sysTenantPackageCapabilityMapper;
         this.sysTenantCapabilityOverrideMapper = sysTenantCapabilityOverrideMapper;
-        this.sysTenantChangeLogMapper = sysTenantChangeLogMapper;
         this.catalogService = catalogService;
         this.auditService = auditService;
-        this.platformAdminSupport = platformAdminSupport;
-        this.currentUserService = currentUserService;
+        this.tenantAccessPolicy = tenantAccessPolicy;
+        this.tenantChangeLogApplicationService = tenantChangeLogApplicationService;
     }
 
     @Transactional
@@ -218,97 +208,6 @@ public class TenantManagementService {
         return PageResult.of(total, safePage, safeSize, records);
     }
 
-    public PageResult<TenantChangeView> history(
-            String tenantId,
-            String changeType,
-            String fieldKey,
-            String operator,
-            Long fromEpochMs,
-            Long toEpochMs,
-            int page,
-            int size
-    ) {
-        ensureTenantReadable(tenantId);
-        int safePage = Math.max(page, 1);
-        int safeSize = Math.max(size, 1);
-        LambdaQueryWrapper<SysTenantChangeLogEntity> query = buildHistoryQuery(
-                tenantId, changeType, fieldKey, operator, fromEpochMs, toEpochMs
-        ).orderByDesc(SysTenantChangeLogEntity::getOccurredAt)
-                .orderByDesc(SysTenantChangeLogEntity::getId);
-        long total = sysTenantChangeLogMapper.selectCount(query);
-        if (total == 0) {
-            return PageResult.of(0, safePage, safeSize, List.of());
-        }
-        int offset = (safePage - 1) * safeSize;
-        List<TenantChangeView> records = sysTenantChangeLogMapper.selectList(query.last("limit " + offset + "," + safeSize))
-                .stream()
-                .map(item -> new TenantChangeView(
-                        item.getId(),
-                        item.getTenantId(),
-                        item.getChangeType(),
-                        item.getFieldKey(),
-                        item.getOldValue(),
-                        item.getNewValue(),
-                        item.getSummary(),
-                        buildImpactSummary(item),
-                        item.getOperator(),
-                        TimeSupport.toEpochMilli(item.getOccurredAt())
-                ))
-                .toList();
-        return PageResult.of(total, safePage, safeSize, records);
-    }
-
-    public TenantHistorySummaryView historySummary(
-            String tenantId,
-            String changeType,
-            String fieldKey,
-            String operator,
-            Long fromEpochMs,
-            Long toEpochMs
-    ) {
-        ensureTenantReadable(tenantId);
-        List<SysTenantChangeLogEntity> records = sysTenantChangeLogMapper.selectList(
-                buildHistoryQuery(tenantId, changeType, fieldKey, operator, fromEpochMs, toEpochMs)
-                        .orderByDesc(SysTenantChangeLogEntity::getOccurredAt)
-                        .orderByDesc(SysTenantChangeLogEntity::getId)
-        );
-        long packageChanges = records.stream().filter(item -> "PACKAGE".equals(item.getChangeType())).count();
-        long capabilityChanges = records.stream().filter(item -> "CAPABILITY".equals(item.getChangeType())).count();
-        long statusChanges = records.stream().filter(item -> "STATUS".equals(item.getChangeType())).count();
-        long profileChanges = records.stream().filter(item -> "PROFILE".equals(item.getChangeType())).count();
-        List<TenantChangeView> recentTimeline = records.stream()
-                .limit(8)
-                .map(item -> new TenantChangeView(
-                        item.getId(),
-                        item.getTenantId(),
-                        item.getChangeType(),
-                        item.getFieldKey(),
-                        item.getOldValue(),
-                        item.getNewValue(),
-                        item.getSummary(),
-                        buildImpactSummary(item),
-                        item.getOperator(),
-                        TimeSupport.toEpochMilli(item.getOccurredAt())
-                ))
-                .toList();
-        Map<String, Long> affectedFieldCounts = records.stream()
-                .collect(java.util.stream.Collectors.groupingBy(
-                        item -> item.getFieldKey() == null ? "unknown" : item.getFieldKey(),
-                        java.util.LinkedHashMap::new,
-                        java.util.stream.Collectors.counting()
-                ));
-        return new TenantHistorySummaryView(
-                tenantId,
-                records.size(),
-                packageChanges,
-                capabilityChanges,
-                statusChanges,
-                profileChanges,
-                affectedFieldCounts,
-                recentTimeline
-        );
-    }
-
     public TenantCapabilityOverrideView capabilityOverrides(String tenantId) {
         ensureTenantReadable(tenantId);
         SysTenantEntity tenant = getTenant(tenantId);
@@ -355,26 +254,6 @@ public class TenantManagementService {
             throw new BusinessException("租户不存在");
         }
         return entity;
-    }
-
-
-    private LambdaQueryWrapper<SysTenantChangeLogEntity> buildHistoryQuery(
-            String tenantId,
-            String changeType,
-            String fieldKey,
-            String operator,
-            Long fromEpochMs,
-            Long toEpochMs
-    ) {
-        return new LambdaQueryWrapper<SysTenantChangeLogEntity>()
-                .eq(SysTenantChangeLogEntity::getTenantId, tenantId)
-                .eq(StringUtils.hasText(changeType), SysTenantChangeLogEntity::getChangeType, changeType)
-                .eq(StringUtils.hasText(fieldKey), SysTenantChangeLogEntity::getFieldKey, fieldKey)
-                .like(StringUtils.hasText(operator), SysTenantChangeLogEntity::getOperator, operator)
-                .ge(fromEpochMs != null, SysTenantChangeLogEntity::getOccurredAt,
-                        fromEpochMs == null ? null : TimeSupport.localDateTimeFromEpochMilli(fromEpochMs))
-                .lt(toEpochMs != null, SysTenantChangeLogEntity::getOccurredAt,
-                        toEpochMs == null ? null : TimeSupport.localDateTimeFromEpochMilli(toEpochMs));
     }
 
     private void saveTenantProfile(
@@ -755,32 +634,20 @@ public class TenantManagementService {
         }
     }
 
-    private Optional<UserAccount> currentUser() {
-        return currentUserService.currentUser();
-    }
-
     private boolean isPlatformSuperAdmin() {
-        return currentUser().map(platformAdminSupport::isPlatformSuperAdmin).orElse(false);
+        return tenantAccessPolicy.isPlatformSuperAdmin();
     }
 
     private String currentTenantId() {
-        String tenantId = TenantContext.getTenantId();
-        return StringUtils.hasText(tenantId) ? tenantId : "platform";
+        return tenantAccessPolicy.currentTenantId();
     }
 
     private void ensureTenantReadable(String tenantId) {
-        if (isPlatformSuperAdmin()) {
-            return;
-        }
-        if (!currentTenantId().equals(tenantId)) {
-            throw new BusinessException("ACCESS_DENIED", "无权访问此租户");
-        }
+        tenantAccessPolicy.ensureTenantReadable(tenantId);
     }
 
     private void requirePlatformSuperAdmin() {
-        if (!isPlatformSuperAdmin()) {
-            throw new BusinessException("ACCESS_DENIED", "需要平台超级管理员权限");
-        }
+        tenantAccessPolicy.requirePlatformSuperAdmin();
     }
 
     private String defaultCapabilityDescription(String code) {
@@ -813,60 +680,19 @@ public class TenantManagementService {
     }
 
     private void recordIfChanged(String tenantId, String changeType, String fieldKey, String oldValue, String newValue, String summary, String operator) {
-        if (java.util.Objects.equals(trimToNull(oldValue), trimToNull(newValue))) {
-            return;
-        }
-        recordTenantChange(tenantId, changeType, fieldKey, oldValue, newValue, summary, operator);
+        tenantChangeLogApplicationService.recordIfChanged(tenantId, changeType, fieldKey, oldValue, newValue, summary, operator);
     }
 
     private void recordTenantChange(String tenantId, String changeType, String fieldKey, String oldValue, String newValue, String summary, String operator) {
-        SysTenantChangeLogEntity entity = new SysTenantChangeLogEntity();
-        entity.setTenantId(tenantId);
-        entity.setChangeType(changeType);
-        entity.setFieldKey(fieldKey);
-        entity.setOldValue(trimToNull(oldValue));
-        entity.setNewValue(trimToNull(newValue));
-        entity.setSummary(summary);
-        entity.setOperator(operator);
-        entity.setOccurredAt(TimeSupport.utcNowDateTime());
-        sysTenantChangeLogMapper.insert(entity);
-    }
-
-    private String trimToNull(String value) {
-        return StringUtils.hasText(value) ? value.trim() : null;
+        tenantChangeLogApplicationService.recordTenantChange(tenantId, changeType, fieldKey, oldValue, newValue, summary, operator);
     }
 
     private String toStringValue(Object value) {
         return value == null ? null : String.valueOf(value);
     }
 
-    private String buildImpactSummary(SysTenantChangeLogEntity entity) {
-        String fieldKey = entity.getFieldKey();
-        if ("packageCode".equals(fieldKey) || "packageName".equals(fieldKey)) {
-            return "套餐变更会影响当前租户的默认能力集、配额说明和运营策略展示。";
-        }
-        if ("userQuota".equals(fieldKey)) {
-            return "用户配额变更会影响新增用户容量和租户运营阈值。";
-        }
-        if ("storageQuotaGb".equals(fieldKey)) {
-            return "存储配额变更会影响文件容量规划与对象存储成本预估。";
-        }
-        if ("capabilityCodes".equals(fieldKey)) {
-            return "能力范围变更会影响当前租户可见模块与功能开关。";
-        }
-        if ("capabilityOverrides".equals(fieldKey)) {
-            return "能力覆盖变更会在套餐默认能力之外，单独调整当前租户的生效状态和说明文案。";
-        }
-        if ("tenantStatus".equals(fieldKey)) {
-            return "租户状态变更会直接影响登录、访问和管理操作可用性。";
-        }
-        if ("expireAt".equals(fieldKey)) {
-            return "到期时间变更会影响续费提醒、停用策略和运营排期。";
-        }
-        if ("lifecycleNote".equals(fieldKey)) {
-            return "运营备注变更会影响租户交付说明、排期提示和内部协作口径。";
-        }
-        return null;
+    private String trimToNull(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
     }
 
     @Schema(description = "租户变更记录")

@@ -6,6 +6,10 @@ import com.enterprise.auth.platform.dto.req.ConfigCrudRequest;
 import com.enterprise.auth.platform.dto.req.CategoryConfigRequest;
 import com.enterprise.auth.platform.dto.req.DictCrudRequest;
 import com.enterprise.auth.platform.dto.req.NoticeCrudRequest;
+import com.enterprise.auth.platform.modules.system.application.CategoryRuleApplicationService;
+import com.enterprise.auth.platform.modules.system.application.ConfigApplicationService;
+import com.enterprise.auth.platform.modules.system.application.DictApplicationService;
+import com.enterprise.auth.platform.modules.system.application.NoticeApplicationService;
 import com.enterprise.auth.platform.service.SystemManagementService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -30,10 +34,21 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/system")
 public class SystemController {
 
-    private final SystemManagementService systemManagementService;
+    private final DictApplicationService dictApplicationService;
+    private final ConfigApplicationService configApplicationService;
+    private final NoticeApplicationService noticeApplicationService;
+    private final CategoryRuleApplicationService categoryRuleApplicationService;
 
-    public SystemController(SystemManagementService systemManagementService) {
-        this.systemManagementService = systemManagementService;
+    public SystemController(
+            DictApplicationService dictApplicationService,
+            ConfigApplicationService configApplicationService,
+            NoticeApplicationService noticeApplicationService,
+            CategoryRuleApplicationService categoryRuleApplicationService
+    ) {
+        this.dictApplicationService = dictApplicationService;
+        this.configApplicationService = configApplicationService;
+        this.noticeApplicationService = noticeApplicationService;
+        this.categoryRuleApplicationService = categoryRuleApplicationService;
     }
 
     @Operation(summary = "查询预留组件状态")
@@ -54,7 +69,7 @@ public class SystemController {
     @GetMapping("/categories")
     @SaCheckPermission("system:read")
     public ApiResponse<Map<String, List<SystemManagementService.CategoryOption>>> categories() {
-        return ApiResponse.ok(systemManagementService.categories());
+        return ApiResponse.ok(categoryRuleApplicationService.categories());
     }
 
     @Operation(summary = "查询指定类型的分类配置")
@@ -63,7 +78,7 @@ public class SystemController {
     public ApiResponse<List<SystemManagementService.CategoryOption>> categoryOptions(
             @Parameter(description = "分类目标类型：dict 或 config") @PathVariable String targetType
     ) {
-        return ApiResponse.ok(systemManagementService.categoryOptions(targetType));
+        return ApiResponse.ok(categoryRuleApplicationService.categoryOptions(targetType));
     }
 
     @Operation(summary = "查询分类配置分析")
@@ -73,7 +88,7 @@ public class SystemController {
             @Parameter(description = "分类目标类型：dict 或 config") @PathVariable String targetType,
             @Parameter(description = "分类编码") @PathVariable String code
     ) {
-        return ApiResponse.ok(systemManagementService.analyzeCategoryOption(targetType, code));
+        return ApiResponse.ok(categoryRuleApplicationService.analyzeCategoryOption(targetType, code));
     }
 
     @Operation(summary = "新增分类配置")
@@ -83,7 +98,7 @@ public class SystemController {
             @Parameter(description = "分类目标类型：dict 或 config") @PathVariable String targetType,
             @Valid @RequestBody CategoryConfigRequest request
     ) {
-        return ApiResponse.ok(systemManagementService.createCategoryOption(targetType, request));
+        return ApiResponse.ok(categoryRuleApplicationService.createCategoryOption(targetType, request));
     }
 
     @Operation(summary = "修改分类配置")
@@ -94,7 +109,7 @@ public class SystemController {
             @Parameter(description = "分类编码") @PathVariable String code,
             @Valid @RequestBody CategoryConfigRequest request
     ) {
-        return ApiResponse.ok(systemManagementService.updateCategoryOption(targetType, code, request));
+        return ApiResponse.ok(categoryRuleApplicationService.updateCategoryOption(targetType, code, request));
     }
 
     @Operation(summary = "删除分类配置")
@@ -104,7 +119,7 @@ public class SystemController {
             @Parameter(description = "分类目标类型：dict 或 config") @PathVariable String targetType,
             @Parameter(description = "分类编码") @PathVariable String code
     ) {
-        systemManagementService.deleteCategoryOption(targetType, code);
+        categoryRuleApplicationService.deleteCategoryOption(targetType, code);
         return ApiResponse.ok();
     }
 
@@ -120,14 +135,14 @@ public class SystemController {
             @Parameter(description = "排序字段：createdAt、dictType、dictCode") @RequestParam(required = false) String sortBy,
             @Parameter(description = "排序方向：asc 或 desc") @RequestParam(required = false) String sortDirection
     ) {
-        return ApiResponse.ok(systemManagementService.dicts(dictType, category, keyword, page, size, sortBy, sortDirection));
+        return ApiResponse.ok(dictApplicationService.dicts(dictType, category, keyword, page, size, sortBy, sortDirection));
     }
 
     @Operation(summary = "新增字典")
     @PostMapping("/dicts")
     @SaCheckPermission("system:write")
     public ApiResponse<SystemManagementService.DictView> createDict(@Valid @RequestBody DictCrudRequest request) {
-        return ApiResponse.ok(systemManagementService.createDict(request));
+        return ApiResponse.ok(dictApplicationService.createDict(request));
     }
 
     @Operation(summary = "修改字典")
@@ -137,14 +152,14 @@ public class SystemController {
             @Parameter(description = "字典 ID") @PathVariable Long id,
             @Valid @RequestBody DictCrudRequest request
     ) {
-        return ApiResponse.ok(systemManagementService.updateDict(id, request));
+        return ApiResponse.ok(dictApplicationService.updateDict(id, request));
     }
 
     @Operation(summary = "删除字典")
     @DeleteMapping("/dicts/{id}")
     @SaCheckPermission("system:write")
     public ApiResponse<Void> deleteDict(@Parameter(description = "字典 ID") @PathVariable Long id) {
-        systemManagementService.deleteDict(id);
+        dictApplicationService.deleteDict(id);
         return ApiResponse.ok();
     }
 
@@ -159,14 +174,14 @@ public class SystemController {
             @Parameter(description = "排序字段：createdAt、configKey、configName") @RequestParam(required = false) String sortBy,
             @Parameter(description = "排序方向：asc 或 desc") @RequestParam(required = false) String sortDirection
     ) {
-        return ApiResponse.ok(systemManagementService.configs(category, keyword, page, size, sortBy, sortDirection));
+        return ApiResponse.ok(configApplicationService.configs(category, keyword, page, size, sortBy, sortDirection));
     }
 
     @Operation(summary = "新增参数")
     @PostMapping("/configs")
     @SaCheckPermission("system:write")
     public ApiResponse<SystemManagementService.ConfigView> createConfig(@Valid @RequestBody ConfigCrudRequest request) {
-        return ApiResponse.ok(systemManagementService.createConfig(request));
+        return ApiResponse.ok(configApplicationService.createConfig(request));
     }
 
     @Operation(summary = "修改参数")
@@ -176,14 +191,14 @@ public class SystemController {
             @Parameter(description = "参数 ID") @PathVariable Long id,
             @Valid @RequestBody ConfigCrudRequest request
     ) {
-        return ApiResponse.ok(systemManagementService.updateConfig(id, request));
+        return ApiResponse.ok(configApplicationService.updateConfig(id, request));
     }
 
     @Operation(summary = "删除参数")
     @DeleteMapping("/configs/{id}")
     @SaCheckPermission("system:write")
     public ApiResponse<Void> deleteConfig(@Parameter(description = "参数 ID") @PathVariable Long id) {
-        systemManagementService.deleteConfig(id);
+        configApplicationService.deleteConfig(id);
         return ApiResponse.ok();
     }
 
@@ -199,14 +214,14 @@ public class SystemController {
             @Parameter(description = "排序字段：publishTime、createdAt、noticeTitle") @RequestParam(required = false) String sortBy,
             @Parameter(description = "排序方向：asc 或 desc") @RequestParam(required = false) String sortDirection
     ) {
-        return ApiResponse.ok(systemManagementService.notices(published, workflowStatus, keyword, page, size, sortBy, sortDirection));
+        return ApiResponse.ok(noticeApplicationService.notices(published, workflowStatus, keyword, page, size, sortBy, sortDirection));
     }
 
     @Operation(summary = "新增公告")
     @PostMapping("/notices")
     @SaCheckPermission("system:write")
     public ApiResponse<SystemManagementService.NoticeView> createNotice(@Valid @RequestBody NoticeCrudRequest request) {
-        return ApiResponse.ok(systemManagementService.createNotice(request));
+        return ApiResponse.ok(noticeApplicationService.createNotice(request));
     }
 
     @Operation(summary = "修改公告")
@@ -216,14 +231,14 @@ public class SystemController {
             @Parameter(description = "公告 ID") @PathVariable Long id,
             @Valid @RequestBody NoticeCrudRequest request
     ) {
-        return ApiResponse.ok(systemManagementService.updateNotice(id, request));
+        return ApiResponse.ok(noticeApplicationService.updateNotice(id, request));
     }
 
     @Operation(summary = "删除公告")
     @DeleteMapping("/notices/{id}")
     @SaCheckPermission("system:write")
     public ApiResponse<Void> deleteNotice(@Parameter(description = "公告 ID") @PathVariable Long id) {
-        systemManagementService.deleteNotice(id);
+        noticeApplicationService.deleteNotice(id);
         return ApiResponse.ok();
     }
 }

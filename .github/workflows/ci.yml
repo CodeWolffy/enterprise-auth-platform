@@ -50,9 +50,6 @@ jobs:
           java-version: '17'
           cache: maven
 
-      - name: Initialize backend test database
-        run: docker exec -i ${{ job.services.mysql.id }} mysql -uroot -proot enterprise_auth_platform < src/main/resources/database/enterprise_auth_platform.sql
-
       - name: Run backend quality gates and tests
         env:
           TEST_DB_URL: jdbc:mysql://127.0.0.1:3306/enterprise_auth_platform?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true

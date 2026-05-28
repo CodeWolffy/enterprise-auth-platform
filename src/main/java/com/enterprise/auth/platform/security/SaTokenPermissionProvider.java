@@ -35,6 +35,11 @@ public class SaTokenPermissionProvider implements StpInterface {
 
     @Override
     public List<String> getPermissionList(Object loginId, String loginType) {
+        Optional<List<String>> sessionPermissions = currentTokenSession()
+                .map(session -> sessionStringList(session, "permissions"));
+        if (sessionPermissions.isPresent()) {
+            return sessionPermissions.get();
+        }
         return loadUser(loginId)
                 .map(user -> new ArrayList<>(resourceService.resolveGrantKeys(
                         activeTenantId(user),
@@ -46,6 +51,11 @@ public class SaTokenPermissionProvider implements StpInterface {
 
     @Override
     public List<String> getRoleList(Object loginId, String loginType) {
+        Optional<List<String>> sessionRoles = currentTokenSession()
+                .map(session -> sessionStringList(session, "roles"));
+        if (sessionRoles.isPresent()) {
+            return sessionRoles.get();
+        }
         return loadUser(loginId)
                 .map(user -> new ArrayList<>(user.roles()))
                 .orElseGet(ArrayList::new);
@@ -93,6 +103,20 @@ public class SaTokenPermissionProvider implements StpInterface {
                 TenantContext.clear();
             }
         }
+    }
+
+    private List<String> sessionStringList(SaSession session, String key) {
+        Object value = session.get(key);
+        if (value instanceof Iterable<?> iterable) {
+            List<String> values = new ArrayList<>();
+            iterable.forEach(item -> {
+                if (item != null) {
+                    values.add(String.valueOf(item));
+                }
+            });
+            return values;
+        }
+        return null;
     }
 
     private String sessionString(SaSession session, String key) {

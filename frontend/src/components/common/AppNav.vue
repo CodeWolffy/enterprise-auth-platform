@@ -29,21 +29,12 @@
 </template>
 
 <script setup lang="ts">
-import {
-  Avatar,
-  Connection,
-  Flag,
-  Histogram,
-  Monitor,
-  OfficeBuilding,
-  Platform,
-  Setting,
-  Tickets,
-} from '@element-plus/icons-vue'
+import type { Component } from 'vue'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
+import { resolveAppIcon, resolveMenuPresentation } from '@/app/registry/module-manifest'
 import { resolveRoutePath } from '@/router/route-access'
+import { useAuthStore } from '@/stores/auth'
 import type { MenuItem } from '@/types/auth'
 
 defineProps<{
@@ -55,49 +46,11 @@ const authStore = useAuthStore()
 
 const activePath = computed(() => route.path)
 
-const iconMap: Record<string, any> = {
-  dashboard: Monitor,
-  system: Setting,
-  'platform-management': Platform,
-  users: Avatar,
-  roles: Connection,
-  depts: OfficeBuilding,
-  'online-users': Monitor,
-  tenants: Flag,
-  audit: Histogram,
-  settings: Setting,
-  dicts: Tickets,
-  configs: Setting,
-  notices: Tickets,
-  categories: Tickets,
-  'tenant-catalog': Tickets,
-  resources: Tickets,
-}
-
-const titleMap: Record<string, string> = {
-  dashboard: '运行总览',
-  system: '系统管理',
-  'platform-management': '平台管理',
-  users: '用户管理',
-  roles: '角色管理',
-  depts: '部门管理',
-  'online-users': '在线用户',
-  tenants: '租户管理',
-  audit: '安全审计',
-  settings: '系统管理',
-  dicts: '字典管理',
-  configs: '参数管理',
-  notices: '公告管理',
-  categories: '分类配置',
-  'tenant-catalog': '租户套餐',
-  resources: '菜单管理',
-}
-
 interface NavLink {
   id: string
   to: string
   label: string
-  icon: any
+  icon: Component
   children: NavLink[]
 }
 
@@ -123,8 +76,8 @@ function buildLinks(nodes: MenuItem[]): NavLink[] {
   const usedPaths = new Set<string>()
 
   for (const node of nodes) {
-    const routeKey = node.routeKey?.trim() || node.code?.trim() || ''
-    const path = resolveRoutePath(routeKey)
+    const accessKey = node.routeKey?.trim() || node.code?.trim() || ''
+    const path = resolveRoutePath(accessKey)
     const children = buildLinks(node.children ?? [])
     if (!path && !children.length) {
       continue
@@ -135,11 +88,17 @@ function buildLinks(nodes: MenuItem[]): NavLink[] {
     if (path) {
       usedPaths.add(path)
     }
+    const presentation = resolveMenuPresentation({
+      code: node.code,
+      routeKey: accessKey,
+      title: node.title,
+      icon: node.icon,
+    })
     links.push({
       id: path || `menu-${node.id}`,
       to: path,
-      label: titleMap[routeKey] || node.title,
-      icon: iconMap[routeKey] || Tickets,
+      label: presentation.title,
+      icon: resolveAppIcon(presentation.icon),
       children,
     })
   }

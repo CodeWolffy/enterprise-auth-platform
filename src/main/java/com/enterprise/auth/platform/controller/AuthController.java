@@ -5,14 +5,15 @@ import com.enterprise.auth.platform.dto.req.LoginRequest;
 import com.enterprise.auth.platform.dto.resp.PermissionSnapshotResponse;
 import com.enterprise.auth.platform.dto.resp.RegisterOptionsResponse;
 import com.enterprise.auth.platform.dto.resp.TokenSessionResponse;
-import com.enterprise.auth.platform.dto.resp.UserSessionResponse;
-import com.enterprise.auth.platform.service.AuthService;
+import com.enterprise.auth.platform.modules.auth.application.LoginApplicationService;
+import com.enterprise.auth.platform.modules.auth.application.PermissionSnapshotApplicationService;
+import com.enterprise.auth.platform.modules.auth.application.RegistrationApplicationService;
+import com.enterprise.auth.platform.modules.auth.application.SessionApplicationService;
+import com.enterprise.auth.platform.modules.auth.application.TenantSwitchApplicationService;
 import com.enterprise.auth.platform.service.CaptchaService;
-import com.enterprise.auth.platform.service.PermissionSnapshotService;
 import com.enterprise.auth.platform.service.RegistrationPolicyService;
 import com.enterprise.auth.platform.common.web.RateLimit;
 import com.enterprise.auth.platform.common.web.ApiResponse;
-import com.enterprise.auth.platform.dto.model.PageResult;
 import com.enterprise.auth.platform.common.context.AuthContextHolder;
 import com.enterprise.auth.platform.security.CurrentUserService;
 import com.enterprise.auth.platform.dto.req.RegisterRequest;
@@ -39,21 +40,30 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final CaptchaService captchaService;
-    private final AuthService authService;
-    private final PermissionSnapshotService permissionSnapshotService;
+    private final LoginApplicationService loginApplicationService;
+    private final RegistrationApplicationService registrationApplicationService;
+    private final SessionApplicationService sessionApplicationService;
+    private final TenantSwitchApplicationService tenantSwitchApplicationService;
+    private final PermissionSnapshotApplicationService permissionSnapshotApplicationService;
     private final RegistrationPolicyService registrationPolicyService;
     private final CurrentUserService currentUserService;
 
     public AuthController(
             CaptchaService captchaService,
-            AuthService authService,
-            PermissionSnapshotService permissionSnapshotService,
+            LoginApplicationService loginApplicationService,
+            RegistrationApplicationService registrationApplicationService,
+            SessionApplicationService sessionApplicationService,
+            TenantSwitchApplicationService tenantSwitchApplicationService,
+            PermissionSnapshotApplicationService permissionSnapshotApplicationService,
             RegistrationPolicyService registrationPolicyService,
             CurrentUserService currentUserService
     ) {
         this.captchaService = captchaService;
-        this.authService = authService;
-        this.permissionSnapshotService = permissionSnapshotService;
+        this.loginApplicationService = loginApplicationService;
+        this.registrationApplicationService = registrationApplicationService;
+        this.sessionApplicationService = sessionApplicationService;
+        this.tenantSwitchApplicationService = tenantSwitchApplicationService;
+        this.permissionSnapshotApplicationService = permissionSnapshotApplicationService;
         this.registrationPolicyService = registrationPolicyService;
         this.currentUserService = currentUserService;
     }
@@ -89,7 +99,7 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest servletRequest
     ) {
-        return ApiResponse.ok(authService.login(request, servletRequest));
+        return ApiResponse.ok(loginApplicationService.login(request, servletRequest));
     }
 
     @Operation(summary = "退出登录")
@@ -97,14 +107,14 @@ public class AuthController {
     public ApiResponse<Void> logout() {
         UserAccount user = currentUser();
         AuthContextHolder.currentSession()
-                .ifPresent(session -> authService.logout(session.sessionId(), user.username(), user.tenantId()));
+                .ifPresent(session -> sessionApplicationService.logout(session.sessionId(), user.username(), user.tenantId()));
         return ApiResponse.ok();
     }
 
     @Operation(summary = "获取当前用户权限快照")
     @GetMapping("/me")
     public ApiResponse<PermissionSnapshotResponse> me() {
-        return ApiResponse.ok(permissionSnapshotService.build(currentUser()));
+        return ApiResponse.ok(permissionSnapshotApplicationService.build(currentUser()));
     }
 
     @Operation(summary = "切换当前会话活跃租户")
@@ -112,7 +122,7 @@ public class AuthController {
     public ApiResponse<PermissionSnapshotResponse> switchTenant(
             @Parameter(description = "目标租户ID") @PathVariable String tenantId
     ) {
-        return ApiResponse.ok(authService.switchTenant(currentUser(), tenantId));
+        return ApiResponse.ok(tenantSwitchApplicationService.switchTenant(currentUser(), tenantId));
     }
 
   @Operation(summary = "获取当前用户在线会话")
@@ -123,9 +133,9 @@ public class AuthController {
       @Parameter(description = "每页数量，scope=all 时生效") @RequestParam(required = false) Integer size
   ) {
     if ("all".equals(scope)) {
-      return ApiResponse.ok(authService.sessions(currentUser(), scope, StpUtil.getTokenValue(), page, size));
+      return ApiResponse.ok(sessionApplicationService.sessions(currentUser(), scope, StpUtil.getTokenValue(), page, size));
     }
-    return ApiResponse.ok(authService.sessions(currentUser(), scope, StpUtil.getTokenValue(), page, size).records());
+    return ApiResponse.ok(sessionApplicationService.sessions(currentUser(), scope, StpUtil.getTokenValue(), page, size).records());
   }
 
     @Operation(summary = "强制指定会话下线")
@@ -133,14 +143,14 @@ public class AuthController {
     public ApiResponse<Void> forceOffline(
             @Parameter(description = "会话ID") @PathVariable String sessionId
     ) {
-        authService.forceOffline(currentUser(), sessionId);
+        sessionApplicationService.forceOffline(currentUser(), sessionId);
         return ApiResponse.ok();
     }
 
     @Operation(summary = "用户注册")
     @PostMapping("/register")
     public ApiResponse<UserSummary> register(@Valid @RequestBody RegisterRequest request, HttpServletRequest servletRequest) {
-        return ApiResponse.ok(authService.register(request, servletRequest));
+        return ApiResponse.ok(registrationApplicationService.register(request, servletRequest));
     }
 
     private UserAccount currentUser() {

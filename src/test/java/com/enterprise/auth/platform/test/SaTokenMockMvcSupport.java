@@ -6,6 +6,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.enterprise.auth.platform.dto.model.SessionPrincipal;
 import com.enterprise.auth.platform.common.context.AuthContextHolder;
 import com.enterprise.auth.platform.dto.model.UserAccount;
+import java.util.List;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 public final class SaTokenMockMvcSupport {
@@ -14,16 +15,20 @@ public final class SaTokenMockMvcSupport {
     }
 
     public static RequestPostProcessor bearer(UserAccount user) {
+        return bearer(user, user.tenantId());
+    }
+
+    public static RequestPostProcessor bearer(UserAccount user, String activeTenantId) {
         return request -> {
             String token = StpUtil.createLoginSession(user.id(), new SaLoginModel().setDevice("mockmvc"));
             SaSession tokenSession = StpUtil.getTokenSessionByToken(token);
             tokenSession.set("username", user.username());
             tokenSession.set("userId", user.id());
             tokenSession.set("tenantId", user.tenantId());
-            tokenSession.set("activeTenantId", user.tenantId());
+            tokenSession.set("activeTenantId", activeTenantId);
             tokenSession.set("sessionVersion", user.sessionVersion());
-            tokenSession.set("roles", user.roles());
-            tokenSession.set("permissions", user.permissions());
+            tokenSession.set("roles", List.copyOf(user.roles()));
+            tokenSession.set("permissions", List.copyOf(user.permissions()));
             tokenSession.set("clientIp", "127.0.0.1");
             tokenSession.set("device", "mockmvc");
             long now = System.currentTimeMillis();

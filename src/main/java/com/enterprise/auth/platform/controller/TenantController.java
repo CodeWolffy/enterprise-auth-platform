@@ -1,13 +1,16 @@
 package com.enterprise.auth.platform.controller;
 
+import com.enterprise.auth.platform.modules.tenant.application.TenantCapabilityApplicationService;
+import com.enterprise.auth.platform.modules.tenant.application.TenantChangeLogApplicationService;
+import com.enterprise.auth.platform.modules.tenant.application.TenantDirectoryApplicationService;
+import com.enterprise.auth.platform.modules.tenant.application.TenantLifecycleApplicationService;
 import com.enterprise.auth.platform.service.CatalogService;
+import com.enterprise.auth.platform.service.TenantManagementService;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.dto.model.PageResult;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.dto.req.CreateTenantRequest;
 import com.enterprise.auth.platform.dto.req.UpdateTenantCapabilityOverridesRequest;
-import com.enterprise.auth.platform.dto.req.CreateTenantRequest;
-import com.enterprise.auth.platform.service.TenantManagementService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,12 +32,21 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/tenants")
 public class TenantController {
 
-    private final CatalogService catalogService;
-    private final TenantManagementService tenantManagementService;
+    private final TenantLifecycleApplicationService tenantLifecycleApplicationService;
+    private final TenantDirectoryApplicationService tenantDirectoryApplicationService;
+    private final TenantCapabilityApplicationService tenantCapabilityApplicationService;
+    private final TenantChangeLogApplicationService tenantChangeLogApplicationService;
 
-    public TenantController(CatalogService catalogService, TenantManagementService tenantManagementService) {
-        this.catalogService = catalogService;
-        this.tenantManagementService = tenantManagementService;
+    public TenantController(
+            TenantLifecycleApplicationService tenantLifecycleApplicationService,
+            TenantDirectoryApplicationService tenantDirectoryApplicationService,
+            TenantCapabilityApplicationService tenantCapabilityApplicationService,
+            TenantChangeLogApplicationService tenantChangeLogApplicationService
+    ) {
+        this.tenantLifecycleApplicationService = tenantLifecycleApplicationService;
+        this.tenantDirectoryApplicationService = tenantDirectoryApplicationService;
+        this.tenantCapabilityApplicationService = tenantCapabilityApplicationService;
+        this.tenantChangeLogApplicationService = tenantChangeLogApplicationService;
     }
 
     @Operation(summary = "租户列表")
@@ -47,7 +59,7 @@ public class TenantController {
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "每页大小") @RequestParam(defaultValue = "10") int size
     ) {
-        return ApiResponse.ok(tenantManagementService.page(keyword, platformLevel, tenantStatus, page, size));
+        return ApiResponse.ok(tenantDirectoryApplicationService.page(keyword, platformLevel, tenantStatus, page, size));
     }
 
     @Operation(summary = "租户变更历史")
@@ -63,7 +75,7 @@ public class TenantController {
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "每页大小") @RequestParam(defaultValue = "10") int size
     ) {
-        return ApiResponse.ok(tenantManagementService.history(
+        return ApiResponse.ok(tenantChangeLogApplicationService.history(
                 tenantId,
                 changeType,
                 fieldKey,
@@ -86,7 +98,7 @@ public class TenantController {
             @Parameter(description = "起始时间（Unix 毫秒时间戳，包含）") @RequestParam(required = false) Long fromEpochMs,
             @Parameter(description = "结束时间（Unix 毫秒时间戳，不包含）") @RequestParam(required = false) Long toEpochMs
     ) {
-        return ApiResponse.ok(tenantManagementService.historySummary(
+        return ApiResponse.ok(tenantChangeLogApplicationService.historySummary(
                 tenantId,
                 changeType,
                 fieldKey,
@@ -102,7 +114,7 @@ public class TenantController {
     public ApiResponse<TenantManagementService.TenantCapabilityOverrideView> capabilityOverrides(
             @Parameter(description = "租户编码") @PathVariable String tenantId
     ) {
-        return ApiResponse.ok(tenantManagementService.capabilityOverrides(tenantId));
+        return ApiResponse.ok(tenantCapabilityApplicationService.capabilityOverrides(tenantId));
     }
 
     @Operation(summary = "更新租户能力覆盖")
@@ -112,14 +124,14 @@ public class TenantController {
             @Parameter(description = "租户编码") @PathVariable String tenantId,
             @Valid @RequestBody UpdateTenantCapabilityOverridesRequest request
     ) {
-        return ApiResponse.ok(tenantManagementService.updateCapabilityOverrides(tenantId, request));
+        return ApiResponse.ok(tenantCapabilityApplicationService.updateCapabilityOverrides(tenantId, request));
     }
 
     @Operation(summary = "创建租户")
     @PostMapping
     @SaCheckPermission("tenant:write")
     public ApiResponse<CatalogService.TenantView> create(@Valid @RequestBody CreateTenantRequest request) {
-        return ApiResponse.ok(tenantManagementService.create(request));
+        return ApiResponse.ok(tenantLifecycleApplicationService.create(request));
     }
 
     @Operation(summary = "更新租户")
@@ -129,14 +141,14 @@ public class TenantController {
             @Parameter(description = "租户编码") @PathVariable String tenantId,
             @Valid @RequestBody CreateTenantRequest request
     ) {
-        return ApiResponse.ok(tenantManagementService.update(tenantId, request));
+        return ApiResponse.ok(tenantLifecycleApplicationService.update(tenantId, request));
     }
 
     @Operation(summary = "删除租户")
     @DeleteMapping("/{tenantId}")
     @SaCheckPermission("tenant:write")
     public ApiResponse<Void> delete(@Parameter(description = "租户编码") @PathVariable String tenantId) {
-        tenantManagementService.delete(tenantId);
+        tenantLifecycleApplicationService.delete(tenantId);
         return ApiResponse.ok();
     }
 

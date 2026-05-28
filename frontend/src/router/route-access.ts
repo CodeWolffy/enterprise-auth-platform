@@ -1,27 +1,11 @@
 import type { RouteLocationNormalized } from 'vue-router'
+import { ROUTE_KEY_PATH_MAP } from '@/app/registry/module-manifest'
 import type { MenuItem, PermissionSnapshot } from '@/types/auth'
 
 interface RouteAccessTarget {
   meta: RouteLocationNormalized['meta']
   name?: RouteLocationNormalized['name'] | null
   path: string
-}
-
-export const ROUTE_KEY_PATH_MAP: Record<string, string> = {
-  dashboard: '/dashboard',
-  users: '/system/users',
-  roles: '/system/roles',
-  depts: '/system/depts',
-  'online-users': '/system/online-users',
-  tenants: '/platform/tenants',
-  audit: '/system/audit',
-  settings: '/system/settings',
-  dicts: '/platform/dicts',
-  configs: '/platform/configs',
-  notices: '/platform/notices',
-  categories: '/platform/categories',
-  'tenant-catalog': '/platform/tenant-catalog',
-  resources: '/system/resources',
 }
 
 const ROUTE_KEYS = new Set(Object.keys(ROUTE_KEY_PATH_MAP))

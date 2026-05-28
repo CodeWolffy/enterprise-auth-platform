@@ -219,7 +219,7 @@
 
 ### 后端
 
-首次本地启动前，先按“本地依赖与配置”复制并填写 `src/main/resources/application-local.yml`。
+首次本地启动前，先按“本地依赖与配置”准备数据库和 Redis 连接；应用启动时会默认执行 `src/main/resources/db/migration` 下的 Flyway 迁移。
 
 ```bash
 mvn spring-boot:run "-Dspring-boot.run.profiles=local"
@@ -248,12 +248,17 @@ npm run dev
 
 - 默认运行配置：`src/main/resources/application.yml`，不包含 DB/Redis 明文默认值，必须通过环境变量注入。
 - 生产配置补充：`src/main/resources/application-prod.yml`。
-- 本地开发样例：`src/main/resources/application-local.example.yml`。如需本地 profile，复制为 `src/main/resources/application-local.yml` 后按本机环境填写；该文件已加入 `.gitignore`，不要提交。
+- 可选本地覆盖：`src/main/resources/application-local.yml`。如需 `local` profile，可在该文件中仅覆写本机 DB/Redis/Flyway 参数；该文件已加入 `.gitignore`，不要提交。
 
 本地启动示例：
 
 ```powershell
-Copy-Item src/main/resources/application-local.example.yml src/main/resources/application-local.yml
+$env:DB_URL='jdbc:mysql://127.0.0.1:3306/enterprise_auth_platform?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true'
+$env:DB_USERNAME='root'
+$env:DB_PASSWORD='<your-local-password>'
+$env:REDIS_HOST='127.0.0.1'
+$env:REDIS_PORT='6379'
+$env:REDIS_PASSWORD=''
 mvn spring-boot:run "-Dspring-boot.run.profiles=local"
 ```
 
@@ -269,10 +274,15 @@ mvn spring-boot:run "-Dspring-boot.run.profiles=local"
 - `APP_CORS_ALLOWED_ORIGIN`
 - `APP_SECURITY_SESSION_IDLE_SECONDS`
 - `APP_SECURITY_MAX_LOGIN_COUNT`
+- `FLYWAY_ENABLED`
+- `FLYWAY_BASELINE_ON_MIGRATE`
 
-数据库脚本：
+数据库迁移：
 
-- 初始化脚本：`src/main/resources/database/enterprise_auth_platform.sql`
+- 初始化与增量迁移统一放在 `src/main/resources/db/migration/`
+- `V1__baseline.sql` 是当前库结构与基础数据基线
+- 本地已手工导入旧 SQL 且库非空时，首次切换 Flyway 前可设置 `FLYWAY_BASELINE_ON_MIGRATE=true`
+- `src/main/resources/database/enterprise_auth_platform.sql` 仅保留作基线来源与兼容备份，不再作为主初始化路径
 
 ## 构建与测试
 
@@ -284,7 +294,7 @@ mvn "-Dmaven.repo.local=.m2repo" test
 mvn "-Dmaven.repo.local=.m2repo" verify
 ```
 
-后端测试依赖已初始化的 MySQL 与可连接 Redis。`src/test/resources/application.yml` 默认使用本机 MySQL/Redis 且不内置密码；如需切换到其他环境，可用 `TEST_*` 环境变量覆盖：
+后端测试依赖可连接的 MySQL 与 Redis；测试启动时会自动执行 Flyway 迁移。`src/test/resources/application.yml` 默认使用本机 MySQL/Redis，并已开启 `baseline-on-migrate` 兼容本地非空历史库；如需切换到其他环境，可用 `TEST_*` 环境变量覆盖：
 
 ```powershell
 $env:TEST_DB_URL='jdbc:mysql://127.0.0.1:3306/enterprise_auth_platform?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true'
@@ -296,7 +306,7 @@ $env:TEST_REDIS_PASSWORD=''
 mvn "-Dmaven.repo.local=.m2repo" test
 ```
 
-数据库结构和基础数据使用 `src/main/resources/database/enterprise_auth_platform.sql` 初始化。
+数据库结构和基础数据由 Flyway 在测试启动时自动迁移；如本地测试库已经手工导入过旧 SQL，测试配置会将其 baseline 到版本 1 后继续应用后续增量脚本。
 
 ### 前端
 
@@ -331,8 +341,9 @@ npm run test:visual:update
 - `playwright-report/`、`test-results/` 与 `frontend/e2e/**/*.png` 均不提交源码。
 - 如需人工确认 UI 变化，从 CI Artifact 下载快照对比，确认后再单独决定是否建立受控基线策略。
 
-## 最近进展（2026-05-12）
+## 最近进展（2026-05-28）
 
+- 数据迁移治理：Flyway 已接管 CI、启动与部署主路径，V1 基线与审计索引增量迁移已落地。
 - 项目结构整理：根目录 Node 残留依赖文件已移除，前端依赖收敛到 `frontend/`。
 - 配置安全整理：DB/Redis 连接信息改为环境变量覆盖，测试配置统一为 YAML。
 - 文档整理：过时 OAuth2/OIDC 与旧 Session-Cookie 文档已归档到 `docs/archive/`。

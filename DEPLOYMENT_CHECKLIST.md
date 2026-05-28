@@ -1,6 +1,6 @@
 # 部署前检查清单（enterprise-auth-platform）
 
-更新时间：2026-05-12
+更新时间：2026-05-28
 
 ## 1. 运行环境
 
@@ -13,10 +13,15 @@
 ## 2. 数据库
 
 - [ ] 数据库已创建：`enterprise_auth_platform`
-- [ ] 应用账号具备最小必要权限
+- [ ] 应用账号具备最小必要权限，并覆盖本次发布所需的 DDL / INDEX 权限
 - [ ] `DB_URL` 指向目标库，且包含字符集、时区和连接参数
 - [ ] `DB_USERNAME` / `DB_PASSWORD` 已通过环境变量或部署平台密钥注入
-- [ ] 初始化脚本已执行：`src/main/resources/database/enterprise_auth_platform.sql`
+- [ ] Flyway 已作为数据库初始化主路径，迁移目录为 `src/main/resources/db/migration`
+- [ ] 全新环境首次启动前不再手工执行完整 SQL，应用首次启动会自动完成 Flyway 迁移
+- [ ] 目标库如为已存在的非空历史库，已按上线方案完成 baseline：
+  - 首次启动前启用 `FLYWAY_BASELINE_ON_MIGRATE=true` 或等效 Spring 配置
+  - 启动后已确认写入 `flyway_schema_history`，且基线版本为 `1`
+- [ ] `src/main/resources/database/enterprise_auth_platform.sql` 仅作为基线来源与兼容备份，不作为部署主初始化路径
 - [ ] 历史库已完成用户名全局唯一约束迁移：
   - `SELECT username, COUNT(*) cnt FROM sys_user WHERE deleted = 0 GROUP BY username HAVING cnt > 1;` 结果为空
   - `sys_user.username` 存在唯一索引

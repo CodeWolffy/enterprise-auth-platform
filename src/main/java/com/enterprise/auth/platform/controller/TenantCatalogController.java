@@ -1,5 +1,7 @@
 package com.enterprise.auth.platform.controller;
 
+import com.enterprise.auth.platform.modules.tenant.application.TenantCapabilityApplicationService;
+import com.enterprise.auth.platform.modules.tenant.application.TenantCatalogApplicationService;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.dto.req.TenantCapabilityCrudRequest;
 import com.enterprise.auth.platform.dto.req.TenantPackageCrudRequest;
@@ -24,17 +26,22 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/tenant-catalog")
 public class TenantCatalogController {
 
-    private final TenantCatalogManagementService tenantCatalogManagementService;
+    private final TenantCatalogApplicationService tenantCatalogApplicationService;
+    private final TenantCapabilityApplicationService tenantCapabilityApplicationService;
 
-    public TenantCatalogController(TenantCatalogManagementService tenantCatalogManagementService) {
-        this.tenantCatalogManagementService = tenantCatalogManagementService;
+    public TenantCatalogController(
+            TenantCatalogApplicationService tenantCatalogApplicationService,
+            TenantCapabilityApplicationService tenantCapabilityApplicationService
+    ) {
+        this.tenantCatalogApplicationService = tenantCatalogApplicationService;
+        this.tenantCapabilityApplicationService = tenantCapabilityApplicationService;
     }
 
     @Operation(summary = "查询套餐列表")
     @GetMapping("/packages")
     @SaCheckPermission("tenant:read")
     public ApiResponse<List<TenantCatalogManagementService.TenantPackageView>> packages() {
-        return ApiResponse.ok(tenantCatalogManagementService.packages());
+        return ApiResponse.ok(tenantCatalogApplicationService.packages());
     }
 
     @Operation(summary = "新增套餐")
@@ -43,7 +50,7 @@ public class TenantCatalogController {
     public ApiResponse<TenantCatalogManagementService.TenantPackageView> createPackage(
             @Valid @RequestBody TenantPackageCrudRequest request
     ) {
-        return ApiResponse.ok(tenantCatalogManagementService.createPackage(request));
+        return ApiResponse.ok(tenantCatalogApplicationService.createPackage(request));
     }
 
     @Operation(summary = "修改套餐")
@@ -53,7 +60,7 @@ public class TenantCatalogController {
             @Parameter(description = "套餐主键 ID") @PathVariable Long id,
             @Valid @RequestBody TenantPackageCrudRequest request
     ) {
-        return ApiResponse.ok(tenantCatalogManagementService.updatePackage(id, request));
+        return ApiResponse.ok(tenantCatalogApplicationService.updatePackage(id, request));
     }
 
     @Operation(summary = "套餐变更影响分析")
@@ -62,14 +69,14 @@ public class TenantCatalogController {
     public ApiResponse<TenantCatalogManagementService.TenantPackageImpactView> packageImpact(
             @Parameter(description = "套餐主键 ID") @PathVariable Long id
     ) {
-        return ApiResponse.ok(tenantCatalogManagementService.packageImpact(id));
+        return ApiResponse.ok(tenantCatalogApplicationService.packageImpact(id));
     }
 
     @Operation(summary = "删除套餐")
     @DeleteMapping("/packages/{id}")
     @SaCheckPermission("tenant:write")
     public ApiResponse<Void> deletePackage(@Parameter(description = "套餐主键 ID") @PathVariable Long id) {
-        tenantCatalogManagementService.deletePackage(id);
+        tenantCatalogApplicationService.deletePackage(id);
         return ApiResponse.ok();
     }
 
@@ -77,7 +84,7 @@ public class TenantCatalogController {
     @GetMapping("/capabilities")
     @SaCheckPermission("tenant:read")
     public ApiResponse<List<TenantCatalogManagementService.TenantCapabilityView>> capabilities() {
-        return ApiResponse.ok(tenantCatalogManagementService.capabilities());
+        return ApiResponse.ok(tenantCapabilityApplicationService.capabilities());
     }
 
     @Operation(summary = "新增能力")
@@ -86,7 +93,7 @@ public class TenantCatalogController {
     public ApiResponse<TenantCatalogManagementService.TenantCapabilityView> createCapability(
             @Valid @RequestBody TenantCapabilityCrudRequest request
     ) {
-        return ApiResponse.ok(tenantCatalogManagementService.createCapability(request));
+        return ApiResponse.ok(tenantCapabilityApplicationService.createCapability(request));
     }
 
     @Operation(summary = "修改能力")
@@ -96,7 +103,7 @@ public class TenantCatalogController {
             @Parameter(description = "能力主键 ID") @PathVariable Long id,
             @Valid @RequestBody TenantCapabilityCrudRequest request
     ) {
-        return ApiResponse.ok(tenantCatalogManagementService.updateCapability(id, request));
+        return ApiResponse.ok(tenantCapabilityApplicationService.updateCapability(id, request));
     }
 
     @Operation(summary = "能力变更影响分析")
@@ -105,14 +112,14 @@ public class TenantCatalogController {
     public ApiResponse<TenantCatalogManagementService.TenantCapabilityImpactView> capabilityImpact(
             @Parameter(description = "能力主键 ID") @PathVariable Long id
     ) {
-        return ApiResponse.ok(tenantCatalogManagementService.capabilityImpact(id));
+        return ApiResponse.ok(tenantCapabilityApplicationService.capabilityImpact(id));
     }
 
     @Operation(summary = "删除能力")
     @DeleteMapping("/capabilities/{id}")
     @SaCheckPermission("tenant:write")
     public ApiResponse<Void> deleteCapability(@Parameter(description = "能力主键 ID") @PathVariable Long id) {
-        tenantCatalogManagementService.deleteCapability(id);
+        tenantCapabilityApplicationService.deleteCapability(id);
         return ApiResponse.ok();
     }
 }

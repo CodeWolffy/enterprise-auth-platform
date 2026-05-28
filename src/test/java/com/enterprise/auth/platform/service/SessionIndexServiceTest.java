@@ -56,7 +56,7 @@ class SessionIndexServiceTest {
                 Duration.ofMinutes(1),
                 false,
                 "Lax",
-                new SecurityProperties.Redis(false, false, false, "eap:test:", "v1")
+                new SecurityProperties.Redis(true, false, false, "eap:test:", "v1")
         );
     }
 }
