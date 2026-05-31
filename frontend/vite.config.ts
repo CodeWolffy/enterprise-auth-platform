@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
@@ -36,5 +36,11 @@ export default defineConfig({
         },
       },
     },
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    include: ['src/**/*.{test,spec}.ts'],
+    exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
   },
 })

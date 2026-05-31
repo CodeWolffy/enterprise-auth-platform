@@ -1,0 +1,46 @@
+spring:
+  config:
+    activate:
+      on-profile: staging
+
+  datasource:
+    url: ${STAGING_DB_URL:${DB_URL}}
+    username: ${STAGING_DB_USERNAME:${DB_USERNAME}}
+    password: ${STAGING_DB_PASSWORD:${DB_PASSWORD}}
+    hikari:
+      pool-name: ${STAGING_DB_POOL_NAME:EnterpriseAuthStagingHikariCP}
+      minimum-idle: ${STAGING_DB_POOL_MIN_IDLE:3}
+      maximum-pool-size: ${STAGING_DB_POOL_MAX_SIZE:15}
+
+  data:
+    redis:
+      host: ${STAGING_REDIS_HOST:${REDIS_HOST}}
+      port: ${STAGING_REDIS_PORT:${REDIS_PORT:6379}}
+      password: ${STAGING_REDIS_PASSWORD:${REDIS_PASSWORD:}}
+      database: ${STAGING_REDIS_DATABASE:${REDIS_DATABASE:0}}
+
+  flyway:
+    baseline-on-migrate: ${STAGING_FLYWAY_BASELINE_ON_MIGRATE:${FLYWAY_BASELINE_ON_MIGRATE:false}}
+
+app:
+  cors:
+    allowed-origins:
+      - ${STAGING_APP_CORS_ALLOWED_ORIGIN}
+
+  security:
+    session-ttl: ${STAGING_APP_SECURITY_SESSION_TTL:${APP_SECURITY_SESSION_TTL:7d}}
+    cookie-secure: true
+    cookie-same-site: ${STAGING_APP_SECURITY_COOKIE_SAME_SITE:${APP_SECURITY_COOKIE_SAME_SITE:Lax}}
+
+sa-token:
+  active-timeout: ${STAGING_APP_SECURITY_SESSION_IDLE_SECONDS:${APP_SECURITY_SESSION_IDLE_SECONDS:7200}}
+  max-login-count: ${STAGING_APP_SECURITY_MAX_LOGIN_COUNT:${APP_SECURITY_MAX_LOGIN_COUNT:10}}
+
+knife4j:
+  enable: ${STAGING_KNIFE4J_ENABLED:false}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

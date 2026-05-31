@@ -46,7 +46,7 @@
 - Vue 3 + TypeScript + Vite
 - Element Plus + Pinia + Vue Router + Axios
 - Sass + ECharts
-- Playwright
+- Vitest + Playwright
 
 ## 核心能力
 
@@ -247,8 +247,10 @@ npm run dev
 ## 本地依赖与配置
 
 - 默认运行配置：`src/main/resources/application.yml`，不包含 DB/Redis 明文默认值，必须通过环境变量注入。
-- 生产配置补充：`src/main/resources/application-prod.yml`。
-- 可选本地覆盖：`src/main/resources/application-local.yml`。如需 `local` profile，可在该文件中仅覆写本机 DB/Redis/Flyway 参数；该文件已加入 `.gitignore`，不要提交。
+- 开发环境配置：`src/main/resources/application-dev.yml`，面向共享开发环境或 CI 开发部署，允许较小连接池和本地前端 CORS。
+- 预发环境配置：`src/main/resources/application-staging.yml`，使用 `STAGING_*` 环境变量覆盖 DB、Redis、CORS 与会话策略。
+- 生产配置补充：`src/main/resources/application-prod.yml`，默认关闭接口文档，仅保留健康检查暴露。
+- 可选本地覆盖：`src/main/resources/application-local.yml`。如需 `local` profile，可复制 `src/main/resources/application-local.example.yml` 后仅覆写本机 DB/Redis/Flyway 参数；该文件已加入 `.gitignore`，不要提交。
 
 本地启动示例：
 
@@ -272,8 +274,11 @@ mvn spring-boot:run "-Dspring-boot.run.profiles=local"
 - `REDIS_PASSWORD`
 - `REDIS_DATABASE`
 - `APP_CORS_ALLOWED_ORIGIN`
+- `DEV_*`：开发环境专用覆盖，如 `DEV_DB_URL`、`DEV_REDIS_HOST`、`DEV_APP_CORS_ALLOWED_ORIGIN`
+- `STAGING_*`：预发环境专用覆盖，如 `STAGING_DB_URL`、`STAGING_REDIS_HOST`、`STAGING_APP_CORS_ALLOWED_ORIGIN`
 - `APP_SECURITY_SESSION_IDLE_SECONDS`
 - `APP_SECURITY_MAX_LOGIN_COUNT`
+- `PROD_KNIFE4J_ENABLED`
 - `FLYWAY_ENABLED`
 - `FLYWAY_BASELINE_ON_MIGRATE`
 
@@ -313,8 +318,11 @@ mvn "-Dmaven.repo.local=.m2repo" test
 ```bash
 cd frontend
 npm run lint
+npm run test:unit
 npm run build
 ```
+
+前端单元测试使用 Vitest，优先覆盖 store、composable、权限判断与通用交互状态；E2E 继续覆盖登录、菜单、会话和关键 CRUD 流程。
 
 ### E2E / 视觉回归
 
@@ -334,7 +342,7 @@ npm run test:visual:update
 
 ## CI
 
-- 主 CI：`.github/workflows/ci.yml`
+- 主 CI：`.github/workflows/ci.yml`，覆盖后端 verify、前端 lint、Vitest 单测、前端 build 与 E2E。
 - 前端视觉回归：`.github/workflows/frontend-visual-regression.yml`
 
 ## 部署前检查

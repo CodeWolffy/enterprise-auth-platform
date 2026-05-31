@@ -2,13 +2,13 @@ package com.enterprise.auth.platform.modules.auth.application;
 
 import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
+import com.enterprise.auth.platform.common.audit.AuditEventPublisher;
 import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.dto.model.PageResult;
 import com.enterprise.auth.platform.dto.model.UserAccount;
 import com.enterprise.auth.platform.dto.resp.UserSessionResponse;
-import com.enterprise.auth.platform.service.AuditService;
 import com.enterprise.auth.platform.service.SessionIndexService;
 import com.enterprise.auth.platform.service.SessionIndexService.Page;
 import java.util.LinkedHashMap;
@@ -22,18 +22,18 @@ public class SessionApplicationService {
 
     private static final int SESSION_RESULT_LIMIT = 200;
 
-    private final AuditService auditService;
+    private final AuditEventPublisher auditEventPublisher;
     private final DataScopeService dataScopeService;
     private final PlatformAdminSupport platformAdminSupport;
     private final SessionIndexService sessionIndexService;
 
     public SessionApplicationService(
-            AuditService auditService,
+            AuditEventPublisher auditEventPublisher,
             DataScopeService dataScopeService,
             PlatformAdminSupport platformAdminSupport,
             SessionIndexService sessionIndexService
     ) {
-        this.auditService = auditService;
+        this.auditEventPublisher = auditEventPublisher;
         this.dataScopeService = dataScopeService;
         this.platformAdminSupport = platformAdminSupport;
         this.sessionIndexService = sessionIndexService;
@@ -43,7 +43,7 @@ public class SessionApplicationService {
         Map<String, Object> payload = sessionAuditPayload(sessionId);
         StpUtil.logoutByTokenValue(sessionId);
         sessionIndexService.remove(sessionId);
-        auditService.record("LOGOUT", username, tenantId, payload);
+        auditEventPublisher.publish("LOGOUT", username, tenantId, payload);
     }
 
     public List<UserSessionResponse> sessions(UserAccount currentUser, String scope, String currentToken) {
@@ -81,7 +81,7 @@ public class SessionApplicationService {
         StpUtil.kickoutByTokenValue(sessionId);
         sessionIndexService.remove(sessionId);
         payload.put("targetUserId", targetUserId);
-        auditService.record("SESSION_FORCED_OFFLINE", currentUser.username(), currentUser.tenantId(), payload);
+        auditEventPublisher.publish("SESSION_FORCED_OFFLINE", currentUser.username(), currentUser.tenantId(), payload);
     }
 
     private List<UserSessionResponse> ownSessions(UserAccount currentUser, String currentToken) {

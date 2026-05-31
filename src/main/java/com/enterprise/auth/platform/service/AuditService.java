@@ -1,6 +1,8 @@
 package com.enterprise.auth.platform.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.enterprise.auth.platform.common.audit.AuditEventPublisher;
+import com.enterprise.auth.platform.common.audit.PlatformAuditEvent;
 import com.enterprise.auth.platform.dto.model.AuditEvent;
 import com.enterprise.auth.platform.dto.resp.AuditPage;
 import com.enterprise.auth.platform.dto.req.AuditQuery;
@@ -22,7 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 @Service
-public class AuditService {
+public class AuditService implements AuditEventPublisher {
 
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() { };
     private static final long MAX_EXPORT_RANGE_MS = Duration.ofDays(31).toMillis();
@@ -42,13 +44,18 @@ public class AuditService {
     }
 
     public void record(String type, String operator, String tenantId, Map<String, Object> details) {
-        String resolvedTenantId = StringUtils.hasText(tenantId) ? tenantId : "platform";
-        Map<String, Object> enrichedDetails = enrichDetails(details, operator, resolvedTenantId);
+        publish(PlatformAuditEvent.of(type, operator, tenantId, details));
+    }
+
+    @Override
+    public void publish(PlatformAuditEvent event) {
+        String resolvedTenantId = StringUtils.hasText(event.tenantId()) ? event.tenantId() : "platform";
+        Map<String, Object> enrichedDetails = enrichDetails(event.details(), event.operator(), resolvedTenantId);
 
         SysAuditLogEntity entity = new SysAuditLogEntity();
         entity.setTenantId(resolvedTenantId);
-        entity.setEventType(type);
-        entity.setOperator(operator);
+        entity.setEventType(event.type());
+        entity.setOperator(event.operator());
         entity.setOccurredAt(TimeSupport.utcNowDateTime());
         entity.setRequestId(stringValue(enrichedDetails.get("requestId")));
         entity.setClientIp(stringValue(enrichedDetails.get("clientIp")));

@@ -38,3 +38,12 @@ sa-token:
   auto-renew: true
   dynamic-active-timeout: true
   max-login-count: ${APP_SECURITY_MAX_LOGIN_COUNT:10}
+
+knife4j:
+  enable: ${PROD_KNIFE4J_ENABLED:false}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

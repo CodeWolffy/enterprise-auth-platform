@@ -11,6 +11,7 @@ import {
 } from '@element-plus/icons-vue'
 import type { Component } from 'vue'
 import type { RouteRecordRaw } from 'vue-router'
+import { PERMISSIONS, type PermissionCode } from './permissions'
 
 const DEFAULT_ICON_NAME = 'Tickets'
 
@@ -20,7 +21,7 @@ export interface AppRouteManifest {
   path: string
   title: string
   component: RouteRecordRaw['component']
-  requiredGrant?: string
+  requiredGrant?: PermissionCode
   hidden?: boolean
   icon?: string
 }
@@ -66,7 +67,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'users',
     title: '用户管理',
     icon: 'Avatar',
-    requiredGrant: 'user:read',
+    requiredGrant: PERMISSIONS.USER_READ,
     component: () => import('@/views/platform/UsersView.vue'),
   },
   {
@@ -75,7 +76,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'roles',
     title: '角色管理',
     icon: 'Connection',
-    requiredGrant: 'role:read',
+    requiredGrant: PERMISSIONS.ROLE_READ,
     component: () => import('@/views/platform/RolesView.vue'),
   },
   {
@@ -84,7 +85,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'depts',
     title: '部门管理',
     icon: 'OfficeBuilding',
-    requiredGrant: 'dept:read',
+    requiredGrant: PERMISSIONS.DEPT_READ,
     component: () => import('@/views/platform/DepartmentsView.vue'),
   },
   {
@@ -93,7 +94,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'online-users',
     title: '在线用户',
     icon: 'Monitor',
-    requiredGrant: 'session:write',
+    requiredGrant: PERMISSIONS.SESSION_WRITE,
     component: () => import('@/views/audit/OnlineUsersView.vue'),
   },
   {
@@ -102,7 +103,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'resources',
     title: '菜单管理',
     icon: 'Tickets',
-    requiredGrant: 'system:read',
+    requiredGrant: PERMISSIONS.SYSTEM_READ,
     component: () => import('@/views/platform/ResourceManagementView.vue'),
   },
   {
@@ -111,7 +112,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'audit',
     title: '安全审计',
     icon: 'Histogram',
-    requiredGrant: 'audit:read',
+    requiredGrant: PERMISSIONS.AUDIT_READ,
     component: () => import('@/views/audit/AuditView.vue'),
   },
   {
@@ -120,7 +121,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'tenants',
     title: '租户管理',
     icon: 'Flag',
-    requiredGrant: 'tenant:read',
+    requiredGrant: PERMISSIONS.TENANT_READ,
     component: () => import('@/views/platform/TenantsView.vue'),
   },
   {
@@ -129,7 +130,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'tenant-catalog',
     title: '租户套餐',
     icon: 'Tickets',
-    requiredGrant: 'tenant:read',
+    requiredGrant: PERMISSIONS.TENANT_READ,
     component: () => import('@/views/platform/TenantCatalogView.vue'),
   },
   {
@@ -138,7 +139,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'dicts',
     title: '字典管理',
     icon: 'Tickets',
-    requiredGrant: 'system:read',
+    requiredGrant: PERMISSIONS.SYSTEM_READ,
     component: () => import('@/views/system/SystemDictsView.vue'),
   },
   {
@@ -147,7 +148,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'configs',
     title: '参数管理',
     icon: 'Setting',
-    requiredGrant: 'system:read',
+    requiredGrant: PERMISSIONS.SYSTEM_READ,
     component: () => import('@/views/system/SystemConfigsView.vue'),
   },
   {
@@ -156,7 +157,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'notices',
     title: '公告管理',
     icon: 'Tickets',
-    requiredGrant: 'system:read',
+    requiredGrant: PERMISSIONS.SYSTEM_READ,
     component: () => import('@/views/system/SystemNoticesView.vue'),
   },
   {
@@ -165,7 +166,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'categories',
     title: '分类配置',
     icon: 'Tickets',
-    requiredGrant: 'system:read',
+    requiredGrant: PERMISSIONS.SYSTEM_READ,
     component: () => import('@/views/system/SystemCategoriesView.vue'),
   },
   {
@@ -174,7 +175,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'settings',
     title: '系统设置',
     icon: 'Setting',
-    requiredGrant: 'system:read',
+    requiredGrant: PERMISSIONS.SYSTEM_READ,
     component: () => import('@/views/system/SystemManagementView.vue'),
   },
   {
@@ -182,7 +183,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'settings-dicts',
     title: '字典管理',
     hidden: true,
-    requiredGrant: 'system:read',
+    requiredGrant: PERMISSIONS.SYSTEM_READ,
     component: () => import('@/views/system/SystemDictsView.vue'),
   },
   {
@@ -190,7 +191,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'settings-configs',
     title: '参数配置',
     hidden: true,
-    requiredGrant: 'system:read',
+    requiredGrant: PERMISSIONS.SYSTEM_READ,
     component: () => import('@/views/system/SystemConfigsView.vue'),
   },
   {
@@ -198,7 +199,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'settings-notices',
     title: '公告管理',
     hidden: true,
-    requiredGrant: 'system:read',
+    requiredGrant: PERMISSIONS.SYSTEM_READ,
     component: () => import('@/views/system/SystemNoticesView.vue'),
   },
   {
@@ -206,7 +207,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'settings-categories',
     title: '分类配置',
     hidden: true,
-    requiredGrant: 'system:read',
+    requiredGrant: PERMISSIONS.SYSTEM_READ,
     component: () => import('@/views/system/SystemCategoriesView.vue'),
   },
   {
@@ -214,7 +215,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'settings-resources',
     title: '菜单管理',
     hidden: true,
-    requiredGrant: 'system:write',
+    requiredGrant: PERMISSIONS.SYSTEM_WRITE,
     component: () => import('@/views/platform/ResourceManagementView.vue'),
   },
 ] satisfies AppRouteManifest[]

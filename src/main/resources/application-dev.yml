@@ -1,0 +1,44 @@
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  datasource:
+    url: ${DEV_DB_URL:${DB_URL}}
+    username: ${DEV_DB_USERNAME:${DB_USERNAME}}
+    password: ${DEV_DB_PASSWORD:${DB_PASSWORD}}
+    hikari:
+      pool-name: ${DEV_DB_POOL_NAME:EnterpriseAuthDevHikariCP}
+      minimum-idle: ${DEV_DB_POOL_MIN_IDLE:2}
+      maximum-pool-size: ${DEV_DB_POOL_MAX_SIZE:10}
+
+  data:
+    redis:
+      host: ${DEV_REDIS_HOST:${REDIS_HOST}}
+      port: ${DEV_REDIS_PORT:${REDIS_PORT:6379}}
+      password: ${DEV_REDIS_PASSWORD:${REDIS_PASSWORD:}}
+      database: ${DEV_REDIS_DATABASE:${REDIS_DATABASE:0}}
+
+  flyway:
+    baseline-on-migrate: ${DEV_FLYWAY_BASELINE_ON_MIGRATE:${FLYWAY_BASELINE_ON_MIGRATE:false}}
+
+app:
+  cors:
+    allowed-origins:
+      - ${DEV_APP_CORS_ALLOWED_ORIGIN:http://127.0.0.1:5173}
+      - http://localhost:5173
+
+  security:
+    cookie-secure: false
+    cookie-same-site: Lax
+    redis:
+      redisson-enabled: ${DEV_REDISSON_ENABLED:true}
+
+knife4j:
+  enable: ${DEV_KNIFE4J_ENABLED:true}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

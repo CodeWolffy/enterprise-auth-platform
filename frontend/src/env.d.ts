@@ -1,9 +1,20 @@
 /// <reference types="vite/client" />
 
+import type { DefineComponent } from 'vue'
+
 declare module '*.vue' {
-  import type { DefineComponent } from 'vue'
   const component: DefineComponent<Record<string, never>, Record<string, never>, any>
   export default component
+}
+
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    requestKey?: string
+    retry?: number
+    retryDelay?: number
+    silentAuthFailure?: boolean
+    suppressErrorMessage?: boolean
+  }
 }
 
 interface ImportMetaEnv {

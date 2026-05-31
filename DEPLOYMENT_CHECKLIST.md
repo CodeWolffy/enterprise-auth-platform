@@ -64,6 +64,10 @@
 
 ## 7. 安全与观测
 
+- [ ] 已按环境选择 profile：`dev` / `staging` / `prod`，本机私有覆盖仅使用 `local`
+- [ ] `application-dev.yml` 仅用于开发或开发部署，不承载预发/生产语义
+- [ ] `application-staging.yml` 使用 `STAGING_*` 环境变量，不复用生产密钥
+- [ ] `application-prod.yml` 使用生产密钥系统注入，默认关闭 Knife4j
 - [ ] `src/main/resources/application.yml` 与 `application-prod.yml` 未包含真实 DB/Redis 密码或公网 Redis 默认值
 - [ ] 本地私有配置仅写入 `src/main/resources/application-local.yml`，且该文件已被 `.gitignore` 忽略
 - [ ] 生产环境未提交真实 DB/Redis 密码到源码

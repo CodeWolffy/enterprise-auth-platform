@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.enterprise.auth.platform.dto.model.DataScopeType;
 import com.enterprise.auth.platform.dto.model.PageResult;
 import com.enterprise.auth.platform.dao.entity.SysRoleEntity;
@@ -65,24 +66,20 @@ public class UserDirectoryService {
         if (enabled != null) {
             query.eq(SysUserEntity::getEnabled, enabled ? 1 : 0);
         }
+        dataScopeService.visibleUserIds(tenantId).ifPresent(visibleUserIds -> {
+            if (visibleUserIds.isEmpty()) {
+                query.apply("1 = 0");
+            } else {
+                query.in(SysUserEntity::getId, visibleUserIds);
+            }
+        });
         query.orderByAsc(SysUserEntity::getId);
 
-        List<SysUserEntity> users = sysUserMapper.selectList(query);
+        Page<SysUserEntity> userPage = sysUserMapper.selectPage(Page.of(page, size), query);
+        List<SysUserEntity> users = userPage.getRecords();
         if (users.isEmpty()) {
-            return PageResult.of(0, page, size, List.of());
+            return PageResult.of(userPage.getTotal(), page, size, List.of());
         }
-
-        users = dataScopeService.filterUsers(tenantId, users);
-        if (users.isEmpty()) {
-            return PageResult.of(0, page, size, List.of());
-        }
-
-        int total = users.size();
-        int fromIndex = (page - 1) * size;
-        if (fromIndex >= total) {
-            return PageResult.of(total, page, size, List.of());
-        }
-        users = users.subList(fromIndex, Math.min(fromIndex + size, total));
 
         Map<Long, Set<String>> roleCodesByUserId = loadRoleCodes(tenantId, users);
         Map<Long, Set<String>> permissionsByUserId = loadPermissionCodes(tenantId, roleCodesByUserId);
@@ -103,7 +100,7 @@ public class UserDirectoryService {
                 ))
                 .toList();
 
-        return PageResult.of(total, page, size, records);
+        return PageResult.of(userPage.getTotal(), page, size, records);
     }
 
     private Map<Long, Set<String>> loadRoleCodes(String tenantId, List<SysUserEntity> users) {

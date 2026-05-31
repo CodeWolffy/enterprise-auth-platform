@@ -12,6 +12,7 @@ import com.enterprise.auth.platform.dao.entity.SysUserEntity;
 import com.enterprise.auth.platform.dao.mapper.SysDeptMapper;
 import com.enterprise.auth.platform.dao.mapper.SysUserMapper;
 import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.dto.model.PageResult;
 import com.enterprise.auth.platform.dto.model.UserAccount;
 import com.enterprise.auth.platform.dto.resp.UserSummary;
 import com.enterprise.auth.platform.dao.repository.UserRepository;
@@ -127,6 +128,20 @@ class UserDirectoryServiceTest {
         assertThat(users).extracting(UserSummary::username)
                 .contains(TENANT_OTHER_DEPT_USER)
                 .doesNotContain(TENANT_TEST_USER, TENANT_CUSTOM_SCOPE_USER, PLATFORM_TEST_USER);
+    }
+
+    @Test
+    void listUsersShouldApplyDataScopeBeforePagination() {
+        TenantContext.setTenantId("tenant-a");
+        UserAccount manager = loadScopedUser(TENANT_MANAGER_USER, DataScopeType.DEPT_AND_CHILDREN, Set.of());
+        bind(manager);
+
+        PageResult<UserSummary> firstPage = userDirectoryService.listUsers(null, null, null, null, 1, 2);
+
+        assertThat(firstPage.total()).isGreaterThanOrEqualTo(3);
+        assertThat(firstPage.records()).hasSize(2);
+        assertThat(firstPage.records()).extracting(UserSummary::username)
+                .doesNotContain(TENANT_OTHER_DEPT_USER, PLATFORM_TEST_USER);
     }
 
     private void ensureUser(String tenantId, String username, Long deptId) {
