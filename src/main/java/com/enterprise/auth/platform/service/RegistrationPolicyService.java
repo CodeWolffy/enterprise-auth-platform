@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.enterprise.auth.platform.common.cache.CacheNames;
 import com.enterprise.auth.platform.dao.entity.SysConfigEntity;
 import com.enterprise.auth.platform.dao.mapper.SysConfigMapper;
 import com.enterprise.auth.platform.common.context.TenantContext;
@@ -17,7 +18,7 @@ import org.springframework.util.StringUtils;
 @Service
 public class RegistrationPolicyService {
 
-    public static final String CACHE_NAME = "registration:policy";
+    public static final String CACHE_NAME = CacheNames.REGISTRATION_POLICY;
     public static final String CACHE_KEY_DEFAULT_TENANT = "default-tenant";
     public static final String CACHE_KEY_DEFAULT_ROLE_CODES = "default-role-codes";
     public static final String CONFIG_KEY_DEFAULT_TENANT = "registration.default_tenant_id";

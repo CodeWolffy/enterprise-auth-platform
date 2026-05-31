@@ -1,41 +1,329 @@
 package com.enterprise.auth.platform.modules.system.application;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.enterprise.auth.platform.common.TimeSupport;
+import com.enterprise.auth.platform.common.authz.DataScopeService;
+import com.enterprise.auth.platform.common.authz.SecuritySupport;
+import com.enterprise.auth.platform.common.cache.CacheNames;
+import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.dao.entity.SysAuditLogEntity;
+import com.enterprise.auth.platform.dao.entity.SysCategoryRuleEntity;
+import com.enterprise.auth.platform.dao.entity.SysConfigEntity;
+import com.enterprise.auth.platform.dao.entity.SysDictEntity;
+import com.enterprise.auth.platform.dao.mapper.SysAuditLogMapper;
+import com.enterprise.auth.platform.dao.mapper.SysCategoryRuleMapper;
+import com.enterprise.auth.platform.dao.mapper.SysConfigMapper;
+import com.enterprise.auth.platform.dao.mapper.SysDictMapper;
 import com.enterprise.auth.platform.dto.req.CategoryConfigRequest;
-import com.enterprise.auth.platform.service.SystemManagementService;
+import com.enterprise.auth.platform.service.AuditService;
+import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 @Service
 public class CategoryRuleApplicationService {
 
-    private final SystemManagementService systemManagementService;
+    private static final String DICT_CATEGORY_PREFIX = "system.category.dict.";
+    private static final String CONFIG_CATEGORY_PREFIX = "system.category.config.";
 
-    public CategoryRuleApplicationService(SystemManagementService systemManagementService) {
-        this.systemManagementService = systemManagementService;
+    private final SysCategoryRuleMapper sysCategoryRuleMapper;
+    private final SysDictMapper sysDictMapper;
+    private final SysConfigMapper sysConfigMapper;
+    private final SysAuditLogMapper sysAuditLogMapper;
+    private final AuditService auditService;
+    private final DataScopeService dataScopeService;
+
+    public CategoryRuleApplicationService(
+            SysCategoryRuleMapper sysCategoryRuleMapper,
+            SysDictMapper sysDictMapper,
+            SysConfigMapper sysConfigMapper,
+            SysAuditLogMapper sysAuditLogMapper,
+            AuditService auditService,
+            DataScopeService dataScopeService
+    ) {
+        this.sysCategoryRuleMapper = sysCategoryRuleMapper;
+        this.sysDictMapper = sysDictMapper;
+        this.sysConfigMapper = sysConfigMapper;
+        this.sysAuditLogMapper = sysAuditLogMapper;
+        this.auditService = auditService;
+        this.dataScopeService = dataScopeService;
     }
 
-    public Map<String, List<SystemManagementService.CategoryOption>> categories() {
-        return systemManagementService.categories();
+    @Cacheable(value = CacheNames.SYSTEM_CATEGORIES_ALL, key = "#root.target.currentTenantId()")
+    public Map<String, List<SystemViewModels.CategoryOption>> categories() {
+        String tenantId = currentTenantId();
+        return Map.of(
+                "dict", loadCategoryOptions(tenantId, DICT_CATEGORY_PREFIX),
+                "config", loadCategoryOptions(tenantId, CONFIG_CATEGORY_PREFIX)
+        );
     }
 
-    public List<SystemManagementService.CategoryOption> categoryOptions(String targetType) {
-        return systemManagementService.categoryOptions(targetType);
+    @Cacheable(value = CacheNames.SYSTEM_CATEGORIES_TARGET, key = "#root.target.generateCacheKey(new Object[]{#targetType})")
+    public List<SystemViewModels.CategoryOption> categoryOptions(String targetType) {
+        return loadCategoryOptions(currentTenantId(), prefixForTargetType(targetType));
     }
 
-    public SystemManagementService.CategoryAnalysis analyzeCategoryOption(String targetType, String code) {
-        return systemManagementService.analyzeCategoryOption(targetType, code);
+    public SystemViewModels.CategoryAnalysis analyzeCategoryOption(String targetType, String code) {
+        String tenantId = currentTenantId();
+        SysCategoryRuleEntity entity = getCategoryConfig(tenantId, targetType, code);
+        List<String> matchers = splitMatchers(entity.getMatchers());
+        int referenceCount = "dict".equalsIgnoreCase(targetType)
+                ? countMatchingDicts(tenantId, matchers)
+                : countMatchingConfigs(tenantId, matchers);
+        List<String> sampleReferences = "dict".equalsIgnoreCase(targetType)
+                ? sampleMatchingDicts(tenantId, matchers)
+                : sampleMatchingConfigs(tenantId, matchers);
+        List<SystemViewModels.CategoryAuditView> recentAudits = loadCategoryAudits(tenantId, targetType, code);
+        List<SystemViewModels.CategoryTrendPoint> trend = buildCategoryTrend(recentAudits);
+        return new SystemViewModels.CategoryAnalysis(
+                code,
+                entity.getCategoryName(),
+                targetType.toLowerCase(),
+                matchers,
+                referenceCount,
+                sampleReferences,
+                recentAudits,
+                trend
+        );
     }
 
-    public SystemManagementService.CategoryOption createCategoryOption(String targetType, CategoryConfigRequest request) {
-        return systemManagementService.createCategoryOption(targetType, request);
+    @Transactional
+    @CacheEvict(value = {CacheNames.SYSTEM_CATEGORIES_ALL, CacheNames.SYSTEM_CATEGORIES_TARGET, CacheNames.SYSTEM_DICTS, CacheNames.SYSTEM_CONFIGS}, allEntries = true)
+    public SystemViewModels.CategoryOption createCategoryOption(String targetType, CategoryConfigRequest request) {
+        String tenantId = currentTenantId();
+        if (sysCategoryRuleMapper.selectCount(new LambdaQueryWrapper<SysCategoryRuleEntity>()
+                .eq(SysCategoryRuleEntity::getTenantId, tenantId)
+                .eq(SysCategoryRuleEntity::getTargetType, targetType.toLowerCase())
+                .eq(SysCategoryRuleEntity::getCategoryCode, request.code())
+                .eq(SysCategoryRuleEntity::getDeleted, 0)) > 0) {
+            throw new BusinessException("分类编码已存在");
+        }
+        SysCategoryRuleEntity entity = new SysCategoryRuleEntity();
+        entity.setTenantId(tenantId);
+        entity.setTargetType(targetType.toLowerCase());
+        entity.setCategoryCode(request.code());
+        entity.setCategoryName(request.name());
+        entity.setMatchers(normalizeMatchers(request.matchers()));
+        sysCategoryRuleMapper.insert(entity);
+        auditService.record("SYSTEM_CATEGORY_CREATED", SecuritySupport.currentOperator(), tenantId, Map.of(
+                "targetType", targetType,
+                "code", request.code()
+        ));
+        return new SystemViewModels.CategoryOption(request.code(), request.name(), splitMatchers(entity.getMatchers()));
     }
 
-    public SystemManagementService.CategoryOption updateCategoryOption(String targetType, String code, CategoryConfigRequest request) {
-        return systemManagementService.updateCategoryOption(targetType, code, request);
+    @Transactional
+    @CacheEvict(value = {CacheNames.SYSTEM_CATEGORIES_ALL, CacheNames.SYSTEM_CATEGORIES_TARGET, CacheNames.SYSTEM_DICTS, CacheNames.SYSTEM_CONFIGS}, allEntries = true)
+    public SystemViewModels.CategoryOption updateCategoryOption(String targetType, String code, CategoryConfigRequest request) {
+        String tenantId = currentTenantId();
+        SysCategoryRuleEntity entity = getCategoryConfig(tenantId, targetType, code);
+        entity.setCategoryName(request.name());
+        entity.setMatchers(normalizeMatchers(request.matchers()));
+        sysCategoryRuleMapper.updateById(entity);
+        auditService.record("SYSTEM_CATEGORY_UPDATED", SecuritySupport.currentOperator(), tenantId, Map.of(
+                "targetType", targetType,
+                "code", code
+        ));
+        return new SystemViewModels.CategoryOption(code, request.name(), splitMatchers(entity.getMatchers()));
     }
 
+    @Transactional
+    @CacheEvict(value = {CacheNames.SYSTEM_CATEGORIES_ALL, CacheNames.SYSTEM_CATEGORIES_TARGET, CacheNames.SYSTEM_DICTS, CacheNames.SYSTEM_CONFIGS}, allEntries = true)
     public void deleteCategoryOption(String targetType, String code) {
-        systemManagementService.deleteCategoryOption(targetType, code);
+        String tenantId = currentTenantId();
+        SysCategoryRuleEntity entity = getCategoryConfig(tenantId, targetType, code);
+        sysCategoryRuleMapper.deleteById(entity.getId());
+        auditService.record("SYSTEM_CATEGORY_DELETED", SecuritySupport.currentOperator(), tenantId, Map.of(
+                "targetType", targetType,
+                "code", code
+        ));
+    }
+
+    public String currentTenantId() {
+        String tenantId = TenantContext.getTenantId();
+        return StringUtils.hasText(tenantId) ? tenantId : "platform";
+    }
+
+    public String generateCacheKey(Object... params) {
+        StringBuilder key = new StringBuilder(currentTenantId());
+        for (Object param : params) {
+            key.append(':').append(param == null ? "" : param);
+        }
+        return key.toString();
+    }
+
+    private int countMatchingDicts(String tenantId, List<String> matchers) {
+        return sysDictMapper.selectList(new LambdaQueryWrapper<SysDictEntity>()
+                        .eq(SysDictEntity::getTenantId, tenantId)
+                        .eq(SysDictEntity::getDeleted, 0))
+                .stream()
+                .map(SysDictEntity::getDictType)
+                .filter(raw -> matchesAny(matchers, raw))
+                .toList()
+                .size();
+    }
+
+    private int countMatchingConfigs(String tenantId, List<String> matchers) {
+        return sysConfigMapper.selectList(new LambdaQueryWrapper<SysConfigEntity>()
+                        .eq(SysConfigEntity::getTenantId, tenantId)
+                        .eq(SysConfigEntity::getDeleted, 0))
+                .stream()
+                .map(SysConfigEntity::getConfigKey)
+                .filter(raw -> matchesAny(matchers, raw))
+                .toList()
+                .size();
+    }
+
+    private List<String> sampleMatchingDicts(String tenantId, List<String> matchers) {
+        return sysDictMapper.selectList(new LambdaQueryWrapper<SysDictEntity>()
+                        .eq(SysDictEntity::getTenantId, tenantId)
+                        .eq(SysDictEntity::getDeleted, 0)
+                        .orderByAsc(SysDictEntity::getDictType)
+                        .orderByAsc(SysDictEntity::getDictCode))
+                .stream()
+                .filter(item -> matchesAny(matchers, item.getDictType()))
+                .map(item -> item.getDictType() + " / " + item.getDictCode())
+                .distinct()
+                .limit(5)
+                .toList();
+    }
+
+    private List<String> sampleMatchingConfigs(String tenantId, List<String> matchers) {
+        return sysConfigMapper.selectList(new LambdaQueryWrapper<SysConfigEntity>()
+                        .eq(SysConfigEntity::getTenantId, tenantId)
+                        .eq(SysConfigEntity::getDeleted, 0)
+                        .orderByAsc(SysConfigEntity::getConfigKey))
+                .stream()
+                .filter(item -> matchesAny(matchers, item.getConfigKey()))
+                .map(SysConfigEntity::getConfigKey)
+                .distinct()
+                .limit(5)
+                .toList();
+    }
+
+    private boolean matchesAny(List<String> matchers, String rawKey) {
+        return matchers.stream().anyMatch(matcher -> {
+            if (!StringUtils.hasText(matcher) || !StringUtils.hasText(rawKey)) {
+                return false;
+            }
+            if (matcher.endsWith("*")) {
+                return rawKey.startsWith(matcher.substring(0, matcher.length() - 1));
+            }
+            return rawKey.equals(matcher);
+        });
+    }
+
+    private List<SystemViewModels.CategoryAuditView> loadCategoryAudits(String tenantId, String targetType, String code) {
+        List<String> eventTypes = List.of("SYSTEM_CATEGORY_CREATED", "SYSTEM_CATEGORY_UPDATED", "SYSTEM_CATEGORY_DELETED");
+        return sysAuditLogMapper.selectList(new LambdaQueryWrapper<SysAuditLogEntity>()
+                        .eq(SysAuditLogEntity::getTenantId, tenantId)
+                        .in(SysAuditLogEntity::getEventType, eventTypes)
+                        .like(SysAuditLogEntity::getPayloadJson, "\"targetType\":\"" + targetType + "\"")
+                        .like(SysAuditLogEntity::getPayloadJson, "\"code\":\"" + code + "\"")
+                        .orderByDesc(SysAuditLogEntity::getOccurredAt)
+                        .last("limit 10"))
+                .stream()
+                .map(item -> new SystemViewModels.CategoryAuditView(
+                        item.getEventType(),
+                        item.getOperator(),
+                        TimeSupport.toEpochMilli(item.getOccurredAt()),
+                        item.getPayloadJson()
+                ))
+                .toList();
+    }
+
+    private List<SystemViewModels.CategoryTrendPoint> buildCategoryTrend(List<SystemViewModels.CategoryAuditView> audits) {
+        java.time.LocalDate today = java.time.LocalDate.now();
+        Map<java.time.LocalDate, Long> counts = audits.stream()
+                .filter(item -> item.occurredAt() != null)
+                .collect(java.util.stream.Collectors.groupingBy(
+                        item -> Instant.ofEpochMilli(item.occurredAt()).atZone(TimeSupport.UTC).toLocalDate(),
+                        LinkedHashMap::new,
+                        java.util.stream.Collectors.counting()
+                ));
+        List<SystemViewModels.CategoryTrendPoint> trend = new java.util.ArrayList<>();
+        for (int i = 6; i >= 0; i--) {
+            java.time.LocalDate day = today.minusDays(i);
+            trend.add(new SystemViewModels.CategoryTrendPoint(day.toString(), counts.getOrDefault(day, 0L).intValue()));
+        }
+        return trend;
+    }
+
+    private List<SystemViewModels.CategoryOption> loadCategoryOptions(String tenantId, String prefix) {
+        return sysCategoryRuleMapper.selectList(new LambdaQueryWrapper<SysCategoryRuleEntity>()
+                        .eq(SysCategoryRuleEntity::getTenantId, tenantId)
+                        .eq(SysCategoryRuleEntity::getTargetType, targetTypeFromPrefix(prefix))
+                        .eq(SysCategoryRuleEntity::getDeleted, 0)
+                        .orderByAsc(SysCategoryRuleEntity::getCategoryCode))
+                .stream()
+                .map(config -> new SystemViewModels.CategoryOption(
+                        config.getCategoryCode(),
+                        StringUtils.hasText(config.getCategoryName()) ? config.getCategoryName() : config.getCategoryCode(),
+                        splitMatchers(config.getMatchers())
+                ))
+                .toList();
+    }
+
+    private SysCategoryRuleEntity getCategoryConfig(String tenantId, String targetType, String code) {
+        SysCategoryRuleEntity entity = sysCategoryRuleMapper.selectOne(new LambdaQueryWrapper<SysCategoryRuleEntity>()
+                .eq(SysCategoryRuleEntity::getTenantId, tenantId)
+                .eq(SysCategoryRuleEntity::getTargetType, targetType.toLowerCase())
+                .eq(SysCategoryRuleEntity::getCategoryCode, code)
+                .eq(SysCategoryRuleEntity::getDeleted, 0)
+                .last("limit 1"));
+        if (entity == null) {
+            throw new BusinessException("分类配置不存在");
+        }
+        if (!dataScopeService.canAccessCreatedBy(tenantId, entity.getCreatedBy())) {
+            throw new BusinessException("无权访问该分类配置");
+        }
+        return entity;
+    }
+
+    private String prefixForTargetType(String targetType) {
+        if ("dict".equalsIgnoreCase(targetType)) {
+            return DICT_CATEGORY_PREFIX;
+        }
+        if ("config".equalsIgnoreCase(targetType)) {
+            return CONFIG_CATEGORY_PREFIX;
+        }
+        throw new BusinessException("仅支持 dict 或 config 分类配置");
+    }
+
+    private String targetTypeFromPrefix(String prefix) {
+        return DICT_CATEGORY_PREFIX.equals(prefix) ? "dict" : "config";
+    }
+
+    private String normalizeMatchers(List<String> matchers) {
+        if (matchers == null || matchers.isEmpty()) {
+            throw new BusinessException("匹配规则不能为空");
+        }
+        String normalized = matchers.stream()
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .reduce((left, right) -> left + "," + right)
+                .orElse("");
+        if (!StringUtils.hasText(normalized)) {
+            throw new BusinessException("匹配规则不能为空");
+        }
+        return normalized;
+    }
+
+    private List<String> splitMatchers(String value) {
+        if (!StringUtils.hasText(value)) {
+            return List.of();
+        }
+        return java.util.Arrays.stream(value.split(","))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .toList();
     }
 }

@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.infrastructure.redis;
 
+import com.enterprise.auth.platform.common.cache.CacheNames;
 import com.enterprise.auth.platform.config.AppCacheProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,12 +40,12 @@ public class RedisCacheConfig implements CachingConfigurer {
             RedisCacheConfiguration defaultRedisCacheConfiguration
     ) {
         return builder -> builder
-                .withCacheConfiguration("auth:principal", defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedAuthPrincipalTtl()))
-                .withCacheConfiguration("registration:policy", defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedRegistrationPolicyTtl()))
-                .withCacheConfiguration("system:dicts", defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedSystemDictsTtl()))
-                .withCacheConfiguration("system:configs", defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedSystemConfigsTtl()))
-                .withCacheConfiguration("system:categories:all", defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedSystemCategoriesAllTtl()))
-                .withCacheConfiguration("system:categories:target", defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedSystemCategoriesTargetTtl()));
+                .withCacheConfiguration(CacheNames.AUTH_PRINCIPAL, defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedAuthPrincipalTtl()))
+                .withCacheConfiguration(CacheNames.REGISTRATION_POLICY, defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedRegistrationPolicyTtl()))
+                .withCacheConfiguration(CacheNames.SYSTEM_DICTS, defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedSystemDictsTtl()))
+                .withCacheConfiguration(CacheNames.SYSTEM_CONFIGS, defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedSystemConfigsTtl()))
+                .withCacheConfiguration(CacheNames.SYSTEM_CATEGORIES_ALL, defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedSystemCategoriesAllTtl()))
+                .withCacheConfiguration(CacheNames.SYSTEM_CATEGORIES_TARGET, defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedSystemCategoriesTargetTtl()));
     }
 
     @Bean
