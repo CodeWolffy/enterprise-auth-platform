@@ -356,8 +356,11 @@ npm run test:visual:update
 - `playwright-report/`、`test-results/` 与 `frontend/e2e/**/*.png` 均不提交源码。
 - 如需人工确认 UI 变化，从 CI Artifact 下载快照对比，确认后再单独决定是否建立受控基线策略。
 
-## 最近进展（2026-05-28）
+## 最近进展（2026-05-31）
 
+- 权限码治理：后端 Controller 权限注解已统一引用 `PermissionCodes`，前端权限声明继续由模块 manifest 消费。
+- 缓存治理：缓存名称已收敛到 `common/cache` 统一登记入口，认证主体、注册策略、系统字典、参数、公告和分类缓存具备独立 TTL 配置。
+- 系统域拆分：`SystemManagementService` 过渡引用已清理，系统域由字典、参数、公告、分类规则四个 application service 承接。
 - 数据迁移治理：Flyway 已接管 CI、启动与部署主路径，V1 基线与审计索引增量迁移已落地。
 - 项目结构整理：根目录 Node 残留依赖文件已移除，前端依赖收敛到 `frontend/`。
 - 配置安全整理：DB/Redis 连接信息改为环境变量覆盖，测试配置统一为 YAML。

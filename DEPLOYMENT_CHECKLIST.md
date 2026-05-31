@@ -36,6 +36,8 @@
 - [ ] `app.security.redis.session-enabled` 与部署目标一致
 - [ ] `app.security.redis.redisson-enabled` 与部署目标一致
 - [ ] `app.security.redis.key-prefix` 和 `namespace-version` 与其他系统不冲突
+- [ ] `app.cache.key-prefix` 与 `app.cache.namespace-version` 已按环境隔离
+- [ ] `app.cache.*-ttl` 已按业务环境确认，尤其是认证主体、注册策略、系统字典、参数、公告和分类缓存
 - [ ] `APP_SECURITY_SESSION_IDLE_SECONDS` 和 `APP_SECURITY_MAX_LOGIN_COUNT` 已按环境设置
 
 ## 4. 前端跨域来源

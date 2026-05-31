@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.controller;
 
+import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.dto.req.CreateResourceRequest;
 import com.enterprise.auth.platform.dto.req.SortResourceRequest;
@@ -34,21 +35,21 @@ public class ResourceController {
 
     @Operation(summary = "查询资源树")
     @GetMapping("/tree")
-    @SaCheckPermission("system:read")
+    @SaCheckPermission(PermissionCodes.SYSTEM_READ)
     public ApiResponse<List<ResourceTreeNode>> tree() {
         return ApiResponse.ok(resourceService.templateTree());
     }
 
     @Operation(summary = "新增资源")
     @PostMapping
-    @SaCheckPermission("system:write")
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
     public ApiResponse<ResourceTreeNode> create(@Valid @RequestBody CreateResourceRequest request) {
         return ApiResponse.ok(resourceService.createResource(request));
     }
 
     @Operation(summary = "修改资源")
     @PutMapping("/{resourceId}")
-    @SaCheckPermission("system:write")
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
     public ApiResponse<ResourceTreeNode> update(
             @Parameter(description = "资源 ID") @PathVariable Long resourceId,
             @Valid @RequestBody CreateResourceRequest request
@@ -58,7 +59,7 @@ public class ResourceController {
 
     @Operation(summary = "删除资源")
     @DeleteMapping("/{resourceId}")
-    @SaCheckPermission("system:write")
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
     public ApiResponse<Void> delete(@Parameter(description = "资源 ID") @PathVariable Long resourceId) {
         resourceService.deleteResource(resourceId);
         return ApiResponse.ok();
@@ -66,7 +67,7 @@ public class ResourceController {
 
     @Operation(summary = "修改资源排序")
     @PutMapping("/{resourceId}/sort")
-    @SaCheckPermission("system:write")
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
     public ApiResponse<ResourceTreeNode> sort(
             @Parameter(description = "资源 ID") @PathVariable Long resourceId,
             @Valid @RequestBody SortResourceRequest request

@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.dao.repository;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.enterprise.auth.platform.common.cache.CacheNames;
 import com.enterprise.auth.platform.dto.model.DataScopeType;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.dao.entity.SysRoleEntity;
@@ -50,7 +51,7 @@ public class DatabaseUserRepository implements UserRepository {
     }
 
     @Override
-    @Cacheable(value = "auth:principal", key = "T(com.enterprise.auth.platform.security.AuthPrincipalCacheService).usernameKey(#tenantId, #username)", unless = "#result == null")
+    @Cacheable(value = CacheNames.AUTH_PRINCIPAL, key = "T(com.enterprise.auth.platform.security.AuthPrincipalCacheService).usernameKey(#tenantId, #username)", unless = "#result == null")
     public Optional<UserAccount> findByUsername(String tenantId, String username) {
         SysUserEntity entity = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>()
                 .eq(SysUserEntity::getTenantId, tenantId)
@@ -61,7 +62,7 @@ public class DatabaseUserRepository implements UserRepository {
     }
 
     @Override
-    @Cacheable(value = "auth:principal", key = "T(com.enterprise.auth.platform.security.AuthPrincipalCacheService).currentTenantIdKey(#id)", unless = "#result == null")
+    @Cacheable(value = CacheNames.AUTH_PRINCIPAL, key = "T(com.enterprise.auth.platform.security.AuthPrincipalCacheService).currentTenantIdKey(#id)", unless = "#result == null")
     public Optional<UserAccount> findById(Long id) {
         SysUserEntity entity = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>()
                 .eq(SysUserEntity::getId, id)

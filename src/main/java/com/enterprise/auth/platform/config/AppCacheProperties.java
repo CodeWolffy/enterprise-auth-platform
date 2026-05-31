@@ -12,6 +12,7 @@ public record AppCacheProperties(
         Duration registrationPolicyTtl,
         Duration systemDictsTtl,
         Duration systemConfigsTtl,
+        Duration systemNoticesTtl,
         Duration systemCategoriesAllTtl,
         Duration systemCategoriesTargetTtl
 ) {
@@ -54,6 +55,10 @@ public record AppCacheProperties(
 
     public Duration resolvedSystemConfigsTtl() {
         return resolvePositiveTtl(systemConfigsTtl, Duration.ofMinutes(30));
+    }
+
+    public Duration resolvedSystemNoticesTtl() {
+        return resolvePositiveTtl(systemNoticesTtl, Duration.ofMinutes(10));
     }
 
     public Duration resolvedSystemCategoriesAllTtl() {

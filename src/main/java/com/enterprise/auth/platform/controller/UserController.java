@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.controller;
 
+import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.service.CatalogService;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.dto.model.PageResult;
@@ -40,7 +41,7 @@ public class UserController {
 
     @Operation(summary = "分页查询用户列表")
     @GetMapping
-    @SaCheckPermission("user:read")
+    @SaCheckPermission(PermissionCodes.USER_READ)
     public ApiResponse<PageResult<UserSummary>> list(
             @RequestParam(required = false) String username,
             @RequestParam(required = false) String mobile,
@@ -54,21 +55,21 @@ public class UserController {
 
     @Operation(summary = "查询用户已分配角色")
     @GetMapping("/{userId}/roles")
-    @SaCheckPermission("user:read")
+    @SaCheckPermission(PermissionCodes.USER_READ)
     public ApiResponse<List<CatalogService.RoleView>> assignedRoles(@Parameter(description = "用户 ID") @PathVariable Long userId) {
         return ApiResponse.ok(userManagementService.listAssignedRoles(userId));
     }
 
     @Operation(summary = "新增用户")
     @PostMapping
-    @SaCheckPermission("user:write")
+    @SaCheckPermission(PermissionCodes.USER_WRITE)
     public ApiResponse<UserSummary> create(@Valid @RequestBody CreateUserRequest request) {
         return ApiResponse.ok(userManagementService.create(request));
     }
 
     @Operation(summary = "修改用户")
     @PutMapping("/{userId}")
-    @SaCheckPermission("user:write")
+    @SaCheckPermission(PermissionCodes.USER_WRITE)
     public ApiResponse<UserSummary> update(
             @Parameter(description = "用户 ID") @PathVariable Long userId,
             @Valid @RequestBody CreateUserRequest request
@@ -78,7 +79,7 @@ public class UserController {
 
     @Operation(summary = "分配用户角色")
     @PutMapping("/{userId}/roles")
-    @SaCheckPermission("user:write")
+    @SaCheckPermission(PermissionCodes.USER_WRITE)
     public ApiResponse<UserSummary> assignRoles(
             @Parameter(description = "用户 ID") @PathVariable Long userId,
             @Valid @RequestBody AssignRolesRequest request
@@ -88,7 +89,7 @@ public class UserController {
 
     @Operation(summary = "删除用户")
     @DeleteMapping("/{userId}")
-    @SaCheckPermission("user:write")
+    @SaCheckPermission(PermissionCodes.USER_WRITE)
     public ApiResponse<Void> delete(@Parameter(description = "用户 ID") @PathVariable Long userId) {
         userManagementService.delete(userId);
         return ApiResponse.ok();

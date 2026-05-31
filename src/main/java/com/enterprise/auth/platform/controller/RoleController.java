@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.controller;
 
+import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.dto.req.AssignResourcesRequest;
 import com.enterprise.auth.platform.dto.req.CreateRoleRequest;
@@ -43,28 +44,28 @@ public class RoleController {
 
     @Operation(summary = "查询角色列表")
     @GetMapping
-    @SaCheckPermission("role:read")
+    @SaCheckPermission(PermissionCodes.ROLE_READ)
     public ApiResponse<List<CatalogService.RoleView>> list() {
         return ApiResponse.ok(catalogService.roles());
     }
 
     @Operation(summary = "查询角色已分配资源")
     @GetMapping("/{roleId}/resources")
-    @SaCheckPermission("role:read")
+    @SaCheckPermission(PermissionCodes.ROLE_READ)
     public ApiResponse<Set<Long>> assignedResources(@Parameter(description = "角色 ID") @PathVariable Long roleId) {
         return ApiResponse.ok(roleGrantQueryFacade.listRoleResourceIds(roleId));
     }
 
     @Operation(summary = "新增角色")
     @PostMapping
-    @SaCheckPermission("role:write")
+    @SaCheckPermission(PermissionCodes.ROLE_WRITE)
     public ApiResponse<CatalogService.RoleView> create(@Valid @RequestBody CreateRoleRequest request) {
         return ApiResponse.ok(roleManagementService.create(request));
     }
 
     @Operation(summary = "修改角色")
     @PutMapping("/{roleId}")
-    @SaCheckPermission("role:write")
+    @SaCheckPermission(PermissionCodes.ROLE_WRITE)
     public ApiResponse<CatalogService.RoleView> update(
             @Parameter(description = "角色 ID") @PathVariable Long roleId,
             @Valid @RequestBody CreateRoleRequest request
@@ -74,7 +75,7 @@ public class RoleController {
 
     @Operation(summary = "分配角色资源")
     @PutMapping("/{roleId}/resources")
-    @SaCheckPermission("role:write")
+    @SaCheckPermission(PermissionCodes.ROLE_WRITE)
     public ApiResponse<Set<Long>> assignResources(
             @Parameter(description = "角色 ID") @PathVariable Long roleId,
             @Valid @RequestBody AssignResourcesRequest request
@@ -84,7 +85,7 @@ public class RoleController {
 
     @Operation(summary = "删除角色")
     @DeleteMapping("/{roleId}")
-    @SaCheckPermission("role:write")
+    @SaCheckPermission(PermissionCodes.ROLE_WRITE)
     public ApiResponse<Void> delete(@Parameter(description = "角色 ID") @PathVariable Long roleId) {
         roleManagementService.delete(roleId);
         return ApiResponse.ok();

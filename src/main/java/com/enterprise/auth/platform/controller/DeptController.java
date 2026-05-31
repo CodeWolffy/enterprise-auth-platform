@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.controller;
 
+import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.service.CatalogService;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.dto.req.DeptCrudRequest;
@@ -34,21 +35,21 @@ public class DeptController {
 
     @Operation(summary = "查询部门列表")
     @GetMapping
-    @SaCheckPermission("dept:read")
+    @SaCheckPermission(PermissionCodes.DEPT_READ)
     public ApiResponse<List<CatalogService.DepartmentView>> list() {
         return ApiResponse.ok(catalogService.departments());
     }
 
     @Operation(summary = "新增部门")
     @PostMapping
-    @SaCheckPermission("dept:write")
+    @SaCheckPermission(PermissionCodes.DEPT_WRITE)
     public ApiResponse<CatalogService.DepartmentView> create(@Valid @RequestBody DeptCrudRequest request) {
         return ApiResponse.ok(deptManagementService.create(request));
     }
 
     @Operation(summary = "修改部门")
     @PutMapping("/{deptId}")
-    @SaCheckPermission("dept:write")
+    @SaCheckPermission(PermissionCodes.DEPT_WRITE)
     public ApiResponse<CatalogService.DepartmentView> update(
             @Parameter(description = "部门 ID") @PathVariable Long deptId,
             @Valid @RequestBody DeptCrudRequest request
@@ -58,7 +59,7 @@ public class DeptController {
 
     @Operation(summary = "删除部门")
     @DeleteMapping("/{deptId}")
-    @SaCheckPermission("dept:write")
+    @SaCheckPermission(PermissionCodes.DEPT_WRITE)
     public ApiResponse<Void> delete(@Parameter(description = "部门 ID") @PathVariable Long deptId) {
         deptManagementService.delete(deptId);
         return ApiResponse.ok();

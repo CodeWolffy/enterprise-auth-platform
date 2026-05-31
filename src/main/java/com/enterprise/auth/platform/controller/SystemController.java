@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.controller;
 
+import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.dto.model.PageResult;
 import com.enterprise.auth.platform.dto.req.ConfigCrudRequest;
@@ -53,7 +54,7 @@ public class SystemController {
 
     @Operation(summary = "查询预留组件状态")
     @GetMapping("/features")
-    @SaCheckPermission("system:read")
+    @SaCheckPermission(PermissionCodes.SYSTEM_READ)
     public ApiResponse<Map<String, Boolean>> features() {
         Map<String, Boolean> features = new LinkedHashMap<>();
         features.put("gatewayEnabled", false);
@@ -67,14 +68,14 @@ public class SystemController {
 
     @Operation(summary = "查询系统分类配置")
     @GetMapping("/categories")
-    @SaCheckPermission("system:read")
+    @SaCheckPermission(PermissionCodes.SYSTEM_READ)
     public ApiResponse<Map<String, List<SystemViewModels.CategoryOption>>> categories() {
         return ApiResponse.ok(categoryRuleApplicationService.categories());
     }
 
     @Operation(summary = "查询指定类型的分类配置")
     @GetMapping("/categories/{targetType}")
-    @SaCheckPermission("system:read")
+    @SaCheckPermission(PermissionCodes.SYSTEM_READ)
     public ApiResponse<List<SystemViewModels.CategoryOption>> categoryOptions(
             @Parameter(description = "分类目标类型：dict 或 config") @PathVariable String targetType
     ) {
@@ -83,7 +84,7 @@ public class SystemController {
 
     @Operation(summary = "查询分类配置分析")
     @GetMapping("/categories/{targetType}/{code}/analysis")
-    @SaCheckPermission("system:read")
+    @SaCheckPermission(PermissionCodes.SYSTEM_READ)
     public ApiResponse<SystemViewModels.CategoryAnalysis> categoryAnalysis(
             @Parameter(description = "分类目标类型：dict 或 config") @PathVariable String targetType,
             @Parameter(description = "分类编码") @PathVariable String code
@@ -93,7 +94,7 @@ public class SystemController {
 
     @Operation(summary = "新增分类配置")
     @PostMapping("/categories/{targetType}")
-    @SaCheckPermission("system:write")
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
     public ApiResponse<SystemViewModels.CategoryOption> createCategoryOption(
             @Parameter(description = "分类目标类型：dict 或 config") @PathVariable String targetType,
             @Valid @RequestBody CategoryConfigRequest request
@@ -103,7 +104,7 @@ public class SystemController {
 
     @Operation(summary = "修改分类配置")
     @PutMapping("/categories/{targetType}/{code}")
-    @SaCheckPermission("system:write")
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
     public ApiResponse<SystemViewModels.CategoryOption> updateCategoryOption(
             @Parameter(description = "分类目标类型：dict 或 config") @PathVariable String targetType,
             @Parameter(description = "分类编码") @PathVariable String code,
@@ -114,7 +115,7 @@ public class SystemController {
 
     @Operation(summary = "删除分类配置")
     @DeleteMapping("/categories/{targetType}/{code}")
-    @SaCheckPermission("system:write")
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
     public ApiResponse<Void> deleteCategoryOption(
             @Parameter(description = "分类目标类型：dict 或 config") @PathVariable String targetType,
             @Parameter(description = "分类编码") @PathVariable String code
@@ -125,7 +126,7 @@ public class SystemController {
 
     @Operation(summary = "分页查询字典列表")
     @GetMapping("/dicts")
-    @SaCheckPermission("system:read")
+    @SaCheckPermission(PermissionCodes.SYSTEM_READ)
     public ApiResponse<PageResult<SystemViewModels.DictView>> dicts(
             @Parameter(description = "字典类型") @RequestParam(required = false) String dictType,
             @Parameter(description = "字典分类，按字典类型前缀匹配") @RequestParam(required = false) String category,
@@ -140,14 +141,14 @@ public class SystemController {
 
     @Operation(summary = "新增字典")
     @PostMapping("/dicts")
-    @SaCheckPermission("system:write")
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
     public ApiResponse<SystemViewModels.DictView> createDict(@Valid @RequestBody DictCrudRequest request) {
         return ApiResponse.ok(dictApplicationService.createDict(request));
     }
 
     @Operation(summary = "修改字典")
     @PutMapping("/dicts/{id}")
-    @SaCheckPermission("system:write")
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
     public ApiResponse<SystemViewModels.DictView> updateDict(
             @Parameter(description = "字典 ID") @PathVariable Long id,
             @Valid @RequestBody DictCrudRequest request
@@ -157,7 +158,7 @@ public class SystemController {
 
     @Operation(summary = "删除字典")
     @DeleteMapping("/dicts/{id}")
-    @SaCheckPermission("system:write")
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
     public ApiResponse<Void> deleteDict(@Parameter(description = "字典 ID") @PathVariable Long id) {
         dictApplicationService.deleteDict(id);
         return ApiResponse.ok();
@@ -165,7 +166,7 @@ public class SystemController {
 
     @Operation(summary = "分页查询参数列表")
     @GetMapping("/configs")
-    @SaCheckPermission("system:read")
+    @SaCheckPermission(PermissionCodes.SYSTEM_READ)
     public ApiResponse<PageResult<SystemViewModels.ConfigView>> configs(
             @Parameter(description = "参数分类，按参数键前缀匹配") @RequestParam(required = false) String category,
             @Parameter(description = "关键字，匹配参数键、参数名称或参数值") @RequestParam(required = false) String keyword,
@@ -179,14 +180,14 @@ public class SystemController {
 
     @Operation(summary = "新增参数")
     @PostMapping("/configs")
-    @SaCheckPermission("system:write")
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
     public ApiResponse<SystemViewModels.ConfigView> createConfig(@Valid @RequestBody ConfigCrudRequest request) {
         return ApiResponse.ok(configApplicationService.createConfig(request));
     }
 
     @Operation(summary = "修改参数")
     @PutMapping("/configs/{id}")
-    @SaCheckPermission("system:write")
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
     public ApiResponse<SystemViewModels.ConfigView> updateConfig(
             @Parameter(description = "参数 ID") @PathVariable Long id,
             @Valid @RequestBody ConfigCrudRequest request
@@ -196,7 +197,7 @@ public class SystemController {
 
     @Operation(summary = "删除参数")
     @DeleteMapping("/configs/{id}")
-    @SaCheckPermission("system:write")
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
     public ApiResponse<Void> deleteConfig(@Parameter(description = "参数 ID") @PathVariable Long id) {
         configApplicationService.deleteConfig(id);
         return ApiResponse.ok();
@@ -204,7 +205,7 @@ public class SystemController {
 
     @Operation(summary = "分页查询公告列表")
     @GetMapping("/notices")
-    @SaCheckPermission("system:read")
+    @SaCheckPermission(PermissionCodes.SYSTEM_READ)
     public ApiResponse<PageResult<SystemViewModels.NoticeView>> notices(
             @Parameter(description = "是否已发布") @RequestParam(required = false) Boolean published,
             @Parameter(description = "工作流状态：DRAFT、SCHEDULED、PUBLISHED") @RequestParam(required = false) String workflowStatus,
@@ -219,14 +220,14 @@ public class SystemController {
 
     @Operation(summary = "新增公告")
     @PostMapping("/notices")
-    @SaCheckPermission("system:write")
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
     public ApiResponse<SystemViewModels.NoticeView> createNotice(@Valid @RequestBody NoticeCrudRequest request) {
         return ApiResponse.ok(noticeApplicationService.createNotice(request));
     }
 
     @Operation(summary = "修改公告")
     @PutMapping("/notices/{id}")
-    @SaCheckPermission("system:write")
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
     public ApiResponse<SystemViewModels.NoticeView> updateNotice(
             @Parameter(description = "公告 ID") @PathVariable Long id,
             @Valid @RequestBody NoticeCrudRequest request
@@ -236,7 +237,7 @@ public class SystemController {
 
     @Operation(summary = "删除公告")
     @DeleteMapping("/notices/{id}")
-    @SaCheckPermission("system:write")
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
     public ApiResponse<Void> deleteNotice(@Parameter(description = "公告 ID") @PathVariable Long id) {
         noticeApplicationService.deleteNotice(id);
         return ApiResponse.ok();

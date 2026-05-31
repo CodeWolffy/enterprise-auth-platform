@@ -92,7 +92,9 @@ sa-token:
 
 ## 权限模型
 
-接口权限通过 Sa-Token 注解控制：
+接口权限通过 Sa-Token 注解控制，后端统一引用 `common/authz/PermissionCodes` 作为登记入口，避免 Controller、前端菜单、初始化数据出现拼写分叉。
+
+当前登记的权限码：
 
 - `user:read` / `user:write`
 - `role:read` / `role:write`

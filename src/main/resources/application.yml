@@ -159,6 +159,7 @@ app:
     registration-policy-ttl: 5m
     system-dicts-ttl: 30m
     system-configs-ttl: 30m
+    system-notices-ttl: 10m
     system-categories-all-ttl: 60m
     system-categories-target-ttl: 60m
 

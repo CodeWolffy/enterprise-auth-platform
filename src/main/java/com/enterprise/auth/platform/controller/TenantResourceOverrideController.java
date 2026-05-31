@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.controller;
 
+import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.dto.model.TenantResourceOverrideItem;
 import com.enterprise.auth.platform.dto.req.UpdateTenantResourceOverridesRequest;
@@ -36,7 +37,7 @@ public class TenantResourceOverrideController {
 
     @Operation(summary = "查询租户资源覆盖")
     @GetMapping
-    @SaCheckPermission("tenant:read")
+    @SaCheckPermission(PermissionCodes.TENANT_READ)
     public ApiResponse<List<TenantResourceOverrideItem>> list(
             @Parameter(description = "租户 ID") @PathVariable String tenantId
     ) {
@@ -45,7 +46,7 @@ public class TenantResourceOverrideController {
 
     @Operation(summary = "更新租户资源覆盖")
     @PutMapping
-    @SaCheckPermission("tenant:write")
+    @SaCheckPermission(PermissionCodes.TENANT_WRITE)
     public ApiResponse<List<TenantResourceOverrideItem>> update(
             @Parameter(description = "租户 ID") @PathVariable String tenantId,
             @Valid @RequestBody UpdateTenantResourceOverridesRequest request
