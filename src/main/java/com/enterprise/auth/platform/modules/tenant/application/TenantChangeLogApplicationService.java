@@ -5,7 +5,7 @@ import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.dao.entity.SysTenantChangeLogEntity;
 import com.enterprise.auth.platform.dao.mapper.SysTenantChangeLogMapper;
 import com.enterprise.auth.platform.dto.model.PageResult;
-import com.enterprise.auth.platform.service.TenantManagementService;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
@@ -25,7 +25,7 @@ public class TenantChangeLogApplicationService {
         this.tenantAccessPolicy = tenantAccessPolicy;
     }
 
-    public PageResult<TenantManagementService.TenantChangeView> history(
+    public PageResult<TenantChangeView> history(
             String tenantId,
             String changeType,
             String fieldKey,
@@ -47,14 +47,14 @@ public class TenantChangeLogApplicationService {
             return PageResult.of(0, safePage, safeSize, List.of());
         }
         int offset = (safePage - 1) * safeSize;
-        List<TenantManagementService.TenantChangeView> records = sysTenantChangeLogMapper.selectList(query.last("limit " + offset + "," + safeSize))
+        List<TenantChangeView> records = sysTenantChangeLogMapper.selectList(query.last("limit " + offset + "," + safeSize))
                 .stream()
                 .map(this::toChangeView)
                 .toList();
         return PageResult.of(total, safePage, safeSize, records);
     }
 
-    public TenantManagementService.TenantHistorySummaryView historySummary(
+    public TenantHistorySummaryView historySummary(
             String tenantId,
             String changeType,
             String fieldKey,
@@ -72,7 +72,7 @@ public class TenantChangeLogApplicationService {
         long capabilityChanges = records.stream().filter(item -> "CAPABILITY".equals(item.getChangeType())).count();
         long statusChanges = records.stream().filter(item -> "STATUS".equals(item.getChangeType())).count();
         long profileChanges = records.stream().filter(item -> "PROFILE".equals(item.getChangeType())).count();
-        List<TenantManagementService.TenantChangeView> recentTimeline = records.stream()
+        List<TenantChangeView> recentTimeline = records.stream()
                 .limit(8)
                 .map(this::toChangeView)
                 .toList();
@@ -82,7 +82,7 @@ public class TenantChangeLogApplicationService {
                         java.util.LinkedHashMap::new,
                         java.util.stream.Collectors.counting()
                 ));
-        return new TenantManagementService.TenantHistorySummaryView(
+        return new TenantHistorySummaryView(
                 tenantId,
                 records.size(),
                 packageChanges,
@@ -149,8 +149,8 @@ public class TenantChangeLogApplicationService {
                         toEpochMs == null ? null : TimeSupport.localDateTimeFromEpochMilli(toEpochMs));
     }
 
-    private TenantManagementService.TenantChangeView toChangeView(SysTenantChangeLogEntity item) {
-        return new TenantManagementService.TenantChangeView(
+    private TenantChangeView toChangeView(SysTenantChangeLogEntity item) {
+        return new TenantChangeView(
                 item.getId(),
                 item.getTenantId(),
                 item.getChangeType(),
@@ -195,5 +195,32 @@ public class TenantChangeLogApplicationService {
             return "运营备注变更会影响租户交付说明、排期提示和内部协作口径。";
         }
         return null;
+    }
+    @Schema(description = "租户变更记录")
+    public record TenantChangeView(
+            @Schema(description = "记录 ID") Long id,
+            @Schema(description = "租户编码") String tenantId,
+            @Schema(description = "变更类型") String changeType,
+            @Schema(description = "字段键") String fieldKey,
+            @Schema(description = "旧值") String oldValue,
+            @Schema(description = "新值") String newValue,
+            @Schema(description = "变更摘要") String summary,
+            @Schema(description = "影响说明") String impactSummary,
+            @Schema(description = "操作人") String operator,
+            @Schema(description = "变更时间") Long occurredAt
+    ) {
+    }
+
+    @Schema(description = "租户变更历史摘要")
+    public record TenantHistorySummaryView(
+            @Schema(description = "租户编码") String tenantId,
+            @Schema(description = "命中的变更总数") Integer totalChanges,
+            @Schema(description = "套餐变更数") Long packageChanges,
+            @Schema(description = "能力变更数") Long capabilityChanges,
+            @Schema(description = "状态变更数") Long statusChanges,
+            @Schema(description = "资料变更数") Long profileChanges,
+            @Schema(description = "字段影响分布") Map<String, Long> affectedFieldCounts,
+            @Schema(description = "最近轨迹") List<TenantChangeView> recentTimeline
+    ) {
     }
 }

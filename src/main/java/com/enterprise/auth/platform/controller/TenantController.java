@@ -6,7 +6,6 @@ import com.enterprise.auth.platform.modules.tenant.application.TenantChangeLogAp
 import com.enterprise.auth.platform.modules.tenant.application.TenantDirectoryApplicationService;
 import com.enterprise.auth.platform.modules.tenant.application.TenantLifecycleApplicationService;
 import com.enterprise.auth.platform.service.CatalogService;
-import com.enterprise.auth.platform.service.TenantManagementService;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.dto.model.PageResult;
 import com.enterprise.auth.platform.common.context.TenantContext;
@@ -66,7 +65,7 @@ public class TenantController {
     @Operation(summary = "租户变更历史")
     @GetMapping("/{tenantId}/history")
     @SaCheckPermission(PermissionCodes.TENANT_READ)
-    public ApiResponse<PageResult<TenantManagementService.TenantChangeView>> history(
+    public ApiResponse<PageResult<TenantChangeLogApplicationService.TenantChangeView>> history(
             @Parameter(description = "租户编码") @PathVariable String tenantId,
             @Parameter(description = "变更类型") @RequestParam(required = false) String changeType,
             @Parameter(description = "字段键") @RequestParam(required = false) String fieldKey,
@@ -91,7 +90,7 @@ public class TenantController {
     @Operation(summary = "租户变更历史摘要")
     @GetMapping("/{tenantId}/history/summary")
     @SaCheckPermission(PermissionCodes.TENANT_READ)
-    public ApiResponse<TenantManagementService.TenantHistorySummaryView> historySummary(
+    public ApiResponse<TenantChangeLogApplicationService.TenantHistorySummaryView> historySummary(
             @Parameter(description = "租户编码") @PathVariable String tenantId,
             @Parameter(description = "变更类型") @RequestParam(required = false) String changeType,
             @Parameter(description = "字段键") @RequestParam(required = false) String fieldKey,
@@ -112,7 +111,7 @@ public class TenantController {
     @Operation(summary = "获取租户能力覆盖")
     @GetMapping("/{tenantId}/capability-overrides")
     @SaCheckPermission(PermissionCodes.TENANT_READ)
-    public ApiResponse<TenantManagementService.TenantCapabilityOverrideView> capabilityOverrides(
+    public ApiResponse<TenantCapabilityApplicationService.TenantCapabilityOverrideView> capabilityOverrides(
             @Parameter(description = "租户编码") @PathVariable String tenantId
     ) {
         return ApiResponse.ok(tenantCapabilityApplicationService.capabilityOverrides(tenantId));
@@ -121,7 +120,7 @@ public class TenantController {
     @Operation(summary = "更新租户能力覆盖")
     @PutMapping("/{tenantId}/capability-overrides")
     @SaCheckPermission(PermissionCodes.TENANT_WRITE)
-    public ApiResponse<TenantManagementService.TenantCapabilityOverrideView> updateCapabilityOverrides(
+    public ApiResponse<TenantCapabilityApplicationService.TenantCapabilityOverrideView> updateCapabilityOverrides(
             @Parameter(description = "租户编码") @PathVariable String tenantId,
             @Valid @RequestBody UpdateTenantCapabilityOverridesRequest request
     ) {

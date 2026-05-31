@@ -4,6 +4,7 @@ import com.enterprise.auth.platform.dto.req.TenantCapabilityCrudRequest;
 import com.enterprise.auth.platform.dto.req.UpdateTenantCapabilityOverridesRequest;
 import com.enterprise.auth.platform.service.TenantCatalogManagementService;
 import com.enterprise.auth.platform.service.TenantManagementService;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -41,14 +42,59 @@ public class TenantCapabilityApplicationService {
         tenantCatalogManagementService.deleteCapability(id);
     }
 
-    public TenantManagementService.TenantCapabilityOverrideView capabilityOverrides(String tenantId) {
-        return tenantManagementService.capabilityOverrides(tenantId);
+    public TenantCapabilityOverrideView capabilityOverrides(String tenantId) {
+        return TenantCapabilityOverrideView.from(tenantManagementService.capabilityOverrides(tenantId));
     }
 
-    public TenantManagementService.TenantCapabilityOverrideView updateCapabilityOverrides(
+    public TenantCapabilityOverrideView updateCapabilityOverrides(
             String tenantId,
             UpdateTenantCapabilityOverridesRequest request
     ) {
-        return tenantManagementService.updateCapabilityOverrides(tenantId, request);
+        return TenantCapabilityOverrideView.from(tenantManagementService.updateCapabilityOverrides(tenantId, request));
+    }
+    @Schema(description = "租户能力覆盖视图")
+    public record TenantCapabilityOverrideView(
+            @Schema(description = "租户编码") String tenantId,
+            @Schema(description = "套餐编码") String packageCode,
+            @Schema(description = "套餐名称") String packageName,
+            @Schema(description = "套餐默认能力编码集合") List<String> packageCapabilityCodes,
+            @Schema(description = "当前生效能力编码集合") List<String> effectiveCapabilityCodes,
+            @Schema(description = "能力覆盖项") List<CapabilityOverrideItemView> overrides
+    ) {
+        static TenantCapabilityOverrideView from(TenantManagementService.TenantCapabilityOverrideView source) {
+            return new TenantCapabilityOverrideView(
+                    source.tenantId(),
+                    source.packageCode(),
+                    source.packageName(),
+                    source.packageCapabilityCodes(),
+                    source.effectiveCapabilityCodes(),
+                    source.overrides().stream().map(CapabilityOverrideItemView::from).toList()
+            );
+        }
+    }
+
+    @Schema(description = "能力覆盖项视图")
+    public record CapabilityOverrideItemView(
+            @Schema(description = "能力编码") String capabilityCode,
+            @Schema(description = "能力名称") String capabilityName,
+            @Schema(description = "基础说明") String capabilityDesc,
+            @Schema(description = "套餐是否默认启用") boolean packageEnabled,
+            @Schema(description = "覆盖启用状态；为空表示继承套餐默认值") Boolean overrideEnabled,
+            @Schema(description = "当前是否生效") boolean effectiveEnabled,
+            @Schema(description = "说明覆盖") String capabilityDescOverride,
+            @Schema(description = "当前展示说明") String effectiveDesc
+    ) {
+        static CapabilityOverrideItemView from(TenantManagementService.CapabilityOverrideItemView source) {
+            return new CapabilityOverrideItemView(
+                    source.capabilityCode(),
+                    source.capabilityName(),
+                    source.capabilityDesc(),
+                    source.packageEnabled(),
+                    source.overrideEnabled(),
+                    source.effectiveEnabled(),
+                    source.capabilityDescOverride(),
+                    source.effectiveDesc()
+            );
+        }
     }
 }
