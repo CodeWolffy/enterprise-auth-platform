@@ -333,11 +333,9 @@ npm run test:visual
 npm run test:visual:update
 ```
 
-## 基座扩展文档
+## 项目维护文档
 
-- 新增业务模块：参考 `docs/基座扩展指南.md`
 - 模块边界和依赖方向：参考 `docs/模块边界规范.md`
-- 新项目复用初始化：参考 `docs/新项目初始化清单.md`
 - 认证、会话、权限、租户切换：参考 `docs/security-auth.md`
 
 ## CI
@@ -356,15 +354,18 @@ npm run test:visual:update
 - `playwright-report/`、`test-results/` 与 `frontend/e2e/**/*.png` 均不提交源码。
 - 如需人工确认 UI 变化，从 CI Artifact 下载快照对比，确认后再单独决定是否建立受控基线策略。
 
-## 最近进展（2026-05-31）
+## 最近进展（2026-06-01）
 
-- 权限码治理：后端 Controller 权限注解已统一引用 `PermissionCodes`，前端权限声明继续由模块 manifest 消费。
+- 模块化基座改造全部完成：旧的 `controller/service/dao/dto` 大平层已清空，8 个业务模块（auth/user/role/resource/dept/tenant/system/audit）全部按 `interfaces/application/domain/infrastructure` 分层就位。
+- 过渡包清空：`config/` 和 `security/` 两个历史过渡包已拆解归属，不再存在。
+- 跨模块依赖治理完成：所有模块的 application 层不再直接注入其他模块的 Mapper/Entity，统一通过 facade 协作。`ModuleBoundaryTest`（3 个 ArchUnit 规则）全量守护。
 - 缓存治理：缓存名称已收敛到 `common/cache` 统一登记入口，认证主体、注册策略、系统字典、参数、公告和分类缓存具备独立 TTL 配置。
-- 系统域拆分：`SystemManagementService` 过渡引用已清理，系统域由字典、参数、公告、分类规则四个 application service 承接。
+- 权限码治理：后端 Controller 权限注解已统一引用 `PermissionCodes`，前端权限声明由模块 manifest 消费。
 - 数据迁移治理：Flyway 已接管 CI、启动与部署主路径，V1 基线与审计索引增量迁移已落地。
+- 系统域拆分：`SystemManagementService` 过渡引用已清理，系统域由字典、参数、公告、分类规则四个 application service 承接。
 - 项目结构整理：根目录 Node 残留依赖文件已移除，前端依赖收敛到 `frontend/`。
 - 配置安全整理：DB/Redis 连接信息改为环境变量覆盖，测试配置统一为 YAML。
-- 文档整理：过时 OAuth2/OIDC 与旧 Session-Cookie 文档已归档到 `docs/archive/`。
+- 文档整理：过时 OAuth2/OIDC 与旧 Session-Cookie 文档已归档到 `docs/archive/`；已完成的优化计划清单已移除。
 - 前端 API 结构统一：业务 API 统一放入 `frontend/src/api/modules/`，业务代码统一从 `@/api/modules` 导入。
 - CI 视觉回归改为默认对比模式，基线更新只在人工确认时执行。
 
