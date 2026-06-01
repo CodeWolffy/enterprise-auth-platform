@@ -8,7 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.enterprise.auth.platform.common.authz.DataScopeType;
-import com.enterprise.auth.platform.security.PasswordHasher;
+import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import java.util.Set;
 import org.junit.jupiter.api.Test;

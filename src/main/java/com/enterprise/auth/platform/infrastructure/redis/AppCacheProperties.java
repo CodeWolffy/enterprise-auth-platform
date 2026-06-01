@@ -1,4 +1,4 @@
-package com.enterprise.auth.platform.config;
+package com.enterprise.auth.platform.infrastructure.redis;
 
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;

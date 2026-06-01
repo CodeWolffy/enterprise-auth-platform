@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.infrastructure.redis;
 
 import com.enterprise.auth.platform.common.cache.CacheNames;
-import com.enterprise.auth.platform.config.AppCacheProperties;
+import com.enterprise.auth.platform.infrastructure.redis.AppCacheProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CachingConfigurer;

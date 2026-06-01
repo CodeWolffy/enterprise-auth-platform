@@ -1,5 +1,6 @@
-package com.enterprise.auth.platform.security;
+package com.enterprise.auth.platform.modules.auth.infrastructure;
 
+import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;

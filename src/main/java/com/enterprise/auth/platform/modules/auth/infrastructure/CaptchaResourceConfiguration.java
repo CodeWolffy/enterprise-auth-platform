@@ -1,4 +1,4 @@
-package com.enterprise.auth.platform.config;
+package com.enterprise.auth.platform.modules.auth.infrastructure;
 
 import cloud.tianai.captcha.common.constant.CaptchaTypeConstant;
 import cloud.tianai.captcha.resource.ResourceStore;

@@ -24,8 +24,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import com.enterprise.auth.platform.security.PasswordHasher;
-import com.enterprise.auth.platform.security.AuthPrincipalCacheService;
+import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
+import com.enterprise.auth.platform.modules.auth.infrastructure.AuthPrincipalCacheService;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;

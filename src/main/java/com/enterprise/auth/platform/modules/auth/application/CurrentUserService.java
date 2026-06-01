@@ -1,16 +1,16 @@
-package com.enterprise.auth.platform.security;
+package com.enterprise.auth.platform.modules.auth.application;
 
 import cn.dev33.satoken.exception.SaTokenContextException;
 import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
 import com.enterprise.auth.platform.modules.auth.domain.SessionPrincipal;
-import com.enterprise.auth.platform.modules.auth.application.SessionIndexService;
+import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
 import com.enterprise.auth.platform.common.context.AuthContextHolder;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
-import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
-import com.enterprise.auth.platform.modules.user.infrastructure.repository.UserRepository;
+import com.enterprise.auth.platform.modules.user.application.AuthenticationUser;
+import com.enterprise.auth.platform.modules.user.application.UserAuthenticationFacade;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.LinkedHashSet;
 import java.util.Optional;
@@ -23,16 +23,16 @@ import org.springframework.util.StringUtils;
 @Service
 public class CurrentUserService {
 
-    private final ObjectProvider<UserRepository> userRepository;
+    private final ObjectProvider<UserAuthenticationFacade> userAuthenticationFacadeProvider;
     private final PlatformAdminSupport platformAdminSupport;
     private final SessionIndexService sessionIndexService;
 
     public CurrentUserService(
-            ObjectProvider<UserRepository> userRepository,
+            ObjectProvider<UserAuthenticationFacade> userAuthenticationFacadeProvider,
             PlatformAdminSupport platformAdminSupport,
             SessionIndexService sessionIndexService
     ) {
-        this.userRepository = userRepository;
+        this.userAuthenticationFacadeProvider = userAuthenticationFacadeProvider;
         this.platformAdminSupport = platformAdminSupport;
         this.sessionIndexService = sessionIndexService;
     }
@@ -71,12 +71,13 @@ public class CurrentUserService {
             long userId = StpUtil.getLoginIdAsLong();
             SaSession tokenSession = StpUtil.getTokenSession();
             String loginTenantId = sessionString(tokenSession, "tenantId");
-            UserAccount user = runWithTenant(loginTenantId, () -> userRepository.getObject().findById(userId))
+            AuthenticationUser authenticationUser = runWithTenant(loginTenantId, () -> userAuthenticationFacadeProvider.getObject().findById(userId))
                     .orElseThrow(() -> {
                         kickoutCurrentToken();
                         StpUtil.checkLogin();
                         return new BusinessException("USER_NOT_FOUND", "User not found");
-            });
+                    });
+            UserAccount user = toUserAccount(authenticationUser);
             UserAccount effectiveUser = mergeSessionAuthorities(user, tokenSession);
             if (!effectiveUser.enabled()) {
                 StpUtil.kickout(userId);
@@ -99,6 +100,21 @@ public class CurrentUserService {
             StpUtil.kickoutByTokenValue(tokenValue);
             sessionIndexService.remove(tokenValue);
         }
+    }
+
+    private UserAccount toUserAccount(AuthenticationUser user) {
+        return new UserAccount(
+                user.id(),
+                user.tenantId(),
+                user.username(),
+                user.password(),
+                user.enabled(),
+                user.roles(),
+                user.permissions(),
+                user.customDeptIds(),
+                user.dataScopeType(),
+                user.sessionVersion()
+        );
     }
 
     private UserAccount mergeSessionAuthorities(UserAccount user, SaSession tokenSession) {

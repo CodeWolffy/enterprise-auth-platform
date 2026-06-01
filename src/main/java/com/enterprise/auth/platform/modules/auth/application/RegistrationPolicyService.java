@@ -3,9 +3,9 @@ package com.enterprise.auth.platform.modules.auth.application;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.cache.CacheNames;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysConfigEntity;
-import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysConfigMapper;
+import com.enterprise.auth.platform.modules.system.application.ConfigApplicationService;
 import com.enterprise.auth.platform.common.context.TenantContext;
-import com.enterprise.auth.platform.config.TenantProperties;
+import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -25,14 +25,14 @@ public class RegistrationPolicyService {
     public static final String CONFIG_KEY_DEFAULT_ROLE_CODES = "registration.default_role_codes";
     public static final String FALLBACK_DEFAULT_TENANT = "tenant-a";
 
-    private final SysConfigMapper sysConfigMapper;
+    private final ConfigApplicationService configApplicationService;
     private final TenantProperties tenantProperties;
 
     public RegistrationPolicyService(
-            SysConfigMapper sysConfigMapper,
+            ConfigApplicationService configApplicationService,
             TenantProperties tenantProperties
     ) {
-        this.sysConfigMapper = sysConfigMapper;
+        this.configApplicationService = configApplicationService;
         this.tenantProperties = tenantProperties;
     }
 
@@ -65,12 +65,7 @@ public class RegistrationPolicyService {
         String previousTenantId = TenantContext.getTenantId();
         try {
             TenantContext.setTenantId(platformTenantId);
-            SysConfigEntity entity = sysConfigMapper.selectOne(new LambdaQueryWrapper<SysConfigEntity>()
-                    .eq(SysConfigEntity::getTenantId, platformTenantId)
-                    .eq(SysConfigEntity::getConfigKey, configKey)
-                    .eq(SysConfigEntity::getDeleted, 0)
-                    .last("limit 1"));
-            return entity == null ? Optional.empty() : Optional.ofNullable(entity.getConfigValue());
+            return configApplicationService.getConfigValue(platformTenantId, configKey);
         } finally {
             if (StringUtils.hasText(previousTenantId)) {
                 TenantContext.setTenantId(previousTenantId);

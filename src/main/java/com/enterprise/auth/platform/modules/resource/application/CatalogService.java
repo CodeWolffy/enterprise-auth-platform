@@ -9,16 +9,11 @@ import com.enterprise.auth.platform.modules.role.infrastructure.entity.SysRoleEn
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantCapabilityEntity;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantCapabilityOverrideEntity;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantEntity;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantPackageCapabilityEntity;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantPackageEntity;
-import com.enterprise.auth.platform.modules.dept.infrastructure.mapper.SysDeptMapper;
-import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMapper;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantCapabilityMapper;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantCapabilityOverrideMapper;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantMapper;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantPackageCapabilityMapper;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantPackageMapper;
+import com.enterprise.auth.platform.modules.dept.application.DeptCatalogFacade;
+import com.enterprise.auth.platform.modules.role.application.RoleCatalogFacade;
 import com.enterprise.auth.platform.modules.role.application.RolePayloadCodec;
+import com.enterprise.auth.platform.modules.tenant.application.TenantProfileFacade;
 import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -32,44 +27,29 @@ import org.springframework.util.StringUtils;
 @Service
 public class CatalogService {
 
-    private final SysRoleMapper sysRoleMapper;
-    private final SysDeptMapper sysDeptMapper;
-    private final SysTenantMapper sysTenantMapper;
-    private final SysTenantPackageMapper sysTenantPackageMapper;
-    private final SysTenantCapabilityMapper sysTenantCapabilityMapper;
-    private final SysTenantPackageCapabilityMapper sysTenantPackageCapabilityMapper;
-    private final SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper;
+    private final RoleCatalogFacade roleCatalogFacade;
+    private final DeptCatalogFacade deptCatalogFacade;
+    private final TenantProfileFacade tenantProfileFacade;
     private final DataScopeService dataScopeService;
     private final RolePayloadCodec rolePayloadCodec;
 
     public CatalogService(
-            SysRoleMapper sysRoleMapper,
-            SysDeptMapper sysDeptMapper,
-            SysTenantMapper sysTenantMapper,
-            SysTenantPackageMapper sysTenantPackageMapper,
-            SysTenantCapabilityMapper sysTenantCapabilityMapper,
-            SysTenantPackageCapabilityMapper sysTenantPackageCapabilityMapper,
-            SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper,
+            RoleCatalogFacade roleCatalogFacade,
+            DeptCatalogFacade deptCatalogFacade,
+            TenantProfileFacade tenantProfileFacade,
             DataScopeService dataScopeService,
             RolePayloadCodec rolePayloadCodec
     ) {
-        this.sysRoleMapper = sysRoleMapper;
-        this.sysDeptMapper = sysDeptMapper;
-        this.sysTenantMapper = sysTenantMapper;
-        this.sysTenantPackageMapper = sysTenantPackageMapper;
-        this.sysTenantCapabilityMapper = sysTenantCapabilityMapper;
-        this.sysTenantPackageCapabilityMapper = sysTenantPackageCapabilityMapper;
-        this.sysTenantCapabilityOverrideMapper = sysTenantCapabilityOverrideMapper;
+        this.roleCatalogFacade = roleCatalogFacade;
+        this.deptCatalogFacade = deptCatalogFacade;
+        this.tenantProfileFacade = tenantProfileFacade;
         this.dataScopeService = dataScopeService;
         this.rolePayloadCodec = rolePayloadCodec;
     }
 
     public List<RoleView> roles() {
         String tenantId = currentTenantId();
-        return sysRoleMapper.selectList(new LambdaQueryWrapper<SysRoleEntity>()
-                        .eq(SysRoleEntity::getTenantId, tenantId)
-                        .eq(SysRoleEntity::getDeleted, 0)
-                        .orderByAsc(SysRoleEntity::getId))
+        return roleCatalogFacade.listRoles(tenantId)
                 .stream()
                 .map(role -> new RoleView(
                         role.getId(),
@@ -83,10 +63,7 @@ public class CatalogService {
     }
     public List<DepartmentView> departments() {
         String tenantId = currentTenantId();
-        List<SysDeptEntity> departments = sysDeptMapper.selectList(new LambdaQueryWrapper<SysDeptEntity>()
-                .eq(SysDeptEntity::getTenantId, tenantId)
-                .eq(SysDeptEntity::getDeleted, 0)
-                .orderByAsc(SysDeptEntity::getId));
+        List<SysDeptEntity> departments = deptCatalogFacade.listDepartments(tenantId);
         departments = dataScopeService.filterDepartments(tenantId, departments);
         return departments.stream()
                 .map(dept -> new DepartmentView(
@@ -99,9 +76,7 @@ public class CatalogService {
                 .toList();
     }
     public List<TenantView> tenants() {
-        List<SysTenantEntity> tenants = sysTenantMapper.selectList(new LambdaQueryWrapper<SysTenantEntity>()
-                .eq(SysTenantEntity::getDeleted, 0)
-                .orderByAsc(SysTenantEntity::getId));
+        List<SysTenantEntity> tenants = tenantProfileFacade.listTenants();
         Map<String, TenantProfile> profiles = loadTenantProfiles(tenants);
         return tenants.stream()
                 .map(tenant -> {
@@ -160,54 +135,17 @@ public class CatalogService {
                 .filter(StringUtils::hasText)
                 .distinct()
                 .toList();
-        Map<String, SysTenantPackageEntity> packages = packageCodes.isEmpty() ? Map.of() : sysTenantPackageMapper.selectList(
-                new LambdaQueryWrapper<SysTenantPackageEntity>()
-                        .eq(SysTenantPackageEntity::getTenantId, "platform")
-                        .eq(SysTenantPackageEntity::getDeleted, 0)
-                        .in(SysTenantPackageEntity::getPackageCode, packageCodes)
-        ).stream().collect(Collectors.toMap(
-                SysTenantPackageEntity::getPackageCode,
-                java.util.function.Function.identity(),
-                (left, right) -> right,
-                LinkedHashMap::new
-        ));
-        Map<String, SysTenantCapabilityEntity> capabilities = sysTenantCapabilityMapper.selectList(
-                new LambdaQueryWrapper<SysTenantCapabilityEntity>()
-                        .eq(SysTenantCapabilityEntity::getTenantId, "platform")
-                        .eq(SysTenantCapabilityEntity::getDeleted, 0)
-                        .eq(SysTenantCapabilityEntity::getEnabled, 1)
-                        .orderByAsc(SysTenantCapabilityEntity::getSortOrder)
-                        .orderByAsc(SysTenantCapabilityEntity::getId)
-        ).stream().collect(Collectors.toMap(
-                SysTenantCapabilityEntity::getCapabilityCode,
-                java.util.function.Function.identity(),
-                (left, right) -> right,
-                LinkedHashMap::new
-        ));
-        Map<String, List<String>> packageCapabilities = packageCodes.isEmpty() ? Map.of() : sysTenantPackageCapabilityMapper.selectList(
-                new LambdaQueryWrapper<SysTenantPackageCapabilityEntity>()
-                        .eq(SysTenantPackageCapabilityEntity::getTenantId, "platform")
-                        .in(SysTenantPackageCapabilityEntity::getPackageCode, packageCodes)
-        ).stream().collect(Collectors.groupingBy(
-                SysTenantPackageCapabilityEntity::getPackageCode,
-                LinkedHashMap::new,
-                Collectors.mapping(SysTenantPackageCapabilityEntity::getCapabilityCode, Collectors.toList())
-        ));
-        Map<String, List<SysTenantCapabilityOverrideEntity>> overrides = sysTenantCapabilityOverrideMapper.selectList(
-                new LambdaQueryWrapper<SysTenantCapabilityOverrideEntity>()
-                        .in(SysTenantCapabilityOverrideEntity::getTenantId, tenantIds)
-        ).stream().collect(Collectors.groupingBy(
-                SysTenantCapabilityOverrideEntity::getTenantId,
-                LinkedHashMap::new,
-                Collectors.toList()
-        ));
+        Map<String, SysTenantPackageEntity> packages = tenantProfileFacade.loadPackages(packageCodes);
+        Map<String, SysTenantCapabilityEntity> capabilities = tenantProfileFacade.loadCapabilities();
+        Map<String, List<String>> packageCapabilities = tenantProfileFacade.loadPackageCapabilities(packageCodes);
+        Map<String, List<SysTenantCapabilityOverrideEntity>> overrides = tenantProfileFacade.loadOverrides(tenantIds);
         Map<String, TenantProfile> result = new LinkedHashMap<>();
         for (SysTenantEntity tenant : tenants) {
             SysTenantPackageEntity pkg = packages.get(tenant.getPackageCode());
             List<String> capabilityCodes = new java.util.ArrayList<>(packageCapabilities.getOrDefault(tenant.getPackageCode(), List.of()));
             Map<String, String> descriptions = capabilityCodes.stream().collect(Collectors.toMap(
                     java.util.function.Function.identity(),
-                    code -> capabilityDescription(capabilities.get(code)),
+                    code -> tenantProfileFacade.capabilityDescription(capabilities.get(code)),
                     (left, right) -> right,
                     LinkedHashMap::new
             ));
@@ -218,7 +156,7 @@ public class CatalogService {
                     }
                     descriptions.put(override.getCapabilityCode(), StringUtils.hasText(override.getCapabilityDescOverride())
                             ? override.getCapabilityDescOverride()
-                            : capabilityDescription(capabilities.get(override.getCapabilityCode())));
+                            : tenantProfileFacade.capabilityDescription(capabilities.get(override.getCapabilityCode())));
                 } else {
                     capabilityCodes.remove(override.getCapabilityCode());
                     descriptions.remove(override.getCapabilityCode());

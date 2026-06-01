@@ -6,20 +6,13 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
-import com.enterprise.auth.platform.config.SecurityProperties;
-import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
-import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
-import com.enterprise.auth.platform.modules.user.infrastructure.repository.UserRepository;
-import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
+import com.enterprise.auth.platform.modules.auth.infrastructure.SecurityProperties;
+import com.enterprise.auth.platform.modules.user.application.AuthenticationUser;
+import com.enterprise.auth.platform.modules.user.application.UserAuthenticationFacade;
 import com.enterprise.auth.platform.modules.auth.interfaces.LoginRequest;
 import com.enterprise.auth.platform.modules.auth.interfaces.TokenSessionResponse;
-import com.enterprise.auth.platform.security.PasswordHasher;
+import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 import com.enterprise.auth.platform.modules.audit.application.AuditService;
-import com.enterprise.auth.platform.modules.auth.application.CaptchaService;
-import com.enterprise.auth.platform.modules.auth.application.LoginAttemptService;
-import com.enterprise.auth.platform.modules.auth.application.LoginAttemptService.LoginFailureResult;
-import com.enterprise.auth.platform.modules.auth.application.RegistrationPolicyService;
-import com.enterprise.auth.platform.modules.auth.application.SessionIndexService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.List;
@@ -32,9 +25,8 @@ public class LoginApplicationService {
 
     private final CaptchaService captchaService;
     private final PasswordHasher passwordHasher;
-    private final UserRepository userRepository;
+    private final UserAuthenticationFacade userAuthenticationFacade;
     private final AuditService auditService;
-    private final SysUserMapper sysUserMapper;
     private final LoginAttemptService loginAttemptService;
     private final RegistrationPolicyService registrationPolicyService;
     private final SecurityProperties securityProperties;
@@ -43,9 +35,8 @@ public class LoginApplicationService {
     public LoginApplicationService(
             CaptchaService captchaService,
             PasswordHasher passwordHasher,
-            UserRepository userRepository,
+            UserAuthenticationFacade userAuthenticationFacade,
             AuditService auditService,
-            SysUserMapper sysUserMapper,
             LoginAttemptService loginAttemptService,
             RegistrationPolicyService registrationPolicyService,
             SecurityProperties securityProperties,
@@ -53,9 +44,8 @@ public class LoginApplicationService {
     ) {
         this.captchaService = captchaService;
         this.passwordHasher = passwordHasher;
-        this.userRepository = userRepository;
+        this.userAuthenticationFacade = userAuthenticationFacade;
         this.auditService = auditService;
-        this.sysUserMapper = sysUserMapper;
         this.loginAttemptService = loginAttemptService;
         this.registrationPolicyService = registrationPolicyService;
         this.securityProperties = securityProperties;
@@ -75,7 +65,7 @@ public class LoginApplicationService {
                 throw new BusinessException("ACCOUNT_LOCKED", "账户已锁定，请稍后再试");
             }
 
-            UserAccount user = userRepository.findByUsername(tenantId, request.username()).orElse(null);
+            AuthenticationUser user = userAuthenticationFacade.findByUsername(tenantId, request.username()).orElse(null);
             if (user == null) {
                 throw buildLoginFailure(tenantId, request.username(), "user_not_found", clientIp);
             }
@@ -117,7 +107,7 @@ public class LoginApplicationService {
                     expiresAt.toEpochMilli()
             );
 
-            updateLastLogin(user.id(), clientIp);
+            userAuthenticationFacade.recordLoginSuccess(user.id(), clientIp);
             auditService.record("LOGIN_SUCCESS", user.username(), user.tenantId(), Map.of("sessionId", tokenValue, "clientIp", clientIp));
             return new TokenSessionResponse(user.tenantId(), tokenValue, TimeSupport.toEpochMilli(expiresAt));
         } finally {
@@ -129,26 +119,9 @@ public class LoginApplicationService {
         }
     }
 
-    private void updateLastLogin(Long userId, String clientIp) {
-        if (userId == null) {
-            return;
-        }
-        SysUserEntity entity = sysUserMapper.selectById(userId);
-        if (entity == null || (entity.getDeleted() != null && entity.getDeleted() == 1)) {
-            return;
-        }
-        entity.setLastLoginAt(TimeSupport.utcNowDateTime());
-        entity.setLastLoginIp(clientIp);
-        entity.setUpdatedBy(entity.getUsername());
-        sysUserMapper.updateById(entity);
-    }
-
     private String resolveLoginTenantId(LoginRequest request) {
         String requestedTenantId = StringUtils.hasText(request.tenantId()) ? request.tenantId().trim() : TenantContext.getTenantId();
-        List<String> matchedTenantIds = sysUserMapper.selectActiveTenantIdsByUsername(request.username()).stream()
-                .filter(StringUtils::hasText)
-                .map(String::trim)
-                .toList();
+        List<String> matchedTenantIds = userAuthenticationFacade.activeTenantIdsByUsername(request.username());
         if (matchedTenantIds.size() == 1) {
             return matchedTenantIds.get(0);
         }
@@ -175,7 +148,7 @@ public class LoginApplicationService {
             String reason,
             String clientIp
     ) {
-        LoginFailureResult result = loginAttemptService.recordFailure(tenantId, username, reason, clientIp);
+        LoginAttemptService.LoginFailureResult result = loginAttemptService.recordFailure(tenantId, username, reason, clientIp);
         if (result.locked()) {
             return new BusinessException("ACCOUNT_LOCKED", "账户已锁定，请稍后再试");
         }

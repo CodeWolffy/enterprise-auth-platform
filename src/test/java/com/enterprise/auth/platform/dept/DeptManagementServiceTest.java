@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import com.enterprise.auth.platform.security.PasswordHasher;
+import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 
 @SpringBootTest
 class DeptManagementServiceTest {

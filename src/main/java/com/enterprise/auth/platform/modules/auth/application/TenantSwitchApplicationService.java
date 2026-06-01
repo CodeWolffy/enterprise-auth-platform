@@ -8,7 +8,7 @@ import com.enterprise.auth.platform.common.context.AuthContextHolder;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantEntity;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantMapper;
+import com.enterprise.auth.platform.modules.tenant.application.TenantProfileFacade;
 import com.enterprise.auth.platform.modules.auth.domain.SessionPrincipal;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.auth.interfaces.PermissionSnapshotResponse;
@@ -26,20 +26,20 @@ public class TenantSwitchApplicationService {
     private final PlatformAdminSupport platformAdminSupport;
     private final PermissionSnapshotApplicationService permissionSnapshotApplicationService;
     private final SessionIndexService sessionIndexService;
-    private final SysTenantMapper sysTenantMapper;
+    private final TenantProfileFacade tenantProfileFacade;
 
     public TenantSwitchApplicationService(
             AuditService auditService,
             PlatformAdminSupport platformAdminSupport,
             PermissionSnapshotApplicationService permissionSnapshotApplicationService,
             SessionIndexService sessionIndexService,
-            SysTenantMapper sysTenantMapper
+            TenantProfileFacade tenantProfileFacade
     ) {
         this.auditService = auditService;
         this.platformAdminSupport = platformAdminSupport;
         this.permissionSnapshotApplicationService = permissionSnapshotApplicationService;
         this.sessionIndexService = sessionIndexService;
-        this.sysTenantMapper = sysTenantMapper;
+        this.tenantProfileFacade = tenantProfileFacade;
     }
 
     public PermissionSnapshotResponse switchTenant(UserAccount currentUser, String targetTenantId) {
@@ -50,10 +50,8 @@ public class TenantSwitchApplicationService {
         if (!platformAdminSupport.canSwitchTenant(currentUser, normalizedTargetTenantId)) {
             throw new BusinessException("ACCESS_DENIED", "无权切换到目标租户");
         }
-        SysTenantEntity tenant = sysTenantMapper.selectOne(new LambdaQueryWrapper<SysTenantEntity>()
-                .eq(SysTenantEntity::getTenantId, normalizedTargetTenantId)
-                .eq(SysTenantEntity::getDeleted, 0)
-                .last("limit 1"));
+        SysTenantEntity tenant = tenantProfileFacade.findByTenantId(normalizedTargetTenantId)
+                .orElse(null);
         if (tenant == null) {
             throw new BusinessException("TENANT_NOT_FOUND", "租户不存在");
         }

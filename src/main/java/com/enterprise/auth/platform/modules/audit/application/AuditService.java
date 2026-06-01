@@ -88,6 +88,25 @@ public class AuditService implements AuditEventPublisher {
         return query(exportQuery).records();
     }
 
+    public List<AuditLogEntry> queryCategoryAudits(String tenantId, String targetType, String code) {
+        List<String> eventTypes = List.of("SYSTEM_CATEGORY_CREATED", "SYSTEM_CATEGORY_UPDATED", "SYSTEM_CATEGORY_DELETED");
+        return sysAuditLogMapper.selectList(new LambdaQueryWrapper<SysAuditLogEntity>()
+                .eq(SysAuditLogEntity::getTenantId, tenantId)
+                .in(SysAuditLogEntity::getEventType, eventTypes)
+                .like(SysAuditLogEntity::getPayloadJson, "\"targetType\":\"" + targetType + "\"")
+                .like(SysAuditLogEntity::getPayloadJson, "\"code\":\"" + code + "\"")
+                .orderByDesc(SysAuditLogEntity::getOccurredAt)
+                .last("limit 10"))
+                .stream()
+                .map(item -> new AuditLogEntry(
+                        item.getEventType(),
+                        item.getOperator(),
+                        TimeSupport.toEpochMilli(item.getOccurredAt()),
+                        item.getPayloadJson()
+                ))
+                .toList();
+    }
+
     public void validateExportQuery(AuditQuery query) {
         if (query.fromEpochMs() == null || query.toEpochMs() == null) {
             throw new BusinessException("导出审计记录必须指定开始和结束时间");

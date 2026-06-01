@@ -1,4 +1,4 @@
-package com.enterprise.auth.platform.security;
+package com.enterprise.auth.platform.modules.auth.infrastructure;
 
 import com.enterprise.auth.platform.common.context.TenantContext;
 import org.springframework.cache.Cache;

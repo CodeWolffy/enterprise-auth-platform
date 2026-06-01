@@ -5,23 +5,20 @@ import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.modules.audit.application.AuditService;
-import com.enterprise.auth.platform.modules.dept.infrastructure.entity.SysDeptEntity;
+import com.enterprise.auth.platform.modules.dept.application.DeptTenantDataFacade;
 import com.enterprise.auth.platform.modules.resource.application.CatalogService;
-import com.enterprise.auth.platform.modules.role.infrastructure.entity.SysRoleEntity;
+import com.enterprise.auth.platform.modules.role.application.RoleTenantDataFacade;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantCapabilityEntity;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantCapabilityOverrideEntity;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantEntity;
-import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantPackageCapabilityEntity;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantPackageEntity;
-import com.enterprise.auth.platform.modules.dept.infrastructure.mapper.SysDeptMapper;
-import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMapper;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantCapabilityMapper;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantCapabilityOverrideMapper;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantMapper;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantPackageCapabilityMapper;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantPackageMapper;
-import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
+import com.enterprise.auth.platform.modules.user.application.UserTenantDataFacade;
 import com.enterprise.auth.platform.modules.tenant.application.TenantAccessPolicy;
 import com.enterprise.auth.platform.modules.tenant.application.TenantChangeLogApplicationService;
 import com.enterprise.auth.platform.common.authz.SecuritySupport;
@@ -40,9 +37,9 @@ import org.springframework.util.StringUtils;
 public class TenantManagementService {
 
     private final SysTenantMapper sysTenantMapper;
-    private final SysUserMapper sysUserMapper;
-    private final SysRoleMapper sysRoleMapper;
-    private final SysDeptMapper sysDeptMapper;
+    private final UserTenantDataFacade userTenantDataFacade;
+    private final RoleTenantDataFacade roleTenantDataFacade;
+    private final DeptTenantDataFacade deptTenantDataFacade;
     private final SysTenantPackageMapper sysTenantPackageMapper;
     private final SysTenantCapabilityMapper sysTenantCapabilityMapper;
     private final SysTenantPackageCapabilityMapper sysTenantPackageCapabilityMapper;
@@ -54,9 +51,9 @@ public class TenantManagementService {
 
     public TenantManagementService(
             SysTenantMapper sysTenantMapper,
-            SysUserMapper sysUserMapper,
-            SysRoleMapper sysRoleMapper,
-            SysDeptMapper sysDeptMapper,
+            UserTenantDataFacade userTenantDataFacade,
+            RoleTenantDataFacade roleTenantDataFacade,
+            DeptTenantDataFacade deptTenantDataFacade,
             SysTenantPackageMapper sysTenantPackageMapper,
             SysTenantCapabilityMapper sysTenantCapabilityMapper,
             SysTenantPackageCapabilityMapper sysTenantPackageCapabilityMapper,
@@ -67,9 +64,9 @@ public class TenantManagementService {
             TenantChangeLogApplicationService tenantChangeLogApplicationService
     ) {
         this.sysTenantMapper = sysTenantMapper;
-        this.sysUserMapper = sysUserMapper;
-        this.sysRoleMapper = sysRoleMapper;
-        this.sysDeptMapper = sysDeptMapper;
+        this.userTenantDataFacade = userTenantDataFacade;
+        this.roleTenantDataFacade = roleTenantDataFacade;
+        this.deptTenantDataFacade = deptTenantDataFacade;
         this.sysTenantPackageMapper = sysTenantPackageMapper;
         this.sysTenantCapabilityMapper = sysTenantCapabilityMapper;
         this.sysTenantPackageCapabilityMapper = sysTenantPackageCapabilityMapper;
@@ -151,16 +148,9 @@ public class TenantManagementService {
         requirePlatformSuperAdmin();
         String operator = SecuritySupport.currentOperator();
         SysTenantEntity entity = getTenant(tenantId);
-        boolean tenantHasRelatedData = withTenant(tenantId, () ->
-                (sysUserMapper.selectCount(new LambdaQueryWrapper<SysUserEntity>()
-                        .eq(SysUserEntity::getTenantId, tenantId)
-                        .eq(SysUserEntity::getDeleted, 0)) > 0)
-                        || (sysRoleMapper.selectCount(new LambdaQueryWrapper<SysRoleEntity>()
-                        .eq(SysRoleEntity::getTenantId, tenantId)
-                        .eq(SysRoleEntity::getDeleted, 0)) > 0)
-                        || (sysDeptMapper.selectCount(new LambdaQueryWrapper<SysDeptEntity>()
-                        .eq(SysDeptEntity::getTenantId, tenantId)
-                        .eq(SysDeptEntity::getDeleted, 0)) > 0));
+        boolean tenantHasRelatedData = userTenantDataFacade.hasActiveUsers(tenantId)
+                || roleTenantDataFacade.hasActiveRoles(tenantId)
+                || deptTenantDataFacade.hasActiveDepartments(tenantId);
         if (tenantHasRelatedData) {
             throw new BusinessException("租户下仍存在用户、角色或部门数据，暂不允许删除");
         }

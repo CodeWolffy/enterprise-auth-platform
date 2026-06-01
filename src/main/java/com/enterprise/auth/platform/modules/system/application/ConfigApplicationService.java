@@ -49,6 +49,15 @@ public class ConfigApplicationService {
         this.dataScopeService = dataScopeService;
     }
 
+    public Optional<String> getConfigValue(String tenantId, String configKey) {
+        SysConfigEntity entity = sysConfigMapper.selectOne(new LambdaQueryWrapper<SysConfigEntity>()
+                .eq(SysConfigEntity::getTenantId, tenantId)
+                .eq(SysConfigEntity::getConfigKey, configKey)
+                .eq(SysConfigEntity::getDeleted, 0)
+                .last("limit 1"));
+        return entity == null ? Optional.empty() : Optional.ofNullable(entity.getConfigValue());
+    }
+
     @Cacheable(value = CacheNames.SYSTEM_CONFIGS, key = "#root.target.generateCacheKey(new Object[]{#category, #keyword, #page, #size, #sortBy, #sortDirection})")
     public PageResult<SystemViewModels.ConfigView> configs(
             String category,

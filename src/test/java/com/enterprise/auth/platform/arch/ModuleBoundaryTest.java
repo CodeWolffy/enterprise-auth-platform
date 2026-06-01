@@ -8,13 +8,15 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 class ModuleBoundaryTest {
 
     private static final Path SOURCE_ROOT = Path.of("src/main/java/com/enterprise/auth/platform");
     private static final Path MODULES_ROOT = SOURCE_ROOT.resolve("modules");
-    private static final Pattern PACKAGE_PATTERN = Pattern.compile("com\\.enterprise\\.auth\\.platform\\.modules\\.([a-z]+)\\.(domain|infrastructure)");
+    private static final Pattern DOMAIN_INFRA_PATTERN = Pattern.compile("com\\.enterprise\\.auth\\.platform\\.modules\\.([a-z]+)\\.(domain|infrastructure)");
+    private static final Pattern INFRA_MAPPER_PATTERN = Pattern.compile("com\\.enterprise\\.auth\\.platform\\.modules\\.([a-z]+)\\.infrastructure\\.mapper");
 
     @Test
     void legacyFlatPackagesAreFullyMigrated() {
@@ -35,26 +37,41 @@ class ModuleBoundaryTest {
             return;
         }
 
-        List<String> violations;
-        try (var files = Files.walk(MODULES_ROOT)) {
-            violations = files
-                    .filter(path -> path.toString().endsWith(".java"))
-                    .filter(path -> path.toString().contains("interfaces"))
-                    .flatMap(path -> findViolations(path).stream())
-                    .toList();
-        }
-
+        List<String> violations = scanFiles("interfaces", DOMAIN_INFRA_PATTERN);
         assertTrue(violations.isEmpty(), () -> String.join(System.lineSeparator(), violations));
     }
 
-    private static List<String> findViolations(Path path) {
+    @Test
+    void moduleApplicationLayerDoesNotDependOnOtherModulesMapper() throws IOException {
+        if (!Files.exists(MODULES_ROOT)) {
+            return;
+        }
+
+        List<String> violations = scanFiles("application", INFRA_MAPPER_PATTERN);
+        assertTrue(violations.isEmpty(), () -> String.join(System.lineSeparator(), violations));
+    }
+
+    private static List<String> scanFiles(String layer, Pattern violationPattern) throws IOException {
+        try (Stream<Path> files = Files.walk(MODULES_ROOT)) {
+            return files
+                    .filter(path -> path.toString().endsWith(".java"))
+                    .filter(path -> {
+                        Path parent = path.getParent();
+                        return parent != null && layer.equals(parent.getFileName().toString());
+                    })
+                    .flatMap(path -> findViolations(path, violationPattern).stream())
+                    .toList();
+        }
+    }
+
+    private static List<String> findViolations(Path path, Pattern violationPattern) {
         String currentModule = currentModule(path);
         if (currentModule.isBlank()) {
             return List.of();
         }
         try {
             return Files.readAllLines(path).stream()
-                    .map(line -> violation(path, currentModule, line))
+                    .map(line -> violation(path, currentModule, line, violationPattern))
                     .filter(message -> !message.isBlank())
                     .toList();
         } catch (IOException ex) {
@@ -70,8 +87,8 @@ class ModuleBoundaryTest {
         return relative.getName(0).toString();
     }
 
-    private static String violation(Path path, String currentModule, String line) {
-        Matcher matcher = PACKAGE_PATTERN.matcher(line);
+    private static String violation(Path path, String currentModule, String line, Pattern violationPattern) {
+        Matcher matcher = violationPattern.matcher(line);
         if (!matcher.find()) {
             return "";
         }

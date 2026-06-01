@@ -6,6 +6,7 @@ import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.modules.role.application.RolePayloadCodec;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
+import com.enterprise.auth.platform.modules.user.application.AuthenticationUser;
 import com.enterprise.auth.platform.modules.user.infrastructure.repository.DatabaseUserRepository;
 import java.util.Optional;
 import java.util.Set;
@@ -16,7 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import com.enterprise.auth.platform.security.PasswordHasher;
+import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 
 @SpringBootTest
 class DatabaseUserRepositoryRolePayloadTest {
@@ -145,10 +146,10 @@ class DatabaseUserRepositoryRolePayloadTest {
 
     @Test
     void findByUsernameShouldLoadPermissionsAndCustomScopeFromRolePayload() {
-        Optional<UserAccount> result = databaseUserRepository.findByUsername(TENANT_ID, username);
+        Optional<AuthenticationUser> result = databaseUserRepository.findByUsername(TENANT_ID, username);
 
         assertThat(result).isPresent();
-        UserAccount user = result.orElseThrow();
+        var user = result.orElseThrow();
         assertThat(user.roles()).contains(roleCode);
         assertThat(user.permissions()).containsExactlyInAnyOrder("user:read", "audit:read");
         assertThat(user.dataScopeType()).isEqualTo(DataScopeType.CUSTOM);

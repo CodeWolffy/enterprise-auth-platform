@@ -6,6 +6,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.enterprise.auth.platform.modules.auth.domain.SessionPrincipal;
 import com.enterprise.auth.platform.common.context.AuthContextHolder;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
+import com.enterprise.auth.platform.modules.user.application.AuthenticationUser;
 import java.util.List;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
@@ -41,6 +42,21 @@ public final class SaTokenMockMvcSupport {
 
     public static void bind(UserAccount user) {
         AuthContextHolder.set(user, new SessionPrincipal("test-token", user.tenantId(), user.tenantId()));
+    }
+
+    public static void bind(AuthenticationUser user) {
+        bind(new UserAccount(
+                user.id(),
+                user.tenantId(),
+                user.username(),
+                user.password(),
+                user.enabled(),
+                user.roles(),
+                user.permissions(),
+                user.customDeptIds(),
+                user.dataScopeType(),
+                user.sessionVersion()
+        ));
     }
 
     public static void clear() {

@@ -7,11 +7,10 @@ import com.enterprise.auth.platform.common.authz.SecuritySupport;
 import com.enterprise.auth.platform.common.cache.CacheNames;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
-import com.enterprise.auth.platform.modules.audit.infrastructure.entity.SysAuditLogEntity;
+import com.enterprise.auth.platform.modules.audit.application.AuditLogEntry;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysCategoryRuleEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysConfigEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysDictEntity;
-import com.enterprise.auth.platform.modules.audit.infrastructure.mapper.SysAuditLogMapper;
 import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysCategoryRuleMapper;
 import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysConfigMapper;
 import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysDictMapper;
@@ -36,7 +35,6 @@ public class CategoryRuleApplicationService {
     private final SysCategoryRuleMapper sysCategoryRuleMapper;
     private final SysDictMapper sysDictMapper;
     private final SysConfigMapper sysConfigMapper;
-    private final SysAuditLogMapper sysAuditLogMapper;
     private final AuditService auditService;
     private final DataScopeService dataScopeService;
 
@@ -44,14 +42,12 @@ public class CategoryRuleApplicationService {
             SysCategoryRuleMapper sysCategoryRuleMapper,
             SysDictMapper sysDictMapper,
             SysConfigMapper sysConfigMapper,
-            SysAuditLogMapper sysAuditLogMapper,
             AuditService auditService,
             DataScopeService dataScopeService
     ) {
         this.sysCategoryRuleMapper = sysCategoryRuleMapper;
         this.sysDictMapper = sysDictMapper;
         this.sysConfigMapper = sysConfigMapper;
-        this.sysAuditLogMapper = sysAuditLogMapper;
         this.auditService = auditService;
         this.dataScopeService = dataScopeService;
     }
@@ -221,20 +217,13 @@ public class CategoryRuleApplicationService {
     }
 
     private List<SystemViewModels.CategoryAuditView> loadCategoryAudits(String tenantId, String targetType, String code) {
-        List<String> eventTypes = List.of("SYSTEM_CATEGORY_CREATED", "SYSTEM_CATEGORY_UPDATED", "SYSTEM_CATEGORY_DELETED");
-        return sysAuditLogMapper.selectList(new LambdaQueryWrapper<SysAuditLogEntity>()
-                        .eq(SysAuditLogEntity::getTenantId, tenantId)
-                        .in(SysAuditLogEntity::getEventType, eventTypes)
-                        .like(SysAuditLogEntity::getPayloadJson, "\"targetType\":\"" + targetType + "\"")
-                        .like(SysAuditLogEntity::getPayloadJson, "\"code\":\"" + code + "\"")
-                        .orderByDesc(SysAuditLogEntity::getOccurredAt)
-                        .last("limit 10"))
+        return auditService.queryCategoryAudits(tenantId, targetType, code)
                 .stream()
                 .map(item -> new SystemViewModels.CategoryAuditView(
-                        item.getEventType(),
-                        item.getOperator(),
-                        TimeSupport.toEpochMilli(item.getOccurredAt()),
-                        item.getPayloadJson()
+                        item.eventType(),
+                        item.operator(),
+                        item.occurredAtMs(),
+                        item.payloadJson()
                 ))
                 .toList();
     }

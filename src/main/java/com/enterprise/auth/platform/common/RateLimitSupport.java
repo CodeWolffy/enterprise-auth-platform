@@ -1,6 +1,6 @@
 package com.enterprise.auth.platform.common;
 
-import com.enterprise.auth.platform.config.SecurityProperties;
+import com.enterprise.auth.platform.modules.auth.infrastructure.SecurityProperties;
 import java.time.Duration;
 import java.util.Locale;
 import org.springframework.data.redis.core.StringRedisTemplate;

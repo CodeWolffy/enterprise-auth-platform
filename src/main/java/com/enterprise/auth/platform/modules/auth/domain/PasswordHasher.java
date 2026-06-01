@@ -1,4 +1,4 @@
-package com.enterprise.auth.platform.security;
+package com.enterprise.auth.platform.modules.auth.domain;
 
 public interface PasswordHasher {
 

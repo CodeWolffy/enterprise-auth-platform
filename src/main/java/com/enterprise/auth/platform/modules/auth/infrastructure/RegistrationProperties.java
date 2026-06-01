@@ -1,4 +1,4 @@
-package com.enterprise.auth.platform.config;
+package com.enterprise.auth.platform.modules.auth.infrastructure;
 
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;

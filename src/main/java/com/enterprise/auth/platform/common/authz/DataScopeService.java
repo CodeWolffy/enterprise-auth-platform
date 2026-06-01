@@ -7,7 +7,7 @@ import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEn
 import com.enterprise.auth.platform.modules.dept.infrastructure.mapper.SysDeptMapper;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
-import com.enterprise.auth.platform.security.CurrentUserService;
+import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import java.util.ArrayDeque;
 import java.util.HashSet;
 import java.util.List;

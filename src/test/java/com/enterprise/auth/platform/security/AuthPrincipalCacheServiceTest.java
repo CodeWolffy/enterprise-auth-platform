@@ -1,5 +1,7 @@
 package com.enterprise.auth.platform.security;
 
+import com.enterprise.auth.platform.modules.auth.infrastructure.AuthPrincipalCacheService;
+
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;

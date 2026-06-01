@@ -6,9 +6,8 @@ import com.enterprise.auth.platform.modules.resource.application.CatalogService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.dept.interfaces.DeptCrudRequest;
 import com.enterprise.auth.platform.modules.dept.infrastructure.entity.SysDeptEntity;
-import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
 import com.enterprise.auth.platform.modules.dept.infrastructure.mapper.SysDeptMapper;
-import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
+import com.enterprise.auth.platform.modules.user.application.UserQueryFacade;
 import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.common.authz.SecuritySupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
@@ -21,19 +20,19 @@ import org.springframework.util.StringUtils;
 public class DeptManagementService {
 
     private final SysDeptMapper sysDeptMapper;
-    private final SysUserMapper sysUserMapper;
+    private final UserQueryFacade userQueryFacade;
     private final AuditService auditService;
     private final DataScopeService dataScopeService;
 
     public DeptManagementService(
             SysDeptMapper sysDeptMapper,
-            SysUserMapper sysUserMapper,
+            UserQueryFacade userQueryFacade,
             CatalogService catalogService,
             AuditService auditService,
             DataScopeService dataScopeService
     ) {
         this.sysDeptMapper = sysDeptMapper;
-        this.sysUserMapper = sysUserMapper;
+        this.userQueryFacade = userQueryFacade;
         this.auditService = auditService;
         this.dataScopeService = dataScopeService;
     }
@@ -81,10 +80,7 @@ public class DeptManagementService {
                 .eq(SysDeptEntity::getTenantId, tenantId)
                 .eq(SysDeptEntity::getDeleted, 0)
                 .eq(SysDeptEntity::getParentId, deptId));
-        long userCount = sysUserMapper.selectCount(new LambdaQueryWrapper<SysUserEntity>()
-                .eq(SysUserEntity::getTenantId, tenantId)
-                .eq(SysUserEntity::getDeleted, 0)
-                .eq(SysUserEntity::getDeptId, deptId));
+        long userCount = userQueryFacade.countByDept(deptId);
         if (childCount > 0 || userCount > 0) {
             throw new BusinessException("部门下仍存在子部门或用户，暂不允许删除");
         }

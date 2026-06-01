@@ -14,6 +14,7 @@ import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMa
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
+import com.enterprise.auth.platform.modules.user.application.AuthenticationUser;
 import com.enterprise.auth.platform.modules.user.interfaces.UserSummary;
 import com.enterprise.auth.platform.modules.user.infrastructure.repository.UserRepository;
 import com.enterprise.auth.platform.modules.user.application.UserDirectoryService;
@@ -25,7 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import com.enterprise.auth.platform.security.PasswordHasher;
+import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 
 @SpringBootTest
 class UserDirectoryServiceTest {
@@ -85,7 +86,7 @@ class UserDirectoryServiceTest {
     @Test
     void listUsersShouldRespectCurrentTenant() {
         TenantContext.setTenantId("tenant-a");
-        UserAccount auditor = userRepository.findByUsername("tenant-a", "auditor").orElseThrow();
+        AuthenticationUser auditor = userRepository.findByUsername("tenant-a", "auditor").orElseThrow();
         bind(auditor);
         List<UserSummary> tenantUsers = userDirectoryService.listUsers();
         assertThat(tenantUsers).extracting(UserSummary::tenantId).containsOnly("tenant-a");
@@ -95,7 +96,7 @@ class UserDirectoryServiceTest {
         assertThat(tenantUsers).extracting(UserSummary::username).doesNotContain(TENANT_OTHER_DEPT_USER);
 
         TenantContext.setTenantId("platform");
-        UserAccount admin = userRepository.findByUsername("platform", "admin").orElseThrow();
+        AuthenticationUser admin = userRepository.findByUsername("platform", "admin").orElseThrow();
         bind(admin);
         List<UserSummary> platformUsers = userDirectoryService.listUsers();
         assertThat(platformUsers).extracting(UserSummary::tenantId).containsOnly("platform");

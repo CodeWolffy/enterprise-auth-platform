@@ -1,8 +1,8 @@
 package com.enterprise.auth.platform.infrastructure.config;
 
 import com.enterprise.auth.platform.common.web.RateLimitInterceptor;
-import com.enterprise.auth.platform.config.CorsProperties;
-import com.enterprise.auth.platform.security.SaTokenUserContextInterceptor;
+import com.enterprise.auth.platform.infrastructure.config.CorsProperties;
+import com.enterprise.auth.platform.infrastructure.security.SaTokenUserContextInterceptor;
 import java.util.List;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Configuration;

@@ -8,15 +8,14 @@ import com.enterprise.auth.platform.modules.resource.application.CatalogService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.PasswordValidator;
-import com.enterprise.auth.platform.modules.role.infrastructure.entity.SysRoleEntity;
+import com.enterprise.auth.platform.modules.role.application.RoleQueryFacade;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserRoleEntity;
-import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMapper;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserRoleMapper;
-import com.enterprise.auth.platform.security.AuthPrincipalCacheService;
+import com.enterprise.auth.platform.modules.auth.infrastructure.AuthPrincipalCacheService;
 import com.enterprise.auth.platform.common.authz.DataScopeService;
-import com.enterprise.auth.platform.security.PasswordHasher;
+import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 import com.enterprise.auth.platform.common.authz.SecuritySupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.modules.user.interfaces.CreateUserRequest;
@@ -37,7 +36,7 @@ public class UserManagementService {
 
     private final SysUserMapper sysUserMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
-    private final SysRoleMapper sysRoleMapper;
+    private final RoleQueryFacade roleQueryFacade;
     private final PasswordHasher passwordHasher;
     private final UserDirectoryService userDirectoryService;
     private final CatalogService catalogService;
@@ -49,7 +48,7 @@ public class UserManagementService {
     public UserManagementService(
             SysUserMapper sysUserMapper,
             SysUserRoleMapper sysUserRoleMapper,
-            SysRoleMapper sysRoleMapper,
+            RoleQueryFacade roleQueryFacade,
             PasswordHasher passwordHasher,
             UserDirectoryService userDirectoryService,
             CatalogService catalogService,
@@ -60,7 +59,7 @@ public class UserManagementService {
     ) {
         this.sysUserMapper = sysUserMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
-        this.sysRoleMapper = sysRoleMapper;
+        this.roleQueryFacade = roleQueryFacade;
         this.passwordHasher = passwordHasher;
         this.userDirectoryService = userDirectoryService;
         this.catalogService = catalogService;
@@ -165,12 +164,10 @@ public class UserManagementService {
         if (roleIds.isEmpty()) {
             return List.of();
         }
-        Set<String> roleCodes = sysRoleMapper.selectList(new LambdaQueryWrapper<SysRoleEntity>()
-                        .eq(SysRoleEntity::getTenantId, tenantId)
-                        .eq(SysRoleEntity::getDeleted, 0)
-                        .in(SysRoleEntity::getId, roleIds))
-                .stream()
-                .map(SysRoleEntity::getRoleCode)
+        Map<Long, String> roleCodeMap = roleQueryFacade.loadRoleCodeMap(tenantId);
+        Set<String> roleCodes = roleIds.stream()
+                .filter(roleCodeMap::containsKey)
+                .map(roleCodeMap::get)
                 .collect(Collectors.toSet());
         return catalogService.roles().stream()
                 .filter(role -> roleCodes.contains(role.code()))
@@ -209,15 +206,14 @@ public class UserManagementService {
             return;
         }
 
-        List<SysRoleEntity> roles = sysRoleMapper.selectList(new LambdaQueryWrapper<SysRoleEntity>()
-                .eq(SysRoleEntity::getTenantId, tenantId)
-                .eq(SysRoleEntity::getDeleted, 0)
-                .in(SysRoleEntity::getRoleCode, roleCodes));
+        var roles = roleQueryFacade.listAll(tenantId).stream()
+                .filter(r -> roleCodes.contains(r.getRoleCode()))
+                .toList();
         if (roles.size() != roleCodes.size()) {
             throw new BusinessException("存在无效的角色编码");
         }
 
-        for (SysRoleEntity role : roles) {
+        for (var role : roles) {
             SysUserRoleEntity link = new SysUserRoleEntity();
             link.setTenantId(tenantId);
             link.setUserId(userId);

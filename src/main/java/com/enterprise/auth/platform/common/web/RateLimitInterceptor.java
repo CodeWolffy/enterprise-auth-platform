@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.common.web;
 
 import cn.dev33.satoken.stp.StpUtil;
-import com.enterprise.auth.platform.config.RateLimitProperties;
+import com.enterprise.auth.platform.infrastructure.config.RateLimitProperties;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.ConsumptionProbe;

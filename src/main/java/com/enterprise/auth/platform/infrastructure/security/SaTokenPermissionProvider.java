@@ -1,4 +1,4 @@
-package com.enterprise.auth.platform.security;
+package com.enterprise.auth.platform.infrastructure.security;
 
 import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpInterface;
@@ -6,29 +6,29 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
-import com.enterprise.auth.platform.modules.user.infrastructure.repository.UserRepository;
+import com.enterprise.auth.platform.modules.user.application.AuthenticationUser;
+import com.enterprise.auth.platform.modules.user.application.UserAuthenticationFacade;
 import com.enterprise.auth.platform.modules.resource.application.ResourceService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 @Component
 public class SaTokenPermissionProvider implements StpInterface {
 
-    private final ObjectProvider<UserRepository> userRepository;
+    private final UserAuthenticationFacade userAuthenticationFacade;
     private final ResourceService resourceService;
     private final PlatformAdminSupport platformAdminSupport;
 
     public SaTokenPermissionProvider(
-            ObjectProvider<UserRepository> userRepository,
+            UserAuthenticationFacade userAuthenticationFacade,
             ResourceService resourceService,
             PlatformAdminSupport platformAdminSupport
     ) {
-        this.userRepository = userRepository;
+        this.userAuthenticationFacade = userAuthenticationFacade;
         this.resourceService = resourceService;
         this.platformAdminSupport = platformAdminSupport;
     }
@@ -44,7 +44,7 @@ public class SaTokenPermissionProvider implements StpInterface {
                 .map(user -> new ArrayList<>(resourceService.resolveGrantKeys(
                         activeTenantId(user),
                         user.roles(),
-                        platformAdminSupport.isPlatformSuperAdmin(user)
+                        platformAdminSupport.isPlatformSuperAdmin(toUserAccount(user))
                 )))
                 .orElseGet(ArrayList::new);
     }
@@ -61,7 +61,7 @@ public class SaTokenPermissionProvider implements StpInterface {
                 .orElseGet(ArrayList::new);
     }
 
-    private java.util.Optional<UserAccount> loadUser(Object loginId) {
+    private java.util.Optional<AuthenticationUser> loadUser(Object loginId) {
         if (loginId == null) {
             return java.util.Optional.empty();
         }
@@ -70,7 +70,7 @@ public class SaTokenPermissionProvider implements StpInterface {
             String loginTenantId = currentTokenSession()
                     .map(session -> sessionString(session, "tenantId"))
                     .orElse(null);
-            return runWithTenant(loginTenantId, () -> userRepository.getObject().findById(userId));
+            return runWithTenant(loginTenantId, () -> userAuthenticationFacade.findById(userId));
         } catch (NumberFormatException ignored) {
             return java.util.Optional.empty();
         }
@@ -124,14 +124,30 @@ public class SaTokenPermissionProvider implements StpInterface {
         return value == null ? null : String.valueOf(value);
     }
 
-    private String activeTenantId(UserAccount user) {
+    private UserAccount toUserAccount(AuthenticationUser user) {
+        return new UserAccount(
+                user.id(),
+                user.tenantId(),
+                user.username(),
+                user.password(),
+                user.enabled(),
+                user.roles(),
+                user.permissions(),
+                user.customDeptIds(),
+                user.dataScopeType(),
+                user.sessionVersion()
+        );
+    }
+
+    private String activeTenantId(AuthenticationUser user) {
         return currentTokenSession()
                 .map(session -> {
                     String sessionTenantId = sessionString(session, "activeTenantId");
                     if (!StringUtils.hasText(sessionTenantId)) {
                         sessionTenantId = sessionString(session, "tenantId");
                     }
-                    String effectiveTenantId = platformAdminSupport.resolveEffectiveTenant(user, sessionTenantId);
+                    UserAccount account = toUserAccount(user);
+                    String effectiveTenantId = platformAdminSupport.resolveEffectiveTenant(account, sessionTenantId);
                     if (!effectiveTenantId.equals(sessionString(session, "activeTenantId"))) {
                         session.set("activeTenantId", effectiveTenantId);
                     }

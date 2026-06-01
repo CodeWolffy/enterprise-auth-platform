@@ -12,8 +12,8 @@ import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMa
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserRoleMapper;
 import com.enterprise.auth.platform.modules.role.application.RolePayloadCodec;
 import com.enterprise.auth.platform.modules.resource.application.ResourceService;
-import com.enterprise.auth.platform.security.AuthPrincipalCacheService;
-import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
+import com.enterprise.auth.platform.modules.auth.infrastructure.AuthPrincipalCacheService;
+import com.enterprise.auth.platform.modules.user.application.AuthenticationUser;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -51,33 +51,33 @@ public class DatabaseUserRepository implements UserRepository {
     }
 
     @Override
-    @Cacheable(value = CacheNames.AUTH_PRINCIPAL, key = "T(com.enterprise.auth.platform.security.AuthPrincipalCacheService).usernameKey(#tenantId, #username)", unless = "#result == null")
-    public Optional<UserAccount> findByUsername(String tenantId, String username) {
+    @Cacheable(value = CacheNames.AUTH_PRINCIPAL, key = "T(com.enterprise.auth.platform.modules.auth.infrastructure.AuthPrincipalCacheService).usernameKey(#tenantId, #username)", unless = "#result == null")
+    public Optional<AuthenticationUser> findByUsername(String tenantId, String username) {
         SysUserEntity entity = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>()
                 .eq(SysUserEntity::getTenantId, tenantId)
                 .eq(SysUserEntity::getUsername, username)
                 .eq(SysUserEntity::getDeleted, 0)
                 .last("limit 1"));
-        return Optional.ofNullable(entity).map(this::toUserAccount);
+        return Optional.ofNullable(entity).map(this::toAuthenticationUser);
     }
 
     @Override
-    @Cacheable(value = CacheNames.AUTH_PRINCIPAL, key = "T(com.enterprise.auth.platform.security.AuthPrincipalCacheService).currentTenantIdKey(#id)", unless = "#result == null")
-    public Optional<UserAccount> findById(Long id) {
+    @Cacheable(value = CacheNames.AUTH_PRINCIPAL, key = "T(com.enterprise.auth.platform.modules.auth.infrastructure.AuthPrincipalCacheService).currentTenantIdKey(#id)", unless = "#result == null")
+    public Optional<AuthenticationUser> findById(Long id) {
         SysUserEntity entity = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>()
                 .eq(SysUserEntity::getId, id)
                 .eq(SysUserEntity::getDeleted, 0)
                 .last("limit 1"));
-        return Optional.ofNullable(entity).map(this::toUserAccount);
+        return Optional.ofNullable(entity).map(this::toAuthenticationUser);
     }
 
     @Override
-    public List<UserAccount> findAll() {
+    public List<AuthenticationUser> findAll() {
         return sysUserMapper.selectList(new LambdaQueryWrapper<SysUserEntity>()
                         .eq(SysUserEntity::getDeleted, 0)
                         .orderByAsc(SysUserEntity::getId))
                 .stream()
-                .map(this::toUserAccount)
+                .map(this::toAuthenticationUser)
                 .toList();
     }
 
@@ -97,10 +97,10 @@ public class DatabaseUserRepository implements UserRepository {
         authPrincipalCacheService.evictByUser(entity.getId(), entity.getTenantId(), entity.getUsername());
     }
 
-    private UserAccount toUserAccount(SysUserEntity user) {
+    private AuthenticationUser toAuthenticationUser(SysUserEntity user) {
         Set<String> roleCodes = loadRoleCodes(user.getTenantId(), user.getId());
         RoleData roleData = loadRoleData(user.getTenantId(), roleCodes);
-        return new UserAccount(
+        return new AuthenticationUser(
                 user.getId(),
                 user.getTenantId(),
                 user.getUsername(),

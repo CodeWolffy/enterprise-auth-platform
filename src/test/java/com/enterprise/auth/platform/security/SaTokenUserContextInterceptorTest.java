@@ -1,5 +1,7 @@
 package com.enterprise.auth.platform.security;
 
+import com.enterprise.auth.platform.infrastructure.security.SaTokenUserContextInterceptor;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 

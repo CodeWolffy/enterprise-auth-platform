@@ -4,10 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.common.web.PageResult;
-import com.enterprise.auth.platform.modules.role.infrastructure.entity.SysRoleEntity;
+import com.enterprise.auth.platform.modules.role.application.RoleQueryFacade;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserRoleEntity;
-import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMapper;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserRoleMapper;
 import com.enterprise.auth.platform.modules.resource.application.ResourceService;
@@ -26,20 +25,20 @@ public class UserDirectoryService {
 
     private final SysUserMapper sysUserMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
-    private final SysRoleMapper sysRoleMapper;
+    private final RoleQueryFacade roleQueryFacade;
     private final DataScopeService dataScopeService;
     private final ResourceService resourceService;
 
     public UserDirectoryService(
             SysUserMapper sysUserMapper,
             SysUserRoleMapper sysUserRoleMapper,
-            SysRoleMapper sysRoleMapper,
+            RoleQueryFacade roleQueryFacade,
             DataScopeService dataScopeService,
             ResourceService resourceService
     ) {
         this.sysUserMapper = sysUserMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
-        this.sysRoleMapper = sysRoleMapper;
+        this.roleQueryFacade = roleQueryFacade;
         this.dataScopeService = dataScopeService;
         this.resourceService = resourceService;
     }
@@ -112,12 +111,7 @@ public class UserDirectoryService {
             return Map.of();
         }
         List<Long> roleIds = userRoles.stream().map(SysUserRoleEntity::getRoleId).distinct().toList();
-        Map<Long, String> roleCodeMap = sysRoleMapper.selectList(new LambdaQueryWrapper<SysRoleEntity>()
-                        .eq(SysRoleEntity::getTenantId, tenantId)
-                        .eq(SysRoleEntity::getDeleted, 0)
-                        .in(SysRoleEntity::getId, roleIds))
-                .stream()
-                .collect(Collectors.toMap(SysRoleEntity::getId, SysRoleEntity::getRoleCode));
+        Map<Long, String> roleCodeMap = roleQueryFacade.loadRoleCodeMap(tenantId);
 
         return userRoles.stream().collect(Collectors.groupingBy(
                 SysUserRoleEntity::getUserId,

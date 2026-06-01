@@ -1,6 +1,6 @@
 package com.enterprise.auth.platform.common.authz;
 
-import com.enterprise.auth.platform.config.TenantProperties;
+import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import java.util.Set;
 import org.springframework.stereotype.Component;

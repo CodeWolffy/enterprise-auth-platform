@@ -3,7 +3,7 @@ package com.enterprise.auth.platform.modules.auth.application;
 import com.enterprise.auth.platform.modules.audit.application.AuditService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.RateLimitSupport;
-import com.enterprise.auth.platform.config.RegistrationProperties;
+import com.enterprise.auth.platform.modules.auth.infrastructure.RegistrationProperties;
 import java.time.Duration;
 import java.util.Map;
 import org.springframework.data.redis.core.StringRedisTemplate;

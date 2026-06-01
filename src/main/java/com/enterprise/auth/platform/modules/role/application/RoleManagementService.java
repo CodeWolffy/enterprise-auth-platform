@@ -5,19 +5,15 @@ import com.enterprise.auth.platform.modules.audit.application.AuditService;
 import com.enterprise.auth.platform.modules.resource.application.CatalogService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.authz.DataScopeType;
-import com.enterprise.auth.platform.modules.dept.infrastructure.entity.SysDeptEntity;
+import com.enterprise.auth.platform.modules.dept.application.DeptQueryFacade;
 import com.enterprise.auth.platform.modules.role.infrastructure.entity.SysRoleEntity;
-import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
-import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserRoleEntity;
-import com.enterprise.auth.platform.modules.dept.infrastructure.mapper.SysDeptMapper;
+import com.enterprise.auth.platform.modules.user.application.UserQueryFacade;
 import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMapper;
-import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
-import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserRoleMapper;
 import com.enterprise.auth.platform.modules.role.interfaces.CreateRoleRequest;
 import com.enterprise.auth.platform.modules.role.interfaces.CreateRoleRequest;
 import com.enterprise.auth.platform.modules.role.application.RolePayloadCodec;
 import com.enterprise.auth.platform.modules.resource.application.ResourceService;
-import com.enterprise.auth.platform.security.AuthPrincipalCacheService;
+import com.enterprise.auth.platform.modules.auth.infrastructure.AuthPrincipalCacheService;
 import com.enterprise.auth.platform.common.authz.SecuritySupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import java.util.List;
@@ -31,9 +27,8 @@ import org.springframework.util.StringUtils;
 public class RoleManagementService {
 
     private final SysRoleMapper sysRoleMapper;
-    private final SysUserRoleMapper sysUserRoleMapper;
-    private final SysDeptMapper sysDeptMapper;
-    private final SysUserMapper sysUserMapper;
+    private final UserQueryFacade userQueryFacade;
+    private final DeptQueryFacade deptQueryFacade;
     private final CatalogService catalogService;
     private final AuditService auditService;
     private final AuthPrincipalCacheService authPrincipalCacheService;
@@ -42,9 +37,8 @@ public class RoleManagementService {
 
     public RoleManagementService(
             SysRoleMapper sysRoleMapper,
-            SysUserRoleMapper sysUserRoleMapper,
-            SysDeptMapper sysDeptMapper,
-            SysUserMapper sysUserMapper,
+            UserQueryFacade userQueryFacade,
+            DeptQueryFacade deptQueryFacade,
             CatalogService catalogService,
             AuditService auditService,
             AuthPrincipalCacheService authPrincipalCacheService,
@@ -52,9 +46,8 @@ public class RoleManagementService {
             ResourceService resourceService
     ) {
         this.sysRoleMapper = sysRoleMapper;
-        this.sysUserRoleMapper = sysUserRoleMapper;
-        this.sysDeptMapper = sysDeptMapper;
-        this.sysUserMapper = sysUserMapper;
+        this.userQueryFacade = userQueryFacade;
+        this.deptQueryFacade = deptQueryFacade;
         this.catalogService = catalogService;
         this.auditService = auditService;
         this.authPrincipalCacheService = authPrincipalCacheService;
@@ -118,9 +111,7 @@ public class RoleManagementService {
         String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
         SysRoleEntity entity = getRole(roleId, tenantId);
-        long assignedUsers = sysUserRoleMapper.selectCount(new LambdaQueryWrapper<SysUserRoleEntity>()
-                .eq(SysUserRoleEntity::getTenantId, tenantId)
-                .eq(SysUserRoleEntity::getRoleId, roleId));
+        long assignedUsers = userQueryFacade.countUsersByRole(roleId);
         if (assignedUsers > 0) {
             throw new BusinessException("角色已分配给用户，暂不允许删除");
         }
@@ -143,10 +134,7 @@ public class RoleManagementService {
         if (normalizedDeptIds.isEmpty()) {
             throw new BusinessException("自定义数据范围至少选择一个部门");
         }
-        long validCount = sysDeptMapper.selectCount(new LambdaQueryWrapper<SysDeptEntity>()
-                .eq(SysDeptEntity::getTenantId, tenantId)
-                .eq(SysDeptEntity::getDeleted, 0)
-                .in(SysDeptEntity::getId, normalizedDeptIds));
+        long validCount = deptQueryFacade.countByIds(tenantId, normalizedDeptIds);
         if (validCount != normalizedDeptIds.size()) {
             throw new BusinessException("存在无效的自定义部门");
         }
@@ -154,24 +142,15 @@ public class RoleManagementService {
     }
 
     private void evictPrincipalsByRole(String tenantId, Long roleId) {
-        List<Long> userIds = sysUserRoleMapper.selectList(new LambdaQueryWrapper<SysUserRoleEntity>()
-                        .eq(SysUserRoleEntity::getTenantId, tenantId)
-                        .eq(SysUserRoleEntity::getRoleId, roleId))
-                .stream()
-                .map(SysUserRoleEntity::getUserId)
-                .distinct()
-                .toList();
+        List<Long> userIds = userQueryFacade.listUserIdsByRole(roleId);
         if (userIds.isEmpty()) {
             return;
         }
-        List<SysUserEntity> users = sysUserMapper.selectList(new LambdaQueryWrapper<SysUserEntity>()
-                .eq(SysUserEntity::getTenantId, tenantId)
-                .eq(SysUserEntity::getDeleted, 0)
-                .in(SysUserEntity::getId, userIds));
+        var users = userQueryFacade.findByIds(userIds);
         if (users.isEmpty()) {
             return;
         }
-        for (SysUserEntity user : users) {
+        for (var user : users) {
             authPrincipalCacheService.evictByUser(user.getId(), user.getTenantId(), user.getUsername());
         }
     }

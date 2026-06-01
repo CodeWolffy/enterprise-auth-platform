@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.modules.auth.application;
 
 import com.enterprise.auth.platform.modules.auth.interfaces.UserSessionResponse;
-import com.enterprise.auth.platform.config.SecurityProperties;
+import com.enterprise.auth.platform.modules.auth.infrastructure.SecurityProperties;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.Comparator;

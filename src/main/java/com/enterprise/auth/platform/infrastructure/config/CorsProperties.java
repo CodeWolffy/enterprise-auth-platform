@@ -1,4 +1,4 @@
-package com.enterprise.auth.platform.config;
+package com.enterprise.auth.platform.infrastructure.config;
 
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;

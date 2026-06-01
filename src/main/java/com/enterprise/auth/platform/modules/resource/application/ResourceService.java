@@ -6,20 +6,18 @@ import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.auth.interfaces.MenuNode;
 import com.enterprise.auth.platform.modules.resource.domain.ResourceType;
 import com.enterprise.auth.platform.modules.resource.infrastructure.entity.SysResourceEntity;
-import com.enterprise.auth.platform.modules.role.infrastructure.entity.SysRoleEntity;
-import com.enterprise.auth.platform.modules.role.infrastructure.entity.SysRoleResourceEntity;
+import com.enterprise.auth.platform.modules.role.application.RoleResourceFacade;
+import com.enterprise.auth.platform.modules.tenant.application.TenantResourceOverrideFacade;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantResourceOverrideEntity;
 import com.enterprise.auth.platform.modules.resource.infrastructure.mapper.SysResourceMapper;
-import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMapper;
-import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleResourceMapper;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantResourceOverrideMapper;
+
 import com.enterprise.auth.platform.modules.resource.interfaces.CreateResourceRequest;
 import com.enterprise.auth.platform.modules.resource.interfaces.CreateResourceRequest;
 import com.enterprise.auth.platform.modules.resource.domain.ResourceTreeNode;
 import com.enterprise.auth.platform.modules.tenant.domain.TenantResourceOverrideItem;
 import com.enterprise.auth.platform.common.authz.SecuritySupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
-import com.enterprise.auth.platform.config.TenantProperties;
+import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
 import com.enterprise.auth.platform.modules.tenant.interfaces.UpdateTenantResourceOverridesRequest;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -40,24 +38,21 @@ import org.springframework.util.StringUtils;
 public class ResourceService {
 
     private final SysResourceMapper sysResourceMapper;
-    private final SysRoleMapper sysRoleMapper;
-    private final SysRoleResourceMapper sysRoleResourceMapper;
-    private final SysTenantResourceOverrideMapper sysTenantResourceOverrideMapper;
+    private final RoleResourceFacade roleResourceFacade;
+    private final TenantResourceOverrideFacade tenantResourceOverrideFacade;
     private final TenantProperties tenantProperties;
     private final AuditService auditService;
 
     public ResourceService(
             SysResourceMapper sysResourceMapper,
-            SysRoleMapper sysRoleMapper,
-            SysRoleResourceMapper sysRoleResourceMapper,
-            SysTenantResourceOverrideMapper sysTenantResourceOverrideMapper,
+            RoleResourceFacade roleResourceFacade,
+            TenantResourceOverrideFacade tenantResourceOverrideFacade,
             TenantProperties tenantProperties,
             AuditService auditService
     ) {
         this.sysResourceMapper = sysResourceMapper;
-        this.sysRoleMapper = sysRoleMapper;
-        this.sysRoleResourceMapper = sysRoleResourceMapper;
-        this.sysTenantResourceOverrideMapper = sysTenantResourceOverrideMapper;
+        this.roleResourceFacade = roleResourceFacade;
+        this.tenantResourceOverrideFacade = tenantResourceOverrideFacade;
         this.tenantProperties = tenantProperties;
         this.auditService = auditService;
     }
@@ -244,8 +239,7 @@ public class ResourceService {
         if (children > 0) {
             throw new BusinessException("请先删除子资源");
         }
-        long linked = runWithTenant(platformTenantId(), () -> sysRoleResourceMapper.selectCount(new LambdaQueryWrapper<SysRoleResourceEntity>()
-                .eq(SysRoleResourceEntity::getResourceId, resourceId)));
+        long linked = runWithTenant(platformTenantId(), () -> roleResourceFacade.countResourceAssignments(resourceId));
         if (linked > 0) {
             throw new BusinessException("资源已被角色使用，无法删除");
         }
@@ -270,12 +264,7 @@ public class ResourceService {
     }
 
     public Set<Long> listRoleResourceIds(String tenantId, Long roleId) {
-        return runWithTenant(tenantId, () -> sysRoleResourceMapper.selectList(new LambdaQueryWrapper<SysRoleResourceEntity>()
-                        .eq(SysRoleResourceEntity::getTenantId, tenantId)
-                        .eq(SysRoleResourceEntity::getRoleId, roleId))
-                .stream()
-                .map(SysRoleResourceEntity::getResourceId)
-                .collect(Collectors.toCollection(LinkedHashSet::new)));
+        return runWithTenant(tenantId, () -> roleResourceFacade.listRoleResourceIds(tenantId, roleId));
     }
 
     @Transactional
@@ -302,30 +291,11 @@ public class ResourceService {
             expanded.add(resourceId);
         }
 
-        runWithTenant(tenantId, () -> {
-            sysRoleResourceMapper.delete(new LambdaQueryWrapper<SysRoleResourceEntity>()
-                    .eq(SysRoleResourceEntity::getTenantId, tenantId)
-                    .eq(SysRoleResourceEntity::getRoleId, roleId));
-            if (!expanded.isEmpty()) {
-                for (Long resourceId : expanded) {
-                    SysRoleResourceEntity relation = new SysRoleResourceEntity();
-                    relation.setTenantId(tenantId);
-                    relation.setRoleId(roleId);
-                    relation.setResourceId(resourceId);
-                    sysRoleResourceMapper.insert(relation);
-                }
-            }
-            return null;
-        });
-        return expanded;
+        return runWithTenant(tenantId, () -> roleResourceFacade.assignRoleResources(tenantId, roleId, normalized, expanded));
     }
 
     public List<TenantResourceOverrideItem> listTenantOverrides(String tenantId) {
-        List<SysTenantResourceOverrideEntity> overrides = runWithTenant(tenantId, () -> sysTenantResourceOverrideMapper.selectList(
-                new LambdaQueryWrapper<SysTenantResourceOverrideEntity>()
-                        .eq(SysTenantResourceOverrideEntity::getTenantId, tenantId)
-                        .orderByAsc(SysTenantResourceOverrideEntity::getId)
-        ));
+        List<SysTenantResourceOverrideEntity> overrides = runWithTenant(tenantId, () -> tenantResourceOverrideFacade.listOverrides(tenantId));
         if (overrides.isEmpty()) {
             return List.of();
         }
@@ -357,17 +327,14 @@ public class ResourceService {
                 if (!resourceById.containsKey(item.resourceId())) {
                     throw new BusinessException("存在无效的资源 ID");
                 }
-                SysTenantResourceOverrideEntity existing = sysTenantResourceOverrideMapper.selectOne(new LambdaQueryWrapper<SysTenantResourceOverrideEntity>()
-                        .eq(SysTenantResourceOverrideEntity::getTenantId, tenantId)
-                        .eq(SysTenantResourceOverrideEntity::getResourceId, item.resourceId())
-                        .last("limit 1"));
+                SysTenantResourceOverrideEntity existing = tenantResourceOverrideFacade.findByResourceId(tenantId, item.resourceId());
                 if (item.enabled() == null
                         && item.visible() == null
                         && item.orderNo() == null
                         && !StringUtils.hasText(item.titleOverride())
                         && !StringUtils.hasText(item.iconOverride())) {
                     if (existing != null) {
-                        sysTenantResourceOverrideMapper.deleteById(existing.getId());
+                        tenantResourceOverrideFacade.deleteById(existing.getId());
                     }
                     continue;
                 }
@@ -380,9 +347,9 @@ public class ResourceService {
                 entity.setTitleOverride(blankToNull(item.titleOverride()));
                 entity.setIconOverride(blankToNull(item.iconOverride()));
                 if (existing == null) {
-                    sysTenantResourceOverrideMapper.insert(entity);
+                    tenantResourceOverrideFacade.insert(entity);
                 } else {
-                    sysTenantResourceOverrideMapper.updateById(entity);
+                    tenantResourceOverrideFacade.updateById(entity);
                 }
             }
             return null;
@@ -392,38 +359,17 @@ public class ResourceService {
     }
 
     private Set<Long> listGrantedResourceIdsByRoleCodes(String tenantId, Set<String> roleCodes) {
-        if (roleCodes == null || roleCodes.isEmpty()) {
-            return Set.of();
-        }
-        List<Long> roleIds = runWithTenant(tenantId, () -> sysRoleMapper.selectList(new LambdaQueryWrapper<SysRoleEntity>()
-                        .eq(SysRoleEntity::getTenantId, tenantId)
-                        .eq(SysRoleEntity::getDeleted, 0)
-                        .in(SysRoleEntity::getRoleCode, roleCodes))
-                .stream()
-                .map(SysRoleEntity::getId)
-                .distinct()
-                .toList());
-        if (roleIds.isEmpty()) {
-            return Set.of();
-        }
-        return runWithTenant(tenantId, () -> sysRoleResourceMapper.selectList(new LambdaQueryWrapper<SysRoleResourceEntity>()
-                        .eq(SysRoleResourceEntity::getTenantId, tenantId)
-                        .in(SysRoleResourceEntity::getRoleId, roleIds))
-                .stream()
-                .map(SysRoleResourceEntity::getResourceId)
-                .collect(Collectors.toCollection(LinkedHashSet::new)));
+        return runWithTenant(tenantId, () -> roleResourceFacade.listGrantedResourceIdsByRoleCodes(tenantId, roleCodes));
     }
 
     private Map<Long, EffectiveResource> mergeEffectiveResources(String tenantId, List<SysResourceEntity> templateResources) {
-        Map<Long, SysTenantResourceOverrideEntity> overrideMap = runWithTenant(tenantId, () -> sysTenantResourceOverrideMapper.selectList(
-                        new LambdaQueryWrapper<SysTenantResourceOverrideEntity>()
-                                .eq(SysTenantResourceOverrideEntity::getTenantId, tenantId))
+        Map<Long, SysTenantResourceOverrideEntity> overrideMap = runWithTenant(tenantId, () -> tenantResourceOverrideFacade.listOverrides(tenantId))
                 .stream()
                 .collect(Collectors.toMap(
                         SysTenantResourceOverrideEntity::getResourceId,
                         value -> value,
                         (left, right) -> right
-                )));
+                ));
         Map<Long, EffectiveResource> result = new LinkedHashMap<>();
         for (SysResourceEntity resource : templateResources) {
             SysTenantResourceOverrideEntity override = overrideMap.get(resource.getId());

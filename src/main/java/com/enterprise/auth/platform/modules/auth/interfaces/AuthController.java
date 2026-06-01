@@ -15,7 +15,7 @@ import com.enterprise.auth.platform.modules.auth.application.RegistrationPolicyS
 import com.enterprise.auth.platform.common.web.RateLimit;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.common.context.AuthContextHolder;
-import com.enterprise.auth.platform.security.CurrentUserService;
+import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import com.enterprise.auth.platform.modules.auth.interfaces.RegisterRequest;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.user.interfaces.UserSummary;

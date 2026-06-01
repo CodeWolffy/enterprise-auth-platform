@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.modules.auth.application;
 
 import com.enterprise.auth.platform.common.RateLimitSupport;
-import com.enterprise.auth.platform.config.RateLimitProperties;
+import com.enterprise.auth.platform.infrastructure.config.RateLimitProperties;
 import com.enterprise.auth.platform.modules.audit.application.AuditService;
 import java.time.Duration;
 import java.util.Map;

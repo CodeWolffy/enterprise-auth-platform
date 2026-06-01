@@ -1,4 +1,4 @@
-package com.enterprise.auth.platform.config;
+package com.enterprise.auth.platform.modules.tenant.infrastructure;
 
 import java.util.LinkedHashSet;
 import java.util.List;

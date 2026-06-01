@@ -1,4 +1,4 @@
-package com.enterprise.auth.platform.config;
+package com.enterprise.auth.platform.infrastructure.config;
 
 import java.time.Duration;
 import java.util.List;
