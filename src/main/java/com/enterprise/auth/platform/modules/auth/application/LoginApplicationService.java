@@ -13,6 +13,7 @@ import com.enterprise.auth.platform.modules.auth.interfaces.LoginRequest;
 import com.enterprise.auth.platform.modules.auth.interfaces.TokenSessionResponse;
 import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 import com.enterprise.auth.platform.modules.audit.application.AuditService;
+import com.enterprise.auth.platform.common.web.ClientIpResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.List;
@@ -31,6 +32,7 @@ public class LoginApplicationService {
     private final RegistrationPolicyService registrationPolicyService;
     private final SecurityProperties securityProperties;
     private final SessionIndexService sessionIndexService;
+    private final ClientIpResolver clientIpResolver;
 
     public LoginApplicationService(
             CaptchaService captchaService,
@@ -40,7 +42,8 @@ public class LoginApplicationService {
             LoginAttemptService loginAttemptService,
             RegistrationPolicyService registrationPolicyService,
             SecurityProperties securityProperties,
-            SessionIndexService sessionIndexService
+            SessionIndexService sessionIndexService,
+            ClientIpResolver clientIpResolver
     ) {
         this.captchaService = captchaService;
         this.passwordHasher = passwordHasher;
@@ -50,12 +53,13 @@ public class LoginApplicationService {
         this.registrationPolicyService = registrationPolicyService;
         this.securityProperties = securityProperties;
         this.sessionIndexService = sessionIndexService;
+        this.clientIpResolver = clientIpResolver;
     }
 
     public TokenSessionResponse login(LoginRequest request, HttpServletRequest servletRequest) {
         captchaService.secondaryVerify(request.captchaId());
         String tenantId = resolveLoginTenantId(request);
-        String clientIp = clientIp(servletRequest);
+        String clientIp = clientIpResolver.resolve(servletRequest);
         String previousTenantId = TenantContext.getTenantId();
         try {
             TenantContext.setTenantId(tenantId);
@@ -132,14 +136,6 @@ public class LoginApplicationService {
             return requestedTenantId;
         }
         return registrationPolicyService.resolveDefaultTenantId();
-    }
-
-    private String clientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (StringUtils.hasText(forwarded)) {
-            return forwarded.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
     }
 
     private BusinessException buildLoginFailure(

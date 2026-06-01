@@ -1,7 +1,8 @@
 /** 部门管理 API */
 
 import { http } from '../http'
-import type { ApiResponse, DepartmentView } from '@/types/auth'
+import type { ApiResponse } from '@/types/api'
+import type { DepartmentView } from '@/types/dept'
 
 export async function queryDepartments() {
   const { data } = await http.get<ApiResponse<DepartmentView[]>>('/api/depts')

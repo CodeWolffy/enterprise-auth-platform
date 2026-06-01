@@ -3,6 +3,7 @@ package com.enterprise.auth.platform.infrastructure.config;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "app.rate-limit")
@@ -49,18 +50,17 @@ public record RateLimitProperties(
                 .toList();
     }
 
-    public LimitRule resolveRule(String key) {
+    public Optional<LimitRule> resolveRule(String key) {
         if (rules != null && rules.containsKey(key)) {
-            return rules.get(key);
+            return Optional.ofNullable(rules.get(key));
         }
-        return null;
+        return Optional.empty();
     }
 
     public FailureMode resolveFailureMode(String key) {
-        LimitRule rule = resolveRule(key);
-        if (rule != null && rule.failureMode() != null) {
-            return rule.failureMode();
-        }
-        return resolvedFailureMode();
+        return resolveRule(key)
+                .map(LimitRule::failureMode)
+                .filter(mode -> mode != null)
+                .orElseGet(this::resolvedFailureMode);
     }
 }

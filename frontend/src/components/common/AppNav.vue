@@ -35,7 +35,7 @@ import { useRoute } from 'vue-router'
 import { resolveAppIcon, resolveMenuPresentation } from '@/app/registry/module-manifest'
 import { resolveRoutePath } from '@/router/route-access'
 import { useAuthStore } from '@/stores/auth'
-import type { MenuItem } from '@/types/auth'
+import type { MenuItem } from '@/types/auth-models'
 
 defineProps<{
   collapse: boolean

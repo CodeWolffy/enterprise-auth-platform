@@ -21,7 +21,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.lang.reflect.Method;
 import java.time.Duration;
-import java.util.List;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,36 +43,38 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     private final RateLimitProperties properties;
     private final LettuceBasedProxyManager<String> proxyManager;
     private final RedisClient redisClient;
-    private final List<CidrMatcher> trustedProxyMatchers;
+    private final ClientIpResolver clientIpResolver;
 
     @Autowired
     public RateLimitInterceptor(
             RateLimitProperties properties,
-            RedisProperties redisProperties
+            RedisProperties redisProperties,
+            ClientIpResolver clientIpResolver
     ) {
-        this(properties, tryBuildInfrastructure(redisProperties));
+        this(properties, tryBuildInfrastructure(redisProperties), clientIpResolver);
     }
 
     private RateLimitInterceptor(
             RateLimitProperties properties,
-            @Nullable RedisInfrastructure infrastructure
+            RedisInfrastructure infrastructure,
+            ClientIpResolver clientIpResolver
     ) {
         this(properties,
-                infrastructure == null ? null : infrastructure.proxyManager(),
-                infrastructure == null ? null : infrastructure.redisClient());
+                infrastructure.proxyManager(),
+                infrastructure.redisClient(),
+                clientIpResolver);
     }
 
     RateLimitInterceptor(
             RateLimitProperties properties,
             @Nullable LettuceBasedProxyManager<String> proxyManager,
-            @Nullable RedisClient redisClient
+            @Nullable RedisClient redisClient,
+            ClientIpResolver clientIpResolver
     ) {
         this.properties = properties;
         this.proxyManager = proxyManager;
         this.redisClient = redisClient;
-        this.trustedProxyMatchers = properties.resolvedTrustedProxies().stream()
-                .map(CidrMatcher::new)
-                .toList();
+        this.clientIpResolver = clientIpResolver;
     }
 
     private static RedisInfrastructure tryBuildInfrastructure(RedisProperties redisProperties) {
@@ -81,7 +82,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             return buildInfrastructure(redisProperties);
         } catch (Exception e) {
             log.warn("限流 Redis 初始化失败，应用继续启动并按限流 failure-mode 处理请求: {}", e.getMessage());
-            return null;
+            return RedisInfrastructure.unavailable();
         }
     }
 
@@ -190,32 +191,8 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         }
     }
 
-    boolean isTrustedProxy(String remoteAddr) {
-        if (!StringUtils.hasText(remoteAddr) || trustedProxyMatchers.isEmpty()) {
-            return false;
-        }
-        return trustedProxyMatchers.stream().anyMatch(matcher -> matcher.matches(remoteAddr.trim()));
-    }
-
     String resolveClientIp(HttpServletRequest request) {
-        String remoteAddr = StringUtils.hasText(request.getRemoteAddr()) ? request.getRemoteAddr().trim() : "unknown";
-        if (!isTrustedProxy(remoteAddr)) {
-            return remoteAddr;
-        }
-
-        String xff = request.getHeader("X-Forwarded-For");
-        if (StringUtils.hasText(xff)) {
-            String forwardedClientIp = xff.split(",")[0].trim();
-            if (StringUtils.hasText(forwardedClientIp)) {
-                return forwardedClientIp;
-            }
-        }
-
-        String realIp = request.getHeader("X-Real-IP");
-        if (StringUtils.hasText(realIp)) {
-            return realIp.trim();
-        }
-        return remoteAddr;
+        return clientIpResolver.resolve(request);
     }
 
     private boolean handleRateLimitInfrastructureFailure(
@@ -267,20 +244,26 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     }
 
     private int resolveRuleCapacity(String rateLimitKey) {
-        RateLimitProperties.LimitRule rule = properties.resolveRule(rateLimitKey);
-        return rule == null ? -1 : rule.capacity();
+        return properties.resolveRule(rateLimitKey)
+                .map(RateLimitProperties.LimitRule::capacity)
+                .orElse(-1);
     }
 
     private int resolveRuleRefillTokens(String rateLimitKey) {
-        RateLimitProperties.LimitRule rule = properties.resolveRule(rateLimitKey);
-        return rule == null ? -1 : rule.refillTokens();
+        return properties.resolveRule(rateLimitKey)
+                .map(RateLimitProperties.LimitRule::refillTokens)
+                .orElse(-1);
     }
 
     private long resolveRefillDurationSeconds(String rateLimitKey, RateLimit rateLimit) {
-        RateLimitProperties.LimitRule rule = properties.resolveRule(rateLimitKey);
+        long ruleDurationSeconds = properties.resolveRule(rateLimitKey)
+                .map(RateLimitProperties.LimitRule::refillDuration)
+                .filter(duration -> duration != null)
+                .map(Duration::getSeconds)
+                .orElse(-1L);
         return resolveLongValue(
                 rateLimit.refillDurationSeconds(),
-                rule != null && rule.refillDuration() != null ? rule.refillDuration().getSeconds() : -1,
+                ruleDurationSeconds,
                 properties.resolvedDefaultRefillDuration().getSeconds()
         );
     }
@@ -329,48 +312,8 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             LettuceBasedProxyManager<String> proxyManager,
             RedisClient redisClient
     ) {
-    }
-
-    private static final class CidrMatcher {
-        private final String cidr;
-
-        private CidrMatcher(String cidr) {
-            this.cidr = cidr;
-        }
-
-        private boolean matches(String address) {
-            if (!StringUtils.hasText(cidr) || !StringUtils.hasText(address)) {
-                return false;
-            }
-            if (!cidr.contains("/")) {
-                return cidr.equals(address);
-            }
-            String[] parts = cidr.split("/", 2);
-            if (parts.length != 2) {
-                return false;
-            }
-            try {
-                int prefix = Integer.parseInt(parts[1]);
-                if (parts[0].contains(":") || address.contains(":")) {
-                    return "::1".equals(parts[0]) && "::1".equals(address);
-                }
-                int mask = prefix == 0 ? 0 : -1 << (32 - prefix);
-                return (ipv4ToInt(parts[0]) & mask) == (ipv4ToInt(address) & mask);
-            } catch (RuntimeException ignored) {
-                return false;
-            }
-        }
-
-        private int ipv4ToInt(String ip) {
-            String[] octets = ip.split("\\.");
-            if (octets.length != 4) {
-                throw new IllegalArgumentException("Invalid IPv4 address");
-            }
-            int value = 0;
-            for (String octet : octets) {
-                value = (value << 8) | Integer.parseInt(octet);
-            }
-            return value;
+        static RedisInfrastructure unavailable() {
+            return new RedisInfrastructure(null, null);
         }
     }
 }

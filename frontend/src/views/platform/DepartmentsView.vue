@@ -200,7 +200,7 @@ import AdvancedSearch from '@/components/common/AdvancedSearch.vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { createDepartment, deleteDepartment, queryDepartments, updateDepartment } from '@/api/modules'
 import { useTablePreferences } from '@/composables/useTablePreferences'
-import type { DepartmentView } from '@/types/auth'
+import type { DepartmentView } from '@/types/dept'
 
 type DepartmentTreeNode = DepartmentView & { children?: DepartmentTreeNode[] }
 

@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import type { MenuItem, PermissionSnapshot } from '@/types/auth'
+import type { MenuItem, PermissionSnapshot } from '@/types/auth-models'
 import { clearDynamicRoutes, registerDynamicRoutes } from '@/router'
 
 export const usePermissionSnapshotStore = defineStore('permissionSnapshot', () => {

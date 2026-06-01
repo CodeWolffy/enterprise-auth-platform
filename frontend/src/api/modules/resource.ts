@@ -1,7 +1,8 @@
 /** 资源/菜单管理 API */
 
 import { http } from '../http'
-import type { ApiResponse, ResourceTreeNode, ResourceType } from '@/types/auth'
+import type { ApiResponse } from '@/types/api'
+import type { ResourceTreeNode, ResourceType } from '@/types/resource'
 
 export interface ResourceMutationPayload {
   parentId?: number | null

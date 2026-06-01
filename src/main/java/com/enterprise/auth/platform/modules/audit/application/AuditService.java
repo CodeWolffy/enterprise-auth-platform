@@ -13,6 +13,7 @@ import com.enterprise.auth.platform.modules.audit.infrastructure.entity.SysAudit
 import com.enterprise.auth.platform.modules.audit.infrastructure.mapper.SysAuditLogMapper;
 import com.enterprise.auth.platform.common.context.AuthContextHolder;
 import com.enterprise.auth.platform.common.authz.DataScopeService;
+import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,15 +33,18 @@ public class AuditService implements AuditEventPublisher {
     private final SysAuditLogMapper sysAuditLogMapper;
     private final ObjectMapper objectMapper;
     private final DataScopeService dataScopeService;
+    private final PlatformAdminSupport platformAdminSupport;
 
     public AuditService(
             SysAuditLogMapper sysAuditLogMapper,
             ObjectMapper objectMapper,
-            DataScopeService dataScopeService
+            DataScopeService dataScopeService,
+            PlatformAdminSupport platformAdminSupport
     ) {
         this.sysAuditLogMapper = sysAuditLogMapper;
         this.objectMapper = objectMapper;
         this.dataScopeService = dataScopeService;
+        this.platformAdminSupport = platformAdminSupport;
     }
 
     public void record(String type, String operator, String tenantId, Map<String, Object> details) {
@@ -68,20 +72,22 @@ public class AuditService implements AuditEventPublisher {
     }
 
     public AuditPage query(AuditQuery query) {
-        validateQueryRange(query);
-        return queryInDatabase(query);
+        AuditQuery scopedQuery = scopedQuery(query);
+        validateQueryRange(scopedQuery);
+        return queryInDatabase(scopedQuery);
     }
 
     public List<AuditEvent> export(AuditQuery query) {
-        validateExportQuery(query);
+        AuditQuery scopedQuery = scopedQuery(query);
+        validateExportQuery(scopedQuery);
         AuditQuery exportQuery = new AuditQuery(
-                query.tenantId(),
-                query.eventType(),
-                query.operator(),
-                query.requestId(),
-                query.clientIp(),
-                query.fromEpochMs(),
-                query.toEpochMs(),
+                scopedQuery.tenantId(),
+                scopedQuery.eventType(),
+                scopedQuery.operator(),
+                scopedQuery.requestId(),
+                scopedQuery.clientIp(),
+                scopedQuery.fromEpochMs(),
+                scopedQuery.toEpochMs(),
                 1,
                 2000
         );
@@ -124,6 +130,41 @@ public class AuditService implements AuditEventPublisher {
         if (query.toEpochMs() - query.fromEpochMs() > MAX_EXPORT_RANGE_MS) {
             throw new BusinessException("审计查询时间范围不能超过 31 天");
         }
+    }
+
+    private AuditQuery scopedQuery(AuditQuery query) {
+        String tenantId = resolveAccessibleTenantId(query.tenantId());
+        return new AuditQuery(
+                tenantId,
+                query.eventType(),
+                query.operator(),
+                query.requestId(),
+                query.clientIp(),
+                query.fromEpochMs(),
+                query.toEpochMs(),
+                query.page(),
+                query.size()
+        );
+    }
+
+    private String resolveAccessibleTenantId(String requestedTenantId) {
+        String normalized = StringUtils.hasText(requestedTenantId) ? requestedTenantId.trim() : null;
+        var currentUser = dataScopeService.currentUser();
+        if (currentUser.isPresent()) {
+            var user = currentUser.get();
+            if (platformAdminSupport.isPlatformSuperAdmin(user)) {
+                return StringUtils.hasText(normalized) ? normalized : user.tenantId();
+            }
+            if (StringUtils.hasText(normalized) && !normalized.equals(user.tenantId())) {
+                throw new BusinessException("ACCESS_DENIED", "无权访问目标租户审计记录");
+            }
+            return user.tenantId();
+        }
+        if (StringUtils.hasText(normalized)) {
+            return normalized;
+        }
+        String contextTenantId = TenantContext.getTenantId();
+        return StringUtils.hasText(contextTenantId) ? contextTenantId : "platform";
     }
 
     private AuditPage queryInDatabase(AuditQuery query) {

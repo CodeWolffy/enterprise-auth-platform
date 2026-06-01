@@ -1,6 +1,6 @@
 import type { RouteLocationNormalized } from 'vue-router'
 import { ROUTE_KEY_PATH_MAP } from '@/app/registry/module-manifest'
-import type { MenuItem, PermissionSnapshot } from '@/types/auth'
+import type { MenuItem, PermissionSnapshot } from '@/types/auth-models'
 
 interface RouteAccessTarget {
   meta: RouteLocationNormalized['meta']

@@ -196,7 +196,7 @@ import AdvancedSearch from '@/components/common/AdvancedSearch.vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { createConfig, deleteConfig, queryCategories, queryConfigs, updateConfig } from '@/api/modules'
 import { useTablePreferences } from '@/composables/useTablePreferences'
-import type { CategoryOption, ConfigView } from '@/types/auth'
+import type { CategoryOption, ConfigView } from '@/types/system'
 
 const configs = ref<ConfigView[]>([])
 const loading = ref(false)

@@ -14,6 +14,7 @@ import com.enterprise.auth.platform.modules.auth.application.SessionIndexService
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -87,7 +88,7 @@ public class SessionApplicationService {
     private List<UserSessionResponse> ownSessions(UserAccount currentUser, String currentToken) {
         return StpUtil.getTokenValueListByLoginId(currentUser.id()).stream()
                 .map(token -> safeSessionResponse(token, currentUser, currentToken))
-                .filter(session -> session != null)
+                .flatMap(Optional::stream)
                 .filter(UserSessionResponse::active)
                 .sorted((a, b) -> Long.compare(b.lastAccessAt(), a.lastAccessAt()))
                 .toList();
@@ -147,12 +148,12 @@ public class SessionApplicationService {
         return currentUser.tenantId().equals(session.tenantId());
     }
 
-    private UserSessionResponse safeSessionResponse(String token, UserAccount fallbackUser, String currentToken) {
+    private Optional<UserSessionResponse> safeSessionResponse(String token, UserAccount fallbackUser, String currentToken) {
         try {
-            return toSessionResponse(token, fallbackUser, currentToken);
+            return Optional.of(toSessionResponse(token, fallbackUser, currentToken));
         } catch (Exception e) {
             sessionIndexService.remove(token);
-            return null;
+            return Optional.empty();
         }
     }
 

@@ -286,8 +286,7 @@ mvn spring-boot:run "-Dspring-boot.run.profiles=local"
 
 - 初始化与增量迁移统一放在 `src/main/resources/db/migration/`
 - `V1__baseline.sql` 是当前库结构与基础数据基线
-- 本地已手工导入旧 SQL 且库非空时，首次切换 Flyway 前可设置 `FLYWAY_BASELINE_ON_MIGRATE=true`
-- `src/main/resources/database/enterprise_auth_platform.sql` 仅保留作基线来源与兼容备份，不再作为主初始化路径
+- `src/main/resources/database/enterprise_auth_platform.sql` 仅作为基线镜像，不作为部署主初始化路径
 
 ## 构建与测试
 

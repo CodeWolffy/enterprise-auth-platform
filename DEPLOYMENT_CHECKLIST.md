@@ -21,7 +21,7 @@
 - [ ] 目标库如为已存在的非空历史库，已按上线方案完成 baseline：
   - 首次启动前启用 `FLYWAY_BASELINE_ON_MIGRATE=true` 或等效 Spring 配置
   - 启动后已确认写入 `flyway_schema_history`，且基线版本为 `1`
-- [ ] `src/main/resources/database/enterprise_auth_platform.sql` 仅作为基线来源与兼容备份，不作为部署主初始化路径
+- [ ] `src/main/resources/database/enterprise_auth_platform.sql` 仅作为基线镜像，不作为部署主初始化路径
 - [ ] 历史库已完成用户名全局唯一约束迁移：
   - `SELECT username, COUNT(*) cnt FROM sys_user WHERE deleted = 0 GROUP BY username HAVING cnt > 1;` 结果为空
   - `sys_user.username` 存在唯一索引

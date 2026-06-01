@@ -5,6 +5,7 @@ import com.enterprise.auth.platform.modules.auth.application.SessionIndexService
 import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import com.enterprise.auth.platform.common.context.AuthContextHolder;
 import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.common.web.ClientIpResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Instant;
@@ -17,10 +18,16 @@ public class SaTokenUserContextInterceptor implements HandlerInterceptor {
 
     private final CurrentUserService currentUserService;
     private final SessionIndexService sessionIndexService;
+    private final ClientIpResolver clientIpResolver;
 
-    public SaTokenUserContextInterceptor(CurrentUserService currentUserService, SessionIndexService sessionIndexService) {
+    public SaTokenUserContextInterceptor(
+            CurrentUserService currentUserService,
+            SessionIndexService sessionIndexService,
+            ClientIpResolver clientIpResolver
+    ) {
         this.currentUserService = currentUserService;
         this.sessionIndexService = sessionIndexService;
+        this.clientIpResolver = clientIpResolver;
     }
 
     @Override
@@ -60,21 +67,13 @@ public class SaTokenUserContextInterceptor implements HandlerInterceptor {
     private void enforceClientIpBinding(HttpServletRequest request) {
         Object boundClientIpValue = StpUtil.getTokenSession().get("clientIp");
         String boundClientIp = boundClientIpValue == null ? null : String.valueOf(boundClientIpValue);
-        String requestClientIp = clientIp(request);
+        String requestClientIp = clientIpResolver.resolve(request);
         if (StringUtils.hasText(boundClientIp) && StringUtils.hasText(requestClientIp) && !boundClientIp.equals(requestClientIp)) {
             String token = StpUtil.getTokenValue();
             StpUtil.kickoutByTokenValue(token);
             sessionIndexService.remove(token);
             StpUtil.checkLogin();
         }
-    }
-
-    private String clientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (StringUtils.hasText(forwarded)) {
-            return forwarded.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
     }
 
     private long sessionLong(String key, long fallback) {

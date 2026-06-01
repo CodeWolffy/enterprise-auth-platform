@@ -1,7 +1,9 @@
 /** 用户管理 API */
 
 import { http } from '../http'
-import type { ApiResponse, UserSummary, RoleView } from '@/types/auth'
+import type { ApiResponse } from '@/types/api'
+import type { RoleView } from '@/types/role'
+import type { UserSummary } from '@/types/user'
 
 export interface UserQueryParams {
   username?: string

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.modules.audit.application.AuditService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.auth.interfaces.MenuNode;
+import com.enterprise.auth.platform.modules.auth.infrastructure.AuthPrincipalCacheService;
 import com.enterprise.auth.platform.modules.resource.domain.ResourceType;
 import com.enterprise.auth.platform.modules.resource.infrastructure.entity.SysResourceEntity;
 import com.enterprise.auth.platform.modules.role.application.RoleResourceFacade;
@@ -11,7 +12,6 @@ import com.enterprise.auth.platform.modules.tenant.application.TenantResourceOve
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantResourceOverrideEntity;
 import com.enterprise.auth.platform.modules.resource.infrastructure.mapper.SysResourceMapper;
 
-import com.enterprise.auth.platform.modules.resource.interfaces.CreateResourceRequest;
 import com.enterprise.auth.platform.modules.resource.interfaces.CreateResourceRequest;
 import com.enterprise.auth.platform.modules.resource.domain.ResourceTreeNode;
 import com.enterprise.auth.platform.modules.tenant.domain.TenantResourceOverrideItem;
@@ -42,19 +42,22 @@ public class ResourceService {
     private final TenantResourceOverrideFacade tenantResourceOverrideFacade;
     private final TenantProperties tenantProperties;
     private final AuditService auditService;
+    private final AuthPrincipalCacheService authPrincipalCacheService;
 
     public ResourceService(
             SysResourceMapper sysResourceMapper,
             RoleResourceFacade roleResourceFacade,
             TenantResourceOverrideFacade tenantResourceOverrideFacade,
             TenantProperties tenantProperties,
-            AuditService auditService
+            AuditService auditService,
+            AuthPrincipalCacheService authPrincipalCacheService
     ) {
         this.sysResourceMapper = sysResourceMapper;
         this.roleResourceFacade = roleResourceFacade;
         this.tenantResourceOverrideFacade = tenantResourceOverrideFacade;
         this.tenantProperties = tenantProperties;
         this.auditService = auditService;
+        this.authPrincipalCacheService = authPrincipalCacheService;
     }
 
     public Set<String> resolveGrantKeys(String activeTenantId, Set<String> roleCodes, boolean superAdmin) {
@@ -176,6 +179,7 @@ public class ResourceService {
         } catch (Exception ex) {
             throw new BusinessException("资源键已存在或数据不合法");
         }
+        authPrincipalCacheService.evictAll();
         auditService.record("RESOURCE_CREATED", SecuritySupport.currentOperator(), platformTenantId(), Map.of("resourceId", entity.getId(), "resourceKey", entity.getResourceKey()));
         return toResourceNode(entity, List.of());
     }
@@ -221,6 +225,7 @@ public class ResourceService {
         }
 
         refreshDescendantAncestors(resourceId);
+        authPrincipalCacheService.evictAll();
         auditService.record("RESOURCE_UPDATED", SecuritySupport.currentOperator(), platformTenantId(), Map.of("resourceId", entity.getId(), "resourceKey", entity.getResourceKey()));
         return toResourceNode(entity, List.of());
     }
@@ -247,6 +252,7 @@ public class ResourceService {
             sysResourceMapper.deleteById(resourceId);
             return null;
         });
+        authPrincipalCacheService.evictAll();
         auditService.record("RESOURCE_DELETED", SecuritySupport.currentOperator(), platformTenantId(), Map.of("resourceId", resourceId, "resourceKey", entity.getResourceKey()));
     }
 
@@ -259,6 +265,7 @@ public class ResourceService {
             sysResourceMapper.updateById(entity);
             return null;
         });
+        authPrincipalCacheService.evictAll();
         auditService.record("RESOURCE_SORT_UPDATED", SecuritySupport.currentOperator(), platformTenantId(), Map.of("resourceId", resourceId, "orderNo", entity.getOrderNo()));
         return toResourceNode(entity, List.of());
     }
@@ -354,6 +361,7 @@ public class ResourceService {
             }
             return null;
         });
+        authPrincipalCacheService.evictAll();
         auditService.record("TENANT_RESOURCE_OVERRIDE_UPDATED", SecuritySupport.currentOperator(), tenantId, Map.of("tenantId", tenantId, "count", request.overrides().size()));
         return listTenantOverrides(tenantId);
     }

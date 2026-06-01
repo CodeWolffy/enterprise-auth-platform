@@ -16,7 +16,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class TenantFilter extends OncePerRequestFilter {
 
     private static final String REQUEST_ID_HEADER = "X-Request-Id";
-    private static final String FORWARDED_FOR_HEADER = "X-Forwarded-For";
+
+    private final ClientIpResolver clientIpResolver;
+
+    public TenantFilter(ClientIpResolver clientIpResolver) {
+        this.clientIpResolver = clientIpResolver;
+    }
 
     @Override
     protected void doFilterInternal(
@@ -30,7 +35,7 @@ public class TenantFilter extends OncePerRequestFilter {
         }
 
         RequestContext.setRequestId(requestId);
-        RequestContext.setClientIp(resolveClientIp(request));
+        RequestContext.setClientIp(clientIpResolver.resolve(request));
         response.setHeader(REQUEST_ID_HEADER, requestId);
         try {
             filterChain.doFilter(request, response);
@@ -38,13 +43,5 @@ public class TenantFilter extends OncePerRequestFilter {
             TenantContext.clear();
             RequestContext.clear();
         }
-    }
-
-    private String resolveClientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader(FORWARDED_FOR_HEADER);
-        if (StringUtils.hasText(forwarded)) {
-            return forwarded.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
     }
 }

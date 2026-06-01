@@ -1,7 +1,7 @@
 ﻿import { createRouter, createWebHistory, type RouteRecordName, type RouteRecordRaw } from 'vue-router'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import type { PermissionSnapshot } from '@/types/auth'
+import type { PermissionSnapshot } from '@/types/auth-models'
 import { useAuthStore } from '@/stores/auth'
 import { APP_ROUTE_MANIFESTS, type AppRouteManifest } from '@/app/registry/module-manifest'
 import { collectAllowedRouteKeys, isAllowedRoute, resolveFirstAllowedPath } from './route-access'

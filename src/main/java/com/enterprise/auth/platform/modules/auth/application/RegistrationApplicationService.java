@@ -9,6 +9,7 @@ import com.enterprise.auth.platform.modules.user.interfaces.UserSummary;
 import com.enterprise.auth.platform.modules.auth.application.RegisterAttemptService;
 import com.enterprise.auth.platform.modules.auth.application.RegistrationPolicyService;
 import com.enterprise.auth.platform.modules.user.application.UserManagementService;
+import com.enterprise.auth.platform.common.web.ClientIpResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Set;
 import org.springframework.stereotype.Service;
@@ -20,19 +21,22 @@ public class RegistrationApplicationService {
     private final RegisterAttemptService registerAttemptService;
     private final RegistrationPolicyService registrationPolicyService;
     private final UserManagementService userManagementService;
+    private final ClientIpResolver clientIpResolver;
 
     public RegistrationApplicationService(
             RegisterAttemptService registerAttemptService,
             RegistrationPolicyService registrationPolicyService,
-            UserManagementService userManagementService
+            UserManagementService userManagementService,
+            ClientIpResolver clientIpResolver
     ) {
         this.registerAttemptService = registerAttemptService;
         this.registrationPolicyService = registrationPolicyService;
         this.userManagementService = userManagementService;
+        this.clientIpResolver = clientIpResolver;
     }
 
     public UserSummary register(RegisterRequest request, HttpServletRequest servletRequest) {
-        String clientIp = clientIp(servletRequest);
+        String clientIp = clientIpResolver.resolve(servletRequest);
         registerAttemptService.checkRateLimit(request.username(), clientIp);
         String defaultTenantId = registrationPolicyService.resolveDefaultTenantId();
         String previousTenantId = TenantContext.getTenantId();
@@ -64,13 +68,5 @@ public class RegistrationApplicationService {
                 TenantContext.clear();
             }
         }
-    }
-
-    private String clientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (StringUtils.hasText(forwarded)) {
-            return forwarded.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
     }
 }

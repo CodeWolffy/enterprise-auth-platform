@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
-import type { PermissionSnapshot } from '@/types/auth'
+import type { PermissionSnapshot } from '@/types/auth-models'
 
 const DEFAULT_TENANT_ID = 'platform'
 

@@ -299,7 +299,9 @@ import {
   updateRole,
 } from '@/api/modules'
 import { useTablePreferences } from '@/composables/useTablePreferences'
-import type { DepartmentView, ResourceTreeNode, RoleView, ResourceType } from '@/types/auth'
+import type { DepartmentView } from '@/types/dept'
+import type { ResourceTreeNode, ResourceType } from '@/types/resource'
+import type { RoleView } from '@/types/role'
 
 type ResourceDisplayNode = {
   id: number

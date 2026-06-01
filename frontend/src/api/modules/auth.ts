@@ -1,13 +1,13 @@
 import { http } from '../http'
+import type { ApiResponse } from '@/types/api'
 import type {
-  ApiResponse,
   CaptchaResponse,
   PermissionSnapshot,
   RegisterOptionsResponse,
   SessionPageResult,
   TokenSessionResponse,
   UserSessionView,
-} from '@/types/auth'
+} from '@/types/auth-models'
 
 export async function fetchPermissionSnapshot() {
   const { data } = await http.get<ApiResponse<PermissionSnapshot>>('/api/auth/me')

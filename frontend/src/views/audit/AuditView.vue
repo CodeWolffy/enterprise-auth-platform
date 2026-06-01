@@ -360,7 +360,7 @@ import {
   retryAuditExportTask,
   updateAuditExportPolicy,
 } from '@/api/modules'
-import type { AuditExportPolicy, AuditExportTask, AuditPage } from '@/types/auth'
+import type { AuditExportPolicy, AuditExportTask, AuditPage } from '@/types/audit'
 
 const query = reactive({
   tenantId: '',

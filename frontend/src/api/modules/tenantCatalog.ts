@@ -1,5 +1,6 @@
 import { http } from '../http'
-import type { ApiResponse, TenantCapabilityView, TenantPackageView } from '@/types/auth'
+import type { ApiResponse } from '@/types/api'
+import type { TenantCapabilityView, TenantPackageView } from '@/types/tenant'
 
 export interface TenantPackagePayload {
   packageCode: string

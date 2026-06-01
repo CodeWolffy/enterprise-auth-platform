@@ -12,13 +12,14 @@ import com.enterprise.auth.platform.modules.audit.infrastructure.entity.SysAudit
 import com.enterprise.auth.platform.modules.audit.infrastructure.entity.SysAuditExportTaskEntity;
 import com.enterprise.auth.platform.modules.audit.infrastructure.mapper.SysAuditExportPolicyMapper;
 import com.enterprise.auth.platform.modules.audit.infrastructure.mapper.SysAuditExportTaskMapper;
+import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import com.enterprise.auth.platform.common.authz.SecuritySupport;
+import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.io.ByteArrayOutputStream;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -57,31 +58,38 @@ public class AuditExportTaskService {
     private final AuditService auditService;
     private final ObjectMapper objectMapper;
     private final java.util.concurrent.Executor auditExportExecutor;
+    private final CurrentUserService currentUserService;
+    private final PlatformAdminSupport platformAdminSupport;
 
     public AuditExportTaskService(
             SysAuditExportTaskMapper sysAuditExportTaskMapper,
             SysAuditExportPolicyMapper sysAuditExportPolicyMapper,
             AuditService auditService,
             ObjectMapper objectMapper,
-            @Qualifier("auditExportExecutor") java.util.concurrent.Executor auditExportExecutor
+            @Qualifier("auditExportExecutor") java.util.concurrent.Executor auditExportExecutor,
+            CurrentUserService currentUserService,
+            PlatformAdminSupport platformAdminSupport
     ) {
         this.sysAuditExportTaskMapper = sysAuditExportTaskMapper;
         this.sysAuditExportPolicyMapper = sysAuditExportPolicyMapper;
         this.auditService = auditService;
         this.objectMapper = objectMapper;
         this.auditExportExecutor = auditExportExecutor;
+        this.currentUserService = currentUserService;
+        this.platformAdminSupport = platformAdminSupport;
     }
 
     @Transactional
     public ExportTaskView create(AuditQuery query) {
-        auditService.validateExportQuery(query);
+        AuditQuery scopedQuery = scopedQuery(query);
+        auditService.validateExportQuery(scopedQuery);
         SysAuditExportTaskEntity entity = new SysAuditExportTaskEntity();
-        entity.setTenantId(resolveTenantId(query));
+        entity.setTenantId(scopedQuery.tenantId());
         entity.setOperator(SecuritySupport.currentOperator());
         entity.setStatus("PENDING");
         entity.setFileName("audit-export-" + System.currentTimeMillis() + ".xlsx");
         entity.setRequestedAt(TimeSupport.utcNowDateTime());
-        entity.setQueryJson(toJson(queryPayload(query)));
+        entity.setQueryJson(toJson(queryPayload(scopedQuery)));
         entity.setRecordCount(0);
         sysAuditExportTaskMapper.insert(entity);
         auditService.record("AUDIT_EXPORT_TASK_CREATED", entity.getOperator(), entity.getTenantId(), Map.of(
@@ -89,7 +97,7 @@ public class AuditExportTaskService {
                 "fileName", entity.getFileName()
         ));
         Long taskId = entity.getId();
-        submitTaskAfterCommit(taskId, query);
+        submitTaskAfterCommit(taskId, scopedQuery);
         return toView(entity, policy(entity.getTenantId()));
     }
 
@@ -116,7 +124,7 @@ public class AuditExportTaskService {
 
     @Transactional
     public ExportTaskView retry(Long taskId) {
-        SysAuditExportTaskEntity source = getTask(taskId);
+        SysAuditExportTaskEntity source = getAccessibleTask(taskId);
         AuditQuery query = parseQuery(source);
         auditService.record("AUDIT_EXPORT_TASK_RETRIED", SecuritySupport.currentOperator(), source.getTenantId(), Map.of(
                 "sourceTaskId", taskId,
@@ -127,7 +135,7 @@ public class AuditExportTaskService {
 
     @Transactional
     public ExportTaskView archive(Long taskId) {
-        SysAuditExportTaskEntity entity = getTask(taskId);
+        SysAuditExportTaskEntity entity = getAccessibleTask(taskId);
         if ("PENDING".equals(entity.getStatus()) || "RUNNING".equals(entity.getStatus())) {
             throw new BusinessException("导出任务仍在运行中，无法归档");
         }
@@ -149,11 +157,12 @@ public class AuditExportTaskService {
     }
 
     public PageResult<ExportTaskView> page(String tenantId, String status, String operator, int page, int size) {
-        ExportPolicy policy = policy(resolveTenantId(new AuditQuery(tenantId, null, null, null, null, null, null, 1, 1)));
+        String resolvedTenantId = resolveAccessibleTenantId(tenantId);
+        ExportPolicy policy = policy(resolvedTenantId);
         int safePage = Math.max(page, 1);
         int safeSize = Math.max(size, 1);
         LambdaQueryWrapper<SysAuditExportTaskEntity> query = new LambdaQueryWrapper<SysAuditExportTaskEntity>()
-                .eq(StringUtils.hasText(tenantId), SysAuditExportTaskEntity::getTenantId, tenantId)
+                .eq(SysAuditExportTaskEntity::getTenantId, resolvedTenantId)
                 .eq(StringUtils.hasText(status), SysAuditExportTaskEntity::getStatus, status)
                 .like(StringUtils.hasText(operator), SysAuditExportTaskEntity::getOperator, operator)
                 .orderByDesc(SysAuditExportTaskEntity::getRequestedAt)
@@ -171,7 +180,7 @@ public class AuditExportTaskService {
     }
 
     public DownloadFile download(Long taskId) {
-        SysAuditExportTaskEntity entity = getTask(taskId);
+        SysAuditExportTaskEntity entity = getAccessibleTask(taskId);
         if (!"SUCCESS".equals(entity.getStatus()) || entity.getFileContent() == null) {
             throw new BusinessException("导出文件尚未就绪或已归档");
         }
@@ -180,7 +189,7 @@ public class AuditExportTaskService {
 
     @Transactional
     public void deleteTask(Long taskId) {
-        SysAuditExportTaskEntity entity = getTask(taskId);
+        SysAuditExportTaskEntity entity = getAccessibleTask(taskId);
         sysAuditExportTaskMapper.deleteById(taskId);
         auditService.record("AUDIT_EXPORT_TASK_DELETED", SecuritySupport.currentOperator(), entity.getTenantId(), Map.of(
                 "taskId", taskId,
@@ -193,8 +202,9 @@ public class AuditExportTaskService {
         if (completedBeforeEpochMs == null) {
             throw new BusinessException("清理操作需要指定 completedBefore 参数");
         }
+        String resolvedTenantId = resolveAccessibleTenantId(tenantId);
         LambdaQueryWrapper<SysAuditExportTaskEntity> query = new LambdaQueryWrapper<SysAuditExportTaskEntity>()
-                .eq(StringUtils.hasText(tenantId), SysAuditExportTaskEntity::getTenantId, tenantId)
+                .eq(SysAuditExportTaskEntity::getTenantId, resolvedTenantId)
                 .eq(StringUtils.hasText(status), SysAuditExportTaskEntity::getStatus, status)
                 .lt(SysAuditExportTaskEntity::getCompletedAt, TimeSupport.localDateTimeFromEpochMilli(completedBeforeEpochMs));
         List<SysAuditExportTaskEntity> tasks = sysAuditExportTaskMapper.selectList(query);
@@ -202,10 +212,8 @@ public class AuditExportTaskService {
             return 0;
         }
         int affected = sysAuditExportTaskMapper.delete(query);
-        auditService.record("AUDIT_EXPORT_TASK_CLEANED", SecuritySupport.currentOperator(), resolveTenantId(new AuditQuery(
-                tenantId, null, null, null, null, null, null, 1, 1
-        )), Map.of(
-                "tenantId", tenantId == null ? "" : tenantId,
+        auditService.record("AUDIT_EXPORT_TASK_CLEANED", SecuritySupport.currentOperator(), resolvedTenantId, Map.of(
+                "tenantId", resolvedTenantId,
                 "status", status == null ? "" : status,
                 "completedBeforeEpochMs", completedBeforeEpochMs,
                 "affected", affected
@@ -218,8 +226,9 @@ public class AuditExportTaskService {
         if (completedBeforeEpochMs == null) {
             throw new BusinessException("批量归档操作需要指定 completedBefore 参数");
         }
+        String resolvedTenantId = resolveAccessibleTenantId(tenantId);
         LambdaQueryWrapper<SysAuditExportTaskEntity> query = new LambdaQueryWrapper<SysAuditExportTaskEntity>()
-                .eq(StringUtils.hasText(tenantId), SysAuditExportTaskEntity::getTenantId, tenantId)
+                .eq(SysAuditExportTaskEntity::getTenantId, resolvedTenantId)
                 .eq(StringUtils.hasText(status), SysAuditExportTaskEntity::getStatus, status)
                 .ne(SysAuditExportTaskEntity::getStatus, "ARCHIVED")
                 .isNotNull(SysAuditExportTaskEntity::getCompletedAt)
@@ -240,10 +249,8 @@ public class AuditExportTaskService {
             }
             affected += sysAuditExportTaskMapper.updateById(entity);
         }
-        auditService.record("AUDIT_EXPORT_TASK_BATCH_ARCHIVED", SecuritySupport.currentOperator(), resolveTenantId(new AuditQuery(
-                tenantId, null, null, null, null, null, null, 1, 1
-        )), Map.of(
-                "tenantId", tenantId == null ? "" : tenantId,
+        auditService.record("AUDIT_EXPORT_TASK_BATCH_ARCHIVED", SecuritySupport.currentOperator(), resolvedTenantId, Map.of(
+                "tenantId", resolvedTenantId,
                 "status", status == null ? "" : status,
                 "completedBeforeEpochMs", completedBeforeEpochMs,
                 "affected", affected
@@ -252,7 +259,7 @@ public class AuditExportTaskService {
     }
 
     public ExportPolicy policy(String tenantId) {
-        String resolvedTenantId = StringUtils.hasText(tenantId) ? tenantId : "platform";
+        String resolvedTenantId = resolveAccessibleTenantId(tenantId);
         SysAuditExportPolicyEntity entity = sysAuditExportPolicyMapper.selectOne(new LambdaQueryWrapper<SysAuditExportPolicyEntity>()
                 .eq(SysAuditExportPolicyEntity::getTenantId, resolvedTenantId)
                 .eq(SysAuditExportPolicyEntity::getDeleted, 0)
@@ -268,7 +275,7 @@ public class AuditExportTaskService {
 
     @Transactional
     public ExportPolicy updatePolicy(String tenantId, AuditExportPolicyRequest request) {
-        String resolvedTenantId = StringUtils.hasText(tenantId) ? tenantId : "platform";
+        String resolvedTenantId = resolveAccessibleTenantId(tenantId);
         SysAuditExportPolicyEntity entity = sysAuditExportPolicyMapper.selectOne(new LambdaQueryWrapper<SysAuditExportPolicyEntity>()
                 .eq(SysAuditExportPolicyEntity::getTenantId, resolvedTenantId)
                 .eq(SysAuditExportPolicyEntity::getDeleted, 0)
@@ -294,7 +301,7 @@ public class AuditExportTaskService {
 
     @Transactional
     public GovernanceResult governance(String tenantId, boolean dryRun) {
-        String resolvedTenantId = StringUtils.hasText(tenantId) ? tenantId : "platform";
+        String resolvedTenantId = resolveAccessibleTenantId(tenantId);
         ExportPolicy currentPolicy = policy(resolvedTenantId);
         int retentionDays = Math.max(1, currentPolicy.retentionDays());
         int maxTasks = Math.max(1, currentPolicy.maxTasks());
@@ -533,6 +540,51 @@ public class AuditExportTaskService {
         return entity;
     }
 
+    private SysAuditExportTaskEntity getAccessibleTask(Long taskId) {
+        SysAuditExportTaskEntity entity = getTask(taskId);
+        ensureTenantAccessible(entity.getTenantId());
+        return entity;
+    }
+
+    private AuditQuery scopedQuery(AuditQuery query) {
+        String tenantId = resolveAccessibleTenantId(query.tenantId());
+        return new AuditQuery(
+                tenantId,
+                query.eventType(),
+                query.operator(),
+                query.requestId(),
+                query.clientIp(),
+                query.fromEpochMs(),
+                query.toEpochMs(),
+                query.page(),
+                query.size()
+        );
+    }
+
+    private void ensureTenantAccessible(String tenantId) {
+        resolveAccessibleTenantId(tenantId);
+    }
+
+    private String resolveAccessibleTenantId(String requestedTenantId) {
+        String normalized = StringUtils.hasText(requestedTenantId) ? requestedTenantId.trim() : null;
+        var currentUser = currentUserService.currentUser();
+        if (currentUser.isPresent()) {
+            var user = currentUser.get();
+            if (platformAdminSupport.isPlatformSuperAdmin(user)) {
+                return StringUtils.hasText(normalized) ? normalized : user.tenantId();
+            }
+            if (StringUtils.hasText(normalized) && !normalized.equals(user.tenantId())) {
+                throw new BusinessException("ACCESS_DENIED", "无权访问目标租户审计导出任务");
+            }
+            return user.tenantId();
+        }
+        if (StringUtils.hasText(normalized)) {
+            return normalized;
+        }
+        String contextTenantId = TenantContext.getTenantId();
+        return StringUtils.hasText(contextTenantId) ? contextTenantId : "platform";
+    }
+
     private AuditQuery parseQuery(SysAuditExportTaskEntity entity) {
         try {
             Map<String, Object> payload = objectMapper.readValue(entity.getQueryJson(), QUERY_PAYLOAD_TYPE);
@@ -550,14 +602,6 @@ public class AuditExportTaskService {
         } catch (Exception ex) {
             throw new BusinessException("审计导出任务处理失败，请稍后重试");
         }
-    }
-
-    private String resolveTenantId(AuditQuery query) {
-        if (StringUtils.hasText(query.tenantId())) {
-            return query.tenantId();
-        }
-        String tenantId = TenantContext.getTenantId();
-        return StringUtils.hasText(tenantId) ? tenantId : "platform";
     }
 
     private Map<String, Object> queryPayload(AuditQuery query) {

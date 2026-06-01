@@ -78,7 +78,7 @@ mybatis-plus:
     map-underscore-to-camel-case: true
 
 knife4j:
-  enable: true
+  enable: ${KNIFE4J_ENABLED:false}
 
 captcha:
   prefix: eap:captcha
@@ -94,10 +94,7 @@ captcha:
 
 app:
   cors:
-    allowed-origins:
-      - http://127.0.0.1:5173
-      - http://localhost:5173
-      - http://*:5173
+    allowed-origins: []
 
   security:
     session-ttl: 7d

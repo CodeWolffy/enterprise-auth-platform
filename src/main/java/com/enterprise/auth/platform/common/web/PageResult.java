@@ -13,7 +13,18 @@ public record PageResult<T>(
 ) implements Serializable {
     private static final long serialVersionUID = 1L;
 
+    public PageResult {
+        records = records == null ? List.of() : List.copyOf(records);
+        page = Math.max(page, 1);
+        size = Math.max(size, 0);
+        total = Math.max(total, 0);
+    }
+
     public static <T> PageResult<T> of(long total, int page, int size, List<T> records) {
         return new PageResult<>(total, page, size, records);
+    }
+
+    public static <T> PageResult<T> empty(int page, int size) {
+        return new PageResult<>(0, page, size, List.of());
     }
 }

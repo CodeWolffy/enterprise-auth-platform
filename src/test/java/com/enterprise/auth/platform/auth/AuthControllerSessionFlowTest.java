@@ -436,9 +436,12 @@ class AuthControllerSessionFlowTest {
         String token = extractToken(loginResult);
 
         mockMvc.perform(get("/api/auth/me")
+                        .with(request -> {
+                            request.setRemoteAddr("203.0.113.10");
+                            return request;
+                        })
                         .header("Authorization", "Bearer " + token)
-                        .header("X-Tenant-Id", ADMIN_TENANT)
-                        .header("X-Forwarded-For", "203.0.113.10"))
+                        .header("X-Tenant-Id", ADMIN_TENANT))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("SESSION_OFFLINE"));
     }

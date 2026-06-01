@@ -1,7 +1,8 @@
 /** 审计日志 API */
 
 import { http } from '../http'
-import type { ApiResponse, AuditPage, AuditExportTask, AuditExportPolicy } from '@/types/auth'
+import type { ApiResponse } from '@/types/api'
+import type { AuditPage, AuditExportTask, AuditExportPolicy } from '@/types/audit'
 
 export interface AuditQueryParams {
   tenantId?: string

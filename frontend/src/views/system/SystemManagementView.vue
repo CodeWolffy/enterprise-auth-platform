@@ -112,7 +112,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { queryConfigs, queryDicts, queryFeatures, queryNotices } from '@/api/modules'
-import type { FeatureFlags } from '@/types/auth'
+import type { FeatureFlags } from '@/types/api'
 
 const router = useRouter()
 const dictCount = ref(0)

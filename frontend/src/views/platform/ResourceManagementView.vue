@@ -261,7 +261,7 @@ import {
   sortResource,
   updateResource,
 } from '@/api/modules'
-import type { ResourceTreeNode, ResourceType } from '@/types/auth'
+import type { ResourceTreeNode, ResourceType } from '@/types/resource'
 
 type ParentOption = {
   id: number

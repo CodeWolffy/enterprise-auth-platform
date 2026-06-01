@@ -42,7 +42,7 @@
 
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
-import type { CaptchaTrackPayload } from '@/types/auth'
+import type { CaptchaTrackPayload } from '@/types/auth-models'
 
 const props = defineProps<{
   backgroundImage: string

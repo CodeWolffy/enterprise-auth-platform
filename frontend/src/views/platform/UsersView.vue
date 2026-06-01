@@ -281,7 +281,8 @@ import {
   updateUser,
 } from '@/api/modules'
 import { useTablePreferences } from '@/composables/useTablePreferences'
-import type { RoleView, UserSummary } from '@/types/auth'
+import type { RoleView } from '@/types/role'
+import type { UserSummary } from '@/types/user'
 import { useAuthStore } from '@/stores/auth'
 
 const users = ref<UserSummary[]>([])

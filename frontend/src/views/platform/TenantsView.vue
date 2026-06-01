@@ -333,7 +333,7 @@ import type {
   TenantHistorySummaryView,
   TenantPackageView,
   TenantView,
-} from '@/types/auth'
+} from '@/types/tenant'
 import { formatDateTime, toDate, toEpochMs } from '@/utils/datetime'
 
 type OverrideRow = TenantCapabilityOverrideItemView & { overrideMode: 'inherit' | 'enable' | 'disable' }

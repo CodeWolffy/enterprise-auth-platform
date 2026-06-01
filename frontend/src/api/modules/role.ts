@@ -1,7 +1,8 @@
 /** 角色管理 API */
 
 import { http } from '../http'
-import type { ApiResponse, RoleView } from '@/types/auth'
+import type { ApiResponse } from '@/types/api'
+import type { RoleView } from '@/types/role'
 
 export async function queryRoles() {
   const { data } = await http.get<ApiResponse<RoleView[]>>('/api/roles')

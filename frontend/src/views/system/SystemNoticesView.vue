@@ -229,7 +229,7 @@ import AdvancedSearch from '@/components/common/AdvancedSearch.vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { createNotice, deleteNotice, queryNotices, updateNotice } from '@/api/modules'
 import { useTablePreferences } from '@/composables/useTablePreferences'
-import type { NoticeView } from '@/types/auth'
+import type { NoticeView } from '@/types/system'
 import { formatDateTime, toDate, toEpochMs } from '@/utils/datetime'
 
 const notices = ref<NoticeView[]>([])

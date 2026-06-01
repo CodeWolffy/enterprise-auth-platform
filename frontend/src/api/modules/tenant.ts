@@ -1,13 +1,13 @@
 /** 租户管理 API */
 
 import { http } from '../http'
+import type { ApiResponse } from '@/types/api'
 import type {
-  ApiResponse,
   TenantView,
   TenantChangeView,
   TenantHistorySummaryView,
   TenantCapabilityOverrideView,
-} from '@/types/auth'
+} from '@/types/tenant'
 
 export interface TenantQueryParams {
   keyword?: string

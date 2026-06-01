@@ -447,7 +447,7 @@ import {
   updateTenantCapability,
   updateTenantPackage,
 } from '@/api/modules'
-import type { TenantCapabilityView, TenantPackageView } from '@/types/auth'
+import type { TenantCapabilityView, TenantPackageView } from '@/types/tenant'
 
 const activeTab = ref<'packages' | 'capabilities'>('packages')
 const loadingPackages = ref(false)

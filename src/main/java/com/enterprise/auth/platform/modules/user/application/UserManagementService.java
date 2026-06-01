@@ -19,7 +19,6 @@ import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 import com.enterprise.auth.platform.common.authz.SecuritySupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.modules.user.interfaces.CreateUserRequest;
-import com.enterprise.auth.platform.modules.user.interfaces.CreateUserRequest;
 import com.enterprise.auth.platform.modules.user.interfaces.UserSummary;
 import com.enterprise.auth.platform.modules.user.application.UserDirectoryService;
 import java.util.List;
@@ -91,7 +90,7 @@ public class UserManagementService {
         try {
             sysUserMapper.insert(entity);
         } catch (DuplicateKeyException ex) {
-            throw new BusinessException("鐢ㄦ埛鍚嶅凡瀛樺湪");
+            throw new BusinessException("用户名已存在");
         }
 
         syncUserRoles(tenantId, entity.getId(), request.roleCodes());

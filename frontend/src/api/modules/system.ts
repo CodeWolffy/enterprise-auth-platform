@@ -1,5 +1,6 @@
 import { http } from '../http'
-import type { ApiResponse, CategoryAnalysis, CategoryOption, ConfigView, DictView, FeatureFlags, NoticeView } from '@/types/auth'
+import type { ApiResponse, FeatureFlags } from '@/types/api'
+import type { CategoryAnalysis, CategoryOption, ConfigView, DictView, NoticeView } from '@/types/system'
 
 export interface PageResult<T> {
   total: number

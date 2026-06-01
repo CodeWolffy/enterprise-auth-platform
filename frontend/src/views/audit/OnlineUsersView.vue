@@ -117,7 +117,7 @@
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { forceOffline, querySessions } from '@/api/modules'
-import type { SessionPageResult, UserSessionView } from '@/types/auth'
+import type { SessionPageResult, UserSessionView } from '@/types/auth-models'
 import { formatDateTime } from '@/utils/datetime'
 
 const loading = ref(false)

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { usePermissionSnapshotStore } from './permissionSnapshot'
-import type { PermissionSnapshot } from '@/types/auth'
+import type { PermissionSnapshot } from '@/types/auth-models'
 
 vi.mock('@/router', () => ({
   registerDynamicRoutes: vi.fn(),
