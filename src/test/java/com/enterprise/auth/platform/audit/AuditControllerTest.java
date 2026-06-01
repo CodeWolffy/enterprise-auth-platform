@@ -9,8 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.enterprise.auth.platform.dto.model.DataScopeType;
-import com.enterprise.auth.platform.dto.model.UserAccount;
+import com.enterprise.auth.platform.common.authz.DataScopeType;
+import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

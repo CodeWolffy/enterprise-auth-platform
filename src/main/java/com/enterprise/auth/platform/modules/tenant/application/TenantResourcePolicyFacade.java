@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.modules.tenant.application;
 
-import com.enterprise.auth.platform.dto.model.TenantResourceOverrideItem;
-import com.enterprise.auth.platform.service.ResourceService;
+import com.enterprise.auth.platform.modules.tenant.domain.TenantResourceOverrideItem;
+import com.enterprise.auth.platform.modules.resource.application.ResourceService;
 import java.util.List;
 import org.springframework.stereotype.Service;
 

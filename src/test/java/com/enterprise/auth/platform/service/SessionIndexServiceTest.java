@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.enterprise.auth.platform.config.SecurityProperties;
+import com.enterprise.auth.platform.modules.auth.application.SessionIndexService;
 import java.time.Duration;
 import java.util.Map;
 import org.junit.jupiter.api.Test;

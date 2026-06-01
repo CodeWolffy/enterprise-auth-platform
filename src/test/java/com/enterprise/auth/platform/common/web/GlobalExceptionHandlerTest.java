@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import com.enterprise.auth.platform.common.web.RateLimitInterceptor.RateLimitExceededException;
-import com.enterprise.auth.platform.service.AuditService;
+import com.enterprise.auth.platform.modules.audit.application.AuditService;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
 

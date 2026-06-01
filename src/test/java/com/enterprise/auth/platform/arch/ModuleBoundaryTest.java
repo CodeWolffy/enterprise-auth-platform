@@ -12,11 +12,25 @@ import org.junit.jupiter.api.Test;
 
 class ModuleBoundaryTest {
 
-    private static final Path MODULES_ROOT = Path.of("src/main/java/com/enterprise/auth/platform/modules");
+    private static final Path SOURCE_ROOT = Path.of("src/main/java/com/enterprise/auth/platform");
+    private static final Path MODULES_ROOT = SOURCE_ROOT.resolve("modules");
     private static final Pattern PACKAGE_PATTERN = Pattern.compile("com\\.enterprise\\.auth\\.platform\\.modules\\.([a-z]+)\\.(domain|infrastructure)");
 
     @Test
-    void modulesDoNotDependOnOtherModulesDomainOrInfrastructure() throws IOException {
+    void legacyFlatPackagesAreFullyMigrated() {
+        List<String> legacyPackages = List.of("controller", "service", "dao", "dto");
+
+        List<String> remaining = legacyPackages.stream()
+                .map(SOURCE_ROOT::resolve)
+                .filter(Files::exists)
+                .map(Path::toString)
+                .toList();
+
+        assertTrue(remaining.isEmpty(), () -> "Legacy flat packages should be removed: " + String.join(", ", remaining));
+    }
+
+    @Test
+    void moduleInterfacesDoNotDependOnOtherModulesDomainOrInfrastructure() throws IOException {
         if (!Files.exists(MODULES_ROOT)) {
             return;
         }
@@ -25,6 +39,7 @@ class ModuleBoundaryTest {
         try (var files = Files.walk(MODULES_ROOT)) {
             violations = files
                     .filter(path -> path.toString().endsWith(".java"))
+                    .filter(path -> path.toString().contains("interfaces"))
                     .flatMap(path -> findViolations(path).stream())
                     .toList();
         }

@@ -1,12 +1,12 @@
 package com.enterprise.auth.platform.common.authz;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.enterprise.auth.platform.dto.model.DataScopeType;
-import com.enterprise.auth.platform.dao.entity.SysDeptEntity;
-import com.enterprise.auth.platform.dao.entity.SysUserEntity;
-import com.enterprise.auth.platform.dao.mapper.SysDeptMapper;
-import com.enterprise.auth.platform.dao.mapper.SysUserMapper;
-import com.enterprise.auth.platform.dto.model.UserAccount;
+import com.enterprise.auth.platform.common.authz.DataScopeType;
+import com.enterprise.auth.platform.modules.dept.infrastructure.entity.SysDeptEntity;
+import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
+import com.enterprise.auth.platform.modules.dept.infrastructure.mapper.SysDeptMapper;
+import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
+import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.security.CurrentUserService;
 import java.util.ArrayDeque;
 import java.util.HashSet;

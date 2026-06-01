@@ -3,9 +3,9 @@ package com.enterprise.auth.platform.test;
 import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.SaLoginModel;
 import cn.dev33.satoken.stp.StpUtil;
-import com.enterprise.auth.platform.dto.model.SessionPrincipal;
+import com.enterprise.auth.platform.modules.auth.domain.SessionPrincipal;
 import com.enterprise.auth.platform.common.context.AuthContextHolder;
-import com.enterprise.auth.platform.dto.model.UserAccount;
+import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import java.util.List;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 

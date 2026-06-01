@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.modules.resource.application;
 
-import com.enterprise.auth.platform.dto.resp.MenuNode;
-import com.enterprise.auth.platform.service.ResourceService;
+import com.enterprise.auth.platform.modules.auth.interfaces.MenuNode;
+import com.enterprise.auth.platform.modules.resource.application.ResourceService;
 import java.util.List;
 import java.util.Set;
 import org.springframework.stereotype.Service;

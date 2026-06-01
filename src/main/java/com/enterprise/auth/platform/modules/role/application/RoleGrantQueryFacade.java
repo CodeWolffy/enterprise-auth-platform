@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.modules.role.application;
 
-import com.enterprise.auth.platform.service.ResourceService;
-import com.enterprise.auth.platform.service.RoleManagementService;
+import com.enterprise.auth.platform.modules.resource.application.ResourceService;
+import com.enterprise.auth.platform.modules.role.application.RoleManagementService;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 

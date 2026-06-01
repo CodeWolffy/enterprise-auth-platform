@@ -3,7 +3,7 @@ package com.enterprise.auth.platform.modules.tenant.application;
 import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
-import com.enterprise.auth.platform.dto.model.UserAccount;
+import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.security.CurrentUserService;
 import java.util.Optional;
 import org.springframework.stereotype.Service;

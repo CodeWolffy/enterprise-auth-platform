@@ -6,7 +6,7 @@ import cn.dev33.satoken.exception.SaTokenException;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.web.RateLimitInterceptor.RateLimitExceededException;
 import com.enterprise.auth.platform.common.exception.BusinessException;
-import com.enterprise.auth.platform.service.AuditService;
+import com.enterprise.auth.platform.modules.audit.application.AuditService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.security.Principal;

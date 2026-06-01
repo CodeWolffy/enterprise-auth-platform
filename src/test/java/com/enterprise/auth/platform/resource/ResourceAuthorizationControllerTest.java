@@ -8,8 +8,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.enterprise.auth.platform.dto.model.DataScopeType;
-import com.enterprise.auth.platform.dto.model.UserAccount;
+import com.enterprise.auth.platform.common.authz.DataScopeType;
+import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;

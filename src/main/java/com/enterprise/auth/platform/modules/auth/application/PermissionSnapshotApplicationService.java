@@ -2,9 +2,9 @@ package com.enterprise.auth.platform.modules.auth.application;
 
 import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
-import com.enterprise.auth.platform.dto.model.UserAccount;
-import com.enterprise.auth.platform.dto.resp.MenuNode;
-import com.enterprise.auth.platform.dto.resp.PermissionSnapshotResponse;
+import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
+import com.enterprise.auth.platform.modules.auth.interfaces.MenuNode;
+import com.enterprise.auth.platform.modules.auth.interfaces.PermissionSnapshotResponse;
 import com.enterprise.auth.platform.modules.resource.application.ResourceQueryFacade;
 import com.enterprise.auth.platform.modules.role.application.RoleGrantQueryFacade;
 import java.util.List;

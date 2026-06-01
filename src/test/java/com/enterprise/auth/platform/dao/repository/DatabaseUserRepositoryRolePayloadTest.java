@@ -2,10 +2,11 @@ package com.enterprise.auth.platform.dao.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.enterprise.auth.platform.dto.model.DataScopeType;
-import com.enterprise.auth.platform.service.RolePayloadCodec;
+import com.enterprise.auth.platform.common.authz.DataScopeType;
+import com.enterprise.auth.platform.modules.role.application.RolePayloadCodec;
 import com.enterprise.auth.platform.common.context.TenantContext;
-import com.enterprise.auth.platform.dto.model.UserAccount;
+import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
+import com.enterprise.auth.platform.modules.user.infrastructure.repository.DatabaseUserRepository;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;

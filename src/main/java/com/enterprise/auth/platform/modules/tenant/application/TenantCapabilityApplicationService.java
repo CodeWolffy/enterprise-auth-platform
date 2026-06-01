@@ -1,9 +1,9 @@
 package com.enterprise.auth.platform.modules.tenant.application;
 
-import com.enterprise.auth.platform.dto.req.TenantCapabilityCrudRequest;
-import com.enterprise.auth.platform.dto.req.UpdateTenantCapabilityOverridesRequest;
-import com.enterprise.auth.platform.service.TenantCatalogManagementService;
-import com.enterprise.auth.platform.service.TenantManagementService;
+import com.enterprise.auth.platform.modules.tenant.interfaces.TenantCapabilityCrudRequest;
+import com.enterprise.auth.platform.modules.tenant.interfaces.UpdateTenantCapabilityOverridesRequest;
+import com.enterprise.auth.platform.modules.tenant.application.TenantCatalogManagementService;
+import com.enterprise.auth.platform.modules.tenant.application.TenantManagementService;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import org.springframework.stereotype.Service;

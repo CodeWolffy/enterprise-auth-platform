@@ -2,9 +2,9 @@ package com.enterprise.auth.platform.modules.tenant.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.TimeSupport;
-import com.enterprise.auth.platform.dao.entity.SysTenantChangeLogEntity;
-import com.enterprise.auth.platform.dao.mapper.SysTenantChangeLogMapper;
-import com.enterprise.auth.platform.dto.model.PageResult;
+import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantChangeLogEntity;
+import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantChangeLogMapper;
+import com.enterprise.auth.platform.common.web.PageResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import java.util.Map;

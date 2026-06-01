@@ -9,7 +9,7 @@ import cloud.tianai.captcha.application.ImageCaptchaApplication;
 import cloud.tianai.captcha.application.vo.ImageCaptchaVO;
 import cloud.tianai.captcha.common.constant.CaptchaTypeConstant;
 import cloud.tianai.captcha.common.response.ApiResponse;
-import com.enterprise.auth.platform.service.CaptchaService;
+import com.enterprise.auth.platform.modules.auth.application.CaptchaService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;

@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.modules.tenant.application;
 
-import com.enterprise.auth.platform.dto.req.TenantPackageCrudRequest;
-import com.enterprise.auth.platform.service.TenantCatalogManagementService;
+import com.enterprise.auth.platform.modules.tenant.interfaces.TenantPackageCrudRequest;
+import com.enterprise.auth.platform.modules.tenant.application.TenantCatalogManagementService;
 import java.util.List;
 import org.springframework.stereotype.Service;
 

@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.common.context;
 
-import com.enterprise.auth.platform.dto.model.SessionPrincipal;
-import com.enterprise.auth.platform.dto.model.UserAccount;
+import com.enterprise.auth.platform.modules.auth.domain.SessionPrincipal;
+import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import java.util.Optional;
 
 public final class AuthContextHolder {
