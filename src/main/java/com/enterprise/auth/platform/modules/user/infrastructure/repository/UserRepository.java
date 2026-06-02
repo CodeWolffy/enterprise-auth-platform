@@ -14,4 +14,3 @@ public interface UserRepository {
 
     void incrementSessionVersion(Long userId);
 }
-

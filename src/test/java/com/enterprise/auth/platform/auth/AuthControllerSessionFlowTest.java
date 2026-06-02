@@ -312,7 +312,7 @@ class AuthControllerSessionFlowTest {
 
         mockMvc.perform(post("/api/auth/tenants/{tenantId}/switch", "missing-tenant-ut")
                         .header("Authorization", "Bearer " + token))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("TENANT_NOT_FOUND"));
     }
 
@@ -329,7 +329,7 @@ class AuthControllerSessionFlowTest {
 
             mockMvc.perform(post("/api/auth/tenants/{tenantId}/switch", TENANT_A)
                             .header("Authorization", "Bearer " + token))
-                    .andExpect(status().isBadRequest())
+                    .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.code").value("TENANT_DISABLED"));
         } finally {
             jdbcTemplate.update("UPDATE sys_tenant SET tenant_status = ? WHERE tenant_id = ? AND deleted = 0", previousStatus, TENANT_A);
@@ -343,7 +343,7 @@ class AuthControllerSessionFlowTest {
 
         mockMvc.perform(post("/api/auth/tenants/{tenantId}/switch", ADMIN_TENANT)
                         .header("Authorization", "Bearer " + token))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
 
@@ -555,7 +555,7 @@ class AuthControllerSessionFlowTest {
         mockMvc.perform(post("/api/auth/sessions/{sessionId}/offline", "nonexistent-session-uuid")
                         .header("Authorization", "Bearer " + token)
                         .header("X-Tenant-Id", ADMIN_TENANT))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("SESSION_NOT_FOUND"));
     }
 

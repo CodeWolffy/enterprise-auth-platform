@@ -215,7 +215,7 @@ class AuthControllerRegisterTest {
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(weakPayload))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.code").value("REGISTER_RATE_LIMITED"));
     }
 
