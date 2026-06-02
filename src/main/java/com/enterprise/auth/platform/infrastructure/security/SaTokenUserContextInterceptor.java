@@ -5,6 +5,7 @@ import com.enterprise.auth.platform.modules.auth.application.SessionIndexService
 import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import com.enterprise.auth.platform.common.context.AuthContextHolder;
 import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.ClientIpResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -54,6 +55,7 @@ public class SaTokenUserContextInterceptor implements HandlerInterceptor {
             }
             sessionIndexService.updateActiveTenant(token, principal.tenantId());
             TenantContext.setTenantId(principal.tenantId());
+            enforcePasswordChangeRestriction(request);
         }
         return true;
     }
@@ -74,6 +76,19 @@ public class SaTokenUserContextInterceptor implements HandlerInterceptor {
             sessionIndexService.remove(token);
             StpUtil.checkLogin();
         }
+    }
+
+    private void enforcePasswordChangeRestriction(HttpServletRequest request) {
+        Object requiredValue = StpUtil.getTokenSession().get("passwordChangeRequired");
+        boolean required = requiredValue instanceof Boolean value ? value : Boolean.parseBoolean(String.valueOf(requiredValue));
+        if (!required) {
+            return;
+        }
+        String path = request.getRequestURI();
+        if ("POST".equalsIgnoreCase(request.getMethod()) && "/api/account/password/change".equals(path)) {
+            return;
+        }
+        throw new BusinessException("PASSWORD_CHANGE_REQUIRED", "当前会话必须先修改密码");
     }
 
     private long sessionLong(String key, long fallback) {

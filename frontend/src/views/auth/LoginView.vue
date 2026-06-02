@@ -314,8 +314,10 @@ async function submitLogin() {
       device: navigator.userAgent,
     })
     sceneStatus.value = 'success'
-    statusMessage.value = '登录成功，正在进入控制台...'
-    const redirect = String(route.query.redirect ?? authStore.menuItems[0]?.path ?? '/dashboard')
+    statusMessage.value = authStore.passwordChangeRequired ? '登录成功，请先修改密码...' : '登录成功，正在进入控制台...'
+    const redirect = authStore.passwordChangeRequired
+      ? '/account/profile'
+      : String(route.query.redirect ?? authStore.menuItems[0]?.path ?? '/dashboard')
     window.setTimeout(async () => {
       await router.replace(redirect)
     }, 280)

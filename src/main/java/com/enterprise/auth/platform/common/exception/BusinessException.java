@@ -46,7 +46,7 @@ public class BusinessException extends RuntimeException {
             return HttpStatus.BAD_REQUEST;
         }
         return switch (code) {
-            case "ACCESS_DENIED" -> HttpStatus.FORBIDDEN;
+            case "ACCESS_DENIED", "PASSWORD_CHANGE_REQUIRED" -> HttpStatus.FORBIDDEN;
             case "UNAUTHORIZED", "AUTH_ERROR", "INVALID_TOKEN", "SESSION_EXPIRED", "SESSION_OFFLINE" -> HttpStatus.UNAUTHORIZED;
             case "NOT_FOUND", "RESOURCE_NOT_FOUND", "TENANT_NOT_FOUND", "SESSION_NOT_FOUND", "USER_NOT_FOUND" -> HttpStatus.NOT_FOUND;
             case "CONFLICT", "DUPLICATE_RESOURCE", "DUPLICATE_USERNAME", "TENANT_DISABLED" -> HttpStatus.CONFLICT;

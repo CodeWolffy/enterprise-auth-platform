@@ -29,6 +29,8 @@ export interface TokenSessionResponse {
   tenantId: string
   token: string
   expiresAt: number
+  passwordChangeRequired?: boolean
+  passwordChangeReason?: 'FORCE_CHANGE' | 'PASSWORD_EXPIRED' | string | null
 }
 
 export interface UserSessionView {

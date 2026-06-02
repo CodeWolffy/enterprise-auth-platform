@@ -110,7 +110,9 @@ public class DatabaseUserRepository implements UserRepository {
                 roleData.permissionCodes(),
                 roleData.customDeptIds(),
                 roleData.dataScopeType(),
-                user.getSessionVersion() == null ? 1 : user.getSessionVersion()
+                user.getSessionVersion() == null ? 1 : user.getSessionVersion(),
+                user.getMustChangePassword() != null && user.getMustChangePassword() == 1,
+                user.getPasswordUpdatedAt()
         );
     }
 

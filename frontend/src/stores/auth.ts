@@ -13,6 +13,8 @@ interface PersistedSession {
   authenticated: boolean
   token: string
   expiresAt: number
+  passwordChangeRequired?: boolean
+  passwordChangeReason?: string | null
   tenantId: string
   operatorTenantId?: string
   snapshot: PermissionSnapshot | null
@@ -26,6 +28,8 @@ export const useAuthStore = defineStore('auth', () => {
   const authenticated = computed(() => sessionStore.authenticated)
   const token = computed(() => sessionStore.token)
   const expiresAt = computed(() => sessionStore.expiresAt)
+  const passwordChangeRequired = computed(() => sessionStore.passwordChangeRequired)
+  const passwordChangeReason = computed(() => sessionStore.passwordChangeReason)
   const tenantId = computed(() => tenantStore.tenantId)
   const operatorTenantId = computed(() => tenantStore.operatorTenantId)
   const snapshot = computed(() => permissionStore.snapshot)
@@ -57,6 +61,8 @@ export const useAuthStore = defineStore('auth', () => {
       authenticated: sessionStore.authenticated,
       token: sessionStore.token,
       expiresAt: sessionStore.expiresAt,
+      passwordChangeRequired: sessionStore.passwordChangeRequired,
+      passwordChangeReason: sessionStore.passwordChangeReason,
       tenantId: tenantStore.tenantId,
       operatorTenantId: tenantStore.operatorTenantId,
       snapshot: permissionStore.snapshot,
@@ -73,8 +79,18 @@ export const useAuthStore = defineStore('auth', () => {
     device?: string
   }) {
     const session = await loginWithPassword(payload)
-    sessionStore.setSession({ token: session.token, expiresAt: session.expiresAt })
+    sessionStore.setSession({
+      token: session.token,
+      expiresAt: session.expiresAt,
+      passwordChangeRequired: session.passwordChangeRequired,
+      passwordChangeReason: session.passwordChangeReason,
+    })
     tenantStore.setOperatorTenant(session.tenantId || payload.tenantId || 'platform')
+    if (session.passwordChangeRequired) {
+      permissionStore.clearSnapshot()
+      persist()
+      return
+    }
     const nextSnapshot = await fetchPermissionSnapshot()
     permissionStore.setSnapshot(nextSnapshot)
     tenantStore.syncTenantFromSnapshot(nextSnapshot)
@@ -141,6 +157,11 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem(storageKey)
   }
 
+  function clearPasswordChangeRequirement() {
+    sessionStore.clearPasswordChangeRequirement()
+    persist()
+  }
+
   async function logout() {
     try {
       if (sessionStore.authenticated) {
@@ -157,6 +178,8 @@ export const useAuthStore = defineStore('auth', () => {
     authenticated,
     token,
     expiresAt,
+    passwordChangeRequired,
+    passwordChangeReason,
     tenantId,
     operatorTenantId,
     snapshot,
@@ -169,6 +192,7 @@ export const useAuthStore = defineStore('auth', () => {
     bootstrapSnapshot,
     login,
     switchTenant,
+    clearPasswordChangeRequirement,
     clearSession,
     logout,
   }

@@ -18,6 +18,8 @@ public final class PermissionCodes {
     public static final String TENANT_WRITE = "tenant:write";
     public static final String SYSTEM_READ = "system:read";
     public static final String SYSTEM_WRITE = "system:write";
+    public static final String SECURITY_READ = "security:read";
+    public static final String SECURITY_WRITE = "security:write";
     public static final String AUDIT_READ = "audit:read";
     public static final String AUDIT_WRITE = "audit:write";
     public static final String SESSION_WRITE = "session:write";
@@ -33,6 +35,8 @@ public final class PermissionCodes {
             TENANT_WRITE,
             SYSTEM_READ,
             SYSTEM_WRITE,
+            SECURITY_READ,
+            SECURITY_WRITE,
             AUDIT_READ,
             AUDIT_WRITE,
             SESSION_WRITE
@@ -49,6 +53,8 @@ public final class PermissionCodes {
             new PermissionDescriptor(TENANT_WRITE, "租户管理", "tenant"),
             new PermissionDescriptor(SYSTEM_READ, "系统查看", "system"),
             new PermissionDescriptor(SYSTEM_WRITE, "系统管理", "system"),
+            new PermissionDescriptor(SECURITY_READ, "安全策略查看", "security"),
+            new PermissionDescriptor(SECURITY_WRITE, "安全策略管理", "security"),
             new PermissionDescriptor(AUDIT_READ, "审计查看", "audit"),
             new PermissionDescriptor(AUDIT_WRITE, "审计管理", "audit"),
             new PermissionDescriptor(SESSION_WRITE, "会话管理", "session")

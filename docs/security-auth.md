@@ -7,8 +7,9 @@
 1. 前端调用 `GET /api/auth/captcha` 获取滑块验证码图片与 `captchaId`。
 2. 前端调用 `POST /api/auth/captcha/verify` 校验滑块轨迹。
 3. 前端调用 `POST /api/auth/login` 提交用户名、密码、`captchaId`、`captchaCode` 和设备信息。
-4. 后端使用 `StpUtil.login(...)` 创建 Sa-Token 会话，返回 token、租户和过期时间。
-5. 前端保存 token 到 Pinia 持久化状态，并调用 `GET /api/auth/me` 恢复权限快照、菜单和租户上下文。
+4. 后端使用 `StpUtil.login(...)` 创建 Sa-Token 会话，返回 token、租户、过期时间和改密状态。
+5. 如果返回 `passwordChangeRequired=true`，前端直接进入 `/account/profile`，只允许完成密码修改。
+6. 如果会话状态正常，前端保存 token 到 Pinia 持久化状态，并调用 `GET /api/auth/me` 恢复权限快照、菜单和租户上下文。
 
 登录、注册、验证码和注册选项接口属于公开接口，不要求 Bearer token。
 
@@ -33,6 +34,36 @@ sa-token:
 ```
 
 因此当前主链路不依赖 Cookie，也不使用 CSRF Token。CSRF 防护通常用于 Cookie 自动携带凭据的模式；当前 Bearer token 由前端显式写入请求头，不会被浏览器在跨站请求中自动携带。
+
+## 受限改密态
+
+P0-B 引入受限改密态，用于强制改密和密码过期场景。
+
+触发条件：
+
+- `sys_user.must_change_password = 1`。
+- `password_updated_at + 当前租户生效策略 password_expire_days` 已过期；`password_expire_days = 0` 表示不过期。
+
+登录响应会返回：
+
+```json
+{
+  "tenantId": "tenant-a",
+  "token": "...",
+  "expiresAt": 1710000000000,
+  "passwordChangeRequired": true,
+  "passwordChangeReason": "FORCE_CHANGE"
+}
+```
+
+受限态规则：
+
+- 前端只进入 `/account/profile`。
+- 后端只放行 `POST /api/account/password/change`。
+- 其他受保护接口返回 `PASSWORD_CHANGE_REQUIRED`。
+- 修改密码成功后清除 `must_change_password`，更新 `password_updated_at`，并刷新当前 token session 的 `sessionVersion`。
+
+账号自助接口不绑定权限码，登录即可访问；受限态下仅改密接口可访问。
 
 ## 会话超时
 
@@ -60,6 +91,8 @@ sa-token:
 生产环境应通过 `app.frontend.allowed-origins` 或环境变量 `APP_FRONTEND_ALLOWED_ORIGIN` 收敛允许来源。
 
 ## 下线与失效语义
+
+`sys_user.session_version` 是账号级会话失效版本号。密码修改、密码重置、管理员重置密码等安全敏感动作会自增该版本；旧 token session 中的版本与用户当前版本不一致时，会被踢下线。
 
 后端统一返回结构中的 `code` 会被前端用于登录页提示：
 
@@ -102,6 +135,7 @@ sa-token:
 - `tenant:read` / `tenant:write`
 - `system:read` / `system:write`
 - `audit:read` / `audit:write`
+- `security:read` / `security:write`
 - `session:write`
 
 前端的 `v-permission` 只负责隐藏或禁用交互入口，后端接口权限仍是最终边界。

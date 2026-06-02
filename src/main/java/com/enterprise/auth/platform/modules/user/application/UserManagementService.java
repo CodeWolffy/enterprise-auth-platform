@@ -14,6 +14,7 @@ import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserRo
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserRoleMapper;
 import com.enterprise.auth.platform.modules.auth.infrastructure.AuthPrincipalCacheService;
+import com.enterprise.auth.platform.modules.security.application.SecurityPolicyApplicationService;
 import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 import com.enterprise.auth.platform.common.authz.SecuritySupport;
@@ -43,6 +44,7 @@ public class UserManagementService {
     private final DataScopeService dataScopeService;
     private final AuthPrincipalCacheService authPrincipalCacheService;
     private final SessionIndexService sessionIndexService;
+    private final SecurityPolicyApplicationService securityPolicyApplicationService;
 
     public UserManagementService(
             SysUserMapper sysUserMapper,
@@ -54,7 +56,8 @@ public class UserManagementService {
             AuditService auditService,
             DataScopeService dataScopeService,
             AuthPrincipalCacheService authPrincipalCacheService,
-            SessionIndexService sessionIndexService
+            SessionIndexService sessionIndexService,
+            SecurityPolicyApplicationService securityPolicyApplicationService
     ) {
         this.sysUserMapper = sysUserMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
@@ -66,6 +69,7 @@ public class UserManagementService {
         this.dataScopeService = dataScopeService;
         this.authPrincipalCacheService = authPrincipalCacheService;
         this.sessionIndexService = sessionIndexService;
+        this.securityPolicyApplicationService = securityPolicyApplicationService;
     }
 
     @Transactional
@@ -86,6 +90,7 @@ public class UserManagementService {
         entity.setPasswordHash(passwordHasher.hash(request.password()));
         entity.setEnabled(Boolean.FALSE.equals(request.enabled()) ? 0 : 1);
         entity.setSessionVersion(1);
+        entity.setMustChangePassword(1);
         entity.setPasswordUpdatedAt(TimeSupport.utcNowDateTime());
         try {
             sysUserMapper.insert(entity);
@@ -124,6 +129,7 @@ public class UserManagementService {
             validatePassword(request.password());
             entity.setPasswordHash(passwordHasher.hash(request.password()));
             entity.setSessionVersion((entity.getSessionVersion() == null ? 1 : entity.getSessionVersion()) + 1);
+            entity.setMustChangePassword(1);
             entity.setPasswordUpdatedAt(TimeSupport.utcNowDateTime());
             invalidateSessions = true;
         }
@@ -247,7 +253,7 @@ public class UserManagementService {
     }
 
     private void validatePassword(String password) {
-        PasswordValidator.validate(password);
+        PasswordValidator.validate(password, securityPolicyApplicationService.currentTenantPolicy());
     }
 
     private UserSummary loadSummary(Long userId, String tenantId) {

@@ -7,6 +7,7 @@ import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.auth.infrastructure.SecurityProperties;
+import com.enterprise.auth.platform.modules.security.application.SecurityPolicyApplicationService;
 import com.enterprise.auth.platform.modules.user.application.AuthenticationUser;
 import com.enterprise.auth.platform.modules.user.application.UserAuthenticationFacade;
 import com.enterprise.auth.platform.modules.auth.interfaces.LoginRequest;
@@ -16,6 +17,8 @@ import com.enterprise.auth.platform.modules.audit.application.AuditService;
 import com.enterprise.auth.platform.common.web.ClientIpResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
@@ -33,6 +36,7 @@ public class LoginApplicationService {
     private final SecurityProperties securityProperties;
     private final SessionIndexService sessionIndexService;
     private final ClientIpResolver clientIpResolver;
+    private final SecurityPolicyApplicationService securityPolicyApplicationService;
 
     public LoginApplicationService(
             CaptchaService captchaService,
@@ -43,7 +47,8 @@ public class LoginApplicationService {
             RegistrationPolicyService registrationPolicyService,
             SecurityProperties securityProperties,
             SessionIndexService sessionIndexService,
-            ClientIpResolver clientIpResolver
+            ClientIpResolver clientIpResolver,
+            SecurityPolicyApplicationService securityPolicyApplicationService
     ) {
         this.captchaService = captchaService;
         this.passwordHasher = passwordHasher;
@@ -54,6 +59,7 @@ public class LoginApplicationService {
         this.securityProperties = securityProperties;
         this.sessionIndexService = sessionIndexService;
         this.clientIpResolver = clientIpResolver;
+        this.securityPolicyApplicationService = securityPolicyApplicationService;
     }
 
     public TokenSessionResponse login(LoginRequest request, HttpServletRequest servletRequest) {
@@ -88,6 +94,7 @@ public class LoginApplicationService {
                     .setDevice(device)
                     .setTimeout(timeoutSeconds));
             String tokenValue = StpUtil.getTokenValue();
+            PasswordChangeState passwordChangeState = resolvePasswordChangeState(user);
             Instant now = Instant.now();
             Instant expiresAt = now.plusSeconds(timeoutSeconds);
             SaSession tokenSession = StpUtil.getTokenSession();
@@ -96,6 +103,8 @@ public class LoginApplicationService {
             tokenSession.set("tenantId", user.tenantId());
             tokenSession.set("activeTenantId", user.tenantId());
             tokenSession.set("sessionVersion", user.sessionVersion());
+            tokenSession.set("passwordChangeRequired", passwordChangeState.required());
+            tokenSession.set("passwordChangeReason", passwordChangeState.reason());
             tokenSession.set("clientIp", clientIp);
             tokenSession.set("device", device);
             tokenSession.set("issuedAt", now.toEpochMilli());
@@ -113,7 +122,13 @@ public class LoginApplicationService {
 
             userAuthenticationFacade.recordLoginSuccess(user.id(), clientIp);
             auditService.record("LOGIN_SUCCESS", user.username(), user.tenantId(), Map.of("sessionId", tokenValue, "clientIp", clientIp));
-            return new TokenSessionResponse(user.tenantId(), tokenValue, TimeSupport.toEpochMilli(expiresAt));
+            return new TokenSessionResponse(
+                    user.tenantId(),
+                    tokenValue,
+                    TimeSupport.toEpochMilli(expiresAt),
+                    passwordChangeState.required(),
+                    passwordChangeState.reason()
+            );
         } finally {
             if (StringUtils.hasText(previousTenantId)) {
                 TenantContext.setTenantId(previousTenantId);
@@ -136,6 +151,24 @@ public class LoginApplicationService {
             return requestedTenantId;
         }
         return registrationPolicyService.resolveDefaultTenantId();
+    }
+
+    private PasswordChangeState resolvePasswordChangeState(AuthenticationUser user) {
+        if (user.mustChangePassword()) {
+            return new PasswordChangeState(true, "FORCE_CHANGE");
+        }
+        int passwordExpireDays = securityPolicyApplicationService.effectivePolicy(user.tenantId()).passwordExpireDays();
+        if (passwordExpireDays > 0 && user.passwordUpdatedAt() != null) {
+            LocalDateTime expiresAt = user.passwordUpdatedAt().plus(passwordExpireDays, ChronoUnit.DAYS);
+            if (!expiresAt.isAfter(TimeSupport.utcNowDateTime())) {
+                auditService.record("PASSWORD_EXPIRED_BLOCKED", user.username(), user.tenantId(), Map.of("userId", user.id()));
+                return new PasswordChangeState(true, "PASSWORD_EXPIRED");
+            }
+        }
+        return new PasswordChangeState(false, null);
+    }
+
+    private record PasswordChangeState(boolean required, String reason) {
     }
 
     private BusinessException buildLoginFailure(

@@ -8,6 +8,7 @@ import com.enterprise.auth.platform.modules.audit.application.AuditService;
 import com.enterprise.auth.platform.modules.dept.application.DeptTenantDataFacade;
 import com.enterprise.auth.platform.modules.resource.application.CatalogService;
 import com.enterprise.auth.platform.modules.role.application.RoleTenantDataFacade;
+import com.enterprise.auth.platform.modules.security.application.SecurityPolicyApplicationService;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantCapabilityEntity;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantCapabilityOverrideEntity;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantEntity;
@@ -48,6 +49,7 @@ public class TenantManagementService {
     private final AuditService auditService;
     private final TenantAccessPolicy tenantAccessPolicy;
     private final TenantChangeLogApplicationService tenantChangeLogApplicationService;
+    private final SecurityPolicyApplicationService securityPolicyApplicationService;
 
     public TenantManagementService(
             SysTenantMapper sysTenantMapper,
@@ -61,7 +63,8 @@ public class TenantManagementService {
             CatalogService catalogService,
             AuditService auditService,
             TenantAccessPolicy tenantAccessPolicy,
-            TenantChangeLogApplicationService tenantChangeLogApplicationService
+            TenantChangeLogApplicationService tenantChangeLogApplicationService,
+            SecurityPolicyApplicationService securityPolicyApplicationService
     ) {
         this.sysTenantMapper = sysTenantMapper;
         this.userTenantDataFacade = userTenantDataFacade;
@@ -75,6 +78,7 @@ public class TenantManagementService {
         this.auditService = auditService;
         this.tenantAccessPolicy = tenantAccessPolicy;
         this.tenantChangeLogApplicationService = tenantChangeLogApplicationService;
+        this.securityPolicyApplicationService = securityPolicyApplicationService;
     }
 
     @Transactional
@@ -94,6 +98,7 @@ public class TenantManagementService {
         entity.setPackageCode(request.packageCode());
         entity.setLifecycleNote(request.lifecycleNote());
         sysTenantMapper.insert(entity);
+        securityPolicyApplicationService.ensureTenantPolicy(request.tenantId());
         saveTenantProfile(request.tenantId(), request.packageCode(), request.packageName(), request.userQuota(),
                 request.storageQuotaGb(), request.capabilityCodes());
         recordTenantChange(request.tenantId(), "CREATED", "tenant", null, request.tenantName(), "创建租户", operator);

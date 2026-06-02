@@ -113,7 +113,9 @@ public class CurrentUserService {
                 user.permissions(),
                 user.customDeptIds(),
                 user.dataScopeType(),
-                user.sessionVersion()
+                user.sessionVersion(),
+                user.mustChangePassword(),
+                user.passwordUpdatedAt()
         );
     }
 
@@ -130,7 +132,9 @@ public class CurrentUserService {
                 permissions,
                 user.customDeptIds(),
                 user.dataScopeType(),
-                user.sessionVersion()
+                user.sessionVersion(),
+                user.mustChangePassword(),
+                user.passwordUpdatedAt()
         );
     }
 

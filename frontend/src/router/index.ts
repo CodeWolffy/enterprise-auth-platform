@@ -34,6 +34,12 @@ const SHELL_ROUTE: RouteRecordRaw = {
       redirect: '/dashboard',
       meta: { hidden: true },
     },
+    {
+      path: 'account/profile',
+      name: 'account-profile',
+      component: () => import('@/views/account/AccountProfileView.vue'),
+      meta: { title: '我的账号', allowPasswordChangeRequired: true },
+    },
   ],
 }
 
@@ -61,6 +67,13 @@ router.beforeEach(async (to) => {
 
   if (!authStore.authenticated) {
     return { path: '/login', query: { redirect: to.fullPath } }
+  }
+
+  if (authStore.passwordChangeRequired) {
+    if (to.meta.allowPasswordChangeRequired) {
+      return true
+    }
+    return { path: '/account/profile', replace: true }
   }
 
   try {
