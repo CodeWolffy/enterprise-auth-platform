@@ -6,6 +6,7 @@ import com.enterprise.auth.platform.modules.auth.interfaces.PermissionSnapshotRe
 import com.enterprise.auth.platform.modules.auth.interfaces.RegisterOptionsResponse;
 import com.enterprise.auth.platform.modules.auth.interfaces.TokenSessionResponse;
 import com.enterprise.auth.platform.modules.auth.application.LoginApplicationService;
+import com.enterprise.auth.platform.modules.auth.application.PasswordResetApplicationService;
 import com.enterprise.auth.platform.modules.auth.application.PermissionSnapshotApplicationService;
 import com.enterprise.auth.platform.modules.auth.application.RegistrationApplicationService;
 import com.enterprise.auth.platform.modules.auth.application.SessionApplicationService;
@@ -47,6 +48,7 @@ public class AuthController {
     private final PermissionSnapshotApplicationService permissionSnapshotApplicationService;
     private final RegistrationPolicyService registrationPolicyService;
     private final CurrentUserService currentUserService;
+    private final PasswordResetApplicationService passwordResetApplicationService;
 
     public AuthController(
             CaptchaService captchaService,
@@ -56,7 +58,8 @@ public class AuthController {
             TenantSwitchApplicationService tenantSwitchApplicationService,
             PermissionSnapshotApplicationService permissionSnapshotApplicationService,
             RegistrationPolicyService registrationPolicyService,
-            CurrentUserService currentUserService
+            CurrentUserService currentUserService,
+            PasswordResetApplicationService passwordResetApplicationService
     ) {
         this.captchaService = captchaService;
         this.loginApplicationService = loginApplicationService;
@@ -66,6 +69,7 @@ public class AuthController {
         this.permissionSnapshotApplicationService = permissionSnapshotApplicationService;
         this.registrationPolicyService = registrationPolicyService;
         this.currentUserService = currentUserService;
+        this.passwordResetApplicationService = passwordResetApplicationService;
     }
 
     @Operation(summary = "获取登录验证码")
@@ -100,6 +104,32 @@ public class AuthController {
             HttpServletRequest servletRequest
     ) {
         return ApiResponse.ok(loginApplicationService.login(request, servletRequest));
+    }
+
+    @Operation(summary = "发起忘记密码")
+    @RateLimit(key = "password-reset-request", strategy = RateLimit.Strategy.IP)
+    @PostMapping("/password/reset/request")
+    public ApiResponse<PasswordResetApplicationService.PasswordResetRequestResponse> requestPasswordReset(
+            @Valid @RequestBody PasswordResetApplicationService.PasswordResetRequest request,
+            HttpServletRequest servletRequest
+    ) {
+        return ApiResponse.ok(passwordResetApplicationService.request(request, servletRequest));
+    }
+
+    @Operation(summary = "校验密码重置令牌")
+    @PostMapping("/password/reset/verify")
+    public ApiResponse<PasswordResetApplicationService.PasswordResetVerifyResponse> verifyPasswordReset(
+            @Valid @RequestBody PasswordResetApplicationService.PasswordResetVerifyRequest request
+    ) {
+        return ApiResponse.ok(passwordResetApplicationService.verify(request));
+    }
+
+    @Operation(summary = "确认重置密码")
+    @PostMapping("/password/reset/confirm")
+    public ApiResponse<PasswordResetApplicationService.PasswordResetConfirmResponse> confirmPasswordReset(
+            @Valid @RequestBody PasswordResetApplicationService.PasswordResetConfirmRequest request
+    ) {
+        return ApiResponse.ok(passwordResetApplicationService.confirm(request));
     }
 
     @Operation(summary = "退出登录")

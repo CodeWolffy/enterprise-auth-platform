@@ -11,7 +11,7 @@
 5. 如果返回 `passwordChangeRequired=true`，前端直接进入 `/account/profile`，只允许完成密码修改。
 6. 如果会话状态正常，前端保存 token 到 Pinia 持久化状态，并调用 `GET /api/auth/me` 恢复权限快照、菜单和租户上下文。
 
-登录、注册、验证码和注册选项接口属于公开接口，不要求 Bearer token。
+登录、注册、验证码、注册选项和忘记密码接口属于公开接口，不要求 Bearer token。
 
 ## Header Token
 
@@ -64,6 +64,29 @@ P0-B 引入受限改密态，用于强制改密和密码过期场景。
 - 修改密码成功后清除 `must_change_password`，更新 `password_updated_at`，并刷新当前 token session 的 `sessionVersion`。
 
 账号自助接口不绑定权限码，登录即可访问；受限态下仅改密接口可访问。
+
+## 忘记密码
+
+P0-C 提供三段式公开流程：
+
+- `POST /api/auth/password/reset/request`: 发起重置请求。
+- `POST /api/auth/password/reset/verify`: 校验重置 token。
+- `POST /api/auth/password/reset/confirm`: 确认设置新密码。
+
+安全语义：
+
+- 重置 token 只保存 SHA-256 哈希，不保存明文。
+- 发起请求统一返回“如果账号存在且已配置邮箱，将会收到密码重置邮件”，避免账号枚举。
+- 请求同时受 IP 频控和用户名窗口频控约束。
+- 每次生成新 token 前会废弃同一用户未使用的旧 token。
+- token 过期、已使用、已废弃都会视为无效。
+- 重置成功后更新密码、清除 `must_change_password`、自增 `session_version` 并清理旧会话。
+
+通知策略：
+
+- `app.security.notification.channel=log`：仅用于 local/dev，日志中输出重置链接。
+- `app.security.notification.channel=smtp`：使用 SMTP 发送重置邮件。
+- staging/prod 环境必须使用 SMTP；不允许失败后把重置链接写入日志。
 
 ## 会话超时
 

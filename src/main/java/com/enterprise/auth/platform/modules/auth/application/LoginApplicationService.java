@@ -104,7 +104,9 @@ public class LoginApplicationService {
             tokenSession.set("activeTenantId", user.tenantId());
             tokenSession.set("sessionVersion", user.sessionVersion());
             tokenSession.set("passwordChangeRequired", passwordChangeState.required());
-            tokenSession.set("passwordChangeReason", passwordChangeState.reason());
+            if (StringUtils.hasText(passwordChangeState.reason())) {
+                tokenSession.set("passwordChangeReason", passwordChangeState.reason());
+            }
             tokenSession.set("clientIp", clientIp);
             tokenSession.set("device", device);
             tokenSession.set("issuedAt", now.toEpochMilli());

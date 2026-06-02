@@ -71,6 +71,8 @@
       </form>
 
       <p class="auth-switch">
+        <button class="auth-link" type="button" @click="router.push('/reset-password')">忘记密码？</button>
+        <span class="auth-switch__divider">·</span>
         还没有账号？<button class="auth-link" type="button" @click="router.push('/register')">注册</button>
       </p>
     </div>

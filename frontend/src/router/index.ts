@@ -16,10 +16,10 @@ const PUBLIC_ROUTES: RouteRecordRaw[] = [
     meta: { public: true, title: '登录' },
   },
   {
-    path: '/register',
-    name: 'register',
-    component: () => import('@/views/auth/RegisterView.vue'),
-    meta: { public: true, title: '注册' },
+    path: '/reset-password',
+    name: 'reset-password',
+    component: () => import('@/views/auth/ResetPasswordView.vue'),
+    meta: { public: true, title: '重置密码' },
   },
 ]
 

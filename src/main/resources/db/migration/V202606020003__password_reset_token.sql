@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS `sys_password_reset_token` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `tenant_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '所属租户',
+  `user_id` bigint NOT NULL COMMENT '用户ID',
+  `username` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '用户名',
+  `token_hash` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '重置令牌哈希',
+  `expires_at` timestamp NOT NULL COMMENT '过期时间',
+  `used_at` timestamp NULL DEFAULT NULL COMMENT '使用时间',
+  `revoked_at` timestamp NULL DEFAULT NULL COMMENT '废弃时间',
+  `request_ip` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '请求IP',
+  `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '创建人',
+  `updated_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '更新人',
+  `deleted` tinyint NOT NULL DEFAULT 0 COMMENT '逻辑删除标记',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_sys_password_reset_token_hash` (`token_hash` ASC) USING BTREE,
+  INDEX `idx_sys_password_reset_token_user` (`tenant_id` ASC, `user_id` ASC, `created_at` DESC) USING BTREE,
+  INDEX `idx_sys_password_reset_token_username` (`tenant_id` ASC, `username` ASC, `created_at` DESC) USING BTREE,
+  INDEX `idx_sys_password_reset_token_ip` (`request_ip` ASC, `created_at` DESC) USING BTREE
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '密码重置令牌表' ROW_FORMAT = DYNAMIC;

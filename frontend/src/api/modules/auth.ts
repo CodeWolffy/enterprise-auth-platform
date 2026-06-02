@@ -52,6 +52,21 @@ export async function loginWithPassword(payload: {
   return data.data
 }
 
+export async function requestPasswordReset(payload: { username: string; tenantId?: string }) {
+  const { data } = await http.post<ApiResponse<{ message: string }>>('/api/auth/password/reset/request', payload)
+  return data.data
+}
+
+export async function verifyPasswordResetToken(token: string) {
+  const { data } = await http.post<ApiResponse<{ valid: boolean; username?: string | null }>>('/api/auth/password/reset/verify', { token })
+  return data.data
+}
+
+export async function confirmPasswordReset(payload: { token: string; newPassword: string }) {
+  const { data } = await http.post<ApiResponse<{ message: string }>>('/api/auth/password/reset/confirm', payload)
+  return data.data
+}
+
 export async function logoutCurrentSession() {
   await http.post('/api/auth/logout')
 }

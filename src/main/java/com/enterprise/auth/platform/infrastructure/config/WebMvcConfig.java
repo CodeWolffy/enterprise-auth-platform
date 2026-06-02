@@ -21,6 +21,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
             "/actuator/health",
             "/api/auth/login",
             "/api/auth/register",
+            "/api/auth/password/reset/request",
+            "/api/auth/password/reset/verify",
+            "/api/auth/password/reset/confirm",
             "/api/auth/captcha",
             "/api/auth/captcha/verify",
             "/api/auth/register/options"

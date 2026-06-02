@@ -99,6 +99,16 @@ app:
   security:
     session-ttl: 7d
     captcha-ttl: 1m
+    password-reset:
+      token-ttl: 30m
+      frontend-url: ${APP_PASSWORD_RESET_FRONTEND_URL:http://localhost:5173/reset-password}
+      username-window-minutes: ${APP_PASSWORD_RESET_USERNAME_WINDOW_MINUTES:15}
+      username-max-requests: ${APP_PASSWORD_RESET_USERNAME_MAX_REQUESTS:3}
+      ip-window-minutes: ${APP_PASSWORD_RESET_IP_WINDOW_MINUTES:15}
+      ip-max-requests: ${APP_PASSWORD_RESET_IP_MAX_REQUESTS:10}
+    notification:
+      channel: ${APP_NOTIFICATION_CHANNEL:log}
+      mail-from: ${APP_NOTIFICATION_MAIL_FROM:noreply@enterprise-auth-platform.local}
     cookie-secure: false
     cookie-same-site: Lax
     redis:
@@ -114,6 +124,7 @@ app:
     mybatis-tenant-enabled: true
     mybatis-ignore-tables:
       - sys_tenant
+      - sys_platform_security_policy
 
   registration:
     # 注册接口防刷策略。
