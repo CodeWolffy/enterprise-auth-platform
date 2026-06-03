@@ -1,40 +1,37 @@
-package com.enterprise.auth.platform.modules.user.infrastructure.entity;
+package com.enterprise.auth.platform.modules.file.infrastructure.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import lombok.Data;
 import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.LocalDateTime;
+import lombok.Data;
 
-@TableName("sys_user")
+@TableName("sys_storage_file")
 @Data
-public class SysUserEntity {
+public class SysStorageFileEntity {
 
     @TableId(type = IdType.AUTO)
     private Long id;
     private String tenantId;
-    private Long deptId;
-    private String username;
-    private String displayName;
-    private String mobile;
-    private String email;
-    private String avatarFileKey;
-    private String passwordHash;
-    private Integer enabled;
-    private Integer sessionVersion;
-    private Integer mustChangePassword;
+    private String fileKey;
+    private String originalName;
+    private String contentType;
+    private Long fileSize;
+    private String storageType;
+    private String bucketName;
+    private String objectKey;
+    private String etag;
+    private String visibility;
+    private Long ownerUserId;
+    @TableLogic
+    private Integer deleted;
     @TableField(fill = FieldFill.INSERT)
     private String createdBy;
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private String updatedBy;
-    @TableLogic
-    private Integer deleted;
-    private LocalDateTime lastLoginAt;
-    private String lastLoginIp;
-    private LocalDateTime passwordUpdatedAt;
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
     @TableField(fill = FieldFill.INSERT_UPDATE)

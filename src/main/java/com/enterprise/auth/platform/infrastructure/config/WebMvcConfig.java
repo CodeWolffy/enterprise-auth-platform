@@ -26,7 +26,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
             "/api/auth/password/reset/confirm",
             "/api/auth/captcha",
             "/api/auth/captcha/verify",
-            "/api/auth/register/options"
+            "/api/auth/register/options",
+            "/api/files/public/**"
     );
 
     private final ObjectProvider<RateLimitInterceptor> rateLimitInterceptor;
