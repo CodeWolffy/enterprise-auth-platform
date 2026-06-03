@@ -7,7 +7,7 @@ import jakarta.validation.constraints.Size;
 @Schema(description = "用户注册请求")
 public record RegisterRequest(
         @Schema(description = "用户名", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotBlank @Size(min = 3, max = 50) String username,
+        @NotBlank @Size(min = 5, max = 16) String username,
 
         @Schema(description = "显示名称", requiredMode = Schema.RequiredMode.REQUIRED)
         @NotBlank @Size(min = 2, max = 100) String displayName,

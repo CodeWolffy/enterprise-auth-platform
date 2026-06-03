@@ -7,7 +7,8 @@ import java.util.Set;
 
 @Schema(description = "新增用户请求")
 public record CreateUserRequest(
-        @Schema(description = "用户名", requiredMode = Schema.RequiredMode.REQUIRED) @NotBlank String username,
+        @Schema(description = "用户名，5-16 位", requiredMode = Schema.RequiredMode.REQUIRED)
+        @NotBlank @Size(min = 5, max = 16) String username,
         @Schema(description = "显示名称") String displayName,
         @Schema(description = "手机号") String mobile,
         @Schema(description = "邮箱") String email,

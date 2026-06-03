@@ -13,7 +13,7 @@
             id="register-username"
             v-model.trim="form.username"
             type="text"
-            placeholder="用户名（3-50 位）"
+            placeholder="用户名（5-16 位）"
             autocomplete="off"
             :class="{ 'is-error': Boolean(fieldErrors.username) }"
             @input="clearFieldError('username')"
@@ -204,8 +204,8 @@ function validateForm() {
   if (!form.username.trim()) {
     setError('username', '请输入用户名')
     hasError = true
-  } else if (form.username.trim().length < 3 || form.username.trim().length > 50) {
-    setError('username', '用户名长度需为 3-50 位')
+  } else if (form.username.trim().length < 5 || form.username.trim().length > 16) {
+    setError('username', '用户名长度需为 5-16 位')
     hasError = true
   }
 

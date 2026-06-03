@@ -26,6 +26,7 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
       database: ${REDIS_DATABASE:0}
+      timeout: ${REDIS_TIMEOUT:3s}
       lettuce:
         pool:
           max-active: 8
@@ -42,6 +43,19 @@ spring:
   jackson:
     time-zone: UTC
     default-property-inclusion: non_null
+
+  mail:
+    host: ${SPRING_MAIL_HOST:}
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
+    protocol: smtp
+    properties:
+      mail:
+        smtp:
+          auth: ${SPRING_MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${SPRING_MAIL_SMTP_STARTTLS_ENABLE:true}
 
   boot:
     admin:
@@ -72,6 +86,8 @@ management:
   health:
     db:
       enabled: true
+    mail:
+      enabled: false
 
 mybatis-plus:
   configuration:
@@ -93,6 +109,13 @@ captcha:
     keyPrefix: "eap:captcha:secondary"
 
 app:
+  mail:
+    secret-key: ${APP_MAIL_SECRET_KEY:}
+    connection-timeout-millis: ${APP_MAIL_CONNECTION_TIMEOUT_MILLIS:10000}
+    timeout-millis: ${APP_MAIL_TIMEOUT_MILLIS:10000}
+    write-timeout-millis: ${APP_MAIL_WRITE_TIMEOUT_MILLIS:10000}
+    debug: ${APP_MAIL_DEBUG:false}
+
   cors:
     allowed-origins: []
 
@@ -100,7 +123,7 @@ app:
     session-ttl: 7d
     captcha-ttl: 1m
     password-reset:
-      token-ttl: 30m
+      token-ttl: 10m
       frontend-url: ${APP_PASSWORD_RESET_FRONTEND_URL:http://localhost:5173/reset-password}
       username-window-minutes: ${APP_PASSWORD_RESET_USERNAME_WINDOW_MINUTES:15}
       username-max-requests: ${APP_PASSWORD_RESET_USERNAME_MAX_REQUESTS:3}
@@ -154,6 +177,11 @@ app:
         refill-tokens: 10
         refill-duration: 60s
         failure-mode: closed
+      password-reset-request:
+        capacity: 5
+        refill-tokens: 5
+        refill-duration: 60s
+        failure-mode: closed
       export:
         capacity: 5
         refill-tokens: 5
@@ -161,7 +189,7 @@ app:
 
   cache:
     key-prefix: "eap:cache:"
-    namespace-version: "v4"
+    namespace-version: "v5"
     default-ttl: 10m
     auth-principal-ttl: 15m
     registration-policy-ttl: 5m

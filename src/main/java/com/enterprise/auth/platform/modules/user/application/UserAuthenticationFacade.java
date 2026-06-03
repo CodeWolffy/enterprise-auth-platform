@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.modules.user.application;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
@@ -14,21 +15,44 @@ public class UserAuthenticationFacade {
 
     private final UserRepository userRepository;
     private final SysUserMapper sysUserMapper;
+    private final ObjectMapper objectMapper;
 
     public UserAuthenticationFacade(
             UserRepository userRepository,
-            SysUserMapper sysUserMapper
+            SysUserMapper sysUserMapper,
+            ObjectMapper objectMapper
     ) {
         this.userRepository = userRepository;
         this.sysUserMapper = sysUserMapper;
+        this.objectMapper = objectMapper;
     }
 
     public Optional<AuthenticationUser> findByUsername(String tenantId, String username) {
-        return userRepository.findByUsername(tenantId, username);
+        Optional<AuthenticationUser> result = userRepository.findByUsername(tenantId, username);
+        return normalizeUser(result);
     }
 
     public Optional<AuthenticationUser> findById(Long id) {
-        return userRepository.findById(id);
+        Optional<AuthenticationUser> result = userRepository.findById(id);
+        return normalizeUser(result);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Optional<AuthenticationUser> normalizeUser(Optional<AuthenticationUser> result) {
+        if (result.isEmpty()) {
+            return Optional.empty();
+        }
+        Object raw = result.get();
+        if (raw instanceof AuthenticationUser user) {
+            return Optional.of(user);
+        }
+        if (raw instanceof java.util.Map<?, ?> map) {
+            try {
+                return Optional.of(objectMapper.convertValue(map, AuthenticationUser.class));
+            } catch (Exception ignored) {
+            }
+        }
+        return Optional.empty();
     }
 
     public List<String> activeTenantIdsByUsername(String username) {

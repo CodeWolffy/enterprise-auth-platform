@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.infrastructure.redis;
 
 import com.enterprise.auth.platform.common.cache.CacheNames;
-import com.enterprise.auth.platform.infrastructure.redis.AppCacheProperties;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CachingConfigurer;
@@ -22,9 +22,19 @@ public class RedisCacheConfig implements CachingConfigurer {
 
     @Bean
     public RedisCacheConfiguration redisCacheConfiguration(
-            AppCacheProperties cacheProperties
+            AppCacheProperties cacheProperties,
+            ObjectMapper objectMapper
     ) {
-        GenericJackson2JsonRedisSerializer valueSerializer = new GenericJackson2JsonRedisSerializer();
+        ObjectMapper cacheObjectMapper = objectMapper.copy();
+        cacheObjectMapper.disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        cacheObjectMapper.addMixIn(
+                com.enterprise.auth.platform.modules.user.application.AuthenticationUser.class,
+                AuthenticationUserTypeMixin.class
+        );
+        GenericJackson2JsonRedisSerializer valueSerializer = GenericJackson2JsonRedisSerializer.builder()
+                .objectMapper(cacheObjectMapper)
+                .defaultTyping(true)
+                .build();
         StringRedisSerializer keySerializer = new StringRedisSerializer();
         return RedisCacheConfiguration.defaultCacheConfig()
                 .entryTtl(cacheProperties.resolvedDefaultTtl())

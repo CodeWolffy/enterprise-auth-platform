@@ -19,6 +19,7 @@ class RateLimitInterceptorTest {
                 properties,
                 (io.github.bucket4j.redis.lettuce.cas.LettuceBasedProxyManager<String>) null,
                 (io.lettuce.core.RedisClient) null,
+                (io.lettuce.core.resource.ClientResources) null,
                 new ClientIpResolver(properties)
         );
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -35,6 +36,7 @@ class RateLimitInterceptorTest {
                 properties,
                 (io.github.bucket4j.redis.lettuce.cas.LettuceBasedProxyManager<String>) null,
                 (io.lettuce.core.RedisClient) null,
+                (io.lettuce.core.resource.ClientResources) null,
                 new ClientIpResolver(properties)
         );
         MockHttpServletRequest request = new MockHttpServletRequest();

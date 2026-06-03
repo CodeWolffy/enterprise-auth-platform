@@ -9,13 +9,16 @@ import io.github.bucket4j.distributed.BucketProxy;
 import io.github.bucket4j.distributed.ExpirationAfterWriteStrategy;
 import io.github.bucket4j.distributed.proxy.ClientSideConfig;
 import io.github.bucket4j.redis.lettuce.cas.LettuceBasedProxyManager;
+import io.lettuce.core.ClientOptions;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.RedisException;
 import io.lettuce.core.RedisURI;
+import io.lettuce.core.SocketOptions;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.codec.ByteArrayCodec;
 import io.lettuce.core.codec.RedisCodec;
 import io.lettuce.core.codec.StringCodec;
+import io.lettuce.core.resource.ClientResources;
 import jakarta.annotation.PreDestroy;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -43,6 +46,8 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     private final RateLimitProperties properties;
     private final LettuceBasedProxyManager<String> proxyManager;
     private final RedisClient redisClient;
+    private final StatefulRedisConnection<String, byte[]> redisConnection;
+    private final ClientResources clientResources;
     private final ClientIpResolver clientIpResolver;
 
     @Autowired
@@ -62,6 +67,8 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         this(properties,
                 infrastructure.proxyManager(),
                 infrastructure.redisClient(),
+                infrastructure.redisConnection(),
+                infrastructure.clientResources(),
                 clientIpResolver);
     }
 
@@ -69,11 +76,25 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             RateLimitProperties properties,
             @Nullable LettuceBasedProxyManager<String> proxyManager,
             @Nullable RedisClient redisClient,
+            @Nullable ClientResources clientResources,
+            ClientIpResolver clientIpResolver
+    ) {
+        this(properties, proxyManager, redisClient, null, clientResources, clientIpResolver);
+    }
+
+    RateLimitInterceptor(
+            RateLimitProperties properties,
+            @Nullable LettuceBasedProxyManager<String> proxyManager,
+            @Nullable RedisClient redisClient,
+            @Nullable StatefulRedisConnection<String, byte[]> redisConnection,
+            @Nullable ClientResources clientResources,
             ClientIpResolver clientIpResolver
     ) {
         this.properties = properties;
         this.proxyManager = proxyManager;
         this.redisClient = redisClient;
+        this.redisConnection = redisConnection;
+        this.clientResources = clientResources;
         this.clientIpResolver = clientIpResolver;
     }
 
@@ -87,21 +108,40 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     }
 
     private static RedisInfrastructure buildInfrastructure(RedisProperties redisProperties) {
-        RedisClient redisClient = RedisClient.create(buildRedisURI(redisProperties));
+        RedisURI redisURI = buildRedisURI(redisProperties);
+        RedisClient redisClient = RedisClient.create(redisURI);
+        redisClient.setOptions(buildClientOptions(resolveRedisTimeout(redisProperties.getTimeout())));
+        StatefulRedisConnection<String, byte[]> connection = null;
         try {
             RedisCodec<String, byte[]> codec = RedisCodec.of(StringCodec.UTF8, ByteArrayCodec.INSTANCE);
-            StatefulRedisConnection<String, byte[]> connection = redisClient.connect(codec);
+            connection = redisClient.connect(codec);
             LettuceBasedProxyManager<String> proxyManager = LettuceBasedProxyManager.builderFor(connection)
                     .withClientSideConfig(ClientSideConfig.getDefault()
                             .withExpirationAfterWriteStrategy(
                                     ExpirationAfterWriteStrategy.basedOnTimeForRefillingBucketUpToMax(Duration.ofMinutes(10))
                             ))
                     .build();
-            return new RedisInfrastructure(proxyManager, redisClient);
+            return new RedisInfrastructure(proxyManager, redisClient, connection, null);
         } catch (RuntimeException e) {
+            if (connection != null) {
+                connection.close();
+            }
             redisClient.shutdown();
             throw e;
         }
+    }
+
+    private static ClientOptions buildClientOptions(Duration timeout) {
+        SocketOptions socketOptions = SocketOptions.builder()
+                .connectTimeout(timeout)
+                .keepAlive(true)
+                .tcpNoDelay(true)
+                .build();
+        return ClientOptions.builder()
+                .autoReconnect(true)
+                .disconnectedBehavior(ClientOptions.DisconnectedBehavior.REJECT_COMMANDS)
+                .socketOptions(socketOptions)
+                .build();
     }
 
     private static RedisURI buildRedisURI(RedisProperties redisProperties) {
@@ -120,7 +160,16 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             builder.withPassword(password.toCharArray());
         }
 
+        builder.withTimeout(resolveRedisTimeout(redisProperties.getTimeout()));
+
         return builder.build();
+    }
+
+    private static Duration resolveRedisTimeout(Duration timeout) {
+        if (timeout != null && !timeout.isZero() && !timeout.isNegative()) {
+            return timeout;
+        }
+        return Duration.ofSeconds(5);
     }
 
     private static boolean isUnresolvedPlaceholder(String value) {
@@ -130,11 +179,25 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
     @PreDestroy
     public void destroy() {
+        if (redisConnection != null) {
+            try {
+                redisConnection.close();
+            } catch (Exception e) {
+                log.warn("Redis connection close error: {}", e.getMessage());
+            }
+        }
         if (redisClient != null) {
             try {
                 redisClient.shutdown();
             } catch (Exception e) {
                 log.warn("Redis client shutdown error: {}", e.getMessage());
+            }
+        }
+        if (clientResources != null) {
+            try {
+                clientResources.shutdown();
+            } catch (Exception e) {
+                log.warn("ClientResources shutdown error: {}", e.getMessage());
             }
         }
     }
@@ -208,9 +271,28 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             throw new RateLimitExceededException(LIMITER_UNAVAILABLE_MESSAGE, retryAfterSeconds);
         }
 
-        log.error("限流依赖异常，按 fail-open 放行请求 {} {} key={}: {}",
-                request.getMethod(), request.getRequestURI(), rateLimitKey, exception.getMessage(), exception);
+        log.warn("限流依赖异常，按 fail-open 放行请求 {} {} key={} cause={}",
+                request.getMethod(), request.getRequestURI(), rateLimitKey, describeException(exception));
+        if (log.isDebugEnabled()) {
+            log.debug("限流 fail-open 异常详情 {} {} key={}",
+                    request.getMethod(), request.getRequestURI(), rateLimitKey, exception);
+        }
         return true;
+    }
+
+    private String describeException(Throwable exception) {
+        Throwable rootCause = exception;
+        while (rootCause.getCause() != null && rootCause.getCause() != rootCause) {
+            rootCause = rootCause.getCause();
+        }
+        if (rootCause == exception) {
+            return exception.getClass().getSimpleName() + ": " + exception.getMessage();
+        }
+        return exception.getClass().getSimpleName()
+                + " -> "
+                + rootCause.getClass().getSimpleName()
+                + ": "
+                + rootCause.getMessage();
     }
 
     private String buildBucketKey(HttpServletRequest request, String rateLimitKey, RateLimit rateLimit) {
@@ -310,10 +392,12 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
     private record RedisInfrastructure(
             LettuceBasedProxyManager<String> proxyManager,
-            RedisClient redisClient
+            RedisClient redisClient,
+            StatefulRedisConnection<String, byte[]> redisConnection,
+            ClientResources clientResources
     ) {
         static RedisInfrastructure unavailable() {
-            return new RedisInfrastructure(null, null);
+            return new RedisInfrastructure(null, null, null, null);
         }
     }
 }

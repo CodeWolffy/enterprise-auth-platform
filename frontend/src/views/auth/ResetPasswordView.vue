@@ -11,7 +11,7 @@
 
       <form v-if="!token" class="auth-form" @submit.prevent="submitRequest">
         <div class="auth-field">
-          <input v-model.trim="username" type="text" placeholder="用户名" autocomplete="username" />
+          <input v-model.trim="username" type="text" placeholder="用户名（5-16 位）" autocomplete="username" />
           <p v-if="fieldError" class="auth-error">{{ fieldError }}</p>
         </div>
         <div v-if="statusMessage" class="auth-status" :class="sceneStatus">{{ statusMessage }}</div>
@@ -88,11 +88,23 @@ async function submitRequest() {
     fieldError.value = '请输入用户名'
     return
   }
+  if (username.value.length < 5 || username.value.length > 16) {
+    fieldError.value = '用户名长度需为 5-16 位'
+    return
+  }
   loading.value = true
   try {
     const result = await requestPasswordReset({ username: username.value })
-    sceneStatus.value = 'success'
-    statusMessage.value = result?.message || '如果账号存在且已配置邮箱，将会收到密码重置邮件'
+    if (result?.result === 'NOT_FOUND') {
+      sceneStatus.value = 'error'
+      statusMessage.value = result.message || '用户名不存在'
+    } else if (result?.result === 'EMAIL_NOT_CONFIGURED') {
+      sceneStatus.value = 'error'
+      statusMessage.value = result.message || '该账号未绑定邮箱，无法通过邮件重置密码'
+    } else {
+      sceneStatus.value = 'success'
+      statusMessage.value = result?.message || '如果账号存在且已配置邮箱，将会收到密码重置邮件'
+    }
   } catch (error) {
     sceneStatus.value = 'error'
     statusMessage.value = resolveErrorMessage(error, '请求失败，请稍后再试')
