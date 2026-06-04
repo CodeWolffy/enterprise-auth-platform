@@ -2,8 +2,6 @@ package com.enterprise.auth.platform.modules.role.interfaces;
 
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.web.ApiResponse;
-import com.enterprise.auth.platform.modules.role.interfaces.AssignResourcesRequest;
-import com.enterprise.auth.platform.modules.role.interfaces.CreateRoleRequest;
 import com.enterprise.auth.platform.modules.role.application.RoleGrantQueryFacade;
 import com.enterprise.auth.platform.modules.resource.application.CatalogService;
 import com.enterprise.auth.platform.modules.role.application.RoleManagementService;

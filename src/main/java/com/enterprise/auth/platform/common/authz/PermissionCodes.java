@@ -27,6 +27,10 @@ public final class PermissionCodes {
     public static final String DASHBOARD_READ = "dashboard:read";
     public static final String OPERATION_LOG_READ = "operation-log:read";
     public static final String OPERATION_LOG_EXPORT = "operation-log:export";
+    public static final String WORKFLOW_READ = "workflow:read";
+    public static final String WORKFLOW_WRITE = "workflow:write";
+    public static final String CODEGEN_READ = "codegen:read";
+    public static final String CODEGEN_WRITE = "codegen:write";
     public static final String SESSION_WRITE = "session:write";
 
     public static final Set<String> ALL = Set.of(
@@ -49,6 +53,10 @@ public final class PermissionCodes {
             DASHBOARD_READ,
             OPERATION_LOG_READ,
             OPERATION_LOG_EXPORT,
+            WORKFLOW_READ,
+            WORKFLOW_WRITE,
+            CODEGEN_READ,
+            CODEGEN_WRITE,
             SESSION_WRITE
     );
 
@@ -72,6 +80,10 @@ public final class PermissionCodes {
             new PermissionDescriptor(DASHBOARD_READ, "仪表盘查看", "dashboard"),
             new PermissionDescriptor(OPERATION_LOG_READ, "操作日志查看", "operation-log"),
             new PermissionDescriptor(OPERATION_LOG_EXPORT, "操作日志导出", "operation-log"),
+            new PermissionDescriptor(WORKFLOW_READ, "工作流查看", "workflow"),
+            new PermissionDescriptor(WORKFLOW_WRITE, "工作流管理", "workflow"),
+            new PermissionDescriptor(CODEGEN_READ, "代码生成查看", "codegen"),
+            new PermissionDescriptor(CODEGEN_WRITE, "代码生成管理", "codegen"),
             new PermissionDescriptor(SESSION_WRITE, "会话管理", "session")
     );
 

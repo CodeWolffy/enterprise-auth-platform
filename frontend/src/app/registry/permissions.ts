@@ -16,6 +16,10 @@ export const PERMISSIONS = {
   DASHBOARD_READ: 'dashboard:read',
   OPERATION_LOG_READ: 'operation-log:read',
   OPERATION_LOG_EXPORT: 'operation-log:export',
+  WORKFLOW_READ: 'workflow:read',
+  WORKFLOW_WRITE: 'workflow:write',
+  CODEGEN_READ: 'codegen:read',
+  CODEGEN_WRITE: 'codegen:write',
   SESSION_WRITE: 'session:write',
 } as const
 
@@ -43,6 +47,10 @@ export const PERMISSION_CATALOG: Array<{
   { code: PERMISSIONS.DASHBOARD_READ, label: '仪表盘查看', module: 'dashboard' },
   { code: PERMISSIONS.OPERATION_LOG_READ, label: '操作日志查看', module: 'operation-log' },
   { code: PERMISSIONS.OPERATION_LOG_EXPORT, label: '操作日志导出', module: 'operation-log' },
+  { code: PERMISSIONS.WORKFLOW_READ, label: '工作流查看', module: 'workflow' },
+  { code: PERMISSIONS.WORKFLOW_WRITE, label: '工作流管理', module: 'workflow' },
+  { code: PERMISSIONS.CODEGEN_READ, label: '代码生成查看', module: 'codegen' },
+  { code: PERMISSIONS.CODEGEN_WRITE, label: '代码生成管理', module: 'codegen' },
   { code: PERMISSIONS.SESSION_WRITE, label: '会话管理', module: 'session' },
 ]
 

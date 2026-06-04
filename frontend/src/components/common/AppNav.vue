@@ -10,20 +10,7 @@
     active-text-color="#409eff"
   >
     <template v-for="item in visibleLinks" :key="item.id">
-      <el-sub-menu v-if="item.children.length" :index="item.id">
-        <template #title>
-          <el-icon><component :is="item.icon" /></el-icon>
-          <span>{{ item.label }}</span>
-        </template>
-        <el-menu-item v-for="child in item.children" :key="child.id" :index="child.to">
-          <el-icon><component :is="child.icon" /></el-icon>
-          <template #title>{{ child.label }}</template>
-        </el-menu-item>
-      </el-sub-menu>
-      <el-menu-item v-else :index="item.to">
-        <el-icon><component :is="item.icon" /></el-icon>
-        <template #title>{{ item.label }}</template>
-      </el-menu-item>
+      <AppNavItem :item="item" />
     </template>
   </el-menu>
 </template>
@@ -34,6 +21,7 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { resolveAppIcon, resolveMenuPresentation } from '@/app/registry/module-manifest'
 import { resolveRoutePath } from '@/router/route-access'
+import AppNavItem from './AppNavItem.vue'
 import { useAuthStore } from '@/stores/auth'
 import type { MenuItem } from '@/types/auth-models'
 
@@ -79,9 +67,11 @@ function buildLinks(nodes: MenuItem[]): NavLink[] {
     const accessKey = node.routeKey?.trim() || node.code?.trim() || ''
     const path = resolveRoutePath(accessKey)
     const children = buildLinks(node.children ?? [])
-    if (!path && !children.length) {
+    const fallbackPath = children[0]?.to ?? ''
+    if (!path && !fallbackPath) {
       continue
     }
+    const to = path || fallbackPath
     if (path && usedPaths.has(path)) {
       continue
     }
@@ -96,7 +86,7 @@ function buildLinks(nodes: MenuItem[]): NavLink[] {
     })
     links.push({
       id: path || `menu-${node.id}`,
-      to: path,
+      to,
       label: presentation.title,
       icon: resolveAppIcon(presentation.icon),
       children,

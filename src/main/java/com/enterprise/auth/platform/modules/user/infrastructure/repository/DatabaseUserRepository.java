@@ -98,8 +98,11 @@ public class DatabaseUserRepository implements UserRepository {
     }
 
     private AuthenticationUser toAuthenticationUser(SysUserEntity user) {
-        Set<String> roleCodes = loadRoleCodes(user.getTenantId(), user.getId());
-        RoleData roleData = loadRoleData(user.getTenantId(), roleCodes);
+        List<SysRoleEntity> roles = loadRoles(user.getTenantId(), user.getId());
+        Set<String> roleCodes = roles.stream()
+                .map(SysRoleEntity::getRoleCode)
+                .collect(Collectors.toSet());
+        RoleData roleData = loadRoleData(user.getTenantId(), roleCodes, roles);
         return new AuthenticationUser(
                 user.getId(),
                 user.getTenantId(),
@@ -117,31 +120,24 @@ public class DatabaseUserRepository implements UserRepository {
         );
     }
 
-    private Set<String> loadRoleCodes(String tenantId, Long userId) {
+    private List<SysRoleEntity> loadRoles(String tenantId, Long userId) {
         List<SysUserRoleEntity> links = sysUserRoleMapper.selectList(new LambdaQueryWrapper<SysUserRoleEntity>()
                 .eq(SysUserRoleEntity::getTenantId, tenantId)
                 .eq(SysUserRoleEntity::getUserId, userId));
         if (links.isEmpty()) {
-            return new HashSet<>();
+            return List.of();
         }
         List<Long> roleIds = links.stream().map(SysUserRoleEntity::getRoleId).distinct().toList();
         return sysRoleMapper.selectList(new LambdaQueryWrapper<SysRoleEntity>()
-                        .eq(SysRoleEntity::getTenantId, tenantId)
-                        .eq(SysRoleEntity::getDeleted, 0)
-                        .in(SysRoleEntity::getId, roleIds))
-                .stream()
-                .map(SysRoleEntity::getRoleCode)
-                .collect(Collectors.toSet());
+                .eq(SysRoleEntity::getTenantId, tenantId)
+                .eq(SysRoleEntity::getDeleted, 0)
+                .in(SysRoleEntity::getId, roleIds));
     }
 
-    private RoleData loadRoleData(String tenantId, Set<String> roleCodes) {
+    private RoleData loadRoleData(String tenantId, Set<String> roleCodes, List<SysRoleEntity> roles) {
         if (roleCodes.isEmpty()) {
             return new RoleData(new HashSet<>(), DataScopeType.SELF, new HashSet<>());
         }
-        List<SysRoleEntity> roles = sysRoleMapper.selectList(new LambdaQueryWrapper<SysRoleEntity>()
-                .eq(SysRoleEntity::getTenantId, tenantId)
-                .eq(SysRoleEntity::getDeleted, 0)
-                .in(SysRoleEntity::getRoleCode, roleCodes));
         DataScopeType dataScopeType = roles.stream()
                 .map(SysRoleEntity::getDataScopeType)
                 .map(this::parseScope)
