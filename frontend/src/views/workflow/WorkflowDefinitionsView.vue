@@ -25,7 +25,10 @@
           <h3>流程定义</h3>
           <p class="muted-line">内置轻量状态机先验证顺序审批、候选人/候选组和变量快照，后续再决定是否替换为外部流程引擎。</p>
         </div>
-        <el-button v-permission="'workflow:write'" type="primary" @click="openCreateDialog">新增定义</el-button>
+        <div class="panel-actions">
+          <el-button v-permission="'workflow:write'" @click="openCreateDialog">JSON 新增</el-button>
+          <el-button v-permission="'workflow:write'" type="primary" @click="openDesigner">打开设计器</el-button>
+        </div>
       </div>
 
       <AdvancedSearch @search="applySearch" @reset="resetSearch">
@@ -139,6 +142,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import type { FormInstance, FormRules, TagProps } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AdvancedSearch from '@/components/common/AdvancedSearch.vue'
@@ -152,6 +156,7 @@ import type { PageResult } from '@/types/api'
 import type { WorkflowDefinitionRequest, WorkflowDefinitionView, WorkflowStepInput, WorkflowStepView } from '@/types/workflow'
 import { formatDateTime } from '@/utils/datetime'
 
+const router = useRouter()
 const loading = ref(false)
 const submitting = ref(false)
 const createVisible = ref(false)
@@ -226,6 +231,10 @@ function openCreateDialog() {
   form.stepsText = defaultStepsText()
   form.remark = ''
   createVisible.value = true
+}
+
+function openDesigner() {
+  void router.push({ name: 'workflow-designer' })
 }
 
 function openDetail(row: WorkflowDefinitionView) {

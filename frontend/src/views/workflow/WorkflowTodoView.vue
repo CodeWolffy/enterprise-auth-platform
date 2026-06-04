@@ -44,10 +44,11 @@
         <el-table-column label="创建时间" width="180">
           <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
         </el-table-column>
-        <el-table-column fixed="right" label="操作" width="220">
+        <el-table-column fixed="right" label="操作" width="280">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button :disabled="!row.actionable || submitting" link type="success" @click="openAction(row, 'approve')">通过</el-button>
+            <el-button :disabled="!row.actionable || submitting" link type="warning" @click="openTransfer(row)">转签</el-button>
             <el-button :disabled="!row.actionable || submitting" link type="danger" @click="openAction(row, 'reject')">驳回</el-button>
           </template>
         </el-table-column>
@@ -85,6 +86,28 @@
       </template>
     </el-dialog>
 
+    <el-dialog v-model="transferVisible" title="转签任务" width="520px">
+      <el-alert
+        title="转签后当前待办会关闭，并为目标用户生成同一审批节点的新待办。"
+        type="info"
+        show-icon
+        :closable="false"
+        style="margin-bottom: 14px"
+      />
+      <el-form label-position="top">
+        <el-form-item label="目标用户 ID" required>
+          <el-input-number v-model="transferForm.targetUserId" :min="1" :precision="0" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="转签说明">
+          <el-input v-model="transferForm.comment" type="textarea" :rows="4" maxlength="500" show-word-limit />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="transferVisible = false">取消</el-button>
+        <el-button type="warning" :loading="submitting" @click="submitTransfer">确认转签</el-button>
+      </template>
+    </el-dialog>
+
     <el-drawer v-model="detailVisible" title="任务详情" size="560px">
       <template v-if="detailItem">
         <el-descriptions :column="2" border class="drawer-section">
@@ -116,7 +139,7 @@
 import { computed, reactive, ref } from 'vue'
 import type { TagProps } from 'element-plus'
 import { ElMessage } from 'element-plus'
-import { approveWorkflowTask, queryWorkflowTodoTasks, rejectWorkflowTask } from '@/api/modules'
+import { approveWorkflowTask, queryWorkflowTodoTasks, rejectWorkflowTask, transferWorkflowTask } from '@/api/modules'
 import type { PageResult } from '@/types/api'
 import type { WorkflowTaskView } from '@/types/workflow'
 import { formatDateTime } from '@/utils/datetime'
@@ -124,11 +147,16 @@ import { formatDateTime } from '@/utils/datetime'
 const loading = ref(false)
 const submitting = ref(false)
 const actionVisible = ref(false)
+const transferVisible = ref(false)
 const detailVisible = ref(false)
 const actionType = ref<'approve' | 'reject'>('approve')
 const currentTask = ref<WorkflowTaskView | null>(null)
 const detailItem = ref<WorkflowTaskView | null>(null)
 const comment = ref('')
+const transferForm = reactive({
+  targetUserId: undefined as number | undefined,
+  comment: '',
+})
 
 const query = reactive({
   page: 1,
@@ -172,6 +200,13 @@ function openAction(row: WorkflowTaskView, type: 'approve' | 'reject') {
   actionVisible.value = true
 }
 
+function openTransfer(row: WorkflowTaskView) {
+  currentTask.value = row
+  transferForm.targetUserId = undefined
+  transferForm.comment = ''
+  transferVisible.value = true
+}
+
 async function submitAction() {
   if (!currentTask.value) {
     return
@@ -186,6 +221,29 @@ async function submitAction() {
       ElMessage.success('任务已驳回')
     }
     actionVisible.value = false
+    currentTask.value = null
+    await loadTasks()
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function submitTransfer() {
+  if (!currentTask.value) {
+    return
+  }
+  if (!transferForm.targetUserId) {
+    ElMessage.warning('请输入目标用户 ID')
+    return
+  }
+  submitting.value = true
+  try {
+    await transferWorkflowTask(currentTask.value.id, {
+      targetUserId: transferForm.targetUserId,
+      comment: transferForm.comment.trim() || undefined,
+    })
+    ElMessage.success('任务已转签')
+    transferVisible.value = false
     currentTask.value = null
     await loadTasks()
   } finally {

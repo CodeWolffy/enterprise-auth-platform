@@ -156,6 +156,15 @@ export const APP_ROUTE_MANIFESTS = [
     component: () => import('@/views/platform/FileManagementView.vue'),
   },
   {
+    routeKey: 'workflow-designer',
+    path: 'platform/workflow/designer',
+    name: 'workflow-designer',
+    title: '流程设计器',
+    icon: 'Connection',
+    requiredGrant: PERMISSIONS.WORKFLOW_WRITE,
+    component: () => import('@/views/workflow/WorkflowDesignerView.vue'),
+  },
+  {
     routeKey: 'workflow-definitions',
     path: 'platform/workflow/definitions',
     name: 'workflow-definitions',

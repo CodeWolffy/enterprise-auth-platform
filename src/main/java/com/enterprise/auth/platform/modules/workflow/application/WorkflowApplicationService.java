@@ -294,6 +294,51 @@ public class WorkflowApplicationService {
     }
 
     @Transactional
+    public WorkflowActionResult transferTask(Long taskId, WorkflowTaskTransferCommand command) {
+        UserAccount user = currentUserService.requireCurrentUser();
+        String tenantId = currentTenantId(user);
+        WfTaskEntity task = requirePendingTask(tenantId, taskId);
+        WfProcessInstanceEntity instance = requireRunningInstance(tenantId, task.getInstanceId());
+        ensureActionable(task, user);
+        SysUserEntity targetUser = requireEnabledUser(tenantId, command.targetUserId());
+        if (Objects.equals(targetUser.getId(), user.id())) {
+            throw new BusinessException("不能转签给自己");
+        }
+
+        LocalDateTime now = TimeSupport.utcNowDateTime();
+        task.setStatus(WorkflowTaskStatus.TRANSFERRED.name());
+        task.setAssigneeUserId(user.id());
+        task.setAssigneeUsername(user.username());
+        task.setComment(normalizeText(command.comment()));
+        task.setCompletedAt(now);
+        taskMapper.updateById(task);
+
+        WfTaskEntity transferredTask = new WfTaskEntity();
+        transferredTask.setTenantId(tenantId);
+        transferredTask.setInstanceId(task.getInstanceId());
+        transferredTask.setDefinitionId(task.getDefinitionId());
+        transferredTask.setStepIndex(task.getStepIndex());
+        transferredTask.setStepName(task.getStepName());
+        transferredTask.setStatus(WorkflowTaskStatus.PENDING.name());
+        transferredTask.setCandidateUserIdsJson(toJson(Set.of(targetUser.getId())));
+        transferredTask.setCandidateGroupCodesJson(toJson(Set.of()));
+        transferredTask.setAssigneeUserId(targetUser.getId());
+        transferredTask.setAssigneeUsername(targetUser.getUsername());
+        transferredTask.setComment("由 " + user.username() + " 转签");
+        taskMapper.insert(transferredTask);
+
+        publish("WORKFLOW_TASK_TRANSFERRED", user, tenantId, Map.of(
+                "instanceId", instance.getId(),
+                "taskId", task.getId(),
+                "newTaskId", transferredTask.getId(),
+                "stepIndex", task.getStepIndex(),
+                "targetUserId", targetUser.getId(),
+                "targetUsername", targetUser.getUsername()
+        ));
+        return new WorkflowActionResult(toInstanceView(instance), toTaskView(transferredTask, user));
+    }
+
+    @Transactional
     public WorkflowInstanceView withdrawInstance(Long instanceId) {
         UserAccount user = currentUserService.requireCurrentUser();
         String tenantId = currentTenantId(user);
@@ -449,6 +494,22 @@ public class WorkflowApplicationService {
             throw new BusinessException("NOT_FOUND", "待办任务不存在");
         }
         return task;
+    }
+
+    private SysUserEntity requireEnabledUser(String tenantId, Long userId) {
+        if (userId == null) {
+            throw new BusinessException("目标用户不能为空");
+        }
+        SysUserEntity user = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>()
+                .eq(SysUserEntity::getTenantId, tenantId)
+                .eq(SysUserEntity::getId, userId)
+                .eq(SysUserEntity::getEnabled, 1)
+                .eq(SysUserEntity::getDeleted, 0)
+                .last("limit 1"));
+        if (user == null) {
+            throw new BusinessException("NOT_FOUND", "目标用户不存在或已禁用");
+        }
+        return user;
     }
 
     private boolean canViewInstance(WfProcessInstanceEntity instance, UserAccount user) {

@@ -10,6 +10,7 @@ import type {
   WorkflowStartRequest,
   WorkflowStartResult,
   WorkflowTaskQueryParams,
+  WorkflowTaskTransferRequest,
   WorkflowTaskView,
 } from '@/types/workflow'
 
@@ -77,5 +78,10 @@ export async function approveWorkflowTask(taskId: number, comment?: string) {
 
 export async function rejectWorkflowTask(taskId: number, comment?: string) {
   const { data } = await http.put<ApiResponse<WorkflowActionResult>>(`/api/workflow/tasks/${taskId}/reject`, { comment })
+  return data.data
+}
+
+export async function transferWorkflowTask(taskId: number, payload: WorkflowTaskTransferRequest) {
+  const { data } = await http.put<ApiResponse<WorkflowActionResult>>(`/api/workflow/tasks/${taskId}/transfer`, payload)
   return data.data
 }

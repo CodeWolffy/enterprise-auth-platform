@@ -149,4 +149,13 @@ public class WorkflowController {
         WorkflowTaskActionRequest safeRequest = request == null ? new WorkflowTaskActionRequest(null) : request;
         return ApiResponse.ok(workflowApplicationService.rejectTask(taskId, safeRequest.toCommand()));
     }
+
+    @Operation(summary = "转签任务")
+    @PutMapping("/tasks/{taskId}/transfer")
+    public ApiResponse<WorkflowActionResult> transferTask(
+            @Parameter(description = "任务 ID") @PathVariable Long taskId,
+            @Valid @RequestBody WorkflowTaskTransferRequest request
+    ) {
+        return ApiResponse.ok(workflowApplicationService.transferTask(taskId, request.toCommand()));
+    }
 }

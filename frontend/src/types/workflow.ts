@@ -89,6 +89,11 @@ export interface WorkflowTaskView {
   actionable: boolean
 }
 
+export interface WorkflowTaskTransferRequest {
+  targetUserId: number
+  comment?: string
+}
+
 export interface WorkflowTaskQueryParams {
   page?: number
   size?: number

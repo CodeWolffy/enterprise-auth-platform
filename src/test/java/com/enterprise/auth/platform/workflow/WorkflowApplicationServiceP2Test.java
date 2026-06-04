@@ -177,6 +177,46 @@ class WorkflowApplicationServiceP2Test {
     }
 
     @Test
+    void actionableUserCanTransferTaskToAnotherEnabledUser() {
+        bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("workflow:write"));
+        createAndDeploySingleStepDefinition("p2-wf-transfer-ut", Set.of(approverOneId), Set.of());
+        var started = workflowApplicationService.startInstance(new WorkflowStartCommand(
+                "p2-wf-transfer-ut",
+                "p2-business-transfer",
+                "P2 MVP 转签",
+                Map.of("amount", 500)
+        ));
+
+        bindPrincipal(TENANT_A, approverOneId, APPROVER_ONE, Set.of(), Set.of());
+        var transferred = workflowApplicationService.transferTask(
+                started.currentTask().id(),
+                new com.enterprise.auth.platform.modules.workflow.application.WorkflowTaskTransferCommand(approverTwoId, "请代处理")
+        );
+
+        assertThat(transferred.instance().status()).isEqualTo("RUNNING");
+        assertThat(transferred.nextTask()).isNotNull();
+        assertThat(transferred.nextTask().assigneeUserId()).isEqualTo(approverTwoId);
+        assertThat(transferred.nextTask().candidateUserIds()).containsExactly(approverTwoId);
+        assertThat(workflowApplicationService.todoTasks(1, 20).records()).isEmpty();
+        String originalStatus = jdbcTemplate.queryForObject(
+                "SELECT status FROM wf_task WHERE tenant_id = ? AND id = ?",
+                String.class,
+                TENANT_A,
+                started.currentTask().id()
+        );
+        assertThat(originalStatus).isEqualTo("TRANSFERRED");
+
+        bindPrincipal(TENANT_A, approverTwoId, APPROVER_TWO, Set.of(), Set.of());
+        assertThat(workflowApplicationService.todoTasks(1, 20).records())
+                .extracting("id")
+                .contains(transferred.nextTask().id());
+        var approved = workflowApplicationService.approveTask(transferred.nextTask().id(), new WorkflowTaskCommand("代处理通过"));
+
+        assertThat(approved.instance().status()).isEqualTo("APPROVED");
+        assertWorkflowAuditRecorded("WORKFLOW_TASK_TRANSFERRED", TENANT_A);
+    }
+
+    @Test
     void tenantAndCandidateIsolationShouldBlockCrossScopeAccess() {
         bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("workflow:write", "workflow:read"));
         Long definitionId = createAndDeploySingleStepDefinition("p2-wf-isolation-ut", Set.of(approverOneId), Set.of());
