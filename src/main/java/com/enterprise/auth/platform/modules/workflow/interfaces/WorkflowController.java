@@ -9,11 +9,14 @@ import com.enterprise.auth.platform.modules.workflow.application.WorkflowApplica
 import com.enterprise.auth.platform.modules.workflow.application.WorkflowDefinitionView;
 import com.enterprise.auth.platform.modules.workflow.application.WorkflowInstanceView;
 import com.enterprise.auth.platform.modules.workflow.application.WorkflowStartResult;
+import com.enterprise.auth.platform.modules.workflow.application.WorkflowTaskUrgeResult;
+import com.enterprise.auth.platform.modules.workflow.application.WorkflowTaskUrgeView;
 import com.enterprise.auth.platform.modules.workflow.application.WorkflowTaskView;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,9 +32,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class WorkflowController {
 
     private final WorkflowApplicationService workflowApplicationService;
+    private final com.enterprise.auth.platform.modules.workflow.application.WorkflowTaskUrgeService urgeService;
 
-    public WorkflowController(WorkflowApplicationService workflowApplicationService) {
+    public WorkflowController(WorkflowApplicationService workflowApplicationService,
+                              com.enterprise.auth.platform.modules.workflow.application.WorkflowTaskUrgeService urgeService) {
         this.workflowApplicationService = workflowApplicationService;
+        this.urgeService = urgeService;
     }
 
     @Operation(summary = "创建流程定义草稿")
@@ -157,5 +163,31 @@ public class WorkflowController {
             @Valid @RequestBody WorkflowTaskTransferRequest request
     ) {
         return ApiResponse.ok(workflowApplicationService.transferTask(taskId, request.toCommand()));
+    }
+
+    @Operation(summary = "催办任务")
+    @PutMapping("/tasks/{taskId}/urge")
+    public ApiResponse<WorkflowTaskUrgeResult> urgeTask(
+            @Parameter(description = "任务 ID") @PathVariable Long taskId,
+            @Valid @RequestBody(required = false) WorkflowTaskUrgeRequest request
+    ) {
+        WorkflowTaskUrgeRequest safeRequest = request == null ? new WorkflowTaskUrgeRequest(null) : request;
+        return ApiResponse.ok(urgeService.urge(taskId, safeRequest.toCommand()));
+    }
+
+    @Operation(summary = "查询任务催办历史")
+    @GetMapping("/tasks/{taskId}/urges")
+    public ApiResponse<List<WorkflowTaskUrgeView>> taskUrges(@Parameter(description = "任务 ID") @PathVariable Long taskId) {
+        return ApiResponse.ok(urgeService.listUrges(taskId));
+    }
+
+    @Operation(summary = "分页查询流程实例催办记录")
+    @GetMapping("/instances/{instanceId}/urges")
+    public ApiResponse<PageResult<WorkflowTaskUrgeView>> instanceUrges(
+            @Parameter(description = "流程实例 ID") @PathVariable Long instanceId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ApiResponse.ok(urgeService.listUrgesByInstance(instanceId, page, size));
     }
 }

@@ -11,6 +11,8 @@ import type {
   WorkflowStartResult,
   WorkflowTaskQueryParams,
   WorkflowTaskTransferRequest,
+  WorkflowTaskUrgeResult,
+  WorkflowTaskUrgeView,
   WorkflowTaskView,
 } from '@/types/workflow'
 
@@ -83,5 +85,23 @@ export async function rejectWorkflowTask(taskId: number, comment?: string) {
 
 export async function transferWorkflowTask(taskId: number, payload: WorkflowTaskTransferRequest) {
   const { data } = await http.put<ApiResponse<WorkflowActionResult>>(`/api/workflow/tasks/${taskId}/transfer`, payload)
+  return data.data
+}
+
+export async function urgeWorkflowTask(taskId: number, comment?: string) {
+  const { data } = await http.put<ApiResponse<WorkflowTaskUrgeResult>>(`/api/workflow/tasks/${taskId}/urge`, { comment })
+  return data.data
+}
+
+export async function listWorkflowTaskUrges(taskId: number) {
+  const { data } = await http.get<ApiResponse<WorkflowTaskUrgeView[]>>(`/api/workflow/tasks/${taskId}/urges`)
+  return data.data
+}
+
+export async function listWorkflowInstanceUrges(instanceId: number, page = 1, size = 20) {
+  const { data } = await http.get<ApiResponse<PageResult<WorkflowTaskUrgeView>>>(
+    `/api/workflow/instances/${instanceId}/urges`,
+    { params: { page, size } },
+  )
   return data.data
 }

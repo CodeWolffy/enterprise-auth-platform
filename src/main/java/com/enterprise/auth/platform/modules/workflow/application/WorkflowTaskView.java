@@ -17,6 +17,7 @@ public record WorkflowTaskView(
         String comment,
         Long createdAt,
         Long completedAt,
-        boolean actionable
+        boolean actionable,
+        int urgeCount
 ) {
 }

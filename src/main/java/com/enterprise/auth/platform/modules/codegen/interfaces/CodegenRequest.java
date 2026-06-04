@@ -4,6 +4,7 @@ import com.enterprise.auth.platform.modules.codegen.application.CodegenCommand;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.util.List;
 
 public record CodegenRequest(
         @NotBlank @Size(max = 128) @Pattern(regexp = "^[A-Za-z][A-Za-z0-9_]*$") String tableName,
@@ -12,9 +13,11 @@ public record CodegenRequest(
         @Size(max = 64) @Pattern(regexp = "^[A-Za-z][A-Za-z0-9_]*$", message = "className 格式不合法") String className,
         Boolean includeBackend,
         Boolean includeFrontend,
-        Boolean overwrite
+        Boolean overwrite,
+        List<String> selectedFiles,
+        Boolean autoRegister
 ) {
-    CodegenCommand toCommand() {
+    public CodegenCommand toCommand() {
         return new CodegenCommand(
                 tableName,
                 moduleName,
@@ -22,7 +25,9 @@ public record CodegenRequest(
                 className,
                 includeBackend == null || includeBackend,
                 includeFrontend == null || includeFrontend,
-                Boolean.TRUE.equals(overwrite)
+                Boolean.TRUE.equals(overwrite),
+                selectedFiles,
+                Boolean.TRUE.equals(autoRegister)
         );
     }
 }

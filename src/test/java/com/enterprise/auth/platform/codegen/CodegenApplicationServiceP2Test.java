@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -75,6 +76,8 @@ class CodegenApplicationServiceP2Test {
                 "OrderGen",
                 true,
                 true,
+                false,
+                List.of(),
                 false
         ));
 
@@ -126,6 +129,8 @@ class CodegenApplicationServiceP2Test {
                 "OrderGen",
                 true,
                 true,
+                false,
+                List.of(),
                 false
         );
 
@@ -152,6 +157,8 @@ class CodegenApplicationServiceP2Test {
                 "OrderGen",
                 true,
                 false,
+                false,
+                List.of(),
                 false
         )))
                 .isInstanceOf(BusinessException.class)

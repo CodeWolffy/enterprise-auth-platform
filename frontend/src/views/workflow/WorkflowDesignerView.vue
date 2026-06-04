@@ -99,6 +99,23 @@
                   <el-input v-model="step.candidateGroupCodesText" placeholder="用逗号分隔，例如 ADMIN, FINANCE" />
                 </el-form-item>
               </div>
+              <div class="step-reject-row">
+                <el-form-item label="驳回策略">
+                  <el-select v-model="step.rejectStrategy" class="step-reject-select" placeholder="选择驳回策略">
+                    <el-option
+                      v-for="option in REJECT_STRATEGY_OPTIONS"
+                      :key="option.value"
+                      :value="option.value"
+                      :label="option.label"
+                    >
+                      <div class="reject-option">
+                        <strong>{{ option.label }}</strong>
+                        <small>{{ option.description }}</small>
+                      </div>
+                    </el-option>
+                  </el-select>
+                </el-form-item>
+              </div>
               <div class="candidate-preview-row">
                 <el-tag v-for="userId in previewUserIds(step)" :key="`${step.localId}-user-${userId}`" effect="plain">用户 {{ userId }}</el-tag>
                 <el-tag v-for="groupCode in previewGroupCodes(step)" :key="`${step.localId}-group-${groupCode}`" type="success" effect="plain">{{ groupCode }}</el-tag>
@@ -128,6 +145,7 @@
             <div>
               <strong>{{ step.name || `审批节点 ${index + 1}` }}</strong>
               <small>{{ formatPreviewCandidates(step) }}</small>
+              <small class="flow-preview-reject">驳回策略：{{ rejectStrategyLabel(step.rejectStrategy) }}</small>
             </div>
           </div>
         </div>
@@ -156,7 +174,14 @@ interface DesignerStep {
   name: string
   candidateUserIdsText: string
   candidateGroupCodesText: string
+  rejectStrategy: 'END' | 'PREVIOUS' | 'RESTART'
 }
+
+const REJECT_STRATEGY_OPTIONS: Array<{ value: DesignerStep['rejectStrategy']; label: string; description: string }> = [
+  { value: 'END', label: '结束流程', description: '驳回后结束流程（默认）' },
+  { value: 'PREVIOUS', label: '回退上一步', description: '驳回后回到上一节点；首节点驳回等同于结束' },
+  { value: 'RESTART', label: '回到起点', description: '驳回后重新从第一个节点开始' },
+]
 
 let stepSerial = 0
 
@@ -185,18 +210,19 @@ const validationIssue = computed(() => {
 
 function defaultSteps() {
   return [
-    createStep('直属主管审批', '1', ''),
-    createStep('平台管理员复核', '', 'ADMIN'),
+    createStep('直属主管审批', '1', '', 'END'),
+    createStep('平台管理员复核', '', 'ADMIN', 'END'),
   ]
 }
 
-function createStep(name = '', candidateUserIdsText = '', candidateGroupCodesText = ''): DesignerStep {
+function createStep(name = '', candidateUserIdsText = '', candidateGroupCodesText = '', rejectStrategy: DesignerStep['rejectStrategy'] = 'END'): DesignerStep {
   stepSerial += 1
   return {
     localId: `step-${Date.now()}-${stepSerial}`,
     name,
     candidateUserIdsText,
     candidateGroupCodesText,
+    rejectStrategy,
   }
 }
 
@@ -209,7 +235,11 @@ function duplicateStep(index: number) {
   if (!source) {
     return
   }
-  steps.value.splice(index + 1, 0, createStep(`${source.name || `审批节点 ${index + 1}`} 副本`, source.candidateUserIdsText, source.candidateGroupCodesText))
+  steps.value.splice(
+    index + 1,
+    0,
+    createStep(`${source.name || `审批节点 ${index + 1}`} 副本`, source.candidateUserIdsText, source.candidateGroupCodesText, source.rejectStrategy),
+  )
 }
 
 function removeStep(index: number) {
@@ -294,7 +324,7 @@ function toWorkflowStep(step: DesignerStep, index: number): WorkflowStepInput {
   if (!candidateUserIds.length && !candidateGroupCodes.length) {
     throw new Error(`第 ${index + 1} 个审批节点至少需要候选人或候选组`)
   }
-  return { name, candidateUserIds, candidateGroupCodes }
+  return { name, candidateUserIds, candidateGroupCodes, rejectStrategy: step.rejectStrategy }
 }
 
 function toPreviewStep(step: DesignerStep) {
@@ -302,6 +332,7 @@ function toPreviewStep(step: DesignerStep) {
     name: step.name.trim(),
     candidateUserIds: previewUserIds(step),
     candidateGroupCodes: previewGroupCodes(step),
+    rejectStrategy: step.rejectStrategy,
   }
 }
 
@@ -350,6 +381,10 @@ function formatPreviewCandidates(step: DesignerStep) {
 async function copyPreview() {
   await navigator.clipboard.writeText(previewJson.value)
   ElMessage.success('步骤 JSON 已复制')
+}
+
+function rejectStrategyLabel(value: DesignerStep['rejectStrategy']) {
+  return REJECT_STRATEGY_OPTIONS.find((option) => option.value === value)?.label ?? '结束流程'
 }
 </script>
 
@@ -517,6 +552,29 @@ async function copyPreview() {
   align-items: center;
 }
 
+.step-reject-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+
+  :deep(.el-form-item) {
+    margin-bottom: 0;
+  }
+}
+
+.step-reject-select {
+  width: 100%;
+}
+
+.reject-option {
+  display: grid;
+  gap: 2px;
+
+  small {
+    color: var(--text-soft);
+  }
+}
+
 .muted-inline {
   color: var(--text-soft);
   font-size: 13px;
@@ -559,6 +617,12 @@ async function copyPreview() {
     color: var(--text-soft);
     line-height: 1.5;
   }
+}
+
+.flow-preview-reject {
+  margin-top: 2px;
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .json-preview {

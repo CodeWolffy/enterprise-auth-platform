@@ -4,6 +4,7 @@ import com.enterprise.auth.platform.common.audit.AuditEventPublisher;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.PageResult;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -12,11 +13,14 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 import javax.sql.DataSource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -33,15 +37,21 @@ public class CodegenApplicationService {
     private final JdbcTemplate jdbcTemplate;
     private final AuditEventPublisher auditEventPublisher;
     private final Path outputRoot;
+    private final CodegenTemplateService templateService;
+    private final CodegenResourceRegistrationService registrationService;
 
     public CodegenApplicationService(
             DataSource dataSource,
             AuditEventPublisher auditEventPublisher,
-            @Value("${platform.codegen.output-root:target/generated-codegen}") String outputRoot
+            @Value("${platform.codegen.output-root:target/generated-codegen}") String outputRoot,
+            CodegenTemplateService templateService,
+            CodegenResourceRegistrationService registrationService
     ) {
         this.jdbcTemplate = new JdbcTemplate(dataSource);
         this.auditEventPublisher = auditEventPublisher;
         this.outputRoot = Path.of(outputRoot).toAbsolutePath().normalize();
+        this.templateService = templateService;
+        this.registrationService = registrationService;
     }
 
     @Transactional(readOnly = true)
@@ -86,7 +96,9 @@ public class CodegenApplicationService {
                 model.moduleName(),
                 model.className(),
                 outputRoot.toString(),
-                renderFiles(model, command.includeBackend(), command.includeFrontend())
+                renderFiles(model, command.includeBackend(), command.includeFrontend()),
+                command.selectedFiles(),
+                command.autoRegister()
         );
     }
 
@@ -95,6 +107,9 @@ public class CodegenApplicationService {
         CodegenPreviewResult preview = preview(command);
         List<String> written = new ArrayList<>();
         for (CodegenFilePreview file : preview.files()) {
+            if (!shouldWrite(command.selectedFiles(), file.path())) {
+                continue;
+            }
             Path target = safeTarget(file.path());
             if (Files.exists(target) && !command.overwrite()) {
                 throw new BusinessException("CONFLICT", "生成文件已存在，请启用覆盖或调整模块名：" + file.path());
@@ -107,12 +122,48 @@ public class CodegenApplicationService {
                 throw new BusinessException("CODEGEN_WRITE_FAILED", "生成文件写入失败：" + file.path());
             }
         }
+        List<String> registered = command.autoRegister()
+                ? registrationService.register(command.moduleName(), preview.className())
+                : List.of();
         auditEventPublisher.publish("CODEGEN_GENERATED", "system", TenantContext.getTenantId(), Map.of(
                 "tableName", preview.tableName(),
                 "moduleName", preview.moduleName(),
-                "files", written
+                "files", written,
+                "registeredPermissions", registered
         ));
-        return new CodegenGenerateResult(preview.tableName(), preview.moduleName(), outputRoot.toString(), written);
+        return new CodegenGenerateResult(preview.tableName(), preview.moduleName(), outputRoot.toString(), written, registered);
+    }
+
+    @Transactional(readOnly = true)
+    public CodegenArtifactDownload download(CodegenCommand command) {
+        CodegenPreviewResult preview = preview(command);
+        try {
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            try (ZipOutputStream zip = new ZipOutputStream(buffer)) {
+                for (CodegenFilePreview file : preview.files()) {
+                    if (!shouldWrite(command.selectedFiles(), file.path())) {
+                        continue;
+                    }
+                    zip.putNextEntry(new ZipEntry(file.path()));
+                    zip.write(file.content().getBytes(StandardCharsets.UTF_8));
+                    zip.closeEntry();
+                }
+            }
+            return new CodegenArtifactDownload(
+                    preview.moduleName() + "-" + preview.className() + ".zip",
+                    "application/zip",
+                    buffer.toByteArray()
+            );
+        } catch (IOException ex) {
+            throw new BusinessException("CODEGEN_PACKAGE_FAILED", "生成产物打包失败");
+        }
+    }
+
+    private boolean shouldWrite(List<String> selectedFiles, String path) {
+        if (selectedFiles == null || selectedFiles.isEmpty()) {
+            return true;
+        }
+        return selectedFiles.contains(path);
     }
 
     private CodegenModel buildModel(CodegenCommand command) {
@@ -183,18 +234,38 @@ public class CodegenApplicationService {
     private List<CodegenFilePreview> renderFiles(CodegenModel model, boolean includeBackend, boolean includeFrontend) {
         List<CodegenFilePreview> files = new ArrayList<>();
         if (includeBackend) {
-            files.add(new CodegenFilePreview(backendPath(model, "infrastructure/entity", model.className() + "Entity.java"), "java", renderEntity(model)));
-            files.add(new CodegenFilePreview(backendPath(model, "infrastructure/mapper", model.className() + "Mapper.java"), "java", renderMapper(model)));
-            files.add(new CodegenFilePreview(backendPath(model, "interfaces", model.className() + "CrudRequest.java"), "java", renderCrudRequest(model)));
-            files.add(new CodegenFilePreview(backendPath(model, "application", model.className() + "ApplicationService.java"), "java", renderService(model)));
-            files.add(new CodegenFilePreview(backendPath(model, "interfaces", model.className() + "Controller.java"), "java", renderController(model)));
+            files.add(new CodegenFilePreview(backendPath(model, "infrastructure/entity", model.className() + "Entity.java"), "java", renderWithTemplate("java", backendPath(model, "infrastructure/entity", model.className() + "Entity.java"), renderEntity(model), templateVariables(model))));
+            files.add(new CodegenFilePreview(backendPath(model, "infrastructure/mapper", model.className() + "Mapper.java"), "java", renderWithTemplate("java", backendPath(model, "infrastructure/mapper", model.className() + "Mapper.java"), renderMapper(model), templateVariables(model))));
+            files.add(new CodegenFilePreview(backendPath(model, "interfaces", model.className() + "CrudRequest.java"), "java", renderWithTemplate("java", backendPath(model, "interfaces", model.className() + "CrudRequest.java"), renderCrudRequest(model), templateVariables(model))));
+            files.add(new CodegenFilePreview(backendPath(model, "application", model.className() + "ApplicationService.java"), "java", renderWithTemplate("java", backendPath(model, "application", model.className() + "ApplicationService.java"), renderService(model), templateVariables(model))));
+            files.add(new CodegenFilePreview(backendPath(model, "interfaces", model.className() + "Controller.java"), "java", renderWithTemplate("java", backendPath(model, "interfaces", model.className() + "Controller.java"), renderController(model), templateVariables(model))));
         }
         if (includeFrontend) {
-            files.add(new CodegenFilePreview("frontend/src/types/" + model.moduleName() + ".ts", "typescript", renderTypes(model)));
-            files.add(new CodegenFilePreview("frontend/src/api/modules/" + model.moduleName() + ".ts", "typescript", renderApi(model)));
-            files.add(new CodegenFilePreview("frontend/src/views/generated/" + model.className() + "View.vue", "vue", renderView(model)));
+            files.add(new CodegenFilePreview("frontend/src/types/" + model.moduleName() + ".ts", "typescript", renderWithTemplate("typescript", model.moduleName() + ".ts", renderTypes(model), templateVariables(model))));
+            files.add(new CodegenFilePreview("frontend/src/api/modules/" + model.moduleName() + ".ts", "typescript", renderWithTemplate("typescript", model.moduleName() + ".ts", renderApi(model), templateVariables(model))));
+            files.add(new CodegenFilePreview("frontend/src/views/generated/" + model.className() + "View.vue", "vue", renderWithTemplate("vue", model.className() + "View.vue", renderView(model), templateVariables(model))));
         }
         return files;
+    }
+
+    private String renderWithTemplate(String language, String path, String defaultContent, Map<String, Object> variables) {
+        return templateService.renderBody(language, path, defaultContent, variables);
+    }
+
+    private Map<String, Object> templateVariables(CodegenModel model) {
+        Map<String, Object> variables = new LinkedHashMap<>();
+        variables.put("tableName", model.tableName());
+        variables.put("moduleName", model.moduleName());
+        variables.put("className", model.className());
+        variables.put("lowerClassName", model.lowerClassName());
+        variables.put("kebabName", model.kebabName());
+        variables.put("title", model.title());
+        variables.put("packageName", model.packageName());
+        variables.put("primaryKeyColumn", model.primaryKeyColumn());
+        variables.put("primaryKeyField", model.primaryKeyField());
+        variables.put("primaryKeyJavaType", model.primaryKeyJavaType());
+        variables.put("generatedAt", Instant.now().toString());
+        return variables;
     }
 
     private String renderEntity(CodegenModel model) {
@@ -455,8 +526,7 @@ public class CodegenApplicationService {
                 + "export interface " + model.className() + "QueryParams {\n"
                 + "  keyword?: string\n"
                 + "  page?: number\n"
-                + "  size?: number\n"
-                + "}\n\n"
+                + "  size?: number\n}\n\n"
                 + "export async function query" + model.className() + "Page(params?: " + model.className() + "QueryParams) {\n"
                 + "  const { data } = await http.get<ApiResponse<" + model.className() + "Page>>('/api/generated/" + model.kebabName() + "', { params })\n"
                 + "  return data.data\n"

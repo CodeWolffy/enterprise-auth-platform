@@ -6,9 +6,11 @@ public record CodegenGenerateResult(
         String tableName,
         String moduleName,
         String outputRoot,
-        List<String> files
+        List<String> files,
+        List<String> registeredResourceKeys
 ) {
     public CodegenGenerateResult {
         files = files == null ? List.of() : List.copyOf(files);
+        registeredResourceKeys = registeredResourceKeys == null ? List.of() : List.copyOf(registeredResourceKeys);
     }
 }

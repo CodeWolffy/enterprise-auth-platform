@@ -44,12 +44,27 @@
         <el-table-column label="创建时间" width="180">
           <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
         </el-table-column>
-        <el-table-column fixed="right" label="操作" width="280">
+        <el-table-column label="催办" width="100" align="center">
+          <template #default="{ row }">
+            <el-badge
+              v-if="row.urgeCount > 0"
+              :value="row.urgeCount"
+              :max="99"
+              type="danger"
+              class="urge-badge"
+            >
+              <el-button link type="warning" @click="openUrgeHistory(row)">已催</el-button>
+            </el-badge>
+            <el-button v-else link type="info" @click="openUrgeHistory(row)">催办</el-button>
+          </template>
+        </el-table-column>
+        <el-table-column fixed="right" label="操作" width="320">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button :disabled="!row.actionable || submitting" link type="success" @click="openAction(row, 'approve')">通过</el-button>
             <el-button :disabled="!row.actionable || submitting" link type="warning" @click="openTransfer(row)">转签</el-button>
             <el-button :disabled="!row.actionable || submitting" link type="danger" @click="openAction(row, 'reject')">驳回</el-button>
+            <el-button :disabled="urging" link type="info" @click="openUrgeDialog(row)">催办</el-button>
           </template>
         </el-table-column>
         <template #empty>
@@ -108,6 +123,37 @@
       </template>
     </el-dialog>
 
+    <el-dialog v-model="urgeVisible" title="催办任务" width="520px">
+      <el-alert
+        :title="urgeTask ? `将向 ${urgeTask.assigneeUsername || '当前处理人'} 发起催办提醒` : '将向当前处理人发起催办提醒'"
+        type="info"
+        show-icon
+        :closable="false"
+        style="margin-bottom: 14px"
+      />
+      <el-form label-position="top">
+        <el-form-item label="催办说明">
+          <el-input v-model="urgeComment" type="textarea" :rows="4" maxlength="500" show-word-limit />
+        </el-form-item>
+        <el-form-item label="催办历史">
+          <div v-if="!urgeHistory.length" class="muted-inline">暂无催办记录</div>
+          <div v-else class="urge-history">
+            <div v-for="record in urgeHistory" :key="record.id" class="urge-history-item">
+              <div>
+                <strong>{{ record.urgedByUsername }}</strong>
+                <small>{{ formatDateTime(record.urgedAt) }}</small>
+              </div>
+              <p>{{ record.comment || '未填写说明' }}</p>
+            </div>
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="urgeVisible = false">关闭</el-button>
+        <el-button type="primary" :loading="urging" @click="submitUrge">确认催办</el-button>
+      </template>
+    </el-dialog>
+
     <el-drawer v-model="detailVisible" title="任务详情" size="560px">
       <template v-if="detailItem">
         <el-descriptions :column="2" border class="drawer-section">
@@ -139,16 +185,21 @@
 import { computed, reactive, ref } from 'vue'
 import type { TagProps } from 'element-plus'
 import { ElMessage } from 'element-plus'
-import { approveWorkflowTask, queryWorkflowTodoTasks, rejectWorkflowTask, transferWorkflowTask } from '@/api/modules'
+import { approveWorkflowTask, listWorkflowTaskUrges, queryWorkflowTodoTasks, rejectWorkflowTask, transferWorkflowTask, urgeWorkflowTask } from '@/api/modules'
 import type { PageResult } from '@/types/api'
-import type { WorkflowTaskView } from '@/types/workflow'
+import type { WorkflowTaskUrgeView, WorkflowTaskView } from '@/types/workflow'
 import { formatDateTime } from '@/utils/datetime'
 
 const loading = ref(false)
 const submitting = ref(false)
+const urging = ref(false)
 const actionVisible = ref(false)
 const transferVisible = ref(false)
 const detailVisible = ref(false)
+const urgeVisible = ref(false)
+const urgeTask = ref<WorkflowTaskView | null>(null)
+const urgeHistory = ref<WorkflowTaskUrgeView[]>([])
+const urgeComment = ref('')
 const actionType = ref<'approve' | 'reject'>('approve')
 const currentTask = ref<WorkflowTaskView | null>(null)
 const detailItem = ref<WorkflowTaskView | null>(null)
@@ -191,6 +242,40 @@ async function handleSizeChange(nextSize: number) {
 function openDetail(row: WorkflowTaskView) {
   detailItem.value = row
   detailVisible.value = true
+}
+
+async function openUrgeDialog(row: WorkflowTaskView) {
+  urgeTask.value = row
+  urgeComment.value = ''
+  urgeVisible.value = true
+  await loadUrgeHistory(row.id)
+}
+
+async function openUrgeHistory(row: WorkflowTaskView) {
+  urgeTask.value = row
+  urgeVisible.value = true
+  urgeComment.value = ''
+  await loadUrgeHistory(row.id)
+}
+
+async function loadUrgeHistory(taskId: number) {
+  urgeHistory.value = await listWorkflowTaskUrges(taskId)
+}
+
+async function submitUrge() {
+  if (!urgeTask.value) {
+    return
+  }
+  urging.value = true
+  try {
+    const result = await urgeWorkflowTask(urgeTask.value.id, urgeComment.value || undefined)
+    urgeComment.value = ''
+    ElMessage.success(`已催办，累计 ${result.totalUrgeCount} 次`)
+    await loadUrgeHistory(urgeTask.value.id)
+    await loadTasks()
+  } finally {
+    urging.value = false
+  }
 }
 
 function openAction(row: WorkflowTaskView, type: 'approve' | 'reject') {
@@ -312,5 +397,40 @@ function taskStatusTag(status: string): TagProps['type'] {
 
 .muted-inline {
   color: var(--text-soft);
+}
+
+.urge-badge {
+  display: inline-flex;
+}
+
+.urge-history {
+  display: grid;
+  gap: 10px;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.urge-history-item {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-card-muted);
+
+  div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+  }
+
+  small {
+    color: var(--text-soft);
+  }
+
+  p {
+    margin: 8px 0 0;
+    color: var(--text-soft);
+    line-height: 1.6;
+  }
 }
 </style>

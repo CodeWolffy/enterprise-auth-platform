@@ -15,6 +15,7 @@ import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEn
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
 import com.enterprise.auth.platform.modules.workflow.domain.WorkflowDefinitionStatus;
 import com.enterprise.auth.platform.modules.workflow.domain.WorkflowInstanceStatus;
+import com.enterprise.auth.platform.modules.workflow.domain.WorkflowRejectStrategy;
 import com.enterprise.auth.platform.modules.workflow.domain.WorkflowTaskStatus;
 import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfProcessDefinitionEntity;
 import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfProcessInstanceEntity;
@@ -53,6 +54,7 @@ public class WorkflowApplicationService {
     private final CurrentUserService currentUserService;
     private final AuditEventPublisher auditEventPublisher;
     private final ObjectMapper objectMapper;
+    private final WorkflowTaskUrgeService urgeService;
 
     public WorkflowApplicationService(
             WfProcessDefinitionMapper definitionMapper,
@@ -62,7 +64,8 @@ public class WorkflowApplicationService {
             SysRoleMapper sysRoleMapper,
             CurrentUserService currentUserService,
             AuditEventPublisher auditEventPublisher,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            WorkflowTaskUrgeService urgeService
     ) {
         this.definitionMapper = definitionMapper;
         this.instanceMapper = instanceMapper;
@@ -72,6 +75,7 @@ public class WorkflowApplicationService {
         this.currentUserService = currentUserService;
         this.auditEventPublisher = auditEventPublisher;
         this.objectMapper = objectMapper;
+        this.urgeService = urgeService;
     }
 
     @Transactional
@@ -274,6 +278,9 @@ public class WorkflowApplicationService {
         WfTaskEntity task = requirePendingTask(tenantId, taskId);
         WfProcessInstanceEntity instance = requireRunningInstance(tenantId, task.getInstanceId());
         ensureActionable(task, user);
+        WfProcessDefinitionEntity definition = requireDefinition(tenantId, task.getDefinitionId());
+        List<WorkflowStepDefinition> steps = readSteps(definition.getStepsJson());
+        WorkflowStepDefinition currentStep = stepAt(steps, task.getStepIndex());
 
         task.setStatus(WorkflowTaskStatus.REJECTED.name());
         task.setAssigneeUserId(user.id());
@@ -282,15 +289,45 @@ public class WorkflowApplicationService {
         task.setCompletedAt(TimeSupport.utcNowDateTime());
         taskMapper.updateById(task);
 
-        instance.setStatus(WorkflowInstanceStatus.REJECTED.name());
-        instance.setEndedAt(TimeSupport.utcNowDateTime());
+        WorkflowTaskView nextTask = null;
+        WorkflowRejectStrategy strategy = currentStep.rejectStrategy();
+        int nextStepIndex = resolveRejectTarget(strategy, task.getStepIndex(), steps.size());
+        if (nextStepIndex < 0) {
+            instance.setStatus(WorkflowInstanceStatus.REJECTED.name());
+            instance.setEndedAt(TimeSupport.utcNowDateTime());
+        } else {
+            instance.setCurrentStepIndex(nextStepIndex);
+            WfTaskEntity created = createPendingTask(tenantId, instance, definition, steps.get(nextStepIndex), nextStepIndex);
+            nextTask = toTaskView(created, user);
+        }
         instanceMapper.updateById(instance);
         publish("WORKFLOW_TASK_REJECTED", user, tenantId, Map.of(
                 "instanceId", instance.getId(),
                 "taskId", task.getId(),
-                "stepIndex", task.getStepIndex()
+                "stepIndex", task.getStepIndex(),
+                "strategy", strategy.name(),
+                "nextStepIndex", nextStepIndex,
+                "ended", nextStepIndex < 0
         ));
-        return new WorkflowActionResult(toInstanceView(instance), null);
+        return new WorkflowActionResult(toInstanceView(instance), nextTask);
+    }
+
+    private int resolveRejectTarget(WorkflowRejectStrategy strategy, int currentStepIndex, int totalSteps) {
+        if (strategy == null) {
+            return -1;
+        }
+        return switch (strategy) {
+            case END -> -1;
+            case PREVIOUS -> currentStepIndex <= 0 ? -1 : currentStepIndex - 1;
+            case RESTART -> totalSteps <= 0 ? -1 : 0;
+        };
+    }
+
+    private WorkflowStepDefinition stepAt(List<WorkflowStepDefinition> steps, int index) {
+        if (steps == null || index < 0 || index >= steps.size()) {
+            return new WorkflowStepDefinition("未知步骤", Set.of(), Set.of(), WorkflowRejectStrategy.END);
+        }
+        return steps.get(index);
     }
 
     @Transactional
@@ -586,7 +623,7 @@ public class WorkflowApplicationService {
             if (userIds.isEmpty() && groupCodes.isEmpty()) {
                 throw new BusinessException("审批步骤至少需要一个候选人或候选组");
             }
-            normalized.add(new WorkflowStepDefinition(step.name().trim(), userIds, groupCodes));
+            normalized.add(new WorkflowStepDefinition(step.name().trim(), userIds, groupCodes, step.rejectStrategy()));
         }
         return normalized;
     }
@@ -636,7 +673,13 @@ public class WorkflowApplicationService {
         List<WorkflowStepView> stepViews = new ArrayList<>();
         for (int i = 0; i < steps.size(); i++) {
             WorkflowStepDefinition step = steps.get(i);
-            stepViews.add(new WorkflowStepView(i, step.name(), step.candidateUserIds(), step.candidateGroupCodes()));
+            stepViews.add(new WorkflowStepView(
+                    i,
+                    step.name(),
+                    step.candidateUserIds(),
+                    step.candidateGroupCodes(),
+                    step.rejectStrategy() == null ? WorkflowRejectStrategy.END.name() : step.rejectStrategy().name()
+            ));
         }
         return new WorkflowDefinitionView(
                 entity.getId(),
@@ -672,6 +715,7 @@ public class WorkflowApplicationService {
     }
 
     private WorkflowTaskView toTaskView(WfTaskEntity entity, UserAccount user) {
+        int urgeCount = urgeService.countUrges(entity.getTenantId(), entity.getId());
         return new WorkflowTaskView(
                 entity.getId(),
                 entity.getTenantId(),
@@ -687,7 +731,8 @@ public class WorkflowApplicationService {
                 entity.getComment(),
                 TimeSupport.toEpochMilli(entity.getCreatedAt()),
                 TimeSupport.toEpochMilli(entity.getCompletedAt()),
-                WorkflowTaskStatus.PENDING.name().equals(entity.getStatus()) && isActionable(entity, user)
+                WorkflowTaskStatus.PENDING.name().equals(entity.getStatus()) && isActionable(entity, user),
+                urgeCount
         );
     }
 

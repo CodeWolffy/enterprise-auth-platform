@@ -132,6 +132,7 @@
             <div>
               <strong>{{ step.name }}</strong>
               <small>{{ formatCandidates(step) }}</small>
+              <small class="step-node-reject">驳回策略：{{ formatRejectStrategy(step.rejectStrategy) }}</small>
             </div>
           </article>
         </div>
@@ -303,8 +304,16 @@ function parseStepsText(value: string): WorkflowStepInput[] {
       name: item.name.trim(),
       candidateUserIds,
       candidateGroupCodes,
+      rejectStrategy: normalizeRejectStrategy(item.rejectStrategy),
     }
   })
+}
+
+function normalizeRejectStrategy(value: unknown): 'END' | 'PREVIOUS' | 'RESTART' {
+  if (value === 'PREVIOUS' || value === 'RESTART' || value === 'END') {
+    return value
+  }
+  return 'END'
 }
 
 function normalizeNumberArray(value: unknown) {
@@ -338,6 +347,16 @@ function defaultStepsText() {
 
 function formatSteps(row: WorkflowDefinitionView) {
   return row.steps.map((step) => `${step.stepIndex + 1}. ${step.name}`).join(' / ')
+}
+
+function formatRejectStrategy(strategy?: string) {
+  if (strategy === 'PREVIOUS') {
+    return '回退上一步'
+  }
+  if (strategy === 'RESTART') {
+    return '回到起点'
+  }
+  return '结束流程'
 }
 
 function formatCandidates(step: WorkflowStepView) {
@@ -428,5 +447,10 @@ function definitionStatusTag(status: string): TagProps['type'] {
     margin-top: 4px;
     color: var(--text-soft);
   }
+}
+
+.step-node-reject {
+  color: var(--accent) !important;
+  font-weight: 600;
 }
 </style>

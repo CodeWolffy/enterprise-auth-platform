@@ -42,6 +42,8 @@ export interface CodegenPreviewResult {
   className: string
   generatedRoot: string
   files: CodegenFilePreview[]
+  selectedFiles?: string[]
+  autoRegister?: boolean
 }
 
 export interface CodegenGenerateResult {
@@ -49,6 +51,7 @@ export interface CodegenGenerateResult {
   moduleName: string
   outputRoot: string
   files: string[]
+  registeredResourceKeys?: string[]
 }
 
 export interface CodegenRequest {
@@ -59,6 +62,21 @@ export interface CodegenRequest {
   includeBackend?: boolean
   includeFrontend?: boolean
   overwrite?: boolean
+  selectedFiles?: string[]
+  autoRegister?: boolean
+}
+
+export interface CodegenTemplateView {
+  id?: number | null
+  name: string
+  language: 'java' | 'typescript' | 'vue'
+  pathPattern: string
+  content: string
+  description?: string | null
+  builtin?: boolean
+  createdAt?: number | null
+  updatedAt?: number | null
 }
 
 export type CodegenTablePage = PageResult<CodegenTableView>
+export type CodegenTemplatePage = PageResult<CodegenTemplateView>

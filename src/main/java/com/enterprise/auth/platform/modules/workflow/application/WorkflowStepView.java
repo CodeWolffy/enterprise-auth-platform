@@ -6,6 +6,7 @@ public record WorkflowStepView(
         int stepIndex,
         String name,
         Set<Long> candidateUserIds,
-        Set<String> candidateGroupCodes
+        Set<String> candidateGroupCodes,
+        String rejectStrategy
 ) {
 }
