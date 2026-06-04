@@ -114,6 +114,7 @@ public class CurrentUserService {
                 user.customDeptIds(),
                 user.dataScopeType(),
                 user.sessionVersion(),
+                user.avatarFileKey(),
                 user.mustChangePassword(),
                 user.passwordUpdatedAt()
         );
@@ -133,6 +134,7 @@ public class CurrentUserService {
                 user.customDeptIds(),
                 user.dataScopeType(),
                 user.sessionVersion(),
+                user.avatarFileKey(),
                 user.mustChangePassword(),
                 user.passwordUpdatedAt()
         );

@@ -7,6 +7,7 @@ import io.minio.GetObjectArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import io.minio.RemoveObjectArgs;
 import io.minio.errors.ErrorResponseException;
 import java.io.InputStream;
 import org.springframework.stereotype.Service;
@@ -51,6 +52,20 @@ public class MinioObjectStorageService implements ObjectStorageService {
             throw new BusinessException("NOT_FOUND", "文件不存在");
         } catch (Exception exception) {
             throw new BusinessException("FILE_STORAGE_ERROR", "文件读取 MinIO 失败");
+        }
+    }
+
+    @Override
+    public void delete(String bucketName, String objectKey) {
+        try {
+            minioClient.removeObject(RemoveObjectArgs.builder()
+                    .bucket(bucketName)
+                    .object(objectKey)
+                    .build());
+        } catch (ErrorResponseException exception) {
+            throw new BusinessException("NOT_FOUND", "文件不存在");
+        } catch (Exception exception) {
+            throw new BusinessException("FILE_STORAGE_ERROR", "文件删除 MinIO 对象失败");
         }
     }
 

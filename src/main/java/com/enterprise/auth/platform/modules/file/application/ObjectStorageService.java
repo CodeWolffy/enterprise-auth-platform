@@ -8,6 +8,8 @@ public interface ObjectStorageService {
 
     InputStream get(String bucketName, String objectKey);
 
+    void delete(String bucketName, String objectKey);
+
     record StoredObject(String storageType, String bucketName, String objectKey, String etag) {
     }
 }

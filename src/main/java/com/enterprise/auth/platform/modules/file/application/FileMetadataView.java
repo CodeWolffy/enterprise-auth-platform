@@ -12,6 +12,7 @@ public record FileMetadataView(
         @Schema(description = "可见性") String visibility,
         @Schema(description = "所属租户") String tenantId,
         @Schema(description = "所有者用户 ID") Long ownerUserId,
-        @Schema(description = "创建时间，epoch ms") Long createdAt
+        @Schema(description = "创建时间，epoch ms") Long createdAt,
+        @Schema(description = "可直接访问的展示 URL") String url
 ) {
 }

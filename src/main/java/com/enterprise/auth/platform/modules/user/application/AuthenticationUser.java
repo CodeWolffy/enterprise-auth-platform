@@ -15,6 +15,7 @@ public record AuthenticationUser(
         Set<Long> customDeptIds,
         DataScopeType dataScopeType,
         int sessionVersion,
+        String avatarFileKey,
         boolean mustChangePassword,
         java.time.LocalDateTime passwordUpdatedAt
 ) {
@@ -31,7 +32,7 @@ public record AuthenticationUser(
             DataScopeType dataScopeType,
             int sessionVersion
     ) {
-        this(id, tenantId, username, password, enabled, roles, permissions, customDeptIds, dataScopeType, sessionVersion, false, null);
+        this(id, tenantId, username, password, enabled, roles, permissions, customDeptIds, dataScopeType, sessionVersion, null, false, null);
     }
 
     public AuthenticationUser {

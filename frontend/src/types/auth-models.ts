@@ -10,6 +10,8 @@ export interface PermissionSnapshot {
   dataScopeType: string
   customDeptIds: number[]
   menus: MenuItem[]
+  avatarFileKey?: string | null
+  avatarUrl?: string | null
   superAdmin?: boolean
 }
 

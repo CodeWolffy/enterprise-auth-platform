@@ -1,9 +1,13 @@
 package com.enterprise.auth.platform.modules.file.interfaces;
 
+import cn.dev33.satoken.annotation.SaCheckPermission;
+import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.web.ApiResponse;
+import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.file.application.FileApplicationService;
 import com.enterprise.auth.platform.modules.file.application.FileDownloadResult;
 import com.enterprise.auth.platform.modules.file.application.FileMetadataView;
+import com.enterprise.auth.platform.modules.file.application.FileQuery;
 import com.enterprise.auth.platform.modules.file.domain.FileVisibility;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -14,6 +18,7 @@ import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -34,8 +39,23 @@ public class FileController {
         this.fileApplicationService = fileApplicationService;
     }
 
+    @Operation(summary = "分页查询文件")
+    @GetMapping
+    @SaCheckPermission(PermissionCodes.FILE_READ)
+    public ApiResponse<PageResult<FileMetadataView>> page(
+            @Parameter(description = "文件名关键词") @RequestParam(required = false) String keyword,
+            @Parameter(description = "内容类型") @RequestParam(required = false) String contentType,
+            @Parameter(description = "存储类型") @RequestParam(required = false) String storageType,
+            @Parameter(description = "可见性") @RequestParam(required = false) String visibility,
+            @Parameter(description = "页码，从 1 开始") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "每页数量") @RequestParam(defaultValue = "20") int size
+    ) {
+        return ApiResponse.ok(fileApplicationService.page(new FileQuery(keyword, contentType, storageType, visibility, page, size)));
+    }
+
     @Operation(summary = "上传文件")
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @SaCheckPermission(PermissionCodes.FILE_WRITE)
     public ApiResponse<FileMetadataView> upload(
             @Parameter(description = "文件") @RequestPart("file") MultipartFile file,
             @Parameter(description = "可见性：PUBLIC/TENANT/OWNER/PRIVATE，默认 OWNER") @RequestParam(required = false) FileVisibility visibility
@@ -59,6 +79,14 @@ public class FileController {
     @GetMapping("/public/{fileKey}")
     public ResponseEntity<InputStreamResource> publicDownload(@PathVariable String fileKey) {
         return downloadResponse(fileApplicationService.publicDownload(fileKey));
+    }
+
+    @Operation(summary = "删除文件")
+    @DeleteMapping("/{fileKey}")
+    @SaCheckPermission(PermissionCodes.FILE_WRITE)
+    public ApiResponse<Void> delete(@PathVariable String fileKey) {
+        fileApplicationService.delete(fileKey);
+        return ApiResponse.ok();
     }
 
     private ResponseEntity<InputStreamResource> downloadResponse(FileDownloadResult result) {

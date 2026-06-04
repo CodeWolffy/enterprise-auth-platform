@@ -1,7 +1,9 @@
 import {
   Avatar,
   Connection,
+  Document,
   Flag,
+  FolderOpened,
   Histogram,
   Message,
   Monitor,
@@ -60,6 +62,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'dashboard',
     title: '运行总览',
     icon: 'Monitor',
+    requiredGrant: PERMISSIONS.DASHBOARD_READ,
     component: () => import('@/views/dashboard/DashboardView.vue'),
   },
   {
@@ -117,6 +120,15 @@ export const APP_ROUTE_MANIFESTS = [
     component: () => import('@/views/audit/AuditView.vue'),
   },
   {
+    routeKey: 'operation-logs',
+    path: 'system/operation-logs',
+    name: 'operation-logs',
+    title: '操作日志',
+    icon: 'Document',
+    requiredGrant: PERMISSIONS.OPERATION_LOG_READ,
+    component: () => import('@/views/audit/OperationLogView.vue'),
+  },
+  {
     routeKey: 'tenants',
     path: 'platform/tenants',
     name: 'tenants',
@@ -133,6 +145,15 @@ export const APP_ROUTE_MANIFESTS = [
     icon: 'Tickets',
     requiredGrant: PERMISSIONS.TENANT_READ,
     component: () => import('@/views/platform/TenantCatalogView.vue'),
+  },
+  {
+    routeKey: 'files',
+    path: 'platform/files',
+    name: 'files',
+    title: '文件管理',
+    icon: 'FolderOpened',
+    requiredGrant: PERMISSIONS.FILE_READ,
+    component: () => import('@/views/platform/FileManagementView.vue'),
   },
   {
     routeKey: 'dicts',
@@ -253,7 +274,9 @@ const NAV_CODE_MANIFEST_MAP: Record<string, AppNavManifest> = Object.fromEntries
 const APP_ICON_COMPONENTS: Record<string, Component> = {
   Avatar,
   Connection,
+  Document,
   Flag,
+  FolderOpened,
   Histogram,
   Message,
   Monitor,

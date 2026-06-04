@@ -11,6 +11,11 @@ export const PERMISSIONS = {
   SYSTEM_WRITE: 'system:write',
   AUDIT_READ: 'audit:read',
   AUDIT_WRITE: 'audit:write',
+  FILE_READ: 'file:read',
+  FILE_WRITE: 'file:write',
+  DASHBOARD_READ: 'dashboard:read',
+  OPERATION_LOG_READ: 'operation-log:read',
+  OPERATION_LOG_EXPORT: 'operation-log:export',
   SESSION_WRITE: 'session:write',
 } as const
 
@@ -33,6 +38,11 @@ export const PERMISSION_CATALOG: Array<{
   { code: PERMISSIONS.SYSTEM_WRITE, label: '系统管理', module: 'system' },
   { code: PERMISSIONS.AUDIT_READ, label: '审计查看', module: 'audit' },
   { code: PERMISSIONS.AUDIT_WRITE, label: '审计管理', module: 'audit' },
+  { code: PERMISSIONS.FILE_READ, label: '文件查看', module: 'file' },
+  { code: PERMISSIONS.FILE_WRITE, label: '文件管理', module: 'file' },
+  { code: PERMISSIONS.DASHBOARD_READ, label: '仪表盘查看', module: 'dashboard' },
+  { code: PERMISSIONS.OPERATION_LOG_READ, label: '操作日志查看', module: 'operation-log' },
+  { code: PERMISSIONS.OPERATION_LOG_EXPORT, label: '操作日志导出', module: 'operation-log' },
   { code: PERMISSIONS.SESSION_WRITE, label: '会话管理', module: 'session' },
 ]
 

@@ -24,6 +24,9 @@ public final class PermissionCodes {
     public static final String AUDIT_WRITE = "audit:write";
     public static final String FILE_READ = "file:read";
     public static final String FILE_WRITE = "file:write";
+    public static final String DASHBOARD_READ = "dashboard:read";
+    public static final String OPERATION_LOG_READ = "operation-log:read";
+    public static final String OPERATION_LOG_EXPORT = "operation-log:export";
     public static final String SESSION_WRITE = "session:write";
 
     public static final Set<String> ALL = Set.of(
@@ -43,6 +46,9 @@ public final class PermissionCodes {
             AUDIT_WRITE,
             FILE_READ,
             FILE_WRITE,
+            DASHBOARD_READ,
+            OPERATION_LOG_READ,
+            OPERATION_LOG_EXPORT,
             SESSION_WRITE
     );
 
@@ -63,6 +69,9 @@ public final class PermissionCodes {
             new PermissionDescriptor(AUDIT_WRITE, "审计管理", "audit"),
             new PermissionDescriptor(FILE_READ, "文件查看", "file"),
             new PermissionDescriptor(FILE_WRITE, "文件管理", "file"),
+            new PermissionDescriptor(DASHBOARD_READ, "仪表盘查看", "dashboard"),
+            new PermissionDescriptor(OPERATION_LOG_READ, "操作日志查看", "operation-log"),
+            new PermissionDescriptor(OPERATION_LOG_EXPORT, "操作日志导出", "operation-log"),
             new PermissionDescriptor(SESSION_WRITE, "会话管理", "session")
     );
 

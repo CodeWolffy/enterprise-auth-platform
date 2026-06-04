@@ -67,13 +67,14 @@
           <el-dropdown trigger="click" @command="handleCommand">
             <div class="avatar-container" data-testid="user-menu-button">
               <div class="avatar-wrapper">
-                <el-avatar :size="28" class="user-avatar">{{ avatarName }}</el-avatar>
+                <el-avatar :size="28" :src="authStore.snapshot?.avatarUrl || undefined" class="user-avatar">{{ avatarName }}</el-avatar>
                 <div class="status-dot"></div>
               </div>
               <el-icon class="el-icon--right" style="margin-left: 8px; color: #606266;"><ArrowDown /></el-icon>
             </div>
             <template #dropdown>
               <el-dropdown-menu>
+                <el-dropdown-item command="profile">个人中心</el-dropdown-item>
                 <el-dropdown-item command="logout" data-testid="logout-button">退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -395,6 +396,7 @@ function isMenuTag(tag: { path: string; title: string }) {
 
 function resolveTagIcon(tag: { path: string; title: string }) {
   if (tag.title.includes('用户')) return User
+  if (tag.title.includes('个人') || tag.title.includes('账号')) return User
   if (tag.title.includes('角色')) return Connection
   if (tag.title.includes('部门')) return OfficeBuilding
   if (tag.title.includes('租户')) return Flag
@@ -492,6 +494,10 @@ function pruneVisitedViewsBySnapshot() {
 }
 
 function handleCommand(command: string) {
+  if (command === 'profile') {
+    router.push('/account/profile')
+    return
+  }
   if (command === 'logout') {
     handleLogout()
   }

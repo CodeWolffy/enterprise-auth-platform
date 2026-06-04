@@ -44,7 +44,7 @@ const SHELL_ROUTE: RouteRecordRaw = {
       path: 'account/profile',
       name: 'account-profile',
       component: () => import('@/views/account/AccountProfileView.vue'),
-      meta: { title: '我的账号', allowPasswordChangeRequired: true },
+      meta: { title: '个人中心', allowPasswordChangeRequired: true },
     },
   ],
 }

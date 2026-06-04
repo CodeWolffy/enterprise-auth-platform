@@ -72,12 +72,18 @@
 - 分类规则管理
 - 前端统一表格偏好、筛选区、详情抽屉交互
 
-### 审计与导出治理
+### 审计、文件与运行总览
 
 - 审计事件查询与导出
 - 审计导出任务创建、重试、归档、清理
 - 导出保留策略与治理任务
 - `dryRun` 预演支持
+- 操作日志正式入口：`/api/operation-logs` 与 `/system/operation-logs`
+- 操作日志 CSV 导出与公式注入防护
+- 文件上传、分页管理、下载、删除和公开文件访问
+- MinIO/S3 与本地存储切换
+- 账号头像上传、公开访问和权限快照透传
+- 仪表盘真实统计数据
 
 ### 租户目录能力
 
@@ -199,8 +205,24 @@
 - `PUT /api/system/notices/{id}`
 - `DELETE /api/system/notices/{id}`
 
-### 审计与导出
+### 账号自助、文件、仪表盘
 
+- `GET /api/account/profile`
+- `PUT /api/account/avatar`
+- `PUT /api/account/profile/avatar`
+- `POST /api/account/password/change`
+- `GET /api/files`
+- `POST /api/files/upload`
+- `GET /api/files/{fileKey}/metadata`
+- `GET /api/files/{fileKey}`
+- `GET /api/files/public/{fileKey}`
+- `DELETE /api/files/{fileKey}`
+- `GET /api/dashboard/stats`
+
+### 操作日志与审计导出
+
+- `GET /api/operation-logs`
+- `GET /api/operation-logs/export`
 - `GET /api/audit/events`
 - `GET /api/audit/events/export`
 - `POST /api/audit/exports`
@@ -352,6 +374,17 @@ npm run test:visual:update
 - 视觉快照由 CI 或本地 `npm run test:visual:update` 生成，统一作为 Artifact 或本地临时产物处理，不提交源码。
 - `playwright-report/`、`test-results/` 与 `frontend/e2e/**/*.png` 均不提交源码。
 - 如需人工确认 UI 变化，从 CI Artifact 下载快照对比，确认后再单独决定是否建立受控基线策略。
+
+## 最近进展（2026-06-04）
+
+- P1-A 已完成：账号头像链路、文件管理前端、仪表盘统计、操作日志正式入口与 CSV 导出防护已落地。
+- 账号头像：`/api/account/avatar` 与 `/api/account/profile/avatar` 可上传头像，账号资料、权限快照和顶部用户信息已透传头像。
+- 文件管理：`/platform/files` 已接入文件分页、上传、下载、删除和公开链接复制，后端支持 MinIO/S3 与本地存储切换。
+- 仪表盘：`/api/dashboard/stats` 已接入真实统计数据，运行总览页不再依赖静态占位数据。
+- 操作日志：正式入口为 `/api/operation-logs` 和 `/system/operation-logs`，原 `/api/audit` 保留兼容。
+- 导出防护：操作日志 CSV 导出使用 `operation-log:export` 权限，具备频控、导出上限和 CSV 公式注入防护。
+- 数据迁移：`V202606030004__file_storage_minio.sql` 与 `V202606040001__p1a_dashboard_operation_logs.sql` 已落地；本地 Flyway 迁移 `202606040001` 已修复并成功执行。
+- 验证：`mvn -DskipTests compile` 与 `npm run build` 通过。
 
 ## 最近进展（2026-06-01）
 

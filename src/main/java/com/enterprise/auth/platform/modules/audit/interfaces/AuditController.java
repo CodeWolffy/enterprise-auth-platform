@@ -46,10 +46,16 @@ public class AuditController {
 
     private final AuditService auditService;
     private final AuditExportTaskService auditExportTaskService;
+    private final com.enterprise.auth.platform.modules.audit.application.AuditPayloadRedactor auditPayloadRedactor;
 
-    public AuditController(AuditService auditService, AuditExportTaskService auditExportTaskService) {
+    public AuditController(
+            AuditService auditService,
+            AuditExportTaskService auditExportTaskService,
+            com.enterprise.auth.platform.modules.audit.application.AuditPayloadRedactor auditPayloadRedactor
+    ) {
         this.auditService = auditService;
         this.auditExportTaskService = auditExportTaskService;
+        this.auditPayloadRedactor = auditPayloadRedactor;
     }
 
     @Operation(summary = "分页查询审计事件")
@@ -108,7 +114,7 @@ public class AuditController {
                 event.requestId(),
                 event.clientIp(),
                 event.occurredAt() == null ? "" : EXPORT_FORMATTER.format(Instant.ofEpochMilli(event.occurredAt())),
-                event.details() == null ? "{}" : event.details().toString()
+                event.details() == null ? "{}" : auditPayloadRedactor.redact(event.details()).toString()
         )).toList();
 
         ByteArrayOutputStream os = new ByteArrayOutputStream();

@@ -1,6 +1,6 @@
 package com.enterprise.auth.platform.modules.file.application;
 
-import java.time.Duration;
+import java.nio.file.Path;
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.StringUtils;
@@ -10,11 +10,13 @@ import org.springframework.util.unit.DataSize;
 public record FileStorageProperties(
         String storage,
         DataSize maxSize,
-        List<String> allowedTypes
+        List<String> allowedTypes,
+        Path localRoot
 ) {
 
     public String resolvedStorage() {
-        return StringUtils.hasText(storage) ? storage.trim().toLowerCase() : "minio";
+        String value = StringUtils.hasText(storage) ? storage.trim().toLowerCase() : "minio";
+        return "s3".equals(value) ? "minio" : value;
     }
 
     public long resolvedMaxSizeBytes() {
@@ -29,5 +31,9 @@ public record FileStorageProperties(
                 .filter(StringUtils::hasText)
                 .map(type -> type.trim().toLowerCase())
                 .toList();
+    }
+
+    public Path resolvedLocalRoot() {
+        return localRoot == null ? Path.of("data", "files") : localRoot;
     }
 }

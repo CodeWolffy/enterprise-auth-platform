@@ -15,6 +15,7 @@ import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -40,12 +41,27 @@ class AuditServiceQueryTest {
     @Autowired
     private PasswordHasher passwordHasher;
 
+    @BeforeEach
+    void setUp() {
+        cleanupAuditFixtures();
+    }
+
     @AfterEach
     void tearDown() {
         TenantContext.clear();
         clear();
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username in (?, ?, ?)",
                 "tenant-a", AUDIT_SCOPE_USER, AUDIT_VISIBLE_USER, AUDIT_HIDDEN_USER);
+        cleanupAuditFixtures();
+    }
+
+    private void cleanupAuditFixtures() {
+        jdbcTemplate.update("""
+                DELETE FROM sys_audit_log
+                WHERE (event_type IN ('USER_CREATED', 'USER_UPDATED') AND operator IN ('alice', 'bob'))
+                   OR (event_type = 'AUDIT_SCOPE_TEST' AND operator IN (?, ?))
+                   OR (event_type = 'P1_REDACTION_TEST' AND operator = 'alice')
+                """, AUDIT_VISIBLE_USER, AUDIT_HIDDEN_USER);
     }
 
     @Test
@@ -113,6 +129,35 @@ class AuditServiceQueryTest {
         assertThat(page.records()).extracting(item -> item.details().get("bizId"))
                 .contains("visible")
                 .doesNotContain("hidden");
+    }
+
+    @Test
+    void shouldRedactSensitiveAuditDetails() {
+        auditService.record("P1_REDACTION_TEST", "alice", "platform", Map.of(
+                "password", "PlainText@123",
+                "resetToken", "token-value",
+                "normalField", "visible",
+                "nested", Map.of("secretKey", "secret-value", "safe", "kept")
+        ));
+
+        var page = auditService.query(new AuditQuery(
+                "platform",
+                "P1_REDACTION_TEST",
+                "alice",
+                null,
+                null,
+                null,
+                null,
+                1,
+                20
+        ));
+
+        assertThat(page.records()).hasSize(1);
+        Map<String, Object> details = page.records().get(0).details();
+        assertThat(details.get("password")).isEqualTo("******");
+        assertThat(details.get("resetToken")).isEqualTo("******");
+        assertThat(details.get("normalField")).isEqualTo("visible");
+        assertThat(details.get("nested").toString()).contains("secretKey=******").contains("safe=kept");
     }
 
     private Long ensureUser(String username, Long deptId) {

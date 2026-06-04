@@ -34,17 +34,20 @@ public class AuditService implements AuditEventPublisher {
     private final ObjectMapper objectMapper;
     private final DataScopeService dataScopeService;
     private final PlatformAdminSupport platformAdminSupport;
+    private final AuditPayloadRedactor auditPayloadRedactor;
 
     public AuditService(
             SysAuditLogMapper sysAuditLogMapper,
             ObjectMapper objectMapper,
             DataScopeService dataScopeService,
-            PlatformAdminSupport platformAdminSupport
+            PlatformAdminSupport platformAdminSupport,
+            AuditPayloadRedactor auditPayloadRedactor
     ) {
         this.sysAuditLogMapper = sysAuditLogMapper;
         this.objectMapper = objectMapper;
         this.dataScopeService = dataScopeService;
         this.platformAdminSupport = platformAdminSupport;
+        this.auditPayloadRedactor = auditPayloadRedactor;
     }
 
     public void record(String type, String operator, String tenantId, Map<String, Object> details) {
@@ -54,7 +57,7 @@ public class AuditService implements AuditEventPublisher {
     @Override
     public void publish(PlatformAuditEvent event) {
         String resolvedTenantId = StringUtils.hasText(event.tenantId()) ? event.tenantId() : "platform";
-        Map<String, Object> enrichedDetails = enrichDetails(event.details(), event.operator(), resolvedTenantId);
+        Map<String, Object> enrichedDetails = auditPayloadRedactor.redact(enrichDetails(event.details(), event.operator(), resolvedTenantId));
 
         SysAuditLogEntity entity = new SysAuditLogEntity();
         entity.setTenantId(resolvedTenantId);
@@ -236,7 +239,7 @@ public class AuditService implements AuditEventPublisher {
                 entity.getRequestId(),
                 entity.getClientIp(),
                 TimeSupport.toEpochMilli(entity.getOccurredAt()),
-                parsePayload(entity.getPayloadJson())
+                auditPayloadRedactor.redact(parsePayload(entity.getPayloadJson()))
         );
     }
 

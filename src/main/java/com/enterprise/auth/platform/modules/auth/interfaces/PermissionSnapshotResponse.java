@@ -1,7 +1,6 @@
 package com.enterprise.auth.platform.modules.auth.interfaces;
 
 import com.enterprise.auth.platform.common.authz.DataScopeType;
-import com.enterprise.auth.platform.modules.auth.interfaces.MenuNode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import java.util.Set;
@@ -17,6 +16,8 @@ public record PermissionSnapshotResponse(
         @Schema(description = "数据权限范围") DataScopeType dataScopeType,
         @Schema(description = "自定义部门 ID 集合") Set<Long> customDeptIds,
         @Schema(description = "可见菜单树") List<MenuNode> menus,
+        @Schema(description = "头像文件键") String avatarFileKey,
+        @Schema(description = "头像访问地址") String avatarUrl,
         @Schema(description = "是否为平台超级管理员") boolean superAdmin
 ) {
 }

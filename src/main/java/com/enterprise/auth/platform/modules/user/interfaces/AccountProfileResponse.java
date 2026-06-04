@@ -9,7 +9,14 @@ public record AccountProfileResponse(
         String displayName,
         String mobile,
         String email,
+        String avatarFileKey,
+        String avatarUrl,
+        boolean enabled,
         boolean mustChangePassword,
-        LocalDateTime passwordUpdatedAt
+        LocalDateTime passwordUpdatedAt,
+        LocalDateTime lastLoginAt,
+        String lastLoginIp,
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt
 ) {
 }
