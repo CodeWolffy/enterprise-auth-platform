@@ -8,6 +8,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.slf4j.Logger;
@@ -177,6 +178,56 @@ public class SessionIndexService {
     return page(0, limit).map(Page::records);
   }
 
+  public Optional<Long> count() {
+    if (useLocalIndex()) {
+      return Optional.of((long) localSessions.size());
+    }
+    try {
+      Long total = redisTemplate.opsForZSet().zCard(allSessionsKey());
+      return Optional.of(total == null ? 0L : total);
+    } catch (RuntimeException ex) {
+      log.warn("Failed to count session index. error={}", ex.getMessage());
+      return Optional.empty();
+    }
+  }
+
+  public Optional<Long> countVisible(String tenantId, boolean platformScope, Optional<Set<Long>> visibleUserIds) {
+    if (platformScope) {
+      return count();
+    }
+    if (useLocalIndex()) {
+      return Optional.of(localSessions.values().stream()
+          .filter(session -> visibleSession(session, tenantId, visibleUserIds))
+          .count());
+    }
+    try {
+      long total = 0;
+      int page = 0;
+      int size = 200;
+      while (true) {
+        Optional<Page> pageResult = page(page, size);
+        if (pageResult.isEmpty()) {
+          return Optional.empty();
+        }
+        List<IndexedSession> records = pageResult.get().records();
+        if (records.isEmpty()) {
+          break;
+        }
+        total += records.stream()
+            .filter(session -> visibleSession(session, tenantId, visibleUserIds))
+            .count();
+        if ((long) (page + 1) * size >= pageResult.get().total()) {
+          break;
+        }
+        page++;
+      }
+      return Optional.of(total);
+    } catch (RuntimeException ex) {
+      log.warn("Failed to count visible session index. error={}", ex.getMessage());
+      return Optional.empty();
+    }
+  }
+
   public Optional<Page> page(int page, int size) {
     if (useLocalIndex()) {
       return Optional.of(localPage(page, size));
@@ -205,6 +256,16 @@ public class SessionIndexService {
   }
 
   public record Page(long total, List<IndexedSession> records) {}
+
+    private boolean visibleSession(IndexedSession session, String tenantId, Optional<Set<Long>> visibleUserIds) {
+        if (session == null || session.response() == null) {
+            return false;
+        }
+        if (!tenantId.equals(session.response().tenantId())) {
+            return false;
+        }
+        return visibleUserIds.map(userIds -> userIds.contains(session.userId())).orElse(true);
+    }
 
     private Optional<IndexedSession> read(String token) {
         Map<Object, Object> meta = redisTemplate.opsForHash().entries(sessionMetaKey(token));

@@ -72,7 +72,11 @@ class DashboardStatsServiceP1Test {
         ensureFile(TENANT_B, "p1-dashboard-b-1", otherTenantUserId, 900L);
         ensureAudit(TENANT_A, ADMIN);
         ensureAudit(TENANT_A, VISIBLE);
+        ensureAudit(TENANT_A, ADMIN, "LOGIN_SUCCESS");
+        ensureAudit(TENANT_A, VISIBLE, "LOGIN_FAILED");
+        ensureAudit(TENANT_A, ADMIN, "ACCOUNT_LOCKED");
         ensureAudit(TENANT_B, OTHER_TENANT);
+        ensureAudit(TENANT_B, OTHER_TENANT, "LOGIN_SUCCESS");
 
         TenantContext.setTenantId(TENANT_A);
         bind(principal(adminId, TENANT_A, ADMIN, DataScopeType.ALL));
@@ -86,8 +90,19 @@ class DashboardStatsServiceP1Test {
         assertThat(stats.tenantCount()).isEqualTo(1);
         assertThat(stats.fileCount()).isEqualTo(2);
         assertThat(stats.storageBytes()).isEqualTo(300L);
-        assertThat(stats.operationLogCount()).isEqualTo(2);
-        assertThat(stats.recentOperationLogCount()).isEqualTo(2);
+        assertThat(stats.operationLogCount()).isEqualTo(5);
+        assertThat(stats.recentOperationLogCount()).isEqualTo(5);
+        assertThat(stats.todayLoginCount()).isEqualTo(1);
+        assertThat(stats.todayOperationLogCount()).isEqualTo(5);
+        assertThat(stats.todayLoginFailedCount()).isEqualTo(1);
+        assertThat(stats.todayRiskEventCount()).isEqualTo(1);
+        assertThat(stats.dailyTrend()).hasSize(7);
+        assertThat(stats.dailyTrend().get(6).loginCount()).isEqualTo(1);
+        assertThat(stats.dailyTrend().get(6).operationCount()).isEqualTo(5);
+        assertThat(stats.dailyTrend().get(6).loginFailedCount()).isEqualTo(1);
+        assertThat(stats.serviceHealth()).extracting("code").contains("backend", "database", "redis", "storage");
+        assertThat(stats.recentAuditEvents()).hasSize(5);
+        assertThat(stats.recentAuditEvents()).allMatch(event -> TENANT_A.equals(event.tenantId()));
     }
 
     @Test
@@ -101,7 +116,11 @@ class DashboardStatsServiceP1Test {
         ensureFile(TENANT_A, "p1-dashboard-hidden-user", hiddenId, 900L);
         ensureAudit(TENANT_A, ADMIN);
         ensureAudit(TENANT_A, VISIBLE);
+        ensureAudit(TENANT_A, ADMIN, "LOGIN_SUCCESS");
+        ensureAudit(TENANT_A, VISIBLE, "LOGIN_FAILED");
         ensureAudit(TENANT_A, HIDDEN);
+        ensureAudit(TENANT_A, HIDDEN, "LOGIN_SUCCESS");
+        ensureAudit(TENANT_A, HIDDEN, "LOGIN_FAILED");
 
         TenantContext.setTenantId(TENANT_A);
         bind(principal(adminId, TENANT_A, ADMIN, DataScopeType.DEPT));
@@ -115,8 +134,18 @@ class DashboardStatsServiceP1Test {
         assertThat(stats.tenantCount()).isEqualTo(1);
         assertThat(stats.fileCount()).isEqualTo(2);
         assertThat(stats.storageBytes()).isEqualTo(300L);
-        assertThat(stats.operationLogCount()).isEqualTo(2);
-        assertThat(stats.recentOperationLogCount()).isEqualTo(2);
+        assertThat(stats.operationLogCount()).isEqualTo(4);
+        assertThat(stats.recentOperationLogCount()).isEqualTo(4);
+        assertThat(stats.todayLoginCount()).isEqualTo(1);
+        assertThat(stats.todayOperationLogCount()).isEqualTo(4);
+        assertThat(stats.todayLoginFailedCount()).isEqualTo(1);
+        assertThat(stats.todayRiskEventCount()).isZero();
+        assertThat(stats.dailyTrend()).hasSize(7);
+        assertThat(stats.dailyTrend().get(6).loginCount()).isEqualTo(1);
+        assertThat(stats.dailyTrend().get(6).operationCount()).isEqualTo(4);
+        assertThat(stats.dailyTrend().get(6).loginFailedCount()).isEqualTo(1);
+        assertThat(stats.recentAuditEvents()).hasSize(4);
+        assertThat(stats.recentAuditEvents()).extracting("operator").doesNotContain(HIDDEN);
     }
 
     private Long ensureUser(String tenantId, String username, Long deptId) {
@@ -160,14 +189,18 @@ class DashboardStatsServiceP1Test {
     }
 
     private void ensureAudit(String tenantId, String operator) {
+        ensureAudit(tenantId, operator, "P1_DASHBOARD_SCOPE_TEST");
+    }
+
+    private void ensureAudit(String tenantId, String operator, String eventType) {
         jdbcTemplate.update(
                 "INSERT INTO sys_audit_log(tenant_id, event_type, operator, payload_json, occurred_at, request_id, client_ip) VALUES(?,?,?,?,?,?,?)",
                 tenantId,
-                "P1_DASHBOARD_SCOPE_TEST",
+                eventType,
                 operator,
                 "{}",
                 TimeSupport.utcNowDateTime(),
-                "p1-dashboard-" + operator,
+                "p1db-" + operator + "-" + eventType,
                 "127.0.0.1"
         );
     }
@@ -188,8 +221,8 @@ class DashboardStatsServiceP1Test {
     }
 
     private void cleanup() {
-        jdbcTemplate.update("DELETE FROM sys_audit_log WHERE tenant_id IN (?, ?) AND event_type = ?",
-                TENANT_A, TENANT_B, "P1_DASHBOARD_SCOPE_TEST");
+        jdbcTemplate.update("DELETE FROM sys_audit_log WHERE tenant_id IN (?, ?) AND request_id LIKE 'p1db-%'",
+                TENANT_A, TENANT_B);
         jdbcTemplate.update("DELETE FROM sys_storage_file WHERE tenant_id IN (?, ?) AND file_key LIKE 'p1-dashboard-%'",
                 TENANT_A, TENANT_B);
         jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id IN (?, ?) AND role_code LIKE 'p1_dashboard_role_%'",

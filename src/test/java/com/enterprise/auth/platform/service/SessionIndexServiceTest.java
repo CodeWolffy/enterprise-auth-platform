@@ -11,6 +11,8 @@ import com.enterprise.auth.platform.modules.auth.infrastructure.SecurityProperti
 import com.enterprise.auth.platform.modules.auth.application.SessionIndexService;
 import java.time.Duration;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -49,6 +51,42 @@ class SessionIndexServiceTest {
 
         verify(hashOps).put("eap:test:v1:session:meta:token-1", "activeTenantId", "tenant-a");
         verify(redisTemplate).expire("eap:test:v1:session:meta:token-1", Duration.ofDays(7).plusHours(1));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void countVisibleShouldFilterByTenantAndVisibleUsers() {
+        StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+        HashOperations<String, Object, Object> hashOps = mock(HashOperations.class);
+        ZSetOperations<String, String> zSetOps = mock(ZSetOperations.class);
+        when(redisTemplate.opsForZSet()).thenReturn(zSetOps);
+        when(redisTemplate.opsForHash()).thenReturn(hashOps);
+        when(zSetOps.zCard("eap:test:v1:session:index:all")).thenReturn(3L);
+        when(zSetOps.reverseRange("eap:test:v1:session:index:all", 0, 199L))
+                .thenReturn(Set.of("token-1", "token-2", "token-3"));
+        when(hashOps.entries("eap:test:v1:session:meta:token-1")).thenReturn(Map.of(
+                "userId", "100",
+                "username", "admin",
+                "tenantId", "tenant-a",
+                "activeTenantId", "tenant-a"
+        ));
+        when(hashOps.entries("eap:test:v1:session:meta:token-2")).thenReturn(Map.of(
+                "userId", "200",
+                "username", "visible",
+                "tenantId", "tenant-a",
+                "activeTenantId", "tenant-a"
+        ));
+        when(hashOps.entries("eap:test:v1:session:meta:token-3")).thenReturn(Map.of(
+                "userId", "300",
+                "username", "other",
+                "tenantId", "tenant-b",
+                "activeTenantId", "tenant-b"
+        ));
+        SessionIndexService service = new SessionIndexService(redisTemplate, securityProperties());
+
+        Optional<Long> count = service.countVisible("tenant-a", false, Optional.of(Set.of(100L)));
+
+        assertThat(count).contains(1L);
     }
 
     private SecurityProperties securityProperties() {
