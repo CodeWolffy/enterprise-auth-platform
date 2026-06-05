@@ -19,12 +19,6 @@ export interface AccountProfileResponse {
   updatedAt?: string | null
 }
 
-export interface AccountProfileUpdatePayload {
-  displayName?: string | null
-  mobile?: string | null
-  email?: string | null
-}
-
 export async function fetchAccountProfile() {
   const { data } = await http.get<ApiResponse<AccountProfileResponse>>('/api/account/profile')
   return data.data

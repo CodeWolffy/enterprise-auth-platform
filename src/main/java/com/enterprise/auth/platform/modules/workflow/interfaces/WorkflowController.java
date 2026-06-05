@@ -122,9 +122,10 @@ public class WorkflowController {
     @GetMapping("/tasks/todo")
     public ApiResponse<PageResult<WorkflowTaskView>> todoTasks(
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) Long taskId
     ) {
-        return ApiResponse.ok(workflowApplicationService.todoTasks(page, size));
+        return ApiResponse.ok(workflowApplicationService.todoTasks(page, size, taskId));
     }
 
     @Operation(summary = "查询我的已办")

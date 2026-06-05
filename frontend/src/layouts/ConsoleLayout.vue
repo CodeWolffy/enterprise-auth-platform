@@ -55,6 +55,7 @@
           </div>
 
           <div class="header-actions">
+            <NotificationBell ref="notificationBellRef" />
             <el-tooltip content="在线设备管理" placement="bottom">
               <el-icon class="action-icon" title="在线设备管理" data-testid="header-online-devices" @click="openSessions"><Monitor /></el-icon>
             </el-tooltip>
@@ -237,8 +238,13 @@ import {
   Close,
 } from '@element-plus/icons-vue'
 import AppNav from '@/components/common/AppNav.vue'
+import NotificationBell from '@/components/notification/NotificationBell.vue'
 import { useAuthStore } from '@/stores/auth'
-import { forceOffline, querySessions, queryTenants } from '@/api/modules'
+import {
+  forceOffline,
+  querySessions,
+  queryTenants,
+} from '@/api/modules'
 import { isAllowedRoute, resolveFirstAllowedPath } from '@/router/route-access'
 import { formatDateTime } from '@/utils/datetime'
 
@@ -247,6 +253,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const isCollapse = ref(false)
+const notificationBellRef = ref<InstanceType<typeof NotificationBell> | null>(null)
 const sessionsVisible = ref(false)
 const sessionsList = ref<any[]>([])
 const sessionsLoading = ref(false)
@@ -418,6 +425,7 @@ const tenantSelectWidth = computed(() => {
 })
 
 onMounted(() => {
+  notificationBellRef.value?.loadUnreadNotificationCount()
   if (canLoadTenants.value) {
     loadTenantOptions()
   }
@@ -446,6 +454,7 @@ async function handleTenantChange(newTenantId: string) {
   if (!targetTenantId || targetTenantId === authStore.tenantId || tenantSwitching.value) return
   try {
     await authStore.switchTenant(targetTenantId)
+    await notificationBellRef.value?.loadUnreadNotificationCount()
     const redirected = await settleRouteAfterTenantSwitch()
     if (!redirected) {
       ElMessage.success(`已切换到租户 ${authStore.tenantId}`)

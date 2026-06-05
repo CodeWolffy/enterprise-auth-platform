@@ -132,7 +132,7 @@
             <div>
               <strong>{{ step.name }}</strong>
               <small>{{ formatCandidates(step) }}</small>
-              <small class="step-node-reject">驳回策略：{{ formatRejectStrategy(step.rejectStrategy) }}</small>
+              <small class="step-node-reject">驳回策略：{{ formatRejectStrategy(step, detailItem.steps) }}</small>
             </div>
           </article>
         </div>
@@ -305,15 +305,30 @@ function parseStepsText(value: string): WorkflowStepInput[] {
       candidateUserIds,
       candidateGroupCodes,
       rejectStrategy: normalizeRejectStrategy(item.rejectStrategy),
+      rejectTarget: normalizeRejectTarget(item.rejectStrategy, item.rejectTarget, index, parsed.length),
     }
   })
 }
 
-function normalizeRejectStrategy(value: unknown): 'END' | 'PREVIOUS' | 'RESTART' {
-  if (value === 'PREVIOUS' || value === 'RESTART' || value === 'END') {
+function normalizeRejectStrategy(value: unknown): 'END' | 'PREVIOUS' | 'RESTART' | 'TO_STEP' | 'TO_STARTER' {
+  if (value === 'PREVIOUS' || value === 'RESTART' || value === 'TO_STEP' || value === 'TO_STARTER' || value === 'END') {
     return value
   }
   return 'END'
+}
+
+function normalizeRejectTarget(strategy: unknown, value: unknown, index: number, totalSteps: number) {
+  if (strategy !== 'TO_STEP') {
+    return null
+  }
+  const target = Number(value)
+  if (!Number.isInteger(target)) {
+    throw new Error(`第 ${index + 1} 个审批步骤需要配置指定驳回目标`)
+  }
+  if (target < 0 || target >= totalSteps || target >= index) {
+    throw new Error(`第 ${index + 1} 个审批步骤的指定驳回目标必须在当前节点之前`)
+  }
+  return target
 }
 
 function normalizeNumberArray(value: unknown) {
@@ -337,8 +352,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function defaultStepsText() {
   return JSON.stringify(
     [
-      { name: '直属主管审批', candidateUserIds: [1], candidateGroupCodes: [] },
-      { name: '平台管理员复核', candidateUserIds: [], candidateGroupCodes: ['ADMIN'] },
+      { name: '直属主管审批', candidateUserIds: [1], candidateGroupCodes: [], rejectStrategy: 'END' },
+      { name: '平台管理员复核', candidateUserIds: [], candidateGroupCodes: ['ADMIN'], rejectStrategy: 'TO_STEP', rejectTarget: 0 },
     ],
     null,
     2,
@@ -349,14 +364,21 @@ function formatSteps(row: WorkflowDefinitionView) {
   return row.steps.map((step) => `${step.stepIndex + 1}. ${step.name}`).join(' / ')
 }
 
-function formatRejectStrategy(strategy?: string) {
-  if (strategy === 'PREVIOUS') {
-    return '回退上一步'
+function formatRejectStrategy(step: WorkflowStepView, steps: WorkflowStepView[] = []) {
+  if (step.rejectStrategy === 'PREVIOUS') {
+    return '驳回上一节点'
   }
-  if (strategy === 'RESTART') {
-    return '回到起点'
+  if (step.rejectStrategy === 'RESTART') {
+    return '驳回首节点'
   }
-  return '结束流程'
+  if (step.rejectStrategy === 'TO_STARTER') {
+    return '驳回发起人重提'
+  }
+  if (step.rejectStrategy === 'TO_STEP') {
+    const target = step.rejectTarget === null || step.rejectTarget === undefined ? null : steps.find((item) => item.stepIndex === step.rejectTarget)
+    return target ? `驳回指定节点：${target.stepIndex + 1}. ${target.name}` : '驳回指定节点：目标未配置'
+  }
+  return '驳回结束'
 }
 
 function formatCandidates(step: WorkflowStepView) {

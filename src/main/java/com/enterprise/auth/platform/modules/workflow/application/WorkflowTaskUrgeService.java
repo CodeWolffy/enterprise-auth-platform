@@ -9,6 +9,8 @@ import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
+import com.enterprise.auth.platform.modules.notification.application.NotificationPublishCommand;
+import com.enterprise.auth.platform.modules.notification.application.NotificationPublisher;
 import com.enterprise.auth.platform.modules.workflow.domain.WorkflowTaskStatus;
 import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfProcessInstanceEntity;
 import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfTaskEntity;
@@ -24,12 +26,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 @Service
 public class WorkflowTaskUrgeService {
+
+    private static final Logger log = LoggerFactory.getLogger(WorkflowTaskUrgeService.class);
 
     private final WfTaskUrgeMapper urgeMapper;
     private final WfTaskMapper taskMapper;
@@ -37,6 +45,7 @@ public class WorkflowTaskUrgeService {
     private final CurrentUserService currentUserService;
     private final AuditEventPublisher auditEventPublisher;
     private final ObjectMapper objectMapper;
+    private final NotificationPublisher notificationPublisher;
     private static final TypeReference<java.util.Set<Long>> LONG_SET_TYPE = new TypeReference<>() { };
     private static final TypeReference<java.util.Set<String>> STRING_SET_TYPE = new TypeReference<>() { };
 
@@ -46,7 +55,8 @@ public class WorkflowTaskUrgeService {
             WfProcessInstanceMapper instanceMapper,
             CurrentUserService currentUserService,
             AuditEventPublisher auditEventPublisher,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            NotificationPublisher notificationPublisher
     ) {
         this.urgeMapper = urgeMapper;
         this.taskMapper = taskMapper;
@@ -54,6 +64,7 @@ public class WorkflowTaskUrgeService {
         this.currentUserService = currentUserService;
         this.auditEventPublisher = auditEventPublisher;
         this.objectMapper = objectMapper;
+        this.notificationPublisher = notificationPublisher;
     }
 
     @Transactional
@@ -84,6 +95,7 @@ public class WorkflowTaskUrgeService {
         urgeMapper.insert(entity);
 
         Set<String> targets = urgeTargets(task);
+        publishAfterCommit(buildUrgeNotification(tenantId, task, entity, user));
         WorkflowTaskUrgeView view = WorkflowTaskUrgeView.from(entity, targets);
         int total = countUrges(task.getTenantId(), task.getId());
         auditEventPublisher.publish(PlatformAuditEvent.of("WORKFLOW_TASK_URGED", user.username(), tenantId, Map.of(
@@ -229,6 +241,88 @@ public class WorkflowTaskUrgeService {
             targets.add("当前处理人");
         }
         return targets;
+    }
+
+    private NotificationPublishCommand buildUrgeNotification(String tenantId, WfTaskEntity task, WfTaskUrgeEntity urge, UserAccount sender) {
+        Set<Long> recipientUserIds = new LinkedHashSet<>();
+        Set<String> recipientRoleCodes = new LinkedHashSet<>();
+        if (task.getAssigneeUserId() != null) {
+            recipientUserIds.add(task.getAssigneeUserId());
+        } else {
+            recipientUserIds.addAll(parseLongSet(task.getCandidateUserIdsJson()));
+            recipientRoleCodes.addAll(parseStringSet(task.getCandidateGroupCodesJson()));
+        }
+        if (recipientUserIds.isEmpty() && recipientRoleCodes.isEmpty()) {
+            return null;
+        }
+        WfProcessInstanceEntity instance = instanceMapper.selectOne(new LambdaQueryWrapper<WfProcessInstanceEntity>()
+                .eq(WfProcessInstanceEntity::getTenantId, tenantId)
+                .eq(WfProcessInstanceEntity::getId, task.getInstanceId())
+                .eq(WfProcessInstanceEntity::getDeleted, 0)
+                .last("limit 1"));
+        String instanceTitle = instance == null || !StringUtils.hasText(instance.getTitle()) ? "流程实例" : instance.getTitle().trim();
+        String businessKey = instance == null || !StringUtils.hasText(instance.getBusinessKey()) ? String.valueOf(task.getInstanceId()) : instance.getBusinessKey().trim();
+        String reason = StringUtils.hasText(urge.getComment()) ? urge.getComment().trim() : "无";
+        String stepName = StringUtils.hasText(task.getStepName()) ? task.getStepName().trim() : "当前节点";
+        String title = "流程待办催办：" + instanceTitle;
+        String content = "流程编号：" + businessKey
+                + "\n催办人：" + sender.username()
+                + "\n当前节点：" + stepName
+                + "\n催办原因：" + reason;
+        return new NotificationPublishCommand(
+                tenantId,
+                "WORKFLOW_TASK_URGE",
+                "WORKFLOW_TASK",
+                String.valueOf(task.getId()),
+                "WORKFLOW_TASK",
+                String.valueOf(task.getId()),
+                recipientUserIds,
+                recipientRoleCodes,
+                false,
+                Map.of(
+                        "taskId", task.getId(),
+                        "urgeId", urge.getId(),
+                        "instanceId", task.getInstanceId(),
+                        "instanceTitle", instanceTitle,
+                        "businessKey", businessKey,
+                        "stepName", stepName,
+                        "senderName", sender.username(),
+                        "reason", reason
+                ),
+                title,
+                content,
+                "WARNING",
+                "/platform/workflow/todo?taskId=" + task.getId(),
+                Map.of("route", "/platform/workflow/todo", "taskId", task.getId()),
+                Map.of("instanceId", task.getInstanceId(), "urgeId", urge.getId()),
+                "WORKFLOW_TASK_URGE:" + urge.getId(),
+                null,
+                sender.username()
+        );
+    }
+
+    private void publishAfterCommit(NotificationPublishCommand command) {
+        if (command == null) {
+            return;
+        }
+        Runnable publishTask = () -> {
+            try {
+                notificationPublisher.publish(command);
+            } catch (Exception ex) {
+                log.warn("Failed to publish workflow urge notification. tenantId={}, bizId={}, dedupKey={}",
+                        command.tenantId(), command.bizId(), command.dedupKey(), ex);
+            }
+        };
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            publishTask.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                publishTask.run();
+            }
+        });
     }
 
     private Set<Long> parseLongSet(String json) {

@@ -4,7 +4,6 @@ import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.modules.user.application.AccountApplicationService;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -23,7 +22,7 @@ public class AccountController {
         this.accountApplicationService = accountApplicationService;
     }
 
-    @GetMapping("/profile")
+    @org.springframework.web.bind.annotation.GetMapping("/profile")
     public ApiResponse<AccountProfileResponse> profile() {
         return ApiResponse.ok(accountApplicationService.profile());
     }

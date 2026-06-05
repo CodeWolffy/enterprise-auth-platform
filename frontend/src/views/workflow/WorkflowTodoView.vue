@@ -23,7 +23,7 @@
         <el-button size="small" :loading="loading" @click="loadTasks">刷新</el-button>
       </div>
 
-      <el-table v-loading="loading" :data="pageData.records" stripe>
+      <el-table v-loading="loading" :data="pageData.records" :row-class-name="taskRowClassName" stripe>
         <el-table-column label="任务" min-width="240" show-overflow-tooltip>
           <template #default="{ row }">
             <div class="workflow-name-cell">
@@ -182,7 +182,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import type { TagProps } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { approveWorkflowTask, listWorkflowTaskUrges, queryWorkflowTodoTasks, rejectWorkflowTask, transferWorkflowTask, urgeWorkflowTask } from '@/api/modules'
@@ -190,6 +191,7 @@ import type { PageResult } from '@/types/api'
 import type { WorkflowTaskUrgeView, WorkflowTaskView } from '@/types/workflow'
 import { formatDateTime } from '@/utils/datetime'
 
+const route = useRoute()
 const loading = ref(false)
 const submitting = ref(false)
 const urging = ref(false)
@@ -215,14 +217,25 @@ const query = reactive({
 })
 
 const pageData = ref<PageResult<WorkflowTaskView>>({ total: 0, page: 1, size: 20, records: [] })
+const focusedTaskId = computed(() => normalizeTaskId(route.query.taskId))
 const actionableCount = computed(() => pageData.value.records.filter((item) => item.actionable).length)
 
-void loadTasks()
+watch(focusedTaskId, async () => {
+  query.page = 1
+  await loadTasks()
+  await focusTaskFromQuery()
+})
+
+void loadTasks().then(focusTaskFromQuery)
 
 async function loadTasks() {
   loading.value = true
   try {
-    pageData.value = await queryWorkflowTodoTasks({ page: query.page, size: query.size })
+    pageData.value = await queryWorkflowTodoTasks({
+      page: query.page,
+      size: query.size,
+      taskId: focusedTaskId.value ?? undefined,
+    })
   } finally {
     loading.value = false
   }
@@ -237,6 +250,32 @@ async function handleSizeChange(nextSize: number) {
   query.size = nextSize
   query.page = 1
   await loadTasks()
+}
+
+function normalizeTaskId(value: unknown) {
+  const raw = Array.isArray(value) ? value[0] : value
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
+async function focusTaskFromQuery() {
+  const taskId = focusedTaskId.value
+  if (!taskId) {
+    return
+  }
+  const existsInCurrentPage = pageData.value.records.some((item) => item.id === taskId)
+  if (!existsInCurrentPage && query.page !== 1) {
+    query.page = 1
+    await loadTasks()
+  }
+  await nextTick()
+  if (pageData.value.records.some((item) => item.id === taskId)) {
+    document.querySelector('.workflow-task-row--focused')?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }
+}
+
+function taskRowClassName({ row }: { row: WorkflowTaskView }) {
+  return focusedTaskId.value === row.id ? 'workflow-task-row--focused' : ''
 }
 
 function openDetail(row: WorkflowTaskView) {
@@ -387,6 +426,14 @@ function taskStatusTag(status: string): TagProps['type'] {
   small {
     color: var(--text-soft);
     font-size: 12px;
+  }
+}
+
+:deep(.workflow-task-row--focused) {
+  --el-table-tr-bg-color: #fff7e6;
+
+  td {
+    background-color: #fff7e6 !important;
   }
 }
 .candidate-detail {

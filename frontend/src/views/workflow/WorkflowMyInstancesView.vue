@@ -149,6 +149,27 @@
           <span class="eyebrow">Variables Snapshot</span>
           <pre>{{ formatSnapshot(detailItem.variablesSnapshot) }}</pre>
         </section>
+        <section class="snapshot-card">
+          <div class="urge-card-head">
+            <span class="eyebrow">Urge Records</span>
+            <el-button size="small" text :loading="urgeLoading" @click="loadInstanceUrges(detailItem.id)">刷新</el-button>
+          </div>
+          <el-table v-loading="urgeLoading" :data="urgePage.records" size="small" stripe>
+            <el-table-column label="催办人" prop="urgedByUsername" width="120" />
+            <el-table-column label="接收范围" min-width="160" show-overflow-tooltip>
+              <template #default="{ row }">{{ row.targetUsernames.join('、') || '-' }}</template>
+            </el-table-column>
+            <el-table-column label="说明" min-width="160" show-overflow-tooltip>
+              <template #default="{ row }">{{ row.comment || '-' }}</template>
+            </el-table-column>
+            <el-table-column label="时间" width="160">
+              <template #default="{ row }">{{ formatDateTime(row.urgedAt) }}</template>
+            </el-table-column>
+            <template #empty>
+              <el-empty description="暂无催办记录" />
+            </template>
+          </el-table>
+        </section>
       </template>
     </el-drawer>
   </div>
@@ -160,6 +181,7 @@ import type { FormInstance, FormRules, TagProps } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AdvancedSearch from '@/components/common/AdvancedSearch.vue'
 import {
+  listWorkflowInstanceUrges,
   queryMyWorkflowInstances,
   queryWorkflowDefinitions,
   startWorkflowInstance,
@@ -167,7 +189,7 @@ import {
   withdrawWorkflowInstance,
 } from '@/api/modules'
 import type { PageResult } from '@/types/api'
-import type { WorkflowDefinitionView, WorkflowInstanceView, WorkflowStartRequest } from '@/types/workflow'
+import type { WorkflowDefinitionView, WorkflowInstanceView, WorkflowStartRequest, WorkflowTaskUrgeView } from '@/types/workflow'
 import { formatDateTime } from '@/utils/datetime'
 
 const loading = ref(false)
@@ -187,6 +209,8 @@ const query = reactive({
 })
 
 const pageData = ref<PageResult<WorkflowInstanceView>>({ total: 0, page: 1, size: 20, records: [] })
+const urgeLoading = ref(false)
+const urgePage = ref<PageResult<WorkflowTaskUrgeView>>({ total: 0, page: 1, size: 20, records: [] })
 const deployedDefinitions = ref<WorkflowDefinitionView[]>([])
 
 const form = reactive({
@@ -233,6 +257,15 @@ async function loadDeployedDefinitions() {
   }
 }
 
+async function loadInstanceUrges(instanceId: number) {
+  urgeLoading.value = true
+  try {
+    urgePage.value = await listWorkflowInstanceUrges(instanceId, 1, 20)
+  } finally {
+    urgeLoading.value = false
+  }
+}
+
 function applySearch() {
   query.page = 1
   void loadInstances()
@@ -269,6 +302,7 @@ function openStartDialog() {
 function openDetail(row: WorkflowInstanceView) {
   detailItem.value = row
   detailVisible.value = true
+  void loadInstanceUrges(row.id)
 }
 
 async function submitStart() {
@@ -408,5 +442,13 @@ function instanceStatusTag(status: string): TagProps['type'] {
     word-break: break-word;
     color: var(--text-main);
   }
+}
+
+.urge-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 </style>

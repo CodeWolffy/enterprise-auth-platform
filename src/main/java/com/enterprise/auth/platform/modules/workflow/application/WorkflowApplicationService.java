@@ -9,10 +9,9 @@ import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.common.context.TenantContext;
-import com.enterprise.auth.platform.modules.role.infrastructure.entity.SysRoleEntity;
-import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMapper;
-import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
-import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
+import com.enterprise.auth.platform.modules.role.application.RoleQueryFacade;
+import com.enterprise.auth.platform.modules.user.application.UserQueryFacade;
+import com.enterprise.auth.platform.modules.user.application.UserQueryFacade.EnabledUser;
 import com.enterprise.auth.platform.modules.workflow.domain.WorkflowDefinitionStatus;
 import com.enterprise.auth.platform.modules.workflow.domain.WorkflowInstanceStatus;
 import com.enterprise.auth.platform.modules.workflow.domain.WorkflowRejectStrategy;
@@ -49,8 +48,8 @@ public class WorkflowApplicationService {
     private final WfProcessDefinitionMapper definitionMapper;
     private final WfProcessInstanceMapper instanceMapper;
     private final WfTaskMapper taskMapper;
-    private final SysUserMapper sysUserMapper;
-    private final SysRoleMapper sysRoleMapper;
+    private final UserQueryFacade userQueryFacade;
+    private final RoleQueryFacade roleQueryFacade;
     private final CurrentUserService currentUserService;
     private final AuditEventPublisher auditEventPublisher;
     private final ObjectMapper objectMapper;
@@ -60,8 +59,8 @@ public class WorkflowApplicationService {
             WfProcessDefinitionMapper definitionMapper,
             WfProcessInstanceMapper instanceMapper,
             WfTaskMapper taskMapper,
-            SysUserMapper sysUserMapper,
-            SysRoleMapper sysRoleMapper,
+            UserQueryFacade userQueryFacade,
+            RoleQueryFacade roleQueryFacade,
             CurrentUserService currentUserService,
             AuditEventPublisher auditEventPublisher,
             ObjectMapper objectMapper,
@@ -70,8 +69,8 @@ public class WorkflowApplicationService {
         this.definitionMapper = definitionMapper;
         this.instanceMapper = instanceMapper;
         this.taskMapper = taskMapper;
-        this.sysUserMapper = sysUserMapper;
-        this.sysRoleMapper = sysRoleMapper;
+        this.userQueryFacade = userQueryFacade;
+        this.roleQueryFacade = roleQueryFacade;
         this.currentUserService = currentUserService;
         this.auditEventPublisher = auditEventPublisher;
         this.objectMapper = objectMapper;
@@ -252,7 +251,7 @@ public class WorkflowApplicationService {
         taskMapper.updateById(task);
 
         WorkflowTaskView nextTask = null;
-        int nextStepIndex = task.getStepIndex() + 1;
+        int nextStepIndex = task.getStepIndex() < 0 ? 0 : task.getStepIndex() + 1;
         if (nextStepIndex >= steps.size()) {
             instance.setStatus(WorkflowInstanceStatus.APPROVED.name());
             instance.setEndedAt(TimeSupport.utcNowDateTime());
@@ -282,6 +281,9 @@ public class WorkflowApplicationService {
         List<WorkflowStepDefinition> steps = readSteps(definition.getStepsJson());
         WorkflowStepDefinition currentStep = stepAt(steps, task.getStepIndex());
 
+        WorkflowRejectStrategy strategy = currentStep.rejectStrategy();
+        int nextStepIndex = resolveRejectTarget(currentStep, task.getStepIndex(), steps);
+
         task.setStatus(WorkflowTaskStatus.REJECTED.name());
         task.setAssigneeUserId(user.id());
         task.setAssigneeUsername(user.username());
@@ -290,11 +292,13 @@ public class WorkflowApplicationService {
         taskMapper.updateById(task);
 
         WorkflowTaskView nextTask = null;
-        WorkflowRejectStrategy strategy = currentStep.rejectStrategy();
-        int nextStepIndex = resolveRejectTarget(strategy, task.getStepIndex(), steps.size());
-        if (nextStepIndex < 0) {
+        if (nextStepIndex == -1) {
             instance.setStatus(WorkflowInstanceStatus.REJECTED.name());
             instance.setEndedAt(TimeSupport.utcNowDateTime());
+        } else if (nextStepIndex == -2) {
+            instance.setCurrentStepIndex(-1);
+            WfTaskEntity created = createStarterReworkTask(tenantId, instance, definition, currentStep);
+            nextTask = toTaskView(created, user);
         } else {
             instance.setCurrentStepIndex(nextStepIndex);
             WfTaskEntity created = createPendingTask(tenantId, instance, definition, steps.get(nextStepIndex), nextStepIndex);
@@ -307,20 +311,36 @@ public class WorkflowApplicationService {
                 "stepIndex", task.getStepIndex(),
                 "strategy", strategy.name(),
                 "nextStepIndex", nextStepIndex,
-                "ended", nextStepIndex < 0
+                "ended", nextStepIndex == -1
         ));
         return new WorkflowActionResult(toInstanceView(instance), nextTask);
     }
 
-    private int resolveRejectTarget(WorkflowRejectStrategy strategy, int currentStepIndex, int totalSteps) {
+    private int resolveRejectTarget(WorkflowStepDefinition currentStep, int currentStepIndex, List<WorkflowStepDefinition> steps) {
+        WorkflowRejectStrategy strategy = currentStep == null ? WorkflowRejectStrategy.END : currentStep.rejectStrategy();
         if (strategy == null) {
             return -1;
         }
         return switch (strategy) {
             case END -> -1;
             case PREVIOUS -> currentStepIndex <= 0 ? -1 : currentStepIndex - 1;
-            case RESTART -> totalSteps <= 0 ? -1 : 0;
+            case RESTART -> steps == null || steps.isEmpty() ? -1 : 0;
+            case TO_STEP -> resolveExplicitRejectTarget(currentStep.rejectTarget(), currentStepIndex, steps == null ? 0 : steps.size());
+            case TO_STARTER -> -2;
         };
+    }
+
+    private int resolveExplicitRejectTarget(Integer rejectTarget, int currentStepIndex, int totalSteps) {
+        if (rejectTarget == null) {
+            throw new BusinessException("指定节点驳回需要配置目标节点");
+        }
+        if (rejectTarget < 0 || rejectTarget >= totalSteps) {
+            throw new BusinessException("指定节点驳回目标不存在");
+        }
+        if (rejectTarget >= currentStepIndex) {
+            throw new BusinessException("指定节点驳回只能指向当前节点之前的节点");
+        }
+        return rejectTarget;
     }
 
     private WorkflowStepDefinition stepAt(List<WorkflowStepDefinition> steps, int index) {
@@ -337,8 +357,8 @@ public class WorkflowApplicationService {
         WfTaskEntity task = requirePendingTask(tenantId, taskId);
         WfProcessInstanceEntity instance = requireRunningInstance(tenantId, task.getInstanceId());
         ensureActionable(task, user);
-        SysUserEntity targetUser = requireEnabledUser(tenantId, command.targetUserId());
-        if (Objects.equals(targetUser.getId(), user.id())) {
+        EnabledUser targetUser = requireEnabledUser(tenantId, command.targetUserId());
+        if (Objects.equals(targetUser.id(), user.id())) {
             throw new BusinessException("不能转签给自己");
         }
 
@@ -357,10 +377,10 @@ public class WorkflowApplicationService {
         transferredTask.setStepIndex(task.getStepIndex());
         transferredTask.setStepName(task.getStepName());
         transferredTask.setStatus(WorkflowTaskStatus.PENDING.name());
-        transferredTask.setCandidateUserIdsJson(toJson(Set.of(targetUser.getId())));
+        transferredTask.setCandidateUserIdsJson(toJson(Set.of(targetUser.id())));
         transferredTask.setCandidateGroupCodesJson(toJson(Set.of()));
-        transferredTask.setAssigneeUserId(targetUser.getId());
-        transferredTask.setAssigneeUsername(targetUser.getUsername());
+        transferredTask.setAssigneeUserId(targetUser.id());
+        transferredTask.setAssigneeUsername(targetUser.username());
         transferredTask.setComment("由 " + user.username() + " 转签");
         taskMapper.insert(transferredTask);
 
@@ -369,8 +389,8 @@ public class WorkflowApplicationService {
                 "taskId", task.getId(),
                 "newTaskId", transferredTask.getId(),
                 "stepIndex", task.getStepIndex(),
-                "targetUserId", targetUser.getId(),
-                "targetUsername", targetUser.getUsername()
+                "targetUserId", targetUser.id(),
+                "targetUsername", targetUser.username()
         ));
         return new WorkflowActionResult(toInstanceView(instance), toTaskView(transferredTask, user));
     }
@@ -405,12 +425,20 @@ public class WorkflowApplicationService {
     }
 
     public PageResult<WorkflowTaskView> todoTasks(int page, int size) {
+        return todoTasks(page, size, null);
+    }
+
+    public PageResult<WorkflowTaskView> todoTasks(int page, int size, Long taskId) {
         UserAccount user = currentUserService.requireCurrentUser();
         String tenantId = currentTenantId(user);
-        List<WorkflowTaskView> filtered = taskMapper.selectList(new LambdaQueryWrapper<WfTaskEntity>()
-                        .eq(WfTaskEntity::getTenantId, tenantId)
-                        .eq(WfTaskEntity::getStatus, WorkflowTaskStatus.PENDING.name())
-                        .eq(WfTaskEntity::getDeleted, 0)
+        LambdaQueryWrapper<WfTaskEntity> wrapper = new LambdaQueryWrapper<WfTaskEntity>()
+                .eq(WfTaskEntity::getTenantId, tenantId)
+                .eq(WfTaskEntity::getStatus, WorkflowTaskStatus.PENDING.name())
+                .eq(WfTaskEntity::getDeleted, 0);
+        if (taskId != null && taskId > 0) {
+            wrapper.eq(WfTaskEntity::getId, taskId);
+        }
+        List<WorkflowTaskView> filtered = taskMapper.selectList(wrapper
                         .orderByAsc(WfTaskEntity::getCreatedAt)
                         .orderByAsc(WfTaskEntity::getId))
                 .stream()
@@ -452,6 +480,28 @@ public class WorkflowApplicationService {
         task.setStatus(WorkflowTaskStatus.PENDING.name());
         task.setCandidateUserIdsJson(toJson(step.candidateUserIds()));
         task.setCandidateGroupCodesJson(toJson(step.candidateGroupCodes()));
+        taskMapper.insert(task);
+        return task;
+    }
+
+    private WfTaskEntity createStarterReworkTask(
+            String tenantId,
+            WfProcessInstanceEntity instance,
+            WfProcessDefinitionEntity definition,
+            WorkflowStepDefinition rejectedStep
+    ) {
+        WfTaskEntity task = new WfTaskEntity();
+        task.setTenantId(tenantId);
+        task.setInstanceId(instance.getId());
+        task.setDefinitionId(definition.getId());
+        task.setStepIndex(-1);
+        task.setStepName("发起人重提");
+        task.setStatus(WorkflowTaskStatus.PENDING.name());
+        task.setCandidateUserIdsJson(toJson(Set.of(instance.getStarterUserId())));
+        task.setCandidateGroupCodesJson(toJson(Set.of()));
+        task.setAssigneeUserId(instance.getStarterUserId());
+        task.setAssigneeUsername(instance.getStarterUsername());
+        task.setComment("由节点「" + rejectedStep.name() + "」驳回发起人重提");
         taskMapper.insert(task);
         return task;
     }
@@ -533,20 +583,15 @@ public class WorkflowApplicationService {
         return task;
     }
 
-    private SysUserEntity requireEnabledUser(String tenantId, Long userId) {
+    private EnabledUser requireEnabledUser(String tenantId, Long userId) {
         if (userId == null) {
             throw new BusinessException("目标用户不能为空");
         }
-        SysUserEntity user = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>()
-                .eq(SysUserEntity::getTenantId, tenantId)
-                .eq(SysUserEntity::getId, userId)
-                .eq(SysUserEntity::getEnabled, 1)
-                .eq(SysUserEntity::getDeleted, 0)
-                .last("limit 1"));
-        if (user == null) {
+        List<EnabledUser> users = userQueryFacade.findEnabledSummariesByIds(tenantId, Set.of(userId));
+        if (users.isEmpty()) {
             throw new BusinessException("NOT_FOUND", "目标用户不存在或已禁用");
         }
-        return user;
+        return users.get(0);
     }
 
     private boolean canViewInstance(WfProcessInstanceEntity instance, UserAccount user) {
@@ -644,9 +689,27 @@ public class WorkflowApplicationService {
             if (userIds.isEmpty() && groupCodes.isEmpty()) {
                 throw new BusinessException("审批步骤至少需要一个候选人或候选组");
             }
-            normalized.add(new WorkflowStepDefinition(step.name().trim(), userIds, groupCodes, step.rejectStrategy()));
+            WorkflowRejectStrategy rejectStrategy = step.rejectStrategy() == null ? WorkflowRejectStrategy.END : step.rejectStrategy();
+            Integer rejectTarget = normalizeRejectTarget(rejectStrategy, step.rejectTarget(), normalized.size(), steps.size());
+            normalized.add(new WorkflowStepDefinition(step.name().trim(), userIds, groupCodes, rejectStrategy, rejectTarget));
         }
         return normalized;
+    }
+
+    private Integer normalizeRejectTarget(WorkflowRejectStrategy strategy, Integer rejectTarget, int stepIndex, int totalSteps) {
+        if (strategy != WorkflowRejectStrategy.TO_STEP) {
+            return null;
+        }
+        if (rejectTarget == null) {
+            throw new BusinessException("指定节点驳回需要配置目标节点");
+        }
+        if (rejectTarget < 0 || rejectTarget >= totalSteps) {
+            throw new BusinessException("指定节点驳回目标不存在");
+        }
+        if (rejectTarget >= stepIndex) {
+            throw new BusinessException("指定节点驳回只能指向当前节点之前的节点");
+        }
+        return rejectTarget;
     }
 
     private void validateCandidates(String tenantId, List<WorkflowStepDefinition> steps) {
@@ -657,19 +720,13 @@ public class WorkflowApplicationService {
             roleCodes.addAll(step.candidateGroupCodes());
         }
         if (!userIds.isEmpty()) {
-            long validUsers = sysUserMapper.selectCount(new LambdaQueryWrapper<SysUserEntity>()
-                    .eq(SysUserEntity::getTenantId, tenantId)
-                    .eq(SysUserEntity::getDeleted, 0)
-                    .in(SysUserEntity::getId, userIds));
+            long validUsers = userQueryFacade.countExistingByIds(tenantId, userIds);
             if (validUsers != userIds.size()) {
                 throw new BusinessException("存在无效的候选人");
             }
         }
         if (!roleCodes.isEmpty()) {
-            long validRoles = sysRoleMapper.selectCount(new LambdaQueryWrapper<SysRoleEntity>()
-                    .eq(SysRoleEntity::getTenantId, tenantId)
-                    .eq(SysRoleEntity::getDeleted, 0)
-                    .in(SysRoleEntity::getRoleCode, roleCodes));
+            long validRoles = roleQueryFacade.countByCodes(tenantId, roleCodes);
             if (validRoles != roleCodes.size()) {
                 throw new BusinessException("存在无效的候选组");
             }
@@ -699,7 +756,8 @@ public class WorkflowApplicationService {
                     step.name(),
                     step.candidateUserIds(),
                     step.candidateGroupCodes(),
-                    step.rejectStrategy() == null ? WorkflowRejectStrategy.END.name() : step.rejectStrategy().name()
+                    step.rejectStrategy() == null ? WorkflowRejectStrategy.END.name() : step.rejectStrategy().name(),
+                    step.rejectTarget()
             ));
         }
         return new WorkflowDefinitionView(

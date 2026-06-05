@@ -18,6 +18,7 @@ import com.enterprise.auth.platform.modules.workflow.application.WorkflowDefinit
 import com.enterprise.auth.platform.modules.workflow.application.WorkflowStartCommand;
 import com.enterprise.auth.platform.modules.workflow.application.WorkflowStepDefinition;
 import com.enterprise.auth.platform.modules.workflow.application.WorkflowTaskCommand;
+import com.enterprise.auth.platform.modules.workflow.domain.WorkflowRejectStrategy;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -144,6 +145,75 @@ class WorkflowApplicationServiceP2Test {
         assertThat(rejected.nextTask()).isNull();
         assertThat(workflowApplicationService.todoTasks(1, 20).records()).isEmpty();
         assertWorkflowAuditRecorded("WORKFLOW_TASK_REJECTED", TENANT_A);
+    }
+
+    @Test
+    void rejectToStepShouldReturnPreviousConfiguredNode() {
+        bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("workflow:write"));
+        var definition = workflowApplicationService.createDefinition(new WorkflowDefinitionCommand(
+                "p2-wf-reject-to-step-ut",
+                "P2 指定节点驳回",
+                List.of(
+                        new WorkflowStepDefinition("直属审批", Set.of(approverOneId), Set.of()),
+                        new WorkflowStepDefinition("角色复核", Set.of(), Set.of(GROUP_APPROVER), WorkflowRejectStrategy.TO_STEP, 0)
+                ),
+                null
+        ));
+        workflowApplicationService.deployDefinition(definition.id());
+        var started = workflowApplicationService.startInstance(new WorkflowStartCommand(
+                "p2-wf-reject-to-step-ut",
+                "p2-business-reject-to-step",
+                "P2 指定节点驳回",
+                Map.of("amount", 700)
+        ));
+
+        bindPrincipal(TENANT_A, approverOneId, APPROVER_ONE, Set.of(), Set.of());
+        var firstApproved = workflowApplicationService.approveTask(started.currentTask().id(), new WorkflowTaskCommand("同意"));
+
+        bindPrincipal(TENANT_A, approverTwoId, APPROVER_TWO, Set.of(GROUP_APPROVER), Set.of());
+        var rejected = workflowApplicationService.rejectTask(firstApproved.nextTask().id(), new WorkflowTaskCommand("回到直属审批"));
+
+        assertThat(rejected.instance().status()).isEqualTo("RUNNING");
+        assertThat(rejected.instance().currentStepIndex()).isEqualTo(0);
+        assertThat(rejected.nextTask()).isNotNull();
+        assertThat(rejected.nextTask().stepIndex()).isEqualTo(0);
+        assertThat(rejected.nextTask().candidateUserIds()).containsExactly(approverOneId);
+    }
+
+    @Test
+    void rejectToStarterShouldCreateStarterReworkTaskAndRestartAfterSubmit() {
+        bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("workflow:write"));
+        var definition = workflowApplicationService.createDefinition(new WorkflowDefinitionCommand(
+                "p2-wf-reject-to-starter-ut",
+                "P2 发起人重提",
+                List.of(new WorkflowStepDefinition("直属审批", Set.of(approverOneId), Set.of(), WorkflowRejectStrategy.TO_STARTER)),
+                null
+        ));
+        workflowApplicationService.deployDefinition(definition.id());
+        var started = workflowApplicationService.startInstance(new WorkflowStartCommand(
+                "p2-wf-reject-to-starter-ut",
+                "p2-business-reject-to-starter",
+                "P2 发起人重提",
+                Map.of("amount", 800)
+        ));
+
+        bindPrincipal(TENANT_A, approverOneId, APPROVER_ONE, Set.of(), Set.of());
+        var rejected = workflowApplicationService.rejectTask(started.currentTask().id(), new WorkflowTaskCommand("请补充材料"));
+
+        assertThat(rejected.instance().status()).isEqualTo("RUNNING");
+        assertThat(rejected.instance().currentStepIndex()).isEqualTo(-1);
+        assertThat(rejected.nextTask()).isNotNull();
+        assertThat(rejected.nextTask().stepIndex()).isEqualTo(-1);
+        assertThat(rejected.nextTask().assigneeUserId()).isEqualTo(starterId);
+
+        bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of());
+        var resubmitted = workflowApplicationService.approveTask(rejected.nextTask().id(), new WorkflowTaskCommand("已补充材料"));
+
+        assertThat(resubmitted.instance().status()).isEqualTo("RUNNING");
+        assertThat(resubmitted.instance().currentStepIndex()).isEqualTo(0);
+        assertThat(resubmitted.nextTask()).isNotNull();
+        assertThat(resubmitted.nextTask().stepIndex()).isEqualTo(0);
+        assertThat(resubmitted.nextTask().candidateUserIds()).containsExactly(approverOneId);
     }
 
     @Test

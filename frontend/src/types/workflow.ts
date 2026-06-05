@@ -1,7 +1,7 @@
 export type WorkflowDefinitionStatus = 'DRAFT' | 'DEPLOYED' | 'DISABLED' | string
 export type WorkflowInstanceStatus = 'RUNNING' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN' | 'TERMINATED' | string
 export type WorkflowTaskStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'TRANSFERRED' | string
-export type WorkflowRejectStrategy = 'END' | 'PREVIOUS' | 'RESTART' | string
+export type WorkflowRejectStrategy = 'END' | 'PREVIOUS' | 'RESTART' | 'TO_STEP' | 'TO_STARTER' | string
 
 export interface WorkflowStepView {
   stepIndex: number
@@ -9,6 +9,7 @@ export interface WorkflowStepView {
   candidateUserIds: number[]
   candidateGroupCodes: string[]
   rejectStrategy?: WorkflowRejectStrategy
+  rejectTarget?: number | null
 }
 
 export interface WorkflowStepInput {
@@ -16,6 +17,7 @@ export interface WorkflowStepInput {
   candidateUserIds: number[]
   candidateGroupCodes: string[]
   rejectStrategy?: WorkflowRejectStrategy
+  rejectTarget?: number | null
 }
 
 export interface WorkflowDefinitionView {
@@ -101,6 +103,7 @@ export interface WorkflowTaskTransferRequest {
 export interface WorkflowTaskQueryParams {
   page?: number
   size?: number
+  taskId?: number
 }
 
 export interface WorkflowStartResult {

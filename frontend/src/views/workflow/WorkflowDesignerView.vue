@@ -101,7 +101,7 @@
               </div>
               <div class="step-reject-row">
                 <el-form-item label="驳回策略">
-                  <el-select v-model="step.rejectStrategy" class="step-reject-select" placeholder="选择驳回策略">
+                  <el-select v-model="step.rejectStrategy" class="step-reject-select" placeholder="选择驳回策略" @change="handleRejectStrategyChange(step)">
                     <el-option
                       v-for="option in REJECT_STRATEGY_OPTIONS"
                       :key="option.value"
@@ -113,6 +113,21 @@
                         <small>{{ option.description }}</small>
                       </div>
                     </el-option>
+                  </el-select>
+                </el-form-item>
+                <el-form-item v-if="step.rejectStrategy === 'TO_STEP'" label="目标节点">
+                  <el-select
+                    v-model="step.rejectTarget"
+                    class="step-reject-select"
+                    placeholder="选择当前节点之前的节点"
+                    :disabled="index === 0"
+                  >
+                    <el-option
+                      v-for="option in rejectTargetOptions(index)"
+                      :key="option.value"
+                      :value="option.value"
+                      :label="option.label"
+                    />
                   </el-select>
                 </el-form-item>
               </div>
@@ -145,7 +160,7 @@
             <div>
               <strong>{{ step.name || `审批节点 ${index + 1}` }}</strong>
               <small>{{ formatPreviewCandidates(step) }}</small>
-              <small class="flow-preview-reject">驳回策略：{{ rejectStrategyLabel(step.rejectStrategy) }}</small>
+              <small class="flow-preview-reject">驳回策略：{{ formatRejectStrategy(step) }}</small>
             </div>
           </div>
         </div>
@@ -169,18 +184,23 @@ import { ElMessage } from 'element-plus'
 import { createWorkflowDefinition, deployWorkflowDefinition } from '@/api/modules'
 import type { WorkflowDefinitionRequest, WorkflowStepInput } from '@/types/workflow'
 
+type DesignerRejectStrategy = 'END' | 'PREVIOUS' | 'RESTART' | 'TO_STEP' | 'TO_STARTER'
+
 interface DesignerStep {
   localId: string
   name: string
   candidateUserIdsText: string
   candidateGroupCodesText: string
-  rejectStrategy: 'END' | 'PREVIOUS' | 'RESTART'
+  rejectStrategy: DesignerRejectStrategy
+  rejectTarget: number | null
 }
 
-const REJECT_STRATEGY_OPTIONS: Array<{ value: DesignerStep['rejectStrategy']; label: string; description: string }> = [
-  { value: 'END', label: '结束流程', description: '驳回后结束流程（默认）' },
-  { value: 'PREVIOUS', label: '回退上一步', description: '驳回后回到上一节点；首节点驳回等同于结束' },
-  { value: 'RESTART', label: '回到起点', description: '驳回后重新从第一个节点开始' },
+const REJECT_STRATEGY_OPTIONS: Array<{ value: DesignerRejectStrategy; label: string; description: string }> = [
+  { value: 'END', label: '驳回结束', description: '驳回后结束流程（默认）' },
+  { value: 'PREVIOUS', label: '驳回上一节点', description: '驳回后回到上一节点；首节点驳回等同于结束' },
+  { value: 'RESTART', label: '驳回首节点', description: '驳回后重新从第一个审批节点开始' },
+  { value: 'TO_STEP', label: '驳回指定节点', description: '驳回到当前节点之前的指定审批节点' },
+  { value: 'TO_STARTER', label: '驳回发起人重提', description: '交回发起人修改后重新提交审批' },
 ]
 
 let stepSerial = 0
@@ -215,7 +235,13 @@ function defaultSteps() {
   ]
 }
 
-function createStep(name = '', candidateUserIdsText = '', candidateGroupCodesText = '', rejectStrategy: DesignerStep['rejectStrategy'] = 'END'): DesignerStep {
+function createStep(
+  name = '',
+  candidateUserIdsText = '',
+  candidateGroupCodesText = '',
+  rejectStrategy: DesignerRejectStrategy = 'END',
+  rejectTarget: number | null = null,
+): DesignerStep {
   stepSerial += 1
   return {
     localId: `step-${Date.now()}-${stepSerial}`,
@@ -223,6 +249,7 @@ function createStep(name = '', candidateUserIdsText = '', candidateGroupCodesTex
     candidateUserIdsText,
     candidateGroupCodesText,
     rejectStrategy,
+    rejectTarget,
   }
 }
 
@@ -238,7 +265,7 @@ function duplicateStep(index: number) {
   steps.value.splice(
     index + 1,
     0,
-    createStep(`${source.name || `审批节点 ${index + 1}`} 副本`, source.candidateUserIdsText, source.candidateGroupCodesText, source.rejectStrategy),
+    createStep(`${source.name || `审批节点 ${index + 1}`} 副本`, source.candidateUserIdsText, source.candidateGroupCodesText, source.rejectStrategy, source.rejectTarget),
   )
 }
 
@@ -324,7 +351,14 @@ function toWorkflowStep(step: DesignerStep, index: number): WorkflowStepInput {
   if (!candidateUserIds.length && !candidateGroupCodes.length) {
     throw new Error(`第 ${index + 1} 个审批节点至少需要候选人或候选组`)
   }
-  return { name, candidateUserIds, candidateGroupCodes, rejectStrategy: step.rejectStrategy }
+  const rejectTarget = resolveRejectTarget(step, index)
+  return {
+    name,
+    candidateUserIds,
+    candidateGroupCodes,
+    rejectStrategy: step.rejectStrategy,
+    rejectTarget,
+  }
 }
 
 function toPreviewStep(step: DesignerStep) {
@@ -333,6 +367,7 @@ function toPreviewStep(step: DesignerStep) {
     candidateUserIds: previewUserIds(step),
     candidateGroupCodes: previewGroupCodes(step),
     rejectStrategy: step.rejectStrategy,
+    rejectTarget: step.rejectStrategy === 'TO_STEP' ? step.rejectTarget : null,
   }
 }
 
@@ -342,6 +377,51 @@ function previewUserIds(step: DesignerStep) {
 
 function previewGroupCodes(step: DesignerStep) {
   return normalizeGroupCodes(step.candidateGroupCodesText)
+}
+
+function handleRejectStrategyChange(step: DesignerStep) {
+  if (step.rejectStrategy !== 'TO_STEP') {
+    step.rejectTarget = null
+  }
+}
+
+function rejectTargetOptions(currentIndex: number) {
+  return steps.value.slice(0, Math.max(currentIndex, 0)).map((step, index) => ({
+    value: index,
+    label: `${index + 1}. ${step.name.trim() || `审批节点 ${index + 1}`}`,
+  }))
+}
+
+function resolveRejectTarget(step: DesignerStep, index: number) {
+  if (step.rejectStrategy !== 'TO_STEP') {
+    return null
+  }
+  if (index === 0) {
+    throw new Error('首个审批节点不能驳回到指定节点')
+  }
+  if (step.rejectTarget === null || step.rejectTarget === undefined) {
+    throw new Error(`第 ${index + 1} 个审批节点需要选择驳回目标节点`)
+  }
+  if (step.rejectTarget < 0 || step.rejectTarget >= index) {
+    throw new Error(`第 ${index + 1} 个审批节点的驳回目标必须在当前节点之前`)
+  }
+  return step.rejectTarget
+}
+
+function rejectTargetLabel(target: number | null) {
+  if (target === null || target === undefined) {
+    return '未选择目标节点'
+  }
+  const targetStep = steps.value[target]
+  return targetStep ? `${target + 1}. ${targetStep.name.trim() || `审批节点 ${target + 1}`}` : '目标节点不存在'
+}
+
+function formatRejectStrategy(step: DesignerStep) {
+  const label = rejectStrategyLabel(step.rejectStrategy)
+  if (step.rejectStrategy !== 'TO_STEP') {
+    return label
+  }
+  return `${label}：${rejectTargetLabel(step.rejectTarget)}`
 }
 
 function parseUserIds(value: string, index: number) {
