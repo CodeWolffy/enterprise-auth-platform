@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.modules.codegen.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.enterprise.auth.platform.common.TimeSupport;
+import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.codegen.infrastructure.entity.CodegenTemplateEntity;
@@ -24,7 +24,9 @@ public class CodegenTemplateService {
     public PageResult<CodegenTemplateView> list(String keyword, int page, int size) {
         int safePage = Math.max(page, 1);
         int safeSize = Math.min(Math.max(size, 1), 100);
+        String tenantId = currentTenantId();
         LambdaQueryWrapper<CodegenTemplateEntity> wrapper = new LambdaQueryWrapper<CodegenTemplateEntity>()
+                .eq(CodegenTemplateEntity::getTenantId, tenantId)
                 .eq(CodegenTemplateEntity::getDeleted, 0)
                 .orderByDesc(CodegenTemplateEntity::getBuiltin)
                 .orderByAsc(CodegenTemplateEntity::getName);
@@ -52,6 +54,7 @@ public class CodegenTemplateService {
         validateLanguage(view.language());
         validatePattern(view.pathPattern());
         CodegenTemplateEntity entity = new CodegenTemplateEntity();
+        entity.setTenantId(currentTenantId());
         entity.setName(view.name().trim());
         entity.setLanguage(view.language().toLowerCase());
         entity.setPathPattern(view.pathPattern().trim());
@@ -86,6 +89,8 @@ public class CodegenTemplateService {
         if (entity.getBuiltin() != null && entity.getBuiltin() == 1) {
             throw new BusinessException("BUILTIN_READONLY", "内置模板不允许删除");
         }
+        entity.setName(entity.getName() + "#deleted#" + entity.getId());
+        templateMapper.updateById(entity);
         templateMapper.deleteById(id);
     }
 
@@ -94,9 +99,11 @@ public class CodegenTemplateService {
             return List.of();
         }
         return templateMapper.selectList(new LambdaQueryWrapper<CodegenTemplateEntity>()
+                .eq(CodegenTemplateEntity::getTenantId, currentTenantId())
                 .eq(CodegenTemplateEntity::getDeleted, 0)
                 .eq(CodegenTemplateEntity::getLanguage, language.toLowerCase())
-                .orderByDesc(CodegenTemplateEntity::getBuiltin)
+                .orderByAsc(CodegenTemplateEntity::getBuiltin)
+                .orderByDesc(CodegenTemplateEntity::getUpdatedAt)
                 .orderByAsc(CodegenTemplateEntity::getId));
     }
 
@@ -142,6 +149,7 @@ public class CodegenTemplateService {
             throw new BusinessException("VALIDATION_ERROR", "模板 ID 不能为空");
         }
         CodegenTemplateEntity entity = templateMapper.selectOne(new LambdaQueryWrapper<CodegenTemplateEntity>()
+                .eq(CodegenTemplateEntity::getTenantId, currentTenantId())
                 .eq(CodegenTemplateEntity::getId, id)
                 .eq(CodegenTemplateEntity::getDeleted, 0)
                 .last("limit 1"));
@@ -156,6 +164,7 @@ public class CodegenTemplateService {
             throw new BusinessException("VALIDATION_ERROR", "模板名称不合法");
         }
         Long count = templateMapper.selectCount(new LambdaQueryWrapper<CodegenTemplateEntity>()
+                .eq(CodegenTemplateEntity::getTenantId, currentTenantId())
                 .eq(CodegenTemplateEntity::getName, name.trim())
                 .eq(CodegenTemplateEntity::getDeleted, 0)
                 .ne(selfId != null, CodegenTemplateEntity::getId, selfId == null ? -1L : selfId));
@@ -168,6 +177,11 @@ public class CodegenTemplateService {
         if (!StringUtils.hasText(language) || !language.matches("^(java|typescript|vue)$")) {
             throw new BusinessException("VALIDATION_ERROR", "模板语言仅支持 java/typescript/vue");
         }
+    }
+
+    private String currentTenantId() {
+        String tenantId = TenantContext.getTenantId();
+        return StringUtils.hasText(tenantId) ? tenantId : "platform";
     }
 
     private void validatePattern(String pathPattern) {

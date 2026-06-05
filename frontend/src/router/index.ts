@@ -155,6 +155,9 @@ function canRegisterRoute(
   if (manifest.routeKey) {
     return allowedRouteKeys.has(manifest.routeKey)
   }
+  if (manifest.generatedRoute) {
+    return [...allowedRouteKeys].some((routeKey) => routeKey.startsWith('generated.'))
+  }
   const requiredGrant = manifest.requiredGrant?.trim()
   return !requiredGrant || snapshot.superAdmin || (snapshot.grants ?? []).includes(requiredGrant)
 }
@@ -170,6 +173,7 @@ function toRouteRecord(manifest: AppRouteManifest): RouteRecordRaw {
       requiresGrant: manifest.requiredGrant,
       hidden: manifest.hidden,
       icon: manifest.icon,
+      generatedRoute: manifest.generatedRoute,
     },
   }
 }

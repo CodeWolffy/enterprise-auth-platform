@@ -144,7 +144,7 @@
           <el-tabs v-model="activePreviewPath" type="border-card" class="preview-tabs">
             <el-tab-pane v-for="file in previewResult.files" :key="file.path" :label="shortPath(file.path)" :name="file.path">
               <template #label>
-                <el-checkbox v-model="selectedFilePaths" :value="file.path" :label="file.path" @change="markPreviewStale" class="file-scope-checkbox">
+                <el-checkbox v-model="selectedFilePaths" :value="file.path" :label="file.path" class="file-scope-checkbox">
                   <span class="file-label-text">{{ shortPath(file.path) }}</span>
                 </el-checkbox>
               </template>
@@ -177,7 +177,7 @@
             <div>
               <span class="eyebrow">Templates</span>
               <h3>生成模板</h3>
-              <p class="muted-line">用 {{ '{{className}}' }} 等占位符编写代码生成模板，按路径匹配覆盖默认实现。</p>
+              <p class="muted-line">用 <code>&#123;&#123;className&#125;&#125;</code> 等占位符编写代码生成模板，按路径匹配覆盖默认实现。</p>
             </div>
             <el-button v-permission="'codegen:write'" type="primary" @click="openTemplateDialog()">新增模板</el-button>
           </div>
@@ -309,8 +309,12 @@ const form = reactive({
 
 const tablePage = ref<CodegenTablePage>({ total: 0, page: 1, size: 10, records: [] })
 const canPreview = computed(() => Boolean(form.tableName) && (form.includeBackend || form.includeFrontend))
-const canGenerate = computed(() => Boolean(previewResult.value) && !previewStale.value && !generating.value)
-const canDownload = computed(() => Boolean(previewResult.value) && selectedFilePaths.value.length > 0 && !downloading.value)
+const selectedValidFilePaths = computed(() => {
+  const previewPaths = new Set(previewResult.value?.files.map((file) => file.path) ?? [])
+  return selectedFilePaths.value.filter((path) => previewPaths.has(path))
+})
+const canGenerate = computed(() => Boolean(previewResult.value) && !previewStale.value && selectedValidFilePaths.value.length > 0 && !generating.value)
+const canDownload = computed(() => Boolean(previewResult.value) && selectedValidFilePaths.value.length > 0 && !downloading.value)
 const safetyAlert = computed(() => {
   const segments = [form.overwrite ? '已启用覆盖：生成时会替换隔离目录中的同名文件。' : '安全模式：生成时遇到同名文件会停止，不会覆盖。']
   if (form.autoRegister) {
@@ -384,6 +388,10 @@ async function generateFiles() {
     ElMessage.warning('配置已变更，请重新生成预览')
     return
   }
+  if (selectedFilePaths.value.length === 0 || selectedValidFilePaths.value.length === 0) {
+    ElMessage.warning('请至少选择一个生成文件')
+    return
+  }
   const message = form.overwrite
     ? '已启用覆盖，确认替换隔离目录中的同名文件？'
     : '确认生成代码到隔离目录？遇到同名文件会停止，不会覆盖。'
@@ -443,7 +451,7 @@ function toPayload(): CodegenRequest {
     includeBackend: form.includeBackend,
     includeFrontend: form.includeFrontend,
     overwrite: form.overwrite,
-    selectedFiles: selectedFilePaths.value,
+    selectedFiles: selectedValidFilePaths.value,
     autoRegister: form.autoRegister,
   }
 }
@@ -453,7 +461,6 @@ function selectAllFiles(selected: boolean) {
     return
   }
   selectedFilePaths.value = selected ? previewResult.value.files.map((file) => file.path) : []
-  markPreviewStale()
 }
 
 function stripPrefix(value: string) {

@@ -556,11 +556,32 @@ public class WorkflowApplicationService {
         if (user.permissions().contains("workflow:read")) {
             return true;
         }
-        return taskMapper.selectCount(new LambdaQueryWrapper<WfTaskEntity>()
-                .eq(WfTaskEntity::getTenantId, instance.getTenantId())
-                .eq(WfTaskEntity::getInstanceId, instance.getId())
-                .eq(WfTaskEntity::getAssigneeUserId, user.id())
-                .eq(WfTaskEntity::getDeleted, 0)) > 0;
+        if (hasVisibleTask(instance, user)) {
+            return true;
+        }
+        return false;
+    }
+
+    private boolean hasVisibleTask(WfProcessInstanceEntity instance, UserAccount user) {
+        return taskMapper.selectList(new LambdaQueryWrapper<WfTaskEntity>()
+                        .eq(WfTaskEntity::getTenantId, instance.getTenantId())
+                        .eq(WfTaskEntity::getInstanceId, instance.getId())
+                        .eq(WfTaskEntity::getDeleted, 0))
+                .stream()
+                .anyMatch(task -> {
+                    if (Objects.equals(task.getAssigneeUserId(), user.id())) {
+                        return true;
+                    }
+                    if (WorkflowTaskStatus.PENDING.name().equals(task.getStatus()) && isActionable(task, user)) {
+                        return true;
+                    }
+                    Set<Long> candidateUserIds = readLongSet(task.getCandidateUserIdsJson());
+                    if (candidateUserIds.contains(user.id())) {
+                        return true;
+                    }
+                    Set<String> candidateGroupCodes = readStringSet(task.getCandidateGroupCodesJson());
+                    return user.roles().stream().anyMatch(candidateGroupCodes::contains);
+                });
     }
 
     private void ensureActionable(WfTaskEntity task, UserAccount user) {

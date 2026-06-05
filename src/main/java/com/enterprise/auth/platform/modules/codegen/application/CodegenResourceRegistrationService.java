@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Supplier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -23,7 +24,7 @@ import org.springframework.util.StringUtils;
 public class CodegenResourceRegistrationService {
 
     private static final String GENERATED_MENU_PARENT_KEY = "generated";
-    private static final String GENERATED_API_PARENT_KEY = "api";
+    private static final String GENERATED_API_PARENT_KEY = "api.generated";
 
     private final SysResourceMapper sysResourceMapper;
     private final SysRoleMapper sysRoleMapper;
@@ -51,27 +52,50 @@ public class CodegenResourceRegistrationService {
         if (!safeModule.matches("^[A-Za-z][A-Za-z0-9_]*$")) {
             throw new BusinessException("VALIDATION_ERROR", "moduleName 格式不合法");
         }
-        String tenantId = platformTenantId();
-        ensureParentMenu(tenantId, GENERATED_MENU_PARENT_KEY, "已生成模块");
-        ensureParentApi(tenantId);
-
-        Long menuId = ensureMenu(tenantId, safeModule, title);
-        Long readApiId = ensureApi(tenantId, "api.generated." + safeModule + ".read", safeModule + " 读", safeModule + ":read", 900);
-        Long writeApiId = ensureApi(tenantId, "api.generated." + safeModule + ".write", safeModule + " 写", safeModule + ":write", 910);
+        String templateTenantId = platformTenantId();
+        String grantTenantId = activeTenantId();
+        Long menuId = runWithTenant(templateTenantId, () -> {
+            ensureParentMenu(templateTenantId, GENERATED_MENU_PARENT_KEY, "已生成模块");
+            ensureParentApi(templateTenantId);
+            return ensureMenu(templateTenantId, safeModule, title);
+        });
+        Long readApiId = runWithTenant(templateTenantId, () -> ensureApi(templateTenantId, "api.generated." + safeModule + ".read", safeModule + " 读", safeModule + ":read", 900));
+        Long writeApiId = runWithTenant(templateTenantId, () -> ensureApi(templateTenantId, "api.generated." + safeModule + ".write", safeModule + " 写", safeModule + ":write", 910));
 
         List<String> grantKeys = new ArrayList<>();
         grantKeys.add(safeModule + ":read");
         grantKeys.add(safeModule + ":write");
-        assignToAdminRole(tenantId, menuId);
-        assignToAdminRole(tenantId, readApiId);
-        assignToAdminRole(tenantId, writeApiId);
+        runWithTenant(grantTenantId, () -> {
+            assignToAdminRole(grantTenantId, menuId);
+            assignToAdminRole(grantTenantId, readApiId);
+            assignToAdminRole(grantTenantId, writeApiId);
+            return null;
+        });
         authPrincipalCacheService.evictAll();
         return grantKeys;
     }
 
-    private String platformTenantId() {
+    private String activeTenantId() {
         String tenantId = TenantContext.getTenantId();
-        return StringUtils.hasText(tenantId) ? tenantId : (StringUtils.hasText(tenantProperties.platformTenantId()) ? tenantProperties.platformTenantId() : "platform");
+        return StringUtils.hasText(tenantId) ? tenantId : platformTenantId();
+    }
+
+    private String platformTenantId() {
+        return StringUtils.hasText(tenantProperties.platformTenantId()) ? tenantProperties.platformTenantId() : "platform";
+    }
+
+    private <T> T runWithTenant(String tenantId, Supplier<T> supplier) {
+        String previousTenantId = TenantContext.getTenantId();
+        try {
+            TenantContext.setTenantId(tenantId);
+            return supplier.get();
+        } finally {
+            if (StringUtils.hasText(previousTenantId)) {
+                TenantContext.setTenantId(previousTenantId);
+            } else {
+                TenantContext.clear();
+            }
+        }
     }
 
     private void ensureParentMenu(String tenantId, String resourceKey, String resourceName) {
@@ -160,11 +184,11 @@ public class CodegenResourceRegistrationService {
         entity.setAncestors(parent.getAncestors() + "," + parent.getId());
         entity.setResourceType("MENU");
         entity.setResourceKey(menuKey);
-        entity.setResourceName(StringUtils.hasText(title) ? title : moduleName);
+        entity.setResourceName((StringUtils.hasText(title) ? title : moduleName) + "（生成产物）");
         entity.setRouteKey(menuKey);
         entity.setGrantKey(moduleName + ":read");
         entity.setPath("/platform/generated/" + moduleName);
-        entity.setComponent("GeneratedView");
+        entity.setComponent("CodegenView");
         entity.setIcon("Files");
         entity.setOrderNo(100);
         entity.setVisible(1);
@@ -214,7 +238,7 @@ public class CodegenResourceRegistrationService {
             return;
         }
         Set<String> ancestorIds = new LinkedHashSet<>();
-        SysResourceEntity resource = sysResourceMapper.selectById(resourceId);
+        SysResourceEntity resource = runWithTenant(platformTenantId(), () -> sysResourceMapper.selectById(resourceId));
         if (resource != null) {
             if (StringUtils.hasText(resource.getAncestors())) {
                 for (String ancestor : resource.getAncestors().split(",")) {

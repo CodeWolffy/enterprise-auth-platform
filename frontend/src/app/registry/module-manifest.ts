@@ -27,6 +27,7 @@ export interface AppRouteManifest {
   requiredGrant?: PermissionCode
   hidden?: boolean
   icon?: string
+  generatedRoute?: boolean
 }
 
 interface AppNavManifest {
@@ -207,6 +208,14 @@ export const APP_ROUTE_MANIFESTS = [
     component: () => import('@/views/platform/CodegenView.vue'),
   },
   {
+    path: 'platform/generated/:moduleName',
+    name: 'generated-module-entry',
+    title: '生成模块入口',
+    hidden: true,
+    generatedRoute: true,
+    component: () => import('@/views/platform/CodegenView.vue'),
+  },
+  {
     routeKey: 'dicts',
     path: 'platform/dicts',
     name: 'dicts',
@@ -350,6 +359,7 @@ export const APP_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = Object.from
         requiresGrant: manifest.requiredGrant,
         hidden: manifest.hidden,
         icon: manifest.icon,
+        generatedRoute: manifest.generatedRoute,
       },
     },
   ]),

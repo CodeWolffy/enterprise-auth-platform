@@ -9,12 +9,18 @@ interface RouteAccessTarget {
 }
 
 const ROUTE_KEYS = new Set(Object.keys(ROUTE_KEY_PATH_MAP))
+const GENERATED_ROUTE_KEY_PREFIX = 'generated.'
 
 export function resolveRoutePath(routeKey?: string | null) {
   if (!routeKey) {
     return ''
   }
-  return ROUTE_KEY_PATH_MAP[routeKey.trim()] ?? ''
+  const normalizedRouteKey = routeKey.trim()
+  if (normalizedRouteKey.startsWith(GENERATED_ROUTE_KEY_PREFIX)) {
+    const moduleName = normalizedRouteKey.slice(GENERATED_ROUTE_KEY_PREFIX.length).trim()
+    return moduleName ? `/platform/generated/${encodeURIComponent(moduleName)}` : ''
+  }
+  return ROUTE_KEY_PATH_MAP[normalizedRouteKey] ?? ''
 }
 
 export function collectAllowedRouteKeys(menus: MenuItem[]) {
@@ -23,7 +29,7 @@ export function collectAllowedRouteKeys(menus: MenuItem[]) {
     for (const item of items) {
       const routeKey = item.routeKey?.trim()
       if (routeKey) {
-        if (ROUTE_KEYS.has(routeKey)) {
+        if (ROUTE_KEYS.has(routeKey) || routeKey.startsWith(GENERATED_ROUTE_KEY_PREFIX)) {
           routeKeys.add(routeKey)
         } else {
           console.warn('[auth] 后端菜单快照中存在未知的路由键:', routeKey)
@@ -48,6 +54,10 @@ export function isAllowedRoute(snapshot: PermissionSnapshot | null, to: RouteAcc
     return false
   }
 
+  if (Boolean(to.meta.generatedRoute)) {
+    return isAllowedGeneratedRoute(snapshot, to.path)
+  }
+
   const routeKey = String(to.meta.routeKey ?? '').trim()
   if (!routeKey) {
     return true
@@ -55,6 +65,30 @@ export function isAllowedRoute(snapshot: PermissionSnapshot | null, to: RouteAcc
 
   const routeKeys = collectAllowedRouteKeys(snapshot.menus ?? [])
   return routeKeys.has(routeKey)
+}
+
+function isAllowedGeneratedRoute(snapshot: PermissionSnapshot, path: string) {
+  const moduleName = resolveGeneratedModuleName(path)
+  if (!moduleName) {
+    return false
+  }
+  return collectAllowedRouteKeys(snapshot.menus ?? []).has(`${GENERATED_ROUTE_KEY_PREFIX}${moduleName}`)
+}
+
+function resolveGeneratedModuleName(path: string) {
+  const prefix = '/platform/generated/'
+  if (!path.startsWith(prefix)) {
+    return ''
+  }
+  const segment = path.slice(prefix.length).split('/')[0]?.trim()
+  if (!segment) {
+    return ''
+  }
+  try {
+    return decodeURIComponent(segment)
+  } catch {
+    return segment
+  }
 }
 
 export function resolveFirstAllowedPath(snapshot: PermissionSnapshot | null) {

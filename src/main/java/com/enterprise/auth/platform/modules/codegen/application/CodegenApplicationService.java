@@ -105,9 +105,10 @@ public class CodegenApplicationService {
     @Transactional
     public CodegenGenerateResult generate(CodegenCommand command) {
         CodegenPreviewResult preview = preview(command);
+        List<String> selectedFiles = resolveSelectedFiles(command.selectedFiles(), preview.files(), "至少选择一个生成文件");
         List<String> written = new ArrayList<>();
         for (CodegenFilePreview file : preview.files()) {
-            if (!shouldWrite(command.selectedFiles(), file.path())) {
+            if (!selectedFiles.contains(file.path())) {
                 continue;
             }
             Path target = safeTarget(file.path());
@@ -123,7 +124,7 @@ public class CodegenApplicationService {
             }
         }
         List<String> registered = command.autoRegister()
-                ? registrationService.register(command.moduleName(), preview.className())
+                ? registrationService.register(preview.moduleName(), preview.className())
                 : List.of();
         auditEventPublisher.publish("CODEGEN_GENERATED", "system", TenantContext.getTenantId(), Map.of(
                 "tableName", preview.tableName(),
@@ -137,11 +138,12 @@ public class CodegenApplicationService {
     @Transactional(readOnly = true)
     public CodegenArtifactDownload download(CodegenCommand command) {
         CodegenPreviewResult preview = preview(command);
+        List<String> selectedFiles = resolveSelectedFiles(command.selectedFiles(), preview.files(), "至少选择一个导出文件");
         try {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             try (ZipOutputStream zip = new ZipOutputStream(buffer)) {
                 for (CodegenFilePreview file : preview.files()) {
-                    if (!shouldWrite(command.selectedFiles(), file.path())) {
+                    if (!selectedFiles.contains(file.path())) {
                         continue;
                     }
                     zip.putNextEntry(new ZipEntry(file.path()));
@@ -159,11 +161,21 @@ public class CodegenApplicationService {
         }
     }
 
-    private boolean shouldWrite(List<String> selectedFiles, String path) {
-        if (selectedFiles == null || selectedFiles.isEmpty()) {
-            return true;
+    private List<String> resolveSelectedFiles(List<String> selectedFiles, List<CodegenFilePreview> files, String emptyMessage) {
+        if (selectedFiles == null) {
+            return files.stream().map(CodegenFilePreview::path).toList();
         }
-        return selectedFiles.contains(path);
+        Set<String> allowedPaths = files.stream()
+                .map(CodegenFilePreview::path)
+                .collect(java.util.stream.Collectors.toSet());
+        List<String> resolved = selectedFiles.stream()
+                .filter(allowedPaths::contains)
+                .distinct()
+                .toList();
+        if (resolved.isEmpty()) {
+            throw new BusinessException("VALIDATION_ERROR", emptyMessage);
+        }
+        return resolved;
     }
 
     private CodegenModel buildModel(CodegenCommand command) {
@@ -249,7 +261,9 @@ public class CodegenApplicationService {
     }
 
     private String renderWithTemplate(String language, String path, String defaultContent, Map<String, Object> variables) {
-        return templateService.renderBody(language, path, defaultContent, variables);
+        Map<String, Object> renderVariables = new LinkedHashMap<>(variables);
+        renderVariables.put("defaultContent", defaultContent);
+        return templateService.renderBody(language, path, defaultContent, renderVariables);
     }
 
     private Map<String, Object> templateVariables(CodegenModel model) {
