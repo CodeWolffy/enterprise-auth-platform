@@ -128,6 +128,7 @@ import type { AuditPage } from '@/types/audit'
 import { formatDateTime } from '@/utils/datetime'
 import { useTablePreferences } from '@/composables/useTablePreferences'
 
+const MAX_EXPORT_RANGE_MS = 31 * 24 * 60 * 60 * 1000
 const loading = ref(false)
 const query = reactive({
   tenantId: '',
@@ -199,6 +200,14 @@ async function handleSizeChange(nextSize: number) {
 async function exportCurrentQuery() {
   if (!dateRange.value?.[0] || !dateRange.value?.[1]) {
     ElMessage.warning('导出前请先选择开始和结束时间，且时间范围不能超过 31 天。')
+    return
+  }
+  if (dateRange.value[1].getTime() <= dateRange.value[0].getTime()) {
+    ElMessage.warning('结束时间必须晚于开始时间。')
+    return
+  }
+  if (dateRange.value[1].getTime() - dateRange.value[0].getTime() > MAX_EXPORT_RANGE_MS) {
+    ElMessage.warning('导出时间范围不能超过 31 天。')
     return
   }
   const blob = await exportOperationLogs(currentQueryParams())

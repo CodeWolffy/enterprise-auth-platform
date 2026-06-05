@@ -81,6 +81,7 @@ public class WorkflowController {
 
     @Operation(summary = "发起流程实例")
     @PostMapping("/instances")
+    @SaCheckPermission(PermissionCodes.WORKFLOW_WRITE)
     public ApiResponse<WorkflowStartResult> startInstance(@Valid @RequestBody WorkflowStartRequest request) {
         return ApiResponse.ok(workflowApplicationService.startInstance(request.toCommand()));
     }
@@ -103,6 +104,7 @@ public class WorkflowController {
 
     @Operation(summary = "撤回流程实例")
     @PutMapping("/instances/{instanceId}/withdraw")
+    @SaCheckPermission(PermissionCodes.WORKFLOW_WRITE)
     public ApiResponse<WorkflowInstanceView> withdrawInstance(@Parameter(description = "流程实例 ID") @PathVariable Long instanceId) {
         return ApiResponse.ok(workflowApplicationService.withdrawInstance(instanceId));
     }

@@ -4,6 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.web.ApiResponse;
+import com.enterprise.auth.platform.common.web.RateLimit;
 import com.enterprise.auth.platform.modules.system.application.MailChannelApplicationService;
 import com.enterprise.auth.platform.modules.system.application.MailChannelPreset;
 import io.swagger.v3.oas.annotations.Operation;
@@ -81,6 +82,7 @@ public class MailChannelController {
     }
 
     @Operation(summary = "发送测试邮件")
+    @RateLimit(key = "mail-channel-test", strategy = RateLimit.Strategy.USER_AND_IP, capacity = 3, refillTokens = 3, refillDurationSeconds = 60)
     @PostMapping("/test")
     @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
     public ApiResponse<Map<String, Object>> testSend(

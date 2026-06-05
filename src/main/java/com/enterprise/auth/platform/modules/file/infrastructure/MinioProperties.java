@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.modules.file.infrastructure;
 
+import com.enterprise.auth.platform.common.exception.BusinessException;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.StringUtils;
@@ -13,23 +14,42 @@ public record MinioProperties(
         String region,
         String publicEndpoint,
         Boolean autoCreateBucket,
-        Duration presignedUrlTtl
+        Duration presignedUrlTtl,
+        Boolean allowDefaultCredentials
 ) {
 
     public String resolvedEndpoint() {
-        return StringUtils.hasText(endpoint) ? endpoint.trim() : "http://localhost:9000";
+        if (StringUtils.hasText(endpoint)) {
+            return endpoint.trim();
+        }
+        throw new BusinessException("FILE_STORAGE_CONFIG_ERROR", "MinIO endpoint 未配置");
     }
 
     public String resolvedAccessKey() {
-        return StringUtils.hasText(accessKey) ? accessKey.trim() : "minioadmin";
+        if (StringUtils.hasText(accessKey)) {
+            return accessKey.trim();
+        }
+        if (Boolean.TRUE.equals(allowDefaultCredentials)) {
+            return "minioadmin";
+        }
+        throw new BusinessException("FILE_STORAGE_CONFIG_ERROR", "MinIO accessKey 未配置");
     }
 
     public String resolvedSecretKey() {
-        return StringUtils.hasText(secretKey) ? secretKey.trim() : "minioadmin";
+        if (StringUtils.hasText(secretKey)) {
+            return secretKey.trim();
+        }
+        if (Boolean.TRUE.equals(allowDefaultCredentials)) {
+            return "minioadmin";
+        }
+        throw new BusinessException("FILE_STORAGE_CONFIG_ERROR", "MinIO secretKey 未配置");
     }
 
     public String resolvedBucket() {
-        return StringUtils.hasText(bucket) ? bucket.trim() : "enterprise-auth-platform";
+        if (StringUtils.hasText(bucket)) {
+            return bucket.trim();
+        }
+        throw new BusinessException("FILE_STORAGE_CONFIG_ERROR", "MinIO bucket 未配置");
     }
 
     public String resolvedRegion() {
@@ -41,7 +61,7 @@ public record MinioProperties(
     }
 
     public boolean resolvedAutoCreateBucket() {
-        return autoCreateBucket == null || autoCreateBucket;
+        return Boolean.TRUE.equals(autoCreateBucket);
     }
 
     public Duration resolvedPresignedUrlTtl() {

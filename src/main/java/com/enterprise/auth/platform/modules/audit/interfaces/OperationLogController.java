@@ -9,14 +9,18 @@ import com.enterprise.auth.platform.modules.audit.application.OperationLogCsvExp
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+@Validated
 @Tag(name = "操作日志")
 @RestController
 @RequestMapping("/api/operation-logs")
@@ -44,8 +48,8 @@ public class OperationLogController {
             @Parameter(description = "客户端 IP") @RequestParam(required = false) String clientIp,
             @Parameter(description = "开始时间，epoch 毫秒，含边界") @RequestParam(required = false) Long fromEpochMs,
             @Parameter(description = "结束时间，epoch 毫秒，不含边界") @RequestParam(required = false) Long toEpochMs,
-            @Parameter(description = "页码，从 1 开始") @RequestParam(defaultValue = "1") int page,
-            @Parameter(description = "每页数量") @RequestParam(defaultValue = "20") int size
+            @Parameter(description = "页码，从 1 开始") @RequestParam(defaultValue = "1") @Min(1) int page,
+            @Parameter(description = "每页数量") @RequestParam(defaultValue = "20") @Min(1) @Max(AuditQuery.MAX_PAGE_SIZE) int size
     ) {
         return ApiResponse.ok(auditService.query(buildQuery(
                 tenantId, eventType, operator, requestId, clientIp, fromEpochMs, toEpochMs, page, size
@@ -66,7 +70,7 @@ public class OperationLogController {
             @RequestParam(required = false) Long toEpochMs
     ) {
         byte[] content = operationLogCsvExportService.export(buildQuery(
-                tenantId, eventType, operator, requestId, clientIp, fromEpochMs, toEpochMs, 1, 2000
+                tenantId, eventType, operator, requestId, clientIp, fromEpochMs, toEpochMs, 1, AuditQuery.EXPORT_PAGE_SIZE
         ));
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=operation-logs.csv")

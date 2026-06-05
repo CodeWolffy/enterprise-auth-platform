@@ -77,7 +77,7 @@ public class CodegenController {
 
     @Operation(summary = "下载生成产物（ZIP 包）")
     @PostMapping("/download")
-    @SaCheckPermission(PermissionCodes.CODEGEN_READ)
+    @SaCheckPermission(PermissionCodes.CODEGEN_DOWNLOAD)
     public ResponseEntity<byte[]> download(@Valid @RequestBody CodegenRequest request) {
         CodegenArtifactDownload artifact = codegenApplicationService.download(request.toCommand());
         MediaType mediaType = MediaType.parseMediaType(artifact.contentType());

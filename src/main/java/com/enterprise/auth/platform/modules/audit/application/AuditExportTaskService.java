@@ -420,7 +420,7 @@ public class AuditExportTaskService {
             long totalRead = 0;
             try (ExcelWriter excelWriter = EasyExcel.write(outputStream, AuditExportVO.class).build()) {
                 WriteSheet writeSheet = EasyExcel.writerSheet("Audit Logs").build();
-                int pageSize = 10000;
+                int pageSize = AuditQuery.EXPORT_PAGE_SIZE;
                 long total = -1;
                 int currentPage = 1;
                 while (total == -1 || totalRead < total) {
@@ -597,7 +597,7 @@ public class AuditExportTaskService {
                     parseEpochMilli(payload.get("fromEpochMs"), payload.get("occurredFrom")),
                     parseEpochMilli(payload.get("toEpochMs"), payload.get("occurredTo")),
                     1,
-                    2000
+                    AuditQuery.EXPORT_PAGE_SIZE
             );
         } catch (Exception ex) {
             throw new BusinessException("审计导出任务处理失败，请稍后重试");

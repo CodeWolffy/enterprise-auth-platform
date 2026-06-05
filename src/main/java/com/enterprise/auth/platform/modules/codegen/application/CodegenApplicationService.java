@@ -33,6 +33,7 @@ public class CodegenApplicationService {
     private static final Pattern IDENTIFIER = Pattern.compile("^[A-Za-z][A-Za-z0-9_]*$");
     private static final Set<String> SYSTEM_COLUMNS = Set.of("id", "tenant_id", "created_by", "updated_by", "deleted", "created_at", "updated_at");
     private static final String DEFAULT_PACKAGE = "com.enterprise.auth.platform.generated";
+    private static final String SERVER_MANAGED_OUTPUT_ROOT = "SERVER_MANAGED";
 
     private final JdbcTemplate jdbcTemplate;
     private final AuditEventPublisher auditEventPublisher;
@@ -60,7 +61,9 @@ public class CodegenApplicationService {
         int safeSize = Math.min(Math.max(size, 1), 100);
         String normalizedKeyword = keyword == null ? "" : keyword.trim();
         List<Object> params = new ArrayList<>();
-        String filterSql = " WHERE table_schema = DATABASE()";
+        String filterSql = " WHERE table_schema = DATABASE()"
+                + " AND table_name IN (SELECT table_name FROM sys_codegen_allowlist WHERE tenant_id = ? AND enabled = 1 AND deleted = 0)";
+        params.add(currentTenantId());
         if (!normalizedKeyword.isBlank()) {
             filterSql += " AND (table_name LIKE ? OR table_comment LIKE ?)";
             String like = "%" + normalizedKeyword + "%";
@@ -95,7 +98,7 @@ public class CodegenApplicationService {
                 model.tableName(),
                 model.moduleName(),
                 model.className(),
-                outputRoot.toString(),
+                SERVER_MANAGED_OUTPUT_ROOT,
                 renderFiles(model, command.includeBackend(), command.includeFrontend()),
                 command.selectedFiles(),
                 command.autoRegister()
@@ -132,7 +135,7 @@ public class CodegenApplicationService {
                 "files", written,
                 "registeredPermissions", registered
         ));
-        return new CodegenGenerateResult(preview.tableName(), preview.moduleName(), outputRoot.toString(), written, registered);
+        return new CodegenGenerateResult(preview.tableName(), preview.moduleName(), SERVER_MANAGED_OUTPUT_ROOT, written, registered);
     }
 
     @Transactional(readOnly = true)
@@ -221,6 +224,7 @@ public class CodegenApplicationService {
 
     private CodegenTableView requireTable(String tableName) {
         String safeTableName = normalizeTableName(tableName);
+        ensureAllowedTable(safeTableName);
         List<CodegenTableView> tables = jdbcTemplate.query(
                 "SELECT table_name, table_comment, engine, table_rows, data_length, index_length, create_time, update_time "
                         + "FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?",
@@ -241,6 +245,23 @@ public class CodegenApplicationService {
                 (rs, rowNum) -> columnView(rs),
                 safeTableName
         );
+    }
+
+    private void ensureAllowedTable(String tableName) {
+        Long count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_codegen_allowlist WHERE tenant_id = ? AND table_name = ? AND enabled = 1 AND deleted = 0",
+                Long.class,
+                currentTenantId(),
+                tableName
+        );
+        if (count == null || count == 0) {
+            throw new BusinessException("ACCESS_DENIED", "数据表未纳入代码生成白名单");
+        }
+    }
+
+    private String currentTenantId() {
+        String tenantId = TenantContext.getTenantId();
+        return tenantId == null || tenantId.isBlank() ? "platform" : tenantId.trim();
     }
 
     private List<CodegenFilePreview> renderFiles(CodegenModel model, boolean includeBackend, boolean includeFrontend) {

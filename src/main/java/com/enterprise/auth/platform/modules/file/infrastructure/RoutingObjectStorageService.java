@@ -4,6 +4,7 @@ import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.file.application.FileStorageProperties;
 import com.enterprise.auth.platform.modules.file.application.ObjectStorageService;
 import java.io.InputStream;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
@@ -12,12 +13,12 @@ import org.springframework.stereotype.Service;
 public class RoutingObjectStorageService implements ObjectStorageService {
 
     private final FileStorageProperties properties;
-    private final MinioObjectStorageService minioObjectStorageService;
+    private final ObjectProvider<MinioObjectStorageService> minioObjectStorageService;
     private final LocalObjectStorageService localObjectStorageService;
 
     public RoutingObjectStorageService(
             FileStorageProperties properties,
-            MinioObjectStorageService minioObjectStorageService,
+            ObjectProvider<MinioObjectStorageService> minioObjectStorageService,
             LocalObjectStorageService localObjectStorageService
     ) {
         this.properties = properties;
@@ -43,7 +44,7 @@ public class RoutingObjectStorageService implements ObjectStorageService {
     private ObjectStorageService activeStorage() {
         return switch (properties.resolvedStorage()) {
             case "local" -> localObjectStorageService;
-            case "minio" -> minioObjectStorageService;
+            case "minio" -> minioStorage();
             default -> throw new BusinessException("FILE_STORAGE_ERROR", "不支持的文件存储类型");
         };
     }
@@ -52,6 +53,14 @@ public class RoutingObjectStorageService implements ObjectStorageService {
         if ("local".equalsIgnoreCase(bucketName)) {
             return localObjectStorageService;
         }
-        return minioObjectStorageService;
+        return minioStorage();
+    }
+
+    private ObjectStorageService minioStorage() {
+        MinioObjectStorageService service = minioObjectStorageService.getIfAvailable();
+        if (service == null) {
+            throw new BusinessException("FILE_STORAGE_CONFIG_ERROR", "MinIO 存储未启用或配置不完整");
+        }
+        return service;
     }
 }

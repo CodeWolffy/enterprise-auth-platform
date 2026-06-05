@@ -51,14 +51,13 @@ public class DatabaseUserRepository implements UserRepository {
     }
 
     @Override
-    @Cacheable(value = CacheNames.AUTH_PRINCIPAL, key = "T(com.enterprise.auth.platform.modules.auth.infrastructure.AuthPrincipalCacheService).usernameKey(#tenantId, #username)", unless = "#result == null")
     public Optional<AuthenticationUser> findByUsername(String tenantId, String username) {
         SysUserEntity entity = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>()
                 .eq(SysUserEntity::getTenantId, tenantId)
                 .eq(SysUserEntity::getUsername, username)
                 .eq(SysUserEntity::getDeleted, 0)
                 .last("limit 1"));
-        return Optional.ofNullable(entity).map(this::toAuthenticationUser);
+        return Optional.ofNullable(entity).map(user -> toAuthenticationUser(user, true));
     }
 
     @Override
@@ -68,7 +67,7 @@ public class DatabaseUserRepository implements UserRepository {
                 .eq(SysUserEntity::getId, id)
                 .eq(SysUserEntity::getDeleted, 0)
                 .last("limit 1"));
-        return Optional.ofNullable(entity).map(this::toAuthenticationUser);
+        return Optional.ofNullable(entity).map(user -> toAuthenticationUser(user, false));
     }
 
     @Override
@@ -77,7 +76,7 @@ public class DatabaseUserRepository implements UserRepository {
                         .eq(SysUserEntity::getDeleted, 0)
                         .orderByAsc(SysUserEntity::getId))
                 .stream()
-                .map(this::toAuthenticationUser)
+                .map(user -> toAuthenticationUser(user, false))
                 .toList();
     }
 
@@ -97,7 +96,7 @@ public class DatabaseUserRepository implements UserRepository {
         authPrincipalCacheService.evictByUser(entity.getId(), entity.getTenantId(), entity.getUsername());
     }
 
-    private AuthenticationUser toAuthenticationUser(SysUserEntity user) {
+    private AuthenticationUser toAuthenticationUser(SysUserEntity user, boolean includePasswordHash) {
         List<SysRoleEntity> roles = loadRoles(user.getTenantId(), user.getId());
         Set<String> roleCodes = roles.stream()
                 .map(SysRoleEntity::getRoleCode)
@@ -107,7 +106,7 @@ public class DatabaseUserRepository implements UserRepository {
                 user.getId(),
                 user.getTenantId(),
                 user.getUsername(),
-                user.getPasswordHash(),
+                includePasswordHash ? user.getPasswordHash() : null,
                 user.getEnabled() != null && user.getEnabled() == 1,
                 roleCodes,
                 roleData.permissionCodes(),

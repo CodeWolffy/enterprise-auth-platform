@@ -15,6 +15,7 @@ import com.enterprise.auth.platform.modules.file.infrastructure.RoutingObjectSto
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 
 class RoutingObjectStorageServiceTest {
 
@@ -27,7 +28,7 @@ class RoutingObjectStorageServiceTest {
 
         var routing = new RoutingObjectStorageService(
                 new FileStorageProperties("local", null, null, null),
-                minio,
+                minioProvider(minio),
                 local
         );
 
@@ -35,6 +36,23 @@ class RoutingObjectStorageServiceTest {
 
         assertThat(stored.storageType()).isEqualTo("LOCAL");
         verify(local).put(eq("object-key"), any(InputStream.class), eq(4L), eq("image/png"), eq("a.png"));
+    }
+
+    @Test
+    void localStorageShouldNotRequireMinioAdapter() {
+        LocalObjectStorageService local = mock(LocalObjectStorageService.class);
+        when(local.put(eq("object-key"), any(InputStream.class), eq(4L), eq("image/png"), eq("a.png")))
+                .thenReturn(new StoredObject("LOCAL", "local", "object-key", null));
+
+        var routing = new RoutingObjectStorageService(
+                new FileStorageProperties("local", null, null, null),
+                minioProvider(null),
+                local
+        );
+
+        StoredObject stored = routing.put("object-key", new ByteArrayInputStream(new byte[4]), 4L, "image/png", "a.png");
+
+        assertThat(stored.storageType()).isEqualTo("LOCAL");
     }
 
     @Test
@@ -46,7 +64,7 @@ class RoutingObjectStorageServiceTest {
 
         var routing = new RoutingObjectStorageService(
                 new FileStorageProperties("minio", null, null, null),
-                minio,
+                minioProvider(minio),
                 local
         );
 
@@ -65,7 +83,7 @@ class RoutingObjectStorageServiceTest {
 
         var routing = new RoutingObjectStorageService(
                 new FileStorageProperties("s3", null, null, null),
-                minio,
+                minioProvider(minio),
                 local
         );
 
@@ -84,7 +102,7 @@ class RoutingObjectStorageServiceTest {
 
         var routing = new RoutingObjectStorageService(
                 new FileStorageProperties("local", null, null, null),
-                minio,
+                minioProvider(minio),
                 local
         );
 
@@ -95,5 +113,12 @@ class RoutingObjectStorageServiceTest {
 
         verify(local).delete("local", "local-key");
         verify(minio).delete("bucket", "minio-key");
+    }
+
+    @SuppressWarnings("unchecked")
+    private ObjectProvider<MinioObjectStorageService> minioProvider(MinioObjectStorageService minio) {
+        ObjectProvider<MinioObjectStorageService> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(minio);
+        return provider;
     }
 }

@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.modules.workflow.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.audit.AuditEventPublisher;
 import com.enterprise.auth.platform.common.audit.PlatformAuditEvent;
@@ -248,7 +249,7 @@ public class WorkflowApplicationService {
         task.setAssigneeUsername(user.username());
         task.setComment(normalizeText(command.comment()));
         task.setCompletedAt(TimeSupport.utcNowDateTime());
-        taskMapper.updateById(task);
+        completePendingTask(task);
 
         WorkflowTaskView nextTask = null;
         int nextStepIndex = task.getStepIndex() < 0 ? 0 : task.getStepIndex() + 1;
@@ -289,7 +290,7 @@ public class WorkflowApplicationService {
         task.setAssigneeUsername(user.username());
         task.setComment(normalizeText(command.comment()));
         task.setCompletedAt(TimeSupport.utcNowDateTime());
-        taskMapper.updateById(task);
+        completePendingTask(task);
 
         WorkflowTaskView nextTask = null;
         if (nextStepIndex == -1) {
@@ -368,7 +369,7 @@ public class WorkflowApplicationService {
         task.setAssigneeUsername(user.username());
         task.setComment(normalizeText(command.comment()));
         task.setCompletedAt(now);
-        taskMapper.updateById(task);
+        completePendingTask(task);
 
         WfTaskEntity transferredTask = new WfTaskEntity();
         transferredTask.setTenantId(tenantId);
@@ -507,17 +508,32 @@ public class WorkflowApplicationService {
     }
 
     private void cancelPendingTasks(String tenantId, Long instanceId, WorkflowTaskStatus status, String comment) {
-        List<WfTaskEntity> tasks = taskMapper.selectList(new LambdaQueryWrapper<WfTaskEntity>()
+        int updated = taskMapper.update(null, new LambdaUpdateWrapper<WfTaskEntity>()
                 .eq(WfTaskEntity::getTenantId, tenantId)
                 .eq(WfTaskEntity::getInstanceId, instanceId)
                 .eq(WfTaskEntity::getStatus, WorkflowTaskStatus.PENDING.name())
-                .eq(WfTaskEntity::getDeleted, 0));
-        LocalDateTime now = TimeSupport.utcNowDateTime();
-        for (WfTaskEntity task : tasks) {
-            task.setStatus(status.name());
-            task.setComment(comment);
-            task.setCompletedAt(now);
-            taskMapper.updateById(task);
+                .eq(WfTaskEntity::getDeleted, 0)
+                .set(WfTaskEntity::getStatus, status.name())
+                .set(WfTaskEntity::getComment, comment)
+                .set(WfTaskEntity::getCompletedAt, TimeSupport.utcNowDateTime()));
+        if (updated <= 0) {
+            throw new BusinessException("CONFLICT", "流程待办状态已变化，请刷新后重试");
+        }
+    }
+
+    private void completePendingTask(WfTaskEntity task) {
+        int updated = taskMapper.update(null, new LambdaUpdateWrapper<WfTaskEntity>()
+                .eq(WfTaskEntity::getTenantId, task.getTenantId())
+                .eq(WfTaskEntity::getId, task.getId())
+                .eq(WfTaskEntity::getStatus, WorkflowTaskStatus.PENDING.name())
+                .eq(WfTaskEntity::getDeleted, 0)
+                .set(WfTaskEntity::getStatus, task.getStatus())
+                .set(WfTaskEntity::getAssigneeUserId, task.getAssigneeUserId())
+                .set(WfTaskEntity::getAssigneeUsername, task.getAssigneeUsername())
+                .set(WfTaskEntity::getComment, task.getComment())
+                .set(WfTaskEntity::getCompletedAt, task.getCompletedAt()));
+        if (updated <= 0) {
+            throw new BusinessException("CONFLICT", "任务状态已变化，请刷新后重试");
         }
     }
 

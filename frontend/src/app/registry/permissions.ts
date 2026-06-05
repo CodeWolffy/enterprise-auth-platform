@@ -20,6 +20,7 @@ export const PERMISSIONS = {
   WORKFLOW_WRITE: 'workflow:write',
   CODEGEN_READ: 'codegen:read',
   CODEGEN_WRITE: 'codegen:write',
+  CODEGEN_DOWNLOAD: 'codegen:download',
   SESSION_WRITE: 'session:write',
 } as const
 
@@ -51,6 +52,7 @@ export const PERMISSION_CATALOG: Array<{
   { code: PERMISSIONS.WORKFLOW_WRITE, label: '工作流管理', module: 'workflow' },
   { code: PERMISSIONS.CODEGEN_READ, label: '代码生成查看', module: 'codegen' },
   { code: PERMISSIONS.CODEGEN_WRITE, label: '代码生成管理', module: 'codegen' },
+  { code: PERMISSIONS.CODEGEN_DOWNLOAD, label: '代码生成下载', module: 'codegen' },
   { code: PERMISSIONS.SESSION_WRITE, label: '会话管理', module: 'session' },
 ]
 

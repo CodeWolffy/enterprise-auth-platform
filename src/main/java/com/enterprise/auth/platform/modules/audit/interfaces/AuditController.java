@@ -17,6 +17,8 @@ import com.enterprise.auth.platform.common.authz.SecuritySupport;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import java.io.ByteArrayOutputStream;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
@@ -25,6 +27,7 @@ import java.util.Map;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -37,6 +40,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+@Validated
 @Tag(name = "安全审计")
 @RestController
 @RequestMapping("/api/audit")
@@ -69,8 +73,8 @@ public class AuditController {
             @Parameter(description = "客户端 IP") @RequestParam(required = false) String clientIp,
             @Parameter(description = "开始时间，epoch 毫秒，含边界") @RequestParam(required = false) Long fromEpochMs,
             @Parameter(description = "结束时间，epoch 毫秒，不含边界") @RequestParam(required = false) Long toEpochMs,
-            @Parameter(description = "页码，从 1 开始") @RequestParam(defaultValue = "1") int page,
-            @Parameter(description = "每页数量") @RequestParam(defaultValue = "20") int size
+            @Parameter(description = "页码，从 1 开始") @RequestParam(defaultValue = "1") @Min(1) int page,
+            @Parameter(description = "每页数量") @RequestParam(defaultValue = "20") @Min(1) @Max(AuditQuery.MAX_PAGE_SIZE) int size
     ) {
         return ApiResponse.ok(auditService.query(buildQuery(
                 tenantId, eventType, operator, requestId, clientIp, fromEpochMs, toEpochMs, page, size
@@ -90,7 +94,7 @@ public class AuditController {
             @RequestParam(required = false) Long fromEpochMs,
             @RequestParam(required = false) Long toEpochMs
     ) {
-        AuditQuery query = buildQuery(tenantId, eventType, operator, requestId, clientIp, fromEpochMs, toEpochMs, 1, 2000);
+        AuditQuery query = buildQuery(tenantId, eventType, operator, requestId, clientIp, fromEpochMs, toEpochMs, 1, AuditQuery.EXPORT_PAGE_SIZE);
         List<AuditEvent> records = auditService.export(query);
         auditService.record(
                 "AUDIT_EXPORTED",
@@ -140,7 +144,7 @@ public class AuditController {
             @RequestParam(required = false) Long toEpochMs
     ) {
         return ApiResponse.ok(auditExportTaskService.create(buildQuery(
-                tenantId, eventType, operator, requestId, clientIp, fromEpochMs, toEpochMs, 1, 2000
+                tenantId, eventType, operator, requestId, clientIp, fromEpochMs, toEpochMs, 1, AuditQuery.EXPORT_PAGE_SIZE
         )));
     }
 
@@ -151,8 +155,8 @@ public class AuditController {
             @RequestParam(required = false) String tenantId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String operator,
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size
+            @RequestParam(defaultValue = "1") @Min(1) int page,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(AuditQuery.MAX_PAGE_SIZE) int size
     ) {
         return ApiResponse.ok(auditExportTaskService.page(tenantId, status, operator, page, size));
     }

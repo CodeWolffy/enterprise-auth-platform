@@ -31,6 +31,7 @@ public final class PermissionCodes {
     public static final String WORKFLOW_WRITE = "workflow:write";
     public static final String CODEGEN_READ = "codegen:read";
     public static final String CODEGEN_WRITE = "codegen:write";
+    public static final String CODEGEN_DOWNLOAD = "codegen:download";
     public static final String SESSION_WRITE = "session:write";
 
     public static final Set<String> ALL = Set.of(
@@ -57,6 +58,7 @@ public final class PermissionCodes {
             WORKFLOW_WRITE,
             CODEGEN_READ,
             CODEGEN_WRITE,
+            CODEGEN_DOWNLOAD,
             SESSION_WRITE
     );
 
@@ -84,6 +86,7 @@ public final class PermissionCodes {
             new PermissionDescriptor(WORKFLOW_WRITE, "工作流管理", "workflow"),
             new PermissionDescriptor(CODEGEN_READ, "代码生成查看", "codegen"),
             new PermissionDescriptor(CODEGEN_WRITE, "代码生成管理", "codegen"),
+            new PermissionDescriptor(CODEGEN_DOWNLOAD, "代码生成下载", "codegen"),
             new PermissionDescriptor(SESSION_WRITE, "会话管理", "session")
     );
 

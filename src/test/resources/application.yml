@@ -51,6 +51,11 @@ app:
   rate-limit:
     enabled: false
 
+platform:
+  file:
+    storage: local
+    local-root: target/test-files
+
 sa-token:
   token-name: Authorization
   token-prefix: Bearer

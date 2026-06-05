@@ -47,10 +47,16 @@ class CodegenApplicationServiceP2Test {
                   PRIMARY KEY (id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='P2 代码生成订单测试'
                 """);
+        jdbcTemplate.update("""
+                INSERT INTO sys_codegen_allowlist (tenant_id, table_name, description, enabled, created_by, updated_by, deleted)
+                VALUES ('platform', ?, '代码生成单测白名单', 1, 'test', 'test', 0)
+                ON DUPLICATE KEY UPDATE enabled = VALUES(enabled), deleted = VALUES(deleted), updated_by = VALUES(updated_by)
+                """, TABLE_NAME);
     }
 
     @AfterEach
     void tearDown() throws IOException {
+        jdbcTemplate.update("DELETE FROM sys_codegen_allowlist WHERE table_name = ?", TABLE_NAME);
         jdbcTemplate.execute("DROP TABLE IF EXISTS " + TABLE_NAME);
         cleanupOutput();
         TenantContext.clear();
@@ -63,6 +69,9 @@ class CodegenApplicationServiceP2Test {
         assertThat(tables.records())
                 .extracting("tableName")
                 .contains(TABLE_NAME);
+        assertThat(tables.records())
+                .extracting("tableName")
+                .doesNotContain("sys_user", "sys_mail_channel", "sys_config");
 
         var detail = codegenApplicationService.table(TABLE_NAME);
         assertThat(detail.columns())
@@ -82,6 +91,8 @@ class CodegenApplicationServiceP2Test {
         ));
 
         assertThat(preview.files()).hasSize(8);
+        assertThat(preview.generatedRoot()).isEqualTo("SERVER_MANAGED");
+        assertThat(preview.toString()).doesNotContain(OUTPUT_ROOT.toAbsolutePath().normalize().toString());
         assertThat(preview.files())
                 .extracting("path")
                 .contains(
@@ -121,6 +132,20 @@ class CodegenApplicationServiceP2Test {
     }
 
     @Test
+    void shouldRejectTableOutsideCurrentTenantAllowlist() {
+        TenantContext.setTenantId("tenant-a");
+
+        var tables = codegenApplicationService.tables("codegen_order", 1, 20);
+
+        assertThat(tables.records())
+                .extracting("tableName")
+                .doesNotContain(TABLE_NAME);
+        assertThatThrownBy(() -> codegenApplicationService.table(TABLE_NAME))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("数据表未纳入代码生成白名单");
+    }
+
+    @Test
     void shouldGenerateIntoIsolatedDirectoryAndProtectExistingFiles() {
         var command = new CodegenCommand(
                 TABLE_NAME,
@@ -130,13 +155,15 @@ class CodegenApplicationServiceP2Test {
                 true,
                 true,
                 false,
-                List.of(),
+                null,
                 false
         );
 
         var generated = codegenApplicationService.generate(command);
 
         assertThat(generated.files()).hasSize(8);
+        assertThat(generated.outputRoot()).isEqualTo("SERVER_MANAGED");
+        assertThat(generated.toString()).doesNotContain(OUTPUT_ROOT.toAbsolutePath().normalize().toString());
         assertThat(OUTPUT_ROOT.resolve("backend/src/main/java/com/enterprise/auth/platform/generated/modules/orderGen/infrastructure/entity/OrderGenEntity.java"))
                 .exists();
         assertThatThrownBy(() -> codegenApplicationService.generate(command))

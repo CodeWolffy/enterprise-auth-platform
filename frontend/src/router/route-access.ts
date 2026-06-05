@@ -54,7 +54,7 @@ export function isAllowedRoute(snapshot: PermissionSnapshot | null, to: RouteAcc
     return false
   }
 
-  if (Boolean(to.meta.generatedRoute)) {
+  if (to.meta.generatedRoute) {
     return isAllowedGeneratedRoute(snapshot, to.path)
   }
 

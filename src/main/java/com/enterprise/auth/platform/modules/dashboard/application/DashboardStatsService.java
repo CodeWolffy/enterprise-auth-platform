@@ -143,13 +143,12 @@ public class DashboardStatsService {
     }
 
     private long sumStorageBytes(String tenantId, boolean platformScope, Optional<Set<Long>> visibleUserIds) {
-        LambdaQueryWrapper<SysStorageFileEntity> wrapper = fileScope(tenantId, platformScope, visibleUserIds)
-                .select(SysStorageFileEntity::getFileSize);
-        return sysStorageFileMapper.selectList(wrapper).stream()
-                .map(SysStorageFileEntity::getFileSize)
-                .filter(size -> size != null && size > 0)
-                .mapToLong(Long::longValue)
-                .sum();
+        Long totalSize = sysStorageFileMapper.sumFileSize(
+                tenantId,
+                platformScope,
+                visibleUserIds.orElse(null)
+        );
+        return totalSize == null ? 0L : Math.max(totalSize, 0L);
     }
 
     private LambdaQueryWrapper<SysStorageFileEntity> fileScope(String tenantId, boolean platformScope, Optional<Set<Long>> visibleUserIds) {

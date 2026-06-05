@@ -29,7 +29,7 @@ class AuthControllerRegisterTest {
     private static final String PLATFORM_TENANT = "platform";
     private static final String DEFAULT_TENANT = "tenant-a";
     private static final String DEFAULT_ROLE_CODE = "REGISTER_BASE_TEST";
-    private static final String USERNAME_PREFIX = "register_api_ut_";
+    private static final String USERNAME_PREFIX = "regut_";
     private static final String CONFIG_KEY_DEFAULT_TENANT = "registration.default_tenant_id";
     private static final String CONFIG_KEY_DEFAULT_ROLE_CODES = "registration.default_role_codes";
 
@@ -220,7 +220,7 @@ class AuthControllerRegisterTest {
     }
 
     private String nextUsername() {
-        return USERNAME_PREFIX + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+        return USERNAME_PREFIX + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
     }
 
     private void ensureDefaultRole() {

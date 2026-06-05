@@ -160,6 +160,18 @@ class AuditServiceQueryTest {
         assertThat(details.get("nested").toString()).contains("secretKey=******").contains("safe=kept");
     }
 
+    @Test
+    void shouldNormalizeAuditPageSizeToOperationalLimit() {
+        AuditQuery query = new AuditQuery("platform", null, null, null, null, null, null, 0, 10_000);
+
+        AuditQuery resolved = query.withDefaultTimeRange(1_800_000_000_000L);
+
+        assertThat(resolved.normalizedPage()).isEqualTo(1);
+        assertThat(resolved.normalizedSize()).isEqualTo(AuditQuery.MAX_PAGE_SIZE);
+        assertThat(resolved.toEpochMs()).isEqualTo(1_800_000_060_000L);
+        assertThat(resolved.fromEpochMs()).isEqualTo(resolved.toEpochMs() - AuditQuery.MAX_QUERY_RANGE_MS);
+    }
+
     private Long ensureUser(String username, Long deptId) {
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username = ?", "tenant-a", username);
         SysUserEntity entity = new SysUserEntity();

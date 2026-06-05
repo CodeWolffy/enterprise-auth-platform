@@ -1,5 +1,5 @@
 import { http } from '../http'
-import type { ApiResponse, PageResult } from '@/types/api'
+import type { ApiResponse } from '@/types/api'
 import type {
   CodegenGenerateResult,
   CodegenPreviewResult,

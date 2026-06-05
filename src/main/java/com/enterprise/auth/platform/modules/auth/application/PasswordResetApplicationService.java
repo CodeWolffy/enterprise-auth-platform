@@ -76,13 +76,13 @@ public class PasswordResetApplicationService {
         String username = normalize(request.username());
         String clientIp = clientIpResolver.resolve(servletRequest);
 
-        // 快速存在性检查：未指定租户时先确认用户名是否存在
+        // 快速存在性检查：失败分支只写审计，不向客户端暴露账号状态
         if (!StringUtils.hasText(request.tenantId())) {
             List<String> tenantIds = sysUserMapper.selectActiveTenantIdsByUsername(username);
             if (tenantIds.isEmpty()) {
                 auditService.record("PASSWORD_RESET_REQUESTED", username, "unknown",
                         Map.of("result", "not_found", "clientIp", clientIp));
-                return new PasswordResetRequestResponse("用户名不存在", "NOT_FOUND");
+                return acceptedPasswordResetRequest();
             }
         }
 
@@ -94,23 +94,23 @@ public class PasswordResetApplicationService {
             if (StringUtils.hasText(request.tenantId())) {
                 auditService.record("PASSWORD_RESET_REQUESTED", username, request.tenantId(),
                         Map.of("result", "not_found", "clientIp", clientIp));
-                return new PasswordResetRequestResponse("用户名不存在", "NOT_FOUND");
+                return acceptedPasswordResetRequest();
             }
             auditService.record("PASSWORD_RESET_REQUESTED", username, "unknown",
                     Map.of("result", "accepted", "clientIp", clientIp, "accountMatched", false));
-            return new PasswordResetRequestResponse(GENERIC_REQUEST_MESSAGE, "EMAIL_SENT");
+            return acceptedPasswordResetRequest();
         }
 
         if (user.getEnabled() == null || user.getEnabled() != 1) {
             auditService.record("PASSWORD_RESET_REQUESTED", username, tenantId,
-                    Map.of("result", "not_found", "clientIp", clientIp));
-            return new PasswordResetRequestResponse("用户名不存在", "NOT_FOUND");
+                    Map.of("result", "disabled", "clientIp", clientIp));
+            return acceptedPasswordResetRequest();
         }
 
         if (!StringUtils.hasText(user.getEmail())) {
             auditService.record("PASSWORD_RESET_REQUESTED", username, tenantId,
                     Map.of("result", "no_email", "clientIp", clientIp));
-            return new PasswordResetRequestResponse("该账号未绑定邮箱，无法通过邮件重置密码", "EMAIL_NOT_CONFIGURED");
+            return acceptedPasswordResetRequest();
         }
 
         enforceRequestFrequency(user, username, clientIp);
@@ -187,10 +187,31 @@ public class PasswordResetApplicationService {
             return null;
         });
         revokeActiveTokens(user.getTenantId(), user.getId());
-        sessionIndexService.removeUser(user.getId());
-        StpUtil.kickout(user.getId());
+        afterCommit(() -> {
+            sessionIndexService.removeUser(user.getId());
+            StpUtil.kickout(user.getId());
+        });
         auditService.record("PASSWORD_RESET_COMPLETED", user.getUsername(), user.getTenantId(), Map.of("userId", user.getId()));
         return new PasswordResetConfirmResponse("密码已重置，请使用新密码登录");
+    }
+
+    private PasswordResetRequestResponse acceptedPasswordResetRequest() {
+        return new PasswordResetRequestResponse(GENERIC_REQUEST_MESSAGE, "EMAIL_SENT");
+    }
+
+    private void afterCommit(Runnable action) {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            action.run();
+                        }
+                    }
+            );
+            return;
+        }
+        action.run();
     }
 
     private void enforceRequestFrequency(SysUserEntity user, String username, String clientIp) {

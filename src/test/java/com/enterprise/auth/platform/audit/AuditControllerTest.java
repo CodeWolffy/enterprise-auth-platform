@@ -47,11 +47,11 @@ class AuditControllerTest {
         jdbcTemplate.update("DELETE FROM sys_audit_export_task WHERE file_name LIKE 'audit-governance-ut-%'");
         jdbcTemplate.update("DELETE FROM sys_audit_log WHERE event_type = ?", EVENT_TYPE);
         jdbcTemplate.update(
-                "INSERT INTO sys_audit_log(tenant_id, event_type, operator, payload_json, occurred_at, request_id, client_ip) VALUES(?,?,?,?,NOW(),?,?)",
+                "INSERT INTO sys_audit_log(tenant_id, event_type, operator, payload_json, occurred_at, request_id, client_ip) VALUES(?,?,?,?,UTC_TIMESTAMP(6),?,?)",
                 "platform", EVENT_TYPE, "admin", "{\"bizId\":\"visible\"}", REQUEST_ID_VISIBLE, "10.10.10.10"
         );
         jdbcTemplate.update(
-                "INSERT INTO sys_audit_log(tenant_id, event_type, operator, payload_json, occurred_at, request_id, client_ip) VALUES(?,?,?,?,NOW(),?,?)",
+                "INSERT INTO sys_audit_log(tenant_id, event_type, operator, payload_json, occurred_at, request_id, client_ip) VALUES(?,?,?,?,UTC_TIMESTAMP(6),?,?)",
                 "platform", EVENT_TYPE, "admin", "{\"bizId\":\"hidden\"}", REQUEST_ID_HIDDEN, "10.10.10.20"
         );
     }

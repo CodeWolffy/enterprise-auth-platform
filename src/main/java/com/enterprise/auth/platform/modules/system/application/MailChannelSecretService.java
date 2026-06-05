@@ -39,8 +39,11 @@ public class MailChannelSecretService {
     }
 
     public String protect(String rawSecret) {
-        if (!StringUtils.hasText(rawSecret) || isProtected(rawSecret) || !canProtect()) {
+        if (!StringUtils.hasText(rawSecret) || isProtected(rawSecret)) {
             return rawSecret;
+        }
+        if (!canProtect()) {
+            throw new BusinessException("MAIL_SECRET_KEY_REQUIRED", "保存 SMTP 密码前必须配置 APP_MAIL_SECRET_KEY");
         }
         try {
             byte[] salt = randomBytes(SALT_BYTES);

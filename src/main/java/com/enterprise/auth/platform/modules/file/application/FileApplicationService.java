@@ -1,7 +1,5 @@
 package com.enterprise.auth.platform.modules.file.application;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
@@ -14,7 +12,6 @@ import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.file.domain.FileVisibility;
 import com.enterprise.auth.platform.modules.file.infrastructure.entity.SysStorageFileEntity;
 import com.enterprise.auth.platform.modules.file.infrastructure.mapper.SysStorageFileMapper;
-import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.net.URLConnection;
 import java.nio.file.Path;
@@ -72,39 +69,55 @@ public class FileApplicationService {
     public PageResult<FileMetadataView> page(FileQuery query) {
         UserAccount user = currentUserService.requireCurrentUser();
         FileQuery normalized = query == null ? new FileQuery(null, null, null, null, 1, 20) : query;
-        LambdaQueryWrapper<SysStorageFileEntity> wrapper = new LambdaQueryWrapper<SysStorageFileEntity>()
-                .eq(SysStorageFileEntity::getDeleted, 0);
-        applyReadableScope(wrapper, user);
-        if (StringUtils.hasText(normalized.keyword())) {
-            wrapper.like(SysStorageFileEntity::getOriginalName, normalized.keyword().trim());
-        }
-        if (StringUtils.hasText(normalized.contentType())) {
-            wrapper.eq(SysStorageFileEntity::getContentType, normalized.contentType().trim().toLowerCase(Locale.ROOT));
-        }
-        if (StringUtils.hasText(normalized.storageType())) {
-            wrapper.eq(SysStorageFileEntity::getStorageType, normalized.storageType().trim().toUpperCase(Locale.ROOT));
-        }
-        if (StringUtils.hasText(normalized.visibility())) {
-            wrapper.eq(SysStorageFileEntity::getVisibility, normalized.visibility().trim().toUpperCase(Locale.ROOT));
-        }
-        wrapper.orderByDesc(SysStorageFileEntity::getCreatedAt).orderByDesc(SysStorageFileEntity::getId);
+        FileReadScope scope = readableScope(user);
+        String keyword = trimmedOrNull(normalized.keyword());
+        String contentType = normalizedContentTypeOrNull(normalized.contentType());
+        String storageType = upperOrNull(normalized.storageType());
+        String visibility = upperOrNull(normalized.visibility());
+        int page = normalized.normalizedPage();
+        int size = normalized.normalizedSize();
+        int offset = (page - 1) * size;
 
-        Page<SysStorageFileEntity> result = storageFileMapper.selectPage(
-                Page.of(normalized.normalizedPage(), normalized.normalizedSize()),
-                wrapper
+        long total = storageFileMapper.countReadableFiles(
+                scope.tenantId(),
+                scope.platformScope(),
+                keyword,
+                contentType,
+                storageType,
+                visibility,
+                scope.restrictReadable(),
+                scope.ownerUserId()
         );
-        List<FileMetadataView> records = result.getRecords().stream()
+        List<FileMetadataView> records = storageFileMapper.selectReadableFiles(
+                        scope.tenantId(),
+                        scope.platformScope(),
+                        keyword,
+                        contentType,
+                        storageType,
+                        visibility,
+                        scope.restrictReadable(),
+                        scope.ownerUserId(),
+                        offset,
+                        size
+                ).stream()
                 .map(this::toView)
                 .toList();
-        return PageResult.of(result.getTotal(), normalized.normalizedPage(), normalized.normalizedSize(), records);
+        return PageResult.of(total, page, size, records);
     }
 
     public long countVisibleFiles() {
         UserAccount user = currentUserService.requireCurrentUser();
-        LambdaQueryWrapper<SysStorageFileEntity> wrapper = new LambdaQueryWrapper<SysStorageFileEntity>()
-                .eq(SysStorageFileEntity::getDeleted, 0);
-        applyReadableScope(wrapper, user);
-        return storageFileMapper.selectCount(wrapper);
+        FileReadScope scope = readableScope(user);
+        return storageFileMapper.countReadableFiles(
+                scope.tenantId(),
+                scope.platformScope(),
+                null,
+                null,
+                null,
+                null,
+                scope.restrictReadable(),
+                scope.ownerUserId()
+        );
     }
 
     public FileMetadataView metadata(String fileKey) {
@@ -135,7 +148,7 @@ public class FileApplicationService {
         SysStorageFileEntity entity = loadByFileKey(fileKey);
         assertDeletable(entity, user);
         objectStorageService.delete(entity.getBucketName(), entity.getObjectKey());
-        storageFileMapper.deleteById(entity.getId());
+        storageFileMapper.softDeleteByIdIgnoreTenant(entity.getId());
         auditService.record("FILE_DELETED", user.username(), entity.getTenantId(), Map.of(
                 "fileKey", entity.getFileKey(),
                 "visibility", entity.getVisibility(),
@@ -170,11 +183,11 @@ public class FileApplicationService {
         String fileKey = newFileKey();
         String objectKey = buildObjectKey(tenantId, fileKey, file.getOriginalFilename());
         ObjectStorageService.StoredObject storedObject;
-        try (InputStream inputStream = new ByteArrayInputStream(validatedUpload.bytes())) {
+        try (InputStream inputStream = file.getInputStream()) {
             storedObject = objectStorageService.put(
                     objectKey,
                     inputStream,
-                    validatedUpload.bytes().length,
+                    file.getSize(),
                     validatedUpload.contentType(),
                     file.getOriginalFilename()
             );
@@ -187,7 +200,7 @@ public class FileApplicationService {
         entity.setFileKey(fileKey);
         entity.setOriginalName(safeOriginalName(file.getOriginalFilename()));
         entity.setContentType(validatedUpload.contentType());
-        entity.setFileSize((long) validatedUpload.bytes().length);
+        entity.setFileSize(file.getSize());
         entity.setStorageType(storedObject.storageType());
         entity.setBucketName(storedObject.bucketName());
         entity.setObjectKey(storedObject.objectKey());
@@ -200,7 +213,7 @@ public class FileApplicationService {
                 "fileKey", fileKey,
                 "visibility", resolvedVisibility.name(),
                 "contentType", validatedUpload.contentType(),
-                "size", validatedUpload.bytes().length,
+                "size", file.getSize(),
                 "storageType", storedObject.storageType()
         ));
         return toView(entity);
@@ -225,13 +238,8 @@ public class FileApplicationService {
         if (file.getSize() > maxSize) {
             throw new BusinessException("VALIDATION_ERROR", "文件大小超出限制");
         }
-        byte[] bytes;
-        try {
-            bytes = file.getBytes();
-        } catch (Exception exception) {
-            throw new BusinessException("FILE_STORAGE_ERROR", "文件读取失败");
-        }
-        String detectedType = detectContentType(bytes, file.getOriginalFilename());
+        byte[] signature = readSignature(file);
+        String detectedType = detectContentType(signature, file.getOriginalFilename());
         List<String> allowedTypes = properties.resolvedAllowedTypes();
         if (!allowedTypes.contains(detectedType)) {
             throw new BusinessException("VALIDATION_ERROR", "不支持的文件类型");
@@ -243,7 +251,23 @@ public class FileApplicationService {
         if (StringUtils.hasText(declaredType) && !declaredType.equals(detectedType)) {
             throw new BusinessException("VALIDATION_ERROR", "文件内容与声明类型不一致");
         }
-        return new ValidatedUpload(bytes, detectedType);
+        return new ValidatedUpload(detectedType);
+    }
+
+    private byte[] readSignature(MultipartFile file) {
+        int maxSignatureBytes = 512;
+        byte[] buffer = new byte[maxSignatureBytes];
+        try (InputStream inputStream = file.getInputStream()) {
+            int read = inputStream.read(buffer);
+            if (read <= 0) {
+                throw new BusinessException("VALIDATION_ERROR", "文件不能为空");
+            }
+            return java.util.Arrays.copyOf(buffer, read);
+        } catch (BusinessException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new BusinessException("FILE_STORAGE_ERROR", "文件读取失败");
+        }
     }
 
     private String detectContentType(byte[] bytes, String originalFilename) {
@@ -315,18 +339,11 @@ public class FileApplicationService {
         }
     }
 
-    private void applyReadableScope(LambdaQueryWrapper<SysStorageFileEntity> wrapper, UserAccount user) {
+    private FileReadScope readableScope(UserAccount user) {
         String activeTenantId = currentTenantId(user);
-        if (platformAdminSupport.isPlatformSuperAdmin(user)) {
-            return;
-        }
-        wrapper.eq(SysStorageFileEntity::getTenantId, activeTenantId);
-        if (!hasFileRead(user)) {
-            wrapper.and(scope -> scope
-                    .eq(SysStorageFileEntity::getVisibility, FileVisibility.PUBLIC.name())
-                    .or()
-                    .eq(SysStorageFileEntity::getOwnerUserId, user.id()));
-        }
+        boolean platformScope = canAccessAllTenants(user);
+        boolean restrictReadable = !platformScope && !hasFileRead(user);
+        return new FileReadScope(activeTenantId, platformScope, restrictReadable, user.id());
     }
 
     private void assertReadable(SysStorageFileEntity entity, UserAccount user) {
@@ -336,14 +353,14 @@ public class FileApplicationService {
             case PUBLIC -> {
             }
             case TENANT -> {
-                if (!entity.getTenantId().equals(activeTenantId) && !platformAdminSupport.isPlatformSuperAdmin(user)) {
+                if (!entity.getTenantId().equals(activeTenantId) && !canAccessAllTenants(user)) {
                     throw new BusinessException("ACCESS_DENIED", "无权访问文件");
                 }
             }
             case OWNER -> {
                 boolean owner = entity.getOwnerUserId() != null && entity.getOwnerUserId().equals(user.id());
                 boolean sameTenantAdmin = entity.getTenantId().equals(activeTenantId) && hasFileRead(user);
-                boolean platformAdmin = platformAdminSupport.isPlatformSuperAdmin(user);
+                boolean platformAdmin = canAccessAllTenants(user);
                 if (!owner && !sameTenantAdmin && !platformAdmin) {
                     throw new BusinessException("ACCESS_DENIED", "无权访问文件");
                 }
@@ -351,7 +368,7 @@ public class FileApplicationService {
             case PRIVATE -> {
                 boolean owner = entity.getOwnerUserId() != null && entity.getOwnerUserId().equals(user.id());
                 boolean sameTenantAdmin = entity.getTenantId().equals(activeTenantId) && hasFileRead(user);
-                boolean platformAdmin = platformAdminSupport.isPlatformSuperAdmin(user);
+                boolean platformAdmin = canAccessAllTenants(user);
                 if (!owner && !sameTenantAdmin && !platformAdmin) {
                     throw new BusinessException("ACCESS_DENIED", "无权访问私有文件");
                 }
@@ -362,10 +379,14 @@ public class FileApplicationService {
     private void assertDeletable(SysStorageFileEntity entity, UserAccount user) {
         boolean owner = entity.getOwnerUserId() != null && entity.getOwnerUserId().equals(user.id());
         boolean sameTenantAdmin = entity.getTenantId().equals(currentTenantId(user)) && hasFileWrite(user);
-        boolean platformAdmin = platformAdminSupport.isPlatformSuperAdmin(user);
+        boolean platformAdmin = canAccessAllTenants(user);
         if (!owner && !sameTenantAdmin && !platformAdmin) {
             throw new BusinessException("ACCESS_DENIED", "无权删除文件");
         }
+    }
+
+    private boolean canAccessAllTenants(UserAccount user) {
+        return platformAdminSupport.isPlatformSuperAdmin(user) && "platform".equals(currentTenantId(user));
     }
 
     private SysStorageFileEntity loadByFileKey(String fileKey) {
@@ -421,6 +442,18 @@ public class FileApplicationService {
         return user.permissions().contains(PermissionCodes.FILE_WRITE);
     }
 
+    private String trimmedOrNull(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private String normalizedContentTypeOrNull(String value) {
+        return StringUtils.hasText(value) ? value.trim().toLowerCase(Locale.ROOT) : null;
+    }
+
+    private String upperOrNull(String value) {
+        return StringUtils.hasText(value) ? value.trim().toUpperCase(Locale.ROOT) : null;
+    }
+
     private String newFileKey() {
         byte[] bytes = new byte[16];
         RANDOM.nextBytes(bytes);
@@ -453,6 +486,9 @@ public class FileApplicationService {
         return name.length() > 255 ? name.substring(0, 255) : name;
     }
 
-    private record ValidatedUpload(byte[] bytes, String contentType) {
+    private record ValidatedUpload(String contentType) {
+    }
+
+    private record FileReadScope(String tenantId, boolean platformScope, boolean restrictReadable, Long ownerUserId) {
     }
 }

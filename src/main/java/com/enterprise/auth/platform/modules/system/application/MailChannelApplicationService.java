@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.modules.system.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysMailChannelEntity;
@@ -123,7 +124,11 @@ public class MailChannelApplicationService {
         String tenantId = currentTenantId();
         SysMailChannelEntity entity = findByTenant(tenantId)
                 .orElseThrow(() -> new BusinessException("MAIL_CHANNEL_NOT_FOUND", "未找到当前租户的邮件渠道配置"));
-        withTenant(tenantId, () -> mapper.hardDeleteByTenantId(entity.getTenantId()));
+        withTenant(tenantId, () -> mapper.update(null, new LambdaUpdateWrapper<SysMailChannelEntity>()
+                .eq(SysMailChannelEntity::getTenantId, entity.getTenantId())
+                .eq(SysMailChannelEntity::getDeleted, 0)
+                .set(SysMailChannelEntity::getEnabled, 0)
+                .set(SysMailChannelEntity::getDeleted, 1)));
         senderManager.evict(tenantId);
         log.info("Mail channel deleted for tenant={}", tenantId);
     }
@@ -151,7 +156,7 @@ public class MailChannelApplicationService {
             return true;
         } catch (Exception ex) {
             log.error("Test mail failed for tenant={}, channelTenant={}, to={}", normalizedTenantId, config.getTenantId(), maskEmail(toEmail), ex);
-            throw new BusinessException("MAIL_TEST_FAILED", "测试邮件发送失败：" + safeMessage(ex));
+            throw new BusinessException("MAIL_TEST_FAILED", "测试邮件发送失败，请检查邮件渠道配置或稍后重试");
         }
     }
 
@@ -293,10 +298,5 @@ public class MailChannelApplicationService {
             return "***";
         }
         return email.charAt(0) + "***" + email.substring(at);
-    }
-
-    private String safeMessage(Exception ex) {
-        String message = ex.getMessage();
-        return StringUtils.hasText(message) ? message : ex.getClass().getSimpleName();
     }
 }

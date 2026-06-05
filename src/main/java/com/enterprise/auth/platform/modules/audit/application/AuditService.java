@@ -17,7 +17,7 @@ import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.time.Duration;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +28,6 @@ import org.springframework.util.StringUtils;
 public class AuditService implements AuditEventPublisher {
 
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() { };
-    private static final long MAX_EXPORT_RANGE_MS = Duration.ofDays(31).toMillis();
 
     private final SysAuditLogMapper sysAuditLogMapper;
     private final ObjectMapper objectMapper;
@@ -75,9 +74,9 @@ public class AuditService implements AuditEventPublisher {
     }
 
     public AuditPage query(AuditQuery query) {
-        AuditQuery scopedQuery = scopedQuery(query);
+        AuditQuery scopedQuery = scopedQuery(query).withDefaultTimeRange(Instant.now().toEpochMilli());
         validateQueryRange(scopedQuery);
-        return queryInDatabase(scopedQuery);
+        return queryInDatabase(scopedQuery, false);
     }
 
     public List<AuditEvent> export(AuditQuery query) {
@@ -92,9 +91,9 @@ public class AuditService implements AuditEventPublisher {
                 scopedQuery.fromEpochMs(),
                 scopedQuery.toEpochMs(),
                 1,
-                2000
+                AuditQuery.EXPORT_PAGE_SIZE
         );
-        return query(exportQuery).records();
+        return queryInDatabase(exportQuery, true).records();
     }
 
     public List<AuditLogEntry> queryCategoryAudits(String tenantId, String targetType, String code) {
@@ -130,7 +129,7 @@ public class AuditService implements AuditEventPublisher {
         if (query.fromEpochMs() >= query.toEpochMs()) {
             throw new BusinessException("查询开始时间必须小于结束时间");
         }
-        if (query.toEpochMs() - query.fromEpochMs() > MAX_EXPORT_RANGE_MS) {
+        if (query.toEpochMs() - query.fromEpochMs() > AuditQuery.MAX_QUERY_RANGE_MS) {
             throw new BusinessException("审计查询时间范围不能超过 31 天");
         }
     }
@@ -170,7 +169,7 @@ public class AuditService implements AuditEventPublisher {
         return StringUtils.hasText(contextTenantId) ? contextTenantId : "platform";
     }
 
-    private AuditPage queryInDatabase(AuditQuery query) {
+    private AuditPage queryInDatabase(AuditQuery query, boolean exportMode) {
         LambdaQueryWrapper<SysAuditLogEntity> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.hasText(query.tenantId())) {
             wrapper.eq(SysAuditLogEntity::getTenantId, query.tenantId());
@@ -204,7 +203,7 @@ public class AuditService implements AuditEventPublisher {
 
         long total = sysAuditLogMapper.selectCount(wrapper);
         int page = query.normalizedPage();
-        int size = query.normalizedSize();
+        int size = exportMode ? query.normalizedExportSize() : query.normalizedSize();
         int offset = (page - 1) * size;
         List<AuditEvent> records = sysAuditLogMapper.selectList(wrapper.last("limit " + offset + "," + size)).stream()
                 .map(this::toEvent)

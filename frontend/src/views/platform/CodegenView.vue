@@ -91,8 +91,8 @@
                 <div class="scope-row">
                   <el-checkbox v-model="form.includeBackend" @change="markPreviewStale">后端</el-checkbox>
                   <el-checkbox v-model="form.includeFrontend" @change="markPreviewStale">前端</el-checkbox>
-                  <el-checkbox v-permission="'codegen:write'" v-model="form.overwrite">允许覆盖</el-checkbox>
-                  <el-checkbox v-permission="'codegen:write'" v-model="form.autoRegister" @change="markPreviewStale">自动注册菜单权限</el-checkbox>
+                  <el-checkbox v-model="form.overwrite" v-permission="'codegen:write'">允许覆盖</el-checkbox>
+                  <el-checkbox v-model="form.autoRegister" v-permission="'codegen:write'" @change="markPreviewStale">自动注册菜单权限</el-checkbox>
                 </div>
                 <el-alert
                   class="safety-alert"
@@ -123,14 +123,14 @@
             <div>
               <span class="eyebrow">Preview</span>
               <h3>生成预览</h3>
-              <p class="muted-line">输出根目录：{{ previewResult.generatedRoot }}</p>
+              <p class="muted-line">生成产物仅展示相对路径，后端输出位置由服务端托管。</p>
             </div>
             <div class="preview-actions">
               <el-tag :type="previewStale ? 'warning' : 'success'" effect="plain">
                 {{ previewStale ? '配置已变更，请重新预览' : '预览可生成' }}
               </el-tag>
               <el-button size="small" :disabled="!activePreviewPath" @click="copyText(activePreviewPath, '预览路径已复制')">复制当前路径</el-button>
-              <el-button v-permission="'codegen:read'" size="small" type="primary" :disabled="!canDownload" :loading="downloading" @click="downloadZip">下载产物</el-button>
+              <el-button v-permission="'codegen:download'" size="small" type="primary" :disabled="!canDownload" :loading="downloading" @click="downloadZip">下载产物</el-button>
             </div>
           </div>
 
@@ -221,7 +221,7 @@
         </section>
 
         <el-dialog v-model="templateDialogVisible" :title="editingTemplate?.id ? '编辑模板' : '新增模板'" width="720px">
-          <el-form label-position="top" :model="editingTemplate" v-if="editingTemplate">
+          <el-form v-if="editingTemplate" label-position="top" :model="editingTemplate">
             <el-form-item label="名称" required>
               <el-input v-model="editingTemplate.name" :disabled="editingTemplate.builtin" />
             </el-form-item>

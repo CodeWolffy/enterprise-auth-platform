@@ -18,6 +18,7 @@ import com.enterprise.auth.platform.modules.workflow.application.WorkflowDefinit
 import com.enterprise.auth.platform.modules.workflow.application.WorkflowStartCommand;
 import com.enterprise.auth.platform.modules.workflow.application.WorkflowStepDefinition;
 import com.enterprise.auth.platform.modules.workflow.application.WorkflowTaskCommand;
+import com.enterprise.auth.platform.modules.workflow.application.WorkflowTaskUrgeService;
 import com.enterprise.auth.platform.modules.workflow.domain.WorkflowRejectStrategy;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -54,6 +55,9 @@ class WorkflowApplicationServiceP2Test {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private WorkflowTaskUrgeService urgeService;
 
     private Long starterId;
     private Long approverOneId;
@@ -287,6 +291,66 @@ class WorkflowApplicationServiceP2Test {
     }
 
     @Test
+    void processedTaskShouldRejectSecondApprovalAttempt() {
+        bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("workflow:write"));
+        createAndDeploySingleStepDefinition("p2-wf-concurrent-approve-ut", Set.of(approverOneId), Set.of());
+        var started = workflowApplicationService.startInstance(new WorkflowStartCommand(
+                "p2-wf-concurrent-approve-ut",
+                "p2-business-concurrent-approve",
+                "P2 并发审批防重",
+                Map.of("amount", 600)
+        ));
+
+        bindPrincipal(TENANT_A, approverOneId, APPROVER_ONE, Set.of(), Set.of());
+        var approved = workflowApplicationService.approveTask(started.currentTask().id(), new WorkflowTaskCommand("第一次通过"));
+
+        assertThat(approved.instance().status()).isEqualTo("APPROVED");
+        assertThatThrownBy(() -> workflowApplicationService.approveTask(started.currentTask().id(), new WorkflowTaskCommand("重复通过")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("待办任务不存在");
+        Long approvedCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM wf_task WHERE tenant_id = ? AND instance_id = ? AND status = 'APPROVED'",
+                Long.class,
+                TENANT_A,
+                started.instance().id()
+        );
+        Long pendingCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM wf_task WHERE tenant_id = ? AND instance_id = ? AND status = 'PENDING'",
+                Long.class,
+                TENANT_A,
+                started.instance().id()
+        );
+        assertThat(approvedCount).isEqualTo(1);
+        assertThat(pendingCount).isZero();
+    }
+
+    @Test
+    void repeatedUrgeForSameTaskShouldBeRateLimited() {
+        bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("workflow:write"));
+        createAndDeploySingleStepDefinition("p2-wf-urge-rate-limit-ut", Set.of(approverOneId), Set.of());
+        var started = workflowApplicationService.startInstance(new WorkflowStartCommand(
+                "p2-wf-urge-rate-limit-ut",
+                "p2-business-urge-rate-limit",
+                "P2 催办频控",
+                Map.of("amount", 650)
+        ));
+
+        var first = urgeService.urge(started.currentTask().id(), new WorkflowTaskCommand("请尽快处理"));
+
+        assertThat(first.totalUrgeCount()).isEqualTo(1);
+        assertThatThrownBy(() -> urgeService.urge(started.currentTask().id(), new WorkflowTaskCommand("再次催办")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("催办过于频繁");
+        Long urgeCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM wf_task_urge WHERE tenant_id = ? AND task_id = ? AND deleted = 0",
+                Long.class,
+                TENANT_A,
+                started.currentTask().id()
+        );
+        assertThat(urgeCount).isEqualTo(1);
+    }
+
+    @Test
     void tenantAndCandidateIsolationShouldBlockCrossScopeAccess() {
         bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("workflow:write", "workflow:read"));
         Long definitionId = createAndDeploySingleStepDefinition("p2-wf-isolation-ut", Set.of(approverOneId), Set.of());
@@ -383,6 +447,8 @@ class WorkflowApplicationServiceP2Test {
     }
 
     private void cleanup() {
+        jdbcTemplate.update("DELETE FROM wf_task_urge WHERE tenant_id IN (?, ?)", TENANT_A, TENANT_B);
+        jdbcTemplate.update("DELETE FROM sys_user_notification WHERE tenant_id IN (?, ?) AND source_type = 'WORKFLOW_TASK'", TENANT_A, TENANT_B);
         jdbcTemplate.update("DELETE FROM wf_task WHERE tenant_id IN (?, ?)", TENANT_A, TENANT_B);
         jdbcTemplate.update("DELETE FROM wf_process_instance WHERE tenant_id IN (?, ?)", TENANT_A, TENANT_B);
         jdbcTemplate.update("DELETE FROM wf_process_definition WHERE tenant_id IN (?, ?)", TENANT_A, TENANT_B);

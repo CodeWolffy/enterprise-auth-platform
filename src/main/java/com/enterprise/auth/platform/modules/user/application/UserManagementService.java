@@ -29,6 +29,8 @@ import java.util.stream.Collectors;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 @Service
@@ -197,10 +199,26 @@ public class UserManagementService {
     }
 
     private void kickoutUserSessions(Long userId) {
-        if (userId != null) {
+        if (userId == null) {
+            return;
+        }
+        afterCommit(() -> {
             StpUtil.kickout(userId);
             sessionIndexService.removeUser(userId);
+        });
+    }
+
+    private void afterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+            return;
         }
+        action.run();
     }
 
     private void syncUserRoles(String tenantId, Long userId, Set<String> roleCodes) {

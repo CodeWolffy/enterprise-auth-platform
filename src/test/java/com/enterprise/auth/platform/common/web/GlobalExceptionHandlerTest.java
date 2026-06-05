@@ -72,6 +72,9 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().code()).isEqualTo("INTERNAL_ERROR");
+        assertThat(response.getBody().message()).isEqualTo("服务器内部错误");
+        assertThat(response.getBody().message()).doesNotContain("boom");
+        assertThat(response.getBody().details()).isEmpty();
         assertThat(response.getBody().requestId()).isEqualTo("test-request-id");
         assertThat(response.getBody().path()).isEqualTo("/api/test");
     }

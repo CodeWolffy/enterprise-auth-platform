@@ -1,5 +1,5 @@
 ﻿<template>
-  <el-container class="admin-layout">
+  <el-container class="admin-layout" :class="{ 'admin-layout--page-fullscreen': isPageFullscreen }">
     <el-aside :width="isCollapse ? '64px' : '200px'" class="admin-aside">
       <div class="logo-box">
         <el-icon class="logo-icon-svg"><Platform /></el-icon>
@@ -140,7 +140,21 @@
               </el-dropdown-menu>
             </template>
           </el-dropdown>
-          <div class="tags-action-btn" @click="toggleFullScreen"><el-icon><FullScreen /></el-icon></div>
+          <button
+            class="tags-action-btn tags-action-btn--fullscreen"
+            :class="{ 'is-active': isPageFullscreen }"
+            type="button"
+            :title="isPageFullscreen ? '退出页面全屏' : '页面全屏'"
+            :aria-label="isPageFullscreen ? '退出页面全屏' : '页面全屏'"
+            @click="togglePageFullscreen"
+          >
+            <span class="fullscreen-symbol">
+              <transition name="el-zoom-in-center" mode="out-in">
+                <el-icon v-if="!isPageFullscreen"><FullScreen /></el-icon>
+                <el-icon v-else><ScaleToOriginal /></el-icon>
+              </transition>
+            </span>
+          </button>
         </div>
       </div>
 
@@ -224,6 +238,7 @@ import {
   Flag,
   Fold,
   FullScreen,
+    ScaleToOriginal,
   Histogram,
   HomeFilled,
   Monitor,
@@ -253,6 +268,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const isCollapse = ref(false)
+const isPageFullscreen = ref(false)
 const notificationBellRef = ref<InstanceType<typeof NotificationBell> | null>(null)
 const sessionsVisible = ref(false)
 const sessionsList = ref<any[]>([])
@@ -311,6 +327,14 @@ function addVisitedView() {
 
 function reloadPage() {
   window.location.reload()
+}
+
+function togglePageFullscreen() {
+  isPageFullscreen.value = !isPageFullscreen.value
+  window.setTimeout(() => {
+    updateTagsScrollState()
+    scrollActiveTagIntoView()
+  }, 140)
 }
 
 function toggleFullScreen() {
@@ -985,6 +1009,42 @@ function formatDevice(raw?: string) {
       font-size: 15px;
       outline: none;
     }
+  }
+}
+
+.admin-layout--page-fullscreen {
+  .admin-aside {
+    flex-basis: 0 !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    opacity: 0;
+    transform: translate3d(-16px, 0, 0);
+    border-right-color: transparent;
+    pointer-events: none;
+  }
+  .admin-header {
+    height: 0 !important;
+    min-height: 0;
+    opacity: 0;
+    transform: translate3d(0, -16px, 0);
+    border-bottom-color: transparent;
+    pointer-events: none;
+  }
+}
+
+.tags-action-btn--fullscreen {
+  .fullscreen-symbol {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    font-size: 16px;
+    transform: scale(1);
+    transition: transform 0.12s ease-out;
+  }
+  &:active .fullscreen-symbol {
+    transform: scale(0.88);
   }
 }
 

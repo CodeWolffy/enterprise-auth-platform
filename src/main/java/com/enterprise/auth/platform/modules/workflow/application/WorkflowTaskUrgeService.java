@@ -20,6 +20,7 @@ import com.enterprise.auth.platform.modules.workflow.infrastructure.mapper.WfTas
 import com.enterprise.auth.platform.modules.workflow.infrastructure.mapper.WfTaskUrgeMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -38,6 +39,8 @@ import org.springframework.util.StringUtils;
 public class WorkflowTaskUrgeService {
 
     private static final Logger log = LoggerFactory.getLogger(WorkflowTaskUrgeService.class);
+    private static final int SAME_TASK_COOLDOWN_MINUTES = 1;
+    private static final int DAILY_TASK_LIMIT = 5;
 
     private final WfTaskUrgeMapper urgeMapper;
     private final WfTaskMapper taskMapper;
@@ -83,6 +86,7 @@ public class WorkflowTaskUrgeService {
         if (!canUrge(task, user)) {
             throw new BusinessException("ACCESS_DENIED", "无权催办该任务");
         }
+        enforceUrgeFrequency(tenantId, task.getId(), user.id());
 
         WfTaskUrgeEntity entity = new WfTaskUrgeEntity();
         entity.setTenantId(tenantId);
@@ -168,7 +172,37 @@ public class WorkflowTaskUrgeService {
     }
 
     private boolean canUrge(WfTaskEntity task, UserAccount user) {
-        return canViewUrges(task, user);
+        if (user.permissions().contains("workflow:write")) {
+            return true;
+        }
+        WfProcessInstanceEntity instance = instanceMapper.selectOne(new LambdaQueryWrapper<WfProcessInstanceEntity>()
+                .eq(WfProcessInstanceEntity::getTenantId, task.getTenantId())
+                .eq(WfProcessInstanceEntity::getId, task.getInstanceId())
+                .eq(WfProcessInstanceEntity::getDeleted, 0)
+                .last("limit 1"));
+        return instance != null && Objects.equals(instance.getStarterUserId(), user.id());
+    }
+
+    private void enforceUrgeFrequency(String tenantId, Long taskId, Long userId) {
+        LocalDateTime now = TimeSupport.utcNowDateTime();
+        Long recentCount = urgeMapper.selectCount(new LambdaQueryWrapper<WfTaskUrgeEntity>()
+                .eq(WfTaskUrgeEntity::getTenantId, tenantId)
+                .eq(WfTaskUrgeEntity::getTaskId, taskId)
+                .eq(WfTaskUrgeEntity::getUrgedByUserId, userId)
+                .eq(WfTaskUrgeEntity::getDeleted, 0)
+                .ge(WfTaskUrgeEntity::getUrgedAt, now.minusMinutes(SAME_TASK_COOLDOWN_MINUTES)));
+        if (recentCount != null && recentCount > 0) {
+            throw new BusinessException("RATE_LIMITED", "催办过于频繁，请稍后再试");
+        }
+        Long dailyCount = urgeMapper.selectCount(new LambdaQueryWrapper<WfTaskUrgeEntity>()
+                .eq(WfTaskUrgeEntity::getTenantId, tenantId)
+                .eq(WfTaskUrgeEntity::getTaskId, taskId)
+                .eq(WfTaskUrgeEntity::getUrgedByUserId, userId)
+                .eq(WfTaskUrgeEntity::getDeleted, 0)
+                .ge(WfTaskUrgeEntity::getUrgedAt, now.minusDays(1)));
+        if (dailyCount != null && dailyCount >= DAILY_TASK_LIMIT) {
+            throw new BusinessException("RATE_LIMITED", "该任务今日催办次数已达上限");
+        }
     }
 
     private boolean canViewUrges(WfTaskEntity task, UserAccount user) {
