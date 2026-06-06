@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -189,7 +190,11 @@ public class WorkflowApplicationService {
         instance.setCurrentStepIndex(0);
         instance.setVariablesSnapshotJson(toJson(snapshotVariables(command.variables())));
         instance.setStartedAt(TimeSupport.utcNowDateTime());
-        instanceMapper.insert(instance);
+        try {
+            instanceMapper.insert(instance);
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException("CONFLICT", "业务单据已存在流程实例");
+        }
 
         WfTaskEntity task = createPendingTask(tenantId, instance, definition, steps.get(0), 0);
         publish("WORKFLOW_INSTANCE_STARTED", user, tenantId, Map.of(
@@ -439,6 +444,13 @@ public class WorkflowApplicationService {
         if (taskId != null && taskId > 0) {
             wrapper.eq(WfTaskEntity::getId, taskId);
         }
+        // 下推候选人过滤到 SQL 层：仅拉取指派给当前用户或尚未指派的任务
+        // 避免全量 PENDING 任务加载到内存再过滤
+        wrapper.and(w -> w.eq(WfTaskEntity::getAssigneeUserId, user.id())
+                .or()
+                .isNull(WfTaskEntity::getAssigneeUserId));
+        // 加硬上限防止意外全量加载，正常场景下候选人匹配后的有效数据远小于此值
+        wrapper.last("LIMIT 500");
         List<WorkflowTaskView> filtered = taskMapper.selectList(wrapper
                         .orderByAsc(WfTaskEntity::getCreatedAt)
                         .orderByAsc(WfTaskEntity::getId))

@@ -72,7 +72,7 @@ public class LoginApplicationService {
 
             if (loginAttemptService.isLocked(tenantId, request.username())) {
                 loginAttemptService.recordBlockedAttempt(tenantId, request.username(), clientIp);
-                throw new BusinessException("ACCOUNT_LOCKED", "账户已锁定，请稍后再试");
+                throw new BusinessException("BAD_CREDENTIALS", "用户名或密码错误");
             }
 
             AuthenticationUser user = userAuthenticationFacade.findByUsername(tenantId, request.username()).orElse(null);
@@ -84,7 +84,8 @@ public class LoginApplicationService {
             }
             if (!user.enabled()) {
                 auditService.record("LOGIN_FAILED", user.username(), tenantId, Map.of("reason", "disabled", "clientIp", clientIp));
-                throw new BusinessException("USER_DISABLED", "用户已禁用");
+                auditService.record("LOGIN_BLOCKED_DISABLED", user.username(), tenantId, Map.of("reason", "disabled", "clientIp", clientIp));
+                throw new BusinessException("BAD_CREDENTIALS", "用户名或密码错误");
             }
 
             loginAttemptService.clearFailures(tenantId, request.username());
@@ -181,8 +182,8 @@ public class LoginApplicationService {
     ) {
         LoginAttemptService.LoginFailureResult result = loginAttemptService.recordFailure(tenantId, username, reason, clientIp);
         if (result.locked()) {
-            return new BusinessException("ACCOUNT_LOCKED", "账户已锁定，请稍后再试");
+            return new BusinessException("BAD_CREDENTIALS", "用户名或密码错误");
         }
-        return new BusinessException("BAD_CREDENTIALS", "用户名或密码错误，剩余尝试次数：" + result.remainingAttempts());
+        return new BusinessException("BAD_CREDENTIALS", "用户名或密码错误");
     }
 }

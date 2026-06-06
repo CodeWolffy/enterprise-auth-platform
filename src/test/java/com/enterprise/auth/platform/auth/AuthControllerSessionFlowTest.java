@@ -194,8 +194,8 @@ class AuthControllerSessionFlowTest {
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"));
-        JsonNode logoutPayload = auditPayload("LOGOUT", token);
-        Assertions.assertEquals(token, logoutPayload.path("sessionId").asText());
+        JsonNode logoutPayload = auditPayload("LOGOUT");
+        Assertions.assertEquals("******", logoutPayload.path("sessionId").asText());
         Assertions.assertEquals("admin", logoutPayload.path("targetUsername").asText());
         Assertions.assertEquals("platform", logoutPayload.path("targetTenantId").asText());
         Assertions.assertEquals("test-browser", logoutPayload.path("targetDevice").asText());
@@ -303,7 +303,7 @@ class AuthControllerSessionFlowTest {
         Assertions.assertEquals(ADMIN_TENANT, payload.path("fromTenantId").asText());
         Assertions.assertEquals(TENANT_A, payload.path("activeTenantId").asText());
         Assertions.assertEquals(TENANT_A, payload.path("targetTenantId").asText());
-        Assertions.assertEquals(token, payload.path("sessionId").asText());
+        Assertions.assertEquals("******", payload.path("sessionId").asText());
     }
 
     @Test
@@ -458,8 +458,8 @@ class AuthControllerSessionFlowTest {
                         .header("Authorization", "Bearer " + t1)
                         .header("X-Tenant-Id", ADMIN_TENANT))
                 .andExpect(status().isOk());
-        JsonNode offlinePayload = auditPayload("SESSION_FORCED_OFFLINE", t2);
-        Assertions.assertEquals(t2, offlinePayload.path("sessionId").asText());
+        JsonNode offlinePayload = auditPayload("SESSION_FORCED_OFFLINE");
+        Assertions.assertEquals("******", offlinePayload.path("sessionId").asText());
         Assertions.assertEquals("admin", offlinePayload.path("targetUsername").asText());
         Assertions.assertEquals(ADMIN_TENANT, offlinePayload.path("targetTenantId").asText());
         Assertions.assertEquals("test-browser", offlinePayload.path("targetDevice").asText());
@@ -643,20 +643,19 @@ class AuthControllerSessionFlowTest {
         throw new AssertionError("session not found: " + token);
     }
 
-    private JsonNode auditPayload(String eventType, String sessionId) throws Exception {
+    private JsonNode auditPayload(String eventType) throws Exception {
         List<String> payloads = jdbcTemplate.queryForList(
                 """
                 SELECT payload_json
                 FROM sys_audit_log
-                WHERE event_type = ? AND payload_json LIKE ?
+                WHERE event_type = ?
                 ORDER BY id DESC
                 LIMIT 1
                 """,
                 String.class,
-                eventType,
-                "%" + sessionId + "%"
+                eventType
         );
-        Assertions.assertFalse(payloads.isEmpty(), "missing audit event " + eventType + " for session " + sessionId);
+        Assertions.assertFalse(payloads.isEmpty(), "missing audit event " + eventType);
         return objectMapper.readTree(payloads.get(0));
     }
 

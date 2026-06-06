@@ -14,6 +14,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -35,6 +36,11 @@ class ResourceAuthorizationControllerTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @BeforeEach
+    void cleanUp() {
+        tearDown();
+    }
 
     @AfterEach
     void tearDown() {

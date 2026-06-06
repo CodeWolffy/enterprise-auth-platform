@@ -24,7 +24,9 @@ public class AuditPayloadRedactor {
             "accesskey",
             "apikey",
             "resetlink",
-            "reseturl"
+            "reseturl",
+            "sessionid",
+            "session"
     );
 
     public Map<String, Object> redact(Map<String, Object> payload) {

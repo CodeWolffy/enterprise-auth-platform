@@ -22,7 +22,9 @@ import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import javax.sql.DataSource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +42,10 @@ public class CodegenApplicationService {
     private final Path outputRoot;
     private final CodegenTemplateService templateService;
     private final CodegenResourceRegistrationService registrationService;
+
+    @Lazy
+    @Autowired
+    private CodegenApplicationService self;
 
     public CodegenApplicationService(
             DataSource dataSource,
@@ -107,7 +113,7 @@ public class CodegenApplicationService {
 
     @Transactional
     public CodegenGenerateResult generate(CodegenCommand command) {
-        CodegenPreviewResult preview = preview(command);
+        CodegenPreviewResult preview = self.preview(command);
         List<String> selectedFiles = resolveSelectedFiles(command.selectedFiles(), preview.files(), "至少选择一个生成文件");
         List<String> written = new ArrayList<>();
         for (CodegenFilePreview file : preview.files()) {
@@ -140,7 +146,7 @@ public class CodegenApplicationService {
 
     @Transactional(readOnly = true)
     public CodegenArtifactDownload download(CodegenCommand command) {
-        CodegenPreviewResult preview = preview(command);
+        CodegenPreviewResult preview = self.preview(command);
         List<String> selectedFiles = resolveSelectedFiles(command.selectedFiles(), preview.files(), "至少选择一个导出文件");
         try {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();

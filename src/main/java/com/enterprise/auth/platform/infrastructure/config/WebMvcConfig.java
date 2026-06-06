@@ -69,7 +69,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addMapping("/api/**")
                 .allowedOriginPatterns(allowedOrigins.toArray(String[]::new))
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
-                .allowedHeaders("*")
+                .allowedHeaders("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin", "X-Tenant-Id")
                 .exposedHeaders("Authorization", "X-Request-Id")
                 .allowCredentials(true)
                 .maxAge(3600);

@@ -88,6 +88,7 @@ public class WorkflowController {
 
     @Operation(summary = "查询我的发起")
     @GetMapping("/instances/my")
+    @SaCheckPermission(PermissionCodes.WORKFLOW_READ)
     public ApiResponse<PageResult<WorkflowInstanceView>> myInstances(
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "1") int page,
@@ -98,6 +99,7 @@ public class WorkflowController {
 
     @Operation(summary = "查询流程实例详情")
     @GetMapping("/instances/{instanceId}")
+    @SaCheckPermission(PermissionCodes.WORKFLOW_READ)
     public ApiResponse<WorkflowInstanceView> instance(@Parameter(description = "流程实例 ID") @PathVariable Long instanceId) {
         return ApiResponse.ok(workflowApplicationService.instance(instanceId));
     }
@@ -122,6 +124,7 @@ public class WorkflowController {
 
     @Operation(summary = "查询我的待办")
     @GetMapping("/tasks/todo")
+    @SaCheckPermission(PermissionCodes.WORKFLOW_READ)
     public ApiResponse<PageResult<WorkflowTaskView>> todoTasks(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -132,6 +135,7 @@ public class WorkflowController {
 
     @Operation(summary = "查询我的已办")
     @GetMapping("/tasks/done")
+    @SaCheckPermission(PermissionCodes.WORKFLOW_READ)
     public ApiResponse<PageResult<WorkflowTaskView>> doneTasks(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size
@@ -141,6 +145,7 @@ public class WorkflowController {
 
     @Operation(summary = "审批通过任务")
     @PutMapping("/tasks/{taskId}/approve")
+    @SaCheckPermission(PermissionCodes.WORKFLOW_WRITE)
     public ApiResponse<WorkflowActionResult> approveTask(
             @Parameter(description = "任务 ID") @PathVariable Long taskId,
             @Valid @RequestBody(required = false) WorkflowTaskActionRequest request
@@ -151,6 +156,7 @@ public class WorkflowController {
 
     @Operation(summary = "驳回任务")
     @PutMapping("/tasks/{taskId}/reject")
+    @SaCheckPermission(PermissionCodes.WORKFLOW_WRITE)
     public ApiResponse<WorkflowActionResult> rejectTask(
             @Parameter(description = "任务 ID") @PathVariable Long taskId,
             @Valid @RequestBody(required = false) WorkflowTaskActionRequest request
@@ -161,6 +167,7 @@ public class WorkflowController {
 
     @Operation(summary = "转签任务")
     @PutMapping("/tasks/{taskId}/transfer")
+    @SaCheckPermission(PermissionCodes.WORKFLOW_WRITE)
     public ApiResponse<WorkflowActionResult> transferTask(
             @Parameter(description = "任务 ID") @PathVariable Long taskId,
             @Valid @RequestBody WorkflowTaskTransferRequest request
@@ -170,6 +177,7 @@ public class WorkflowController {
 
     @Operation(summary = "催办任务")
     @PutMapping("/tasks/{taskId}/urge")
+    @SaCheckPermission(PermissionCodes.WORKFLOW_WRITE)
     public ApiResponse<WorkflowTaskUrgeResult> urgeTask(
             @Parameter(description = "任务 ID") @PathVariable Long taskId,
             @Valid @RequestBody(required = false) WorkflowTaskUrgeRequest request
@@ -180,12 +188,14 @@ public class WorkflowController {
 
     @Operation(summary = "查询任务催办历史")
     @GetMapping("/tasks/{taskId}/urges")
+    @SaCheckPermission(PermissionCodes.WORKFLOW_READ)
     public ApiResponse<List<WorkflowTaskUrgeView>> taskUrges(@Parameter(description = "任务 ID") @PathVariable Long taskId) {
         return ApiResponse.ok(urgeService.listUrges(taskId));
     }
 
     @Operation(summary = "分页查询流程实例催办记录")
     @GetMapping("/instances/{instanceId}/urges")
+    @SaCheckPermission(PermissionCodes.WORKFLOW_READ)
     public ApiResponse<PageResult<WorkflowTaskUrgeView>> instanceUrges(
             @Parameter(description = "流程实例 ID") @PathVariable Long instanceId,
             @RequestParam(defaultValue = "1") int page,
