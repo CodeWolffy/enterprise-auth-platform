@@ -21,6 +21,20 @@ public final class SystemViewModels {
         private static final long serialVersionUID = 1L;
     }
 
+    @Schema(description = "字典值视图（二级模型）")
+    public record DictValueView(
+            @Schema(description = "字典值 ID") Long id,
+            @Schema(description = "关联字典 ID") Long dictId,
+            @Schema(description = "字典类型") String dictType,
+            @Schema(description = "字典标签") String dictLabel,
+            @Schema(description = "字典键值") String dictValue,
+            @Schema(description = "排序") Integer sort,
+            @Schema(description = "回显样式") String showClass,
+            @Schema(description = "是否启用") boolean enabled
+    ) implements Serializable {
+        private static final long serialVersionUID = 1L;
+    }
+
     @Schema(description = "参数项视图")
     public record ConfigView(
             @Schema(description = "参数 ID") Long id,

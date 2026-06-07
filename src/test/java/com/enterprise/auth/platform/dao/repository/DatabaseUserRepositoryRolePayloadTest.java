@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.modules.role.application.RolePayloadCodec;
 import com.enterprise.auth.platform.common.context.TenantContext;
-import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.user.application.AuthenticationUser;
 import com.enterprise.auth.platform.modules.user.infrastructure.repository.DatabaseUserRepository;
 import java.util.Optional;
@@ -40,6 +39,7 @@ class DatabaseUserRepositoryRolePayloadTest {
 
     private String username;
     private String roleCode;
+    private String permissionCode;
     private Long userId;
 
     @BeforeEach
@@ -47,6 +47,7 @@ class DatabaseUserRepositoryRolePayloadTest {
         TenantContext.setTenantId(TENANT_ID);
         username = USERNAME_PREFIX + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
         roleCode = ROLE_CODE_PREFIX + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        permissionCode = "perm_payload_ut_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
 
         jdbcTemplate.update(
                 """
@@ -72,21 +73,19 @@ class DatabaseUserRepositoryRolePayloadTest {
         );
         jdbcTemplate.update(
                 """
-                INSERT IGNORE INTO sys_role_resource (
-                    tenant_id, role_id, resource_id, created_by, updated_by, created_at, updated_at
+                INSERT IGNORE INTO sys_role_menu (
+                    tenant_id, role_id, menu_id, created_by, created_at
                 )
-                SELECT ?, ?, id, ?, ?, NOW(), NOW()
-                FROM sys_resource
+                SELECT ?, ?, id, ?, NOW()
+                FROM sys_menu
                 WHERE tenant_id = 'platform'
                   AND deleted = 0
                   AND grant_key IN ('user:read', 'audit:read')
                 """,
                 TENANT_ID,
                 roleId,
-                "test",
                 "test"
         );
-
         jdbcTemplate.update(
                 """
                 INSERT INTO sys_user (
@@ -138,7 +137,7 @@ class DatabaseUserRepositoryRolePayloadTest {
                     .findFirst()
                     .orElse(null);
             if (roleId != null) {
-                jdbcTemplate.update("DELETE FROM sys_role_resource WHERE tenant_id = ? AND role_id = ?", TENANT_ID, roleId);
+                jdbcTemplate.update("DELETE FROM sys_role_menu WHERE tenant_id = ? AND role_id = ?", TENANT_ID, roleId);
             }
             jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id = ? AND role_code = ?", TENANT_ID, roleCode);
         }
@@ -152,6 +151,7 @@ class DatabaseUserRepositoryRolePayloadTest {
         var user = result.orElseThrow();
         assertThat(user.roles()).contains(roleCode);
         assertThat(user.permissions()).containsExactlyInAnyOrder("user:read", "audit:read");
+        assertThat(user.permissions()).doesNotContain("payload:extra");
         assertThat(user.dataScopeType()).isEqualTo(DataScopeType.CUSTOM);
         assertThat(user.customDeptIds()).containsExactlyInAnyOrder(2L, 3L);
     }

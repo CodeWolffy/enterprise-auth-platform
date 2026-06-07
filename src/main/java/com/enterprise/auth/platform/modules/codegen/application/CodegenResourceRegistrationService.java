@@ -3,13 +3,13 @@ package com.enterprise.auth.platform.modules.codegen.application;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
-import com.enterprise.auth.platform.modules.auth.infrastructure.AuthPrincipalCacheService;
-import com.enterprise.auth.platform.modules.resource.infrastructure.entity.SysResourceEntity;
-import com.enterprise.auth.platform.modules.resource.infrastructure.mapper.SysResourceMapper;
+import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
+import com.enterprise.auth.platform.modules.menu.infrastructure.entity.SysMenuEntity;
+import com.enterprise.auth.platform.modules.menu.infrastructure.mapper.SysMenuMapper;
 import com.enterprise.auth.platform.modules.role.infrastructure.entity.SysRoleEntity;
-import com.enterprise.auth.platform.modules.role.infrastructure.entity.SysRoleResourceEntity;
+import com.enterprise.auth.platform.modules.role.infrastructure.entity.SysRoleMenuEntity;
 import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMapper;
-import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleResourceMapper;
+import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMenuMapper;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -26,23 +26,23 @@ public class CodegenResourceRegistrationService {
     private static final String GENERATED_MENU_PARENT_KEY = "generated";
     private static final String GENERATED_API_PARENT_KEY = "api.generated";
 
-    private final SysResourceMapper sysResourceMapper;
+    private final SysMenuMapper sysMenuMapper;
     private final SysRoleMapper sysRoleMapper;
-    private final SysRoleResourceMapper sysRoleResourceMapper;
-    private final AuthPrincipalCacheService authPrincipalCacheService;
+    private final SysRoleMenuMapper sysRoleMenuMapper;
+    private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
     private final TenantProperties tenantProperties;
 
     public CodegenResourceRegistrationService(
-            SysResourceMapper sysResourceMapper,
+            SysMenuMapper sysMenuMapper,
             SysRoleMapper sysRoleMapper,
-            SysRoleResourceMapper sysRoleResourceMapper,
-            AuthPrincipalCacheService authPrincipalCacheService,
+            SysRoleMenuMapper sysRoleMenuMapper,
+            AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
             TenantProperties tenantProperties
     ) {
-        this.sysResourceMapper = sysResourceMapper;
+        this.sysMenuMapper = sysMenuMapper;
         this.sysRoleMapper = sysRoleMapper;
-        this.sysRoleResourceMapper = sysRoleResourceMapper;
-        this.authPrincipalCacheService = authPrincipalCacheService;
+        this.sysRoleMenuMapper = sysRoleMenuMapper;
+        this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
         this.tenantProperties = tenantProperties;
     }
 
@@ -71,7 +71,7 @@ public class CodegenResourceRegistrationService {
             assignToAdminRole(grantTenantId, writeApiId);
             return null;
         });
-        authPrincipalCacheService.evictAll();
+        permissionSnapshotInvalidationService.invalidateAll();
         return grantKeys;
     }
 
@@ -99,92 +99,92 @@ public class CodegenResourceRegistrationService {
     }
 
     private void ensureParentMenu(String tenantId, String resourceKey, String resourceName) {
-        SysResourceEntity existing = sysResourceMapper.selectOne(new LambdaQueryWrapper<SysResourceEntity>()
-                .eq(SysResourceEntity::getTenantId, tenantId)
-                .eq(SysResourceEntity::getResourceKey, resourceKey)
-                .eq(SysResourceEntity::getResourceType, "DIR")
-                .eq(SysResourceEntity::getDeleted, 0)
+        SysMenuEntity existing = sysMenuMapper.selectOne(new LambdaQueryWrapper<SysMenuEntity>()
+                .eq(SysMenuEntity::getTenantId, tenantId)
+                .eq(SysMenuEntity::getResourceKey, resourceKey)
+                .eq(SysMenuEntity::getMenuType, "DIR")
+                .eq(SysMenuEntity::getDeleted, 0)
                 .last("limit 1"));
         if (existing != null) {
             return;
         }
-        SysResourceEntity platformManagement = sysResourceMapper.selectOne(new LambdaQueryWrapper<SysResourceEntity>()
-                .eq(SysResourceEntity::getTenantId, tenantId)
-                .eq(SysResourceEntity::getResourceKey, "platform-management")
-                .eq(SysResourceEntity::getDeleted, 0)
+        SysMenuEntity platformManagement = sysMenuMapper.selectOne(new LambdaQueryWrapper<SysMenuEntity>()
+                .eq(SysMenuEntity::getTenantId, tenantId)
+                .eq(SysMenuEntity::getResourceKey, "platform-management")
+                .eq(SysMenuEntity::getDeleted, 0)
                 .last("limit 1"));
-        SysResourceEntity entity = new SysResourceEntity();
+        SysMenuEntity entity = new SysMenuEntity();
         entity.setTenantId(tenantId);
         entity.setParentId(platformManagement == null ? null : platformManagement.getId());
         entity.setAncestors(platformManagement == null ? "" : platformManagement.getAncestors() + "," + platformManagement.getId());
-        entity.setResourceType("DIR");
+        entity.setMenuType("DIR");
         entity.setResourceKey(resourceKey);
-        entity.setResourceName(resourceName);
+        entity.setMenuName(resourceName);
         entity.setIcon("Files");
         entity.setOrderNo(75);
         entity.setVisible(1);
         entity.setEnabled(1);
         entity.setIsSystem(1);
-        sysResourceMapper.insert(entity);
+        sysMenuMapper.insert(entity);
     }
 
     private void ensureParentApi(String tenantId) {
-        SysResourceEntity existing = sysResourceMapper.selectOne(new LambdaQueryWrapper<SysResourceEntity>()
-                .eq(SysResourceEntity::getTenantId, tenantId)
-                .eq(SysResourceEntity::getResourceKey, GENERATED_API_PARENT_KEY)
-                .eq(SysResourceEntity::getResourceType, "DIR")
-                .eq(SysResourceEntity::getDeleted, 0)
+        SysMenuEntity existing = sysMenuMapper.selectOne(new LambdaQueryWrapper<SysMenuEntity>()
+                .eq(SysMenuEntity::getTenantId, tenantId)
+                .eq(SysMenuEntity::getResourceKey, GENERATED_API_PARENT_KEY)
+                .eq(SysMenuEntity::getMenuType, "DIR")
+                .eq(SysMenuEntity::getDeleted, 0)
                 .last("limit 1"));
         if (existing != null) {
             return;
         }
-        SysResourceEntity apiParent = sysResourceMapper.selectOne(new LambdaQueryWrapper<SysResourceEntity>()
-                .eq(SysResourceEntity::getTenantId, tenantId)
-                .eq(SysResourceEntity::getResourceKey, "api")
-                .eq(SysResourceEntity::getDeleted, 0)
+        SysMenuEntity apiParent = sysMenuMapper.selectOne(new LambdaQueryWrapper<SysMenuEntity>()
+                .eq(SysMenuEntity::getTenantId, tenantId)
+                .eq(SysMenuEntity::getResourceKey, "api")
+                .eq(SysMenuEntity::getDeleted, 0)
                 .last("limit 1"));
         if (apiParent == null) {
             return;
         }
-        SysResourceEntity entity = new SysResourceEntity();
+        SysMenuEntity entity = new SysMenuEntity();
         entity.setTenantId(tenantId);
         entity.setParentId(apiParent.getId());
         entity.setAncestors(apiParent.getAncestors() + "," + apiParent.getId());
-        entity.setResourceType("DIR");
+        entity.setMenuType("DIR");
         entity.setResourceKey("api.generated");
-        entity.setResourceName("生成模块 API");
+        entity.setMenuName("生成模块 API");
         entity.setOrderNo(990);
         entity.setVisible(0);
         entity.setEnabled(1);
         entity.setIsSystem(1);
-        sysResourceMapper.insert(entity);
+        sysMenuMapper.insert(entity);
     }
 
     private Long ensureMenu(String tenantId, String moduleName, String title) {
         String menuKey = "generated." + moduleName;
-        SysResourceEntity existing = sysResourceMapper.selectOne(new LambdaQueryWrapper<SysResourceEntity>()
-                .eq(SysResourceEntity::getTenantId, tenantId)
-                .eq(SysResourceEntity::getResourceKey, menuKey)
-                .eq(SysResourceEntity::getDeleted, 0)
+        SysMenuEntity existing = sysMenuMapper.selectOne(new LambdaQueryWrapper<SysMenuEntity>()
+                .eq(SysMenuEntity::getTenantId, tenantId)
+                .eq(SysMenuEntity::getResourceKey, menuKey)
+                .eq(SysMenuEntity::getDeleted, 0)
                 .last("limit 1"));
         if (existing != null) {
             return existing.getId();
         }
-        SysResourceEntity parent = sysResourceMapper.selectOne(new LambdaQueryWrapper<SysResourceEntity>()
-                .eq(SysResourceEntity::getTenantId, tenantId)
-                .eq(SysResourceEntity::getResourceKey, GENERATED_MENU_PARENT_KEY)
-                .eq(SysResourceEntity::getDeleted, 0)
+        SysMenuEntity parent = sysMenuMapper.selectOne(new LambdaQueryWrapper<SysMenuEntity>()
+                .eq(SysMenuEntity::getTenantId, tenantId)
+                .eq(SysMenuEntity::getResourceKey, GENERATED_MENU_PARENT_KEY)
+                .eq(SysMenuEntity::getDeleted, 0)
                 .last("limit 1"));
         if (parent == null) {
             throw new BusinessException("PARENT_MENU_MISSING", "已生成模块父菜单未就绪");
         }
-        SysResourceEntity entity = new SysResourceEntity();
+        SysMenuEntity entity = new SysMenuEntity();
         entity.setTenantId(tenantId);
         entity.setParentId(parent.getId());
         entity.setAncestors(parent.getAncestors() + "," + parent.getId());
-        entity.setResourceType("MENU");
+        entity.setMenuType("MENU");
         entity.setResourceKey(menuKey);
-        entity.setResourceName((StringUtils.hasText(title) ? title : moduleName) + "（生成产物）");
+        entity.setMenuName((StringUtils.hasText(title) ? title : moduleName) + "（生成产物）");
         entity.setRouteKey(menuKey);
         entity.setGrantKey(moduleName + ":read");
         entity.setPath("/platform/generated/" + moduleName);
@@ -194,41 +194,41 @@ public class CodegenResourceRegistrationService {
         entity.setVisible(1);
         entity.setEnabled(1);
         entity.setIsSystem(0);
-        sysResourceMapper.insert(entity);
+        sysMenuMapper.insert(entity);
         return entity.getId();
     }
 
     private Long ensureApi(String tenantId, String resourceKey, String resourceName, String grantKey, int orderNo) {
-        SysResourceEntity existing = sysResourceMapper.selectOne(new LambdaQueryWrapper<SysResourceEntity>()
-                .eq(SysResourceEntity::getTenantId, tenantId)
-                .eq(SysResourceEntity::getResourceKey, resourceKey)
-                .eq(SysResourceEntity::getDeleted, 0)
+        SysMenuEntity existing = sysMenuMapper.selectOne(new LambdaQueryWrapper<SysMenuEntity>()
+                .eq(SysMenuEntity::getTenantId, tenantId)
+                .eq(SysMenuEntity::getResourceKey, resourceKey)
+                .eq(SysMenuEntity::getDeleted, 0)
                 .last("limit 1"));
         if (existing != null) {
             return existing.getId();
         }
-        SysResourceEntity parent = sysResourceMapper.selectOne(new LambdaQueryWrapper<SysResourceEntity>()
-                .eq(SysResourceEntity::getTenantId, tenantId)
-                .eq(SysResourceEntity::getResourceKey, "api.generated")
-                .eq(SysResourceEntity::getDeleted, 0)
+        SysMenuEntity parent = sysMenuMapper.selectOne(new LambdaQueryWrapper<SysMenuEntity>()
+                .eq(SysMenuEntity::getTenantId, tenantId)
+                .eq(SysMenuEntity::getResourceKey, "api.generated")
+                .eq(SysMenuEntity::getDeleted, 0)
                 .last("limit 1"));
-        SysResourceEntity entity = new SysResourceEntity();
+        SysMenuEntity entity = new SysMenuEntity();
         entity.setTenantId(tenantId);
         entity.setParentId(parent == null ? null : parent.getId());
         entity.setAncestors(parent == null ? "" : (parent.getAncestors() + "," + parent.getId()));
-        entity.setResourceType("API");
+        entity.setMenuType("API");
         entity.setResourceKey(resourceKey);
-        entity.setResourceName(resourceName);
+        entity.setMenuName(resourceName);
         entity.setGrantKey(grantKey);
         entity.setOrderNo(orderNo);
         entity.setVisible(0);
         entity.setEnabled(1);
         entity.setIsSystem(0);
-        sysResourceMapper.insert(entity);
+        sysMenuMapper.insert(entity);
         return entity.getId();
     }
 
-    private void assignToAdminRole(String tenantId, Long resourceId) {
+    private void assignToAdminRole(String tenantId, Long menuId) {
         SysRoleEntity adminRole = sysRoleMapper.selectOne(new LambdaQueryWrapper<SysRoleEntity>()
                 .eq(SysRoleEntity::getTenantId, tenantId)
                 .eq(SysRoleEntity::getRoleCode, "ADMIN")
@@ -238,17 +238,17 @@ public class CodegenResourceRegistrationService {
             return;
         }
         Set<String> ancestorIds = new LinkedHashSet<>();
-        SysResourceEntity resource = runWithTenant(platformTenantId(), () -> sysResourceMapper.selectById(resourceId));
-        if (resource != null) {
-            if (StringUtils.hasText(resource.getAncestors())) {
-                for (String ancestor : resource.getAncestors().split(",")) {
+        SysMenuEntity menu = runWithTenant(platformTenantId(), () -> sysMenuMapper.selectById(menuId));
+        if (menu != null) {
+            if (StringUtils.hasText(menu.getAncestors())) {
+                for (String ancestor : menu.getAncestors().split(",")) {
                     if (StringUtils.hasText(ancestor)) {
                         ancestorIds.add(ancestor.trim());
                     }
                 }
             }
         }
-        ancestorIds.add(String.valueOf(resourceId));
+        ancestorIds.add(String.valueOf(menuId));
         for (String ancestorId : ancestorIds) {
             Long aid;
             try {
@@ -256,16 +256,16 @@ public class CodegenResourceRegistrationService {
             } catch (NumberFormatException ex) {
                 continue;
             }
-            Long existing = sysRoleResourceMapper.selectCount(new LambdaQueryWrapper<SysRoleResourceEntity>()
-                    .eq(SysRoleResourceEntity::getTenantId, tenantId)
-                    .eq(SysRoleResourceEntity::getRoleId, adminRole.getId())
-                    .eq(SysRoleResourceEntity::getResourceId, aid));
+            Long existing = sysRoleMenuMapper.selectCount(new LambdaQueryWrapper<SysRoleMenuEntity>()
+                    .eq(SysRoleMenuEntity::getTenantId, tenantId)
+                    .eq(SysRoleMenuEntity::getRoleId, adminRole.getId())
+                    .eq(SysRoleMenuEntity::getMenuId, aid));
             if (existing == null || existing == 0) {
-                SysRoleResourceEntity relation = new SysRoleResourceEntity();
+                SysRoleMenuEntity relation = new SysRoleMenuEntity();
                 relation.setTenantId(tenantId);
                 relation.setRoleId(adminRole.getId());
-                relation.setResourceId(aid);
-                sysRoleResourceMapper.insert(relation);
+                relation.setMenuId(aid);
+                sysRoleMenuMapper.insert(relation);
             }
         }
     }

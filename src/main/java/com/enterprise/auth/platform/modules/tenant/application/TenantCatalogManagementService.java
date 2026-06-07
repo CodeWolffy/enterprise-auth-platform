@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.modules.audit.application.AuditService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.TimeSupport;
+import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantCapabilityEntity;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantCapabilityOverrideEntity;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantEntity;
@@ -38,6 +39,7 @@ public class TenantCatalogManagementService {
     private final SysTenantMapper sysTenantMapper;
     private final SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper;
     private final AuditService auditService;
+    private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
 
     public TenantCatalogManagementService(
             SysTenantPackageMapper sysTenantPackageMapper,
@@ -45,7 +47,8 @@ public class TenantCatalogManagementService {
             SysTenantPackageCapabilityMapper sysTenantPackageCapabilityMapper,
             SysTenantMapper sysTenantMapper,
             SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper,
-            AuditService auditService
+            AuditService auditService,
+            AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService
     ) {
         this.sysTenantPackageMapper = sysTenantPackageMapper;
         this.sysTenantCapabilityMapper = sysTenantCapabilityMapper;
@@ -53,6 +56,7 @@ public class TenantCatalogManagementService {
         this.sysTenantMapper = sysTenantMapper;
         this.sysTenantCapabilityOverrideMapper = sysTenantCapabilityOverrideMapper;
         this.auditService = auditService;
+        this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
     }
 
     public List<TenantPackageView> packages() {
@@ -222,6 +226,7 @@ public class TenantCatalogManagementService {
         replacePackageCapabilities(request.packageCode(), request.capabilityCodes());
         auditService.record("TENANT_PACKAGE_CREATED", SecuritySupport.currentOperator(), "platform",
                 java.util.Map.of("packageCode", request.packageCode()));
+        evictPrincipalSnapshots();
         return toPackageView(entity, normalizedCodes(request.capabilityCodes()), loadPackageReferences().get(request.packageCode()));
     }
 
@@ -244,6 +249,7 @@ public class TenantCatalogManagementService {
         replacePackageCapabilities(request.packageCode(), request.capabilityCodes());
         auditService.record("TENANT_PACKAGE_UPDATED", SecuritySupport.currentOperator(), "platform",
                 java.util.Map.of("packageId", id, "packageCode", request.packageCode()));
+        evictPrincipalSnapshots();
         return toPackageView(entity, normalizedCodes(request.capabilityCodes()), loadPackageReferences().get(request.packageCode()));
     }
 
@@ -261,6 +267,7 @@ public class TenantCatalogManagementService {
                 .eq(SysTenantPackageCapabilityEntity::getPackageCode, entity.getPackageCode()));
         auditService.record("TENANT_PACKAGE_DELETED", SecuritySupport.currentOperator(), "platform",
                 java.util.Map.of("packageId", id, "packageCode", entity.getPackageCode()));
+        evictPrincipalSnapshots();
     }
 
     @Transactional
@@ -275,6 +282,7 @@ public class TenantCatalogManagementService {
         sysTenantCapabilityMapper.insert(entity);
         auditService.record("TENANT_CAPABILITY_CREATED", SecuritySupport.currentOperator(), "platform",
                 java.util.Map.of("capabilityCode", request.capabilityCode()));
+        evictPrincipalSnapshots();
         return toCapabilityView(entity, loadCapabilityReferences().get(request.capabilityCode()));
     }
 
@@ -293,6 +301,7 @@ public class TenantCatalogManagementService {
         }
         auditService.record("TENANT_CAPABILITY_UPDATED", SecuritySupport.currentOperator(), "platform",
                 java.util.Map.of("capabilityId", id, "capabilityCode", request.capabilityCode()));
+        evictPrincipalSnapshots();
         return toCapabilityView(entity, loadCapabilityReferences().get(request.capabilityCode()));
     }
 
@@ -314,6 +323,11 @@ public class TenantCatalogManagementService {
         sysTenantCapabilityMapper.deleteById(id);
         auditService.record("TENANT_CAPABILITY_DELETED", SecuritySupport.currentOperator(), "platform",
                 java.util.Map.of("capabilityId", id, "capabilityCode", entity.getCapabilityCode()));
+        evictPrincipalSnapshots();
+    }
+
+    private void evictPrincipalSnapshots() {
+        permissionSnapshotInvalidationService.invalidateAll();
     }
 
     private Map<String, List<String>> loadPackageCapabilities() {

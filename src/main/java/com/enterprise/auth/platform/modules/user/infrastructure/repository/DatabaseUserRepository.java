@@ -11,8 +11,8 @@ import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMa
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserRoleMapper;
 import com.enterprise.auth.platform.modules.role.application.RolePayloadCodec;
-import com.enterprise.auth.platform.modules.resource.application.ResourceService;
-import com.enterprise.auth.platform.modules.auth.infrastructure.AuthPrincipalCacheService;
+import com.enterprise.auth.platform.modules.role.application.RoleGrantQueryFacade;
+import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
 import com.enterprise.auth.platform.modules.user.application.AuthenticationUser;
 import java.util.HashSet;
 import java.util.List;
@@ -30,24 +30,24 @@ public class DatabaseUserRepository implements UserRepository {
     private final SysUserMapper sysUserMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
     private final SysRoleMapper sysRoleMapper;
-    private final AuthPrincipalCacheService authPrincipalCacheService;
+    private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
     private final RolePayloadCodec rolePayloadCodec;
-    private final ResourceService resourceService;
+    private final RoleGrantQueryFacade roleGrantQueryFacade;
 
     public DatabaseUserRepository(
             SysUserMapper sysUserMapper,
             SysUserRoleMapper sysUserRoleMapper,
             SysRoleMapper sysRoleMapper,
-            AuthPrincipalCacheService authPrincipalCacheService,
+            AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
             RolePayloadCodec rolePayloadCodec,
-            ResourceService resourceService
+            RoleGrantQueryFacade roleGrantQueryFacade
     ) {
         this.sysUserMapper = sysUserMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
         this.sysRoleMapper = sysRoleMapper;
-        this.authPrincipalCacheService = authPrincipalCacheService;
+        this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
         this.rolePayloadCodec = rolePayloadCodec;
-        this.resourceService = resourceService;
+        this.roleGrantQueryFacade = roleGrantQueryFacade;
     }
 
     @Override
@@ -93,7 +93,7 @@ public class DatabaseUserRepository implements UserRepository {
         entity.setUpdatedBy(entity.getUsername());
         entity.setPasswordUpdatedAt(TimeSupport.utcNowDateTime());
         sysUserMapper.updateById(entity);
-        authPrincipalCacheService.evictByUser(entity.getId(), entity.getTenantId(), entity.getUsername());
+        permissionSnapshotInvalidationService.invalidateUser(entity.getId(), entity.getTenantId(), entity.getUsername());
     }
 
     private AuthenticationUser toAuthenticationUser(SysUserEntity user, boolean includePasswordHash) {
@@ -147,7 +147,7 @@ public class DatabaseUserRepository implements UserRepository {
                 .flatMap(role -> rolePayloadCodec.readDeptIds(role.getDataScopeValueJson()).stream())
                 .collect(Collectors.toSet());
         boolean superAdmin = "platform".equals(tenantId) && roleCodes.contains("ADMIN");
-        Set<String> permissionCodes = resourceService.resolveGrantKeys(tenantId, roleCodes, superAdmin);
+        Set<String> permissionCodes = roleGrantQueryFacade.resolveGrantKeys(tenantId, roleCodes, superAdmin);
         return new RoleData(permissionCodes, dataScopeType, customDeptIds);
     }
 

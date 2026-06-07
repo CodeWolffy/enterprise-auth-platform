@@ -1,0 +1,101 @@
+package com.enterprise.auth.platform.modules.menu.interfaces;
+
+import com.enterprise.auth.platform.common.authz.PermissionCodes;
+import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.common.web.ApiResponse;
+import com.enterprise.auth.platform.modules.menu.application.MenuService;
+import com.enterprise.auth.platform.modules.menu.domain.MenuTreeNode;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Valid;
+import jakarta.validation.Validator;
+import java.util.List;
+import java.util.Set;
+import cn.dev33.satoken.annotation.SaCheckPermission;
+import org.springframework.web.bind.annotation.*;
+
+@Tag(name = "菜单管理")
+@RestController
+@RequestMapping("/api/menus")
+public class MenuController {
+
+    private final MenuService menuService;
+    private final ObjectMapper objectMapper;
+    private final Validator validator;
+
+    public MenuController(MenuService menuService, ObjectMapper objectMapper, Validator validator) {
+        this.menuService = menuService;
+        this.objectMapper = objectMapper;
+        this.validator = validator;
+    }
+
+    @Operation(summary = "查询菜单树")
+    @GetMapping("/tree")
+    @SaCheckPermission(PermissionCodes.SYSTEM_READ)
+    public ApiResponse<List<MenuTreeNode>> tree() {
+        return ApiResponse.ok(menuService.templateTree());
+    }
+
+    @Operation(summary = "查询可授权菜单树")
+    @GetMapping("/grantable-tree")
+    @SaCheckPermission(PermissionCodes.ROLE_READ)
+    public ApiResponse<List<MenuTreeNode>> grantableTree() {
+        return ApiResponse.ok(menuService.grantableTree(TenantContext.getTenantId()));
+    }
+
+    @Operation(summary = "查询平台菜单模板树")
+    @GetMapping("/template-tree")
+    @SaCheckPermission(PermissionCodes.SYSTEM_READ)
+    public ApiResponse<List<MenuTreeNode>> templateTree() {
+        return ApiResponse.ok(menuService.templateTree());
+    }
+
+    @Operation(summary = "新增菜单")
+    @PostMapping
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
+    public ApiResponse<MenuTreeNode> create(@Valid @RequestBody CreateMenuRequest request) {
+        return ApiResponse.ok(menuService.create(request));
+    }
+
+    @Operation(summary = "修改菜单")
+    @PutMapping("/{menuId}")
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
+    public ApiResponse<MenuTreeNode> update(
+            @Parameter(description = "菜单 ID") @PathVariable Long menuId,
+            @RequestBody JsonNode body
+    ) {
+        CreateMenuRequest request = objectMapper.convertValue(body, CreateMenuRequest.class);
+        validateRequest(request);
+        return ApiResponse.ok(menuService.update(menuId, request, body.has("parentId")));
+    }
+
+    private void validateRequest(CreateMenuRequest request) {
+        Set<ConstraintViolation<CreateMenuRequest>> violations = validator.validate(request);
+        if (!violations.isEmpty()) {
+            throw new ConstraintViolationException(violations);
+        }
+    }
+
+    @Operation(summary = "删除菜单")
+    @DeleteMapping("/{menuId}")
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
+    public ApiResponse<Void> delete(@Parameter(description = "菜单 ID") @PathVariable Long menuId) {
+        menuService.delete(menuId);
+        return ApiResponse.ok();
+    }
+
+    @Operation(summary = "修改菜单排序")
+    @PutMapping("/{menuId}/sort")
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
+    public ApiResponse<MenuTreeNode> sort(
+            @Parameter(description = "菜单 ID") @PathVariable Long menuId,
+            @Valid @RequestBody SortMenuRequest request
+    ) {
+        return ApiResponse.ok(menuService.updateSort(menuId, request.orderNo()));
+    }
+}

@@ -5,6 +5,7 @@ import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.modules.audit.application.AuditService;
+import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
 import com.enterprise.auth.platform.modules.dept.application.DeptTenantDataFacade;
 import com.enterprise.auth.platform.modules.resource.application.CatalogService;
 import com.enterprise.auth.platform.modules.role.application.RoleTenantDataFacade;
@@ -47,6 +48,7 @@ public class TenantManagementService {
     private final SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper;
     private final CatalogService catalogService;
     private final AuditService auditService;
+    private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
     private final TenantAccessPolicy tenantAccessPolicy;
     private final TenantChangeLogApplicationService tenantChangeLogApplicationService;
     private final SecurityPolicyApplicationService securityPolicyApplicationService;
@@ -62,6 +64,7 @@ public class TenantManagementService {
             SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper,
             CatalogService catalogService,
             AuditService auditService,
+            AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
             TenantAccessPolicy tenantAccessPolicy,
             TenantChangeLogApplicationService tenantChangeLogApplicationService,
             SecurityPolicyApplicationService securityPolicyApplicationService
@@ -76,6 +79,7 @@ public class TenantManagementService {
         this.sysTenantCapabilityOverrideMapper = sysTenantCapabilityOverrideMapper;
         this.catalogService = catalogService;
         this.auditService = auditService;
+        this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
         this.tenantAccessPolicy = tenantAccessPolicy;
         this.tenantChangeLogApplicationService = tenantChangeLogApplicationService;
         this.securityPolicyApplicationService = securityPolicyApplicationService;
@@ -109,6 +113,7 @@ public class TenantManagementService {
         recordTenantChange(request.tenantId(), "PROFILE", "lifecycleNote", null, request.lifecycleNote(), "初始化运营备注", operator);
 
         auditService.record("TENANT_CREATED", operator, request.tenantId(), Map.of("tenantId", request.tenantId()));
+        evictPrincipalSnapshots();
         return catalogService.tenant(request.tenantId());
     }
 
@@ -145,6 +150,7 @@ public class TenantManagementService {
         recordIfChanged(tenantId, "PROFILE", "lifecycleNote", oldProfile.lifecycleNote(), request.lifecycleNote(), "更新运营备注", operator);
 
         auditService.record("TENANT_UPDATED", operator, tenantId, Map.of("tenantId", tenantId));
+        evictPrincipalSnapshots();
         return catalogService.tenant(tenantId);
     }
 
@@ -165,6 +171,7 @@ public class TenantManagementService {
                 .eq(SysTenantCapabilityOverrideEntity::getTenantId, tenantId));
         recordTenantChange(tenantId, "DELETED", "tenant", entity.getTenantName(), null, "删除租户", operator);
         auditService.record("TENANT_DELETED", operator, tenantId, Map.of("tenantId", entity.getTenantId()));
+        evictPrincipalSnapshots();
     }
 
     public PageResult<CatalogService.TenantView> page(String keyword, Boolean platformLevel, Integer tenantStatus, int page, int size) {
@@ -233,6 +240,7 @@ public class TenantManagementService {
                 operator
         );
         auditService.record("TENANT_CAPABILITY_OVERRIDES_UPDATED", operator, tenantId, Map.of("tenantId", tenantId));
+        evictPrincipalSnapshots();
         return capabilityOverrides(tenantId);
     }
 
@@ -682,6 +690,10 @@ public class TenantManagementService {
 
     private void recordTenantChange(String tenantId, String changeType, String fieldKey, String oldValue, String newValue, String summary, String operator) {
         tenantChangeLogApplicationService.recordTenantChange(tenantId, changeType, fieldKey, oldValue, newValue, summary, operator);
+    }
+
+    private void evictPrincipalSnapshots() {
+        permissionSnapshotInvalidationService.invalidateAll();
     }
 
     private String toStringValue(Object value) {

@@ -30,6 +30,7 @@ public final class SaTokenMockMvcSupport {
             tokenSession.set("sessionVersion", user.sessionVersion());
             tokenSession.set("roles", List.copyOf(user.roles()));
             tokenSession.set("permissions", List.copyOf(user.permissions()));
+            tokenSession.set("permissionsTenantId", activeTenantId);
             tokenSession.set("clientIp", "127.0.0.1");
             tokenSession.set("device", "mockmvc");
             long now = System.currentTimeMillis();

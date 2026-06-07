@@ -255,6 +255,37 @@ public class SessionIndexService {
     }
   }
 
+  public Optional<Page> pageUser(Long userId, int page, int size) {
+    if (userId == null) {
+      return Optional.of(new Page(0, List.of()));
+    }
+    if (useLocalIndex()) {
+      return Optional.of(localUserPage(userId, page, size));
+    }
+    try {
+      String key = userSessionsKey(userId);
+      Long total = redisTemplate.opsForZSet().zCard(key);
+      if (total == null || total == 0) {
+        return Optional.of(new Page(0, List.of()));
+      }
+      long start = (long) page * size;
+      long end = start + size - 1;
+      Collection<String> tokens = redisTemplate.opsForZSet().reverseRange(key, start, end);
+      if (tokens == null) {
+        return Optional.of(new Page(total, List.of()));
+      }
+      List<IndexedSession> sessions = tokens.stream()
+          .map(this::read)
+          .flatMap(Optional::stream)
+          .filter(session -> userId.equals(session.userId()))
+          .toList();
+      return Optional.of(new Page(total, sessions));
+    } catch (RuntimeException ex) {
+      log.warn("Failed to read user session index. userId={}, error={}", userId, ex.getMessage());
+      return Optional.empty();
+    }
+  }
+
   public record Page(long total, List<IndexedSession> records) {}
 
     private boolean visibleSession(IndexedSession session, String tenantId, Optional<Set<Long>> visibleUserIds) {
@@ -357,6 +388,21 @@ public class SessionIndexService {
                 .limit(effectiveSize)
                 .toList();
         return new Page(localSessions.size(), sessions);
+    }
+
+    private Page localUserPage(Long userId, int page, int size) {
+        int effectivePage = Math.max(page, 0);
+        int effectiveSize = Math.max(size, 0);
+        long start = (long) effectivePage * effectiveSize;
+        List<IndexedSession> matched = localSessions.values().stream()
+                .filter(session -> userId.equals(session.userId()))
+                .sorted(Comparator.comparingLong((IndexedSession session) -> session.response().lastAccessAt()).reversed())
+                .toList();
+        List<IndexedSession> sessions = matched.stream()
+                .skip(start)
+                .limit(effectiveSize)
+                .toList();
+        return new Page(matched.size(), sessions);
     }
 
     private Duration indexTtl() {

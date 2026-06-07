@@ -21,3 +21,4 @@ yarn-error.log*
 pnpm-debug.log*
 /src/main/resources/application-local.yml
 /src/test/resources/application.yml
+/haorong-mall-master

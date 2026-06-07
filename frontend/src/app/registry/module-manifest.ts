@@ -103,13 +103,13 @@ export const APP_ROUTE_MANIFESTS = [
     component: () => import('@/views/audit/OnlineUsersView.vue'),
   },
   {
-    routeKey: 'resources',
-    path: 'system/resources',
-    name: 'resources',
+    routeKey: 'menus',
+    path: 'system/menus',
+    name: 'menus',
     title: '菜单管理',
     icon: 'Tickets',
     requiredGrant: PERMISSIONS.SYSTEM_READ,
-    component: () => import('@/views/platform/ResourceManagementView.vue'),
+    component: () => import('@/views/platform/MenuManagementView.vue'),
   },
   {
     routeKey: 'audit',
@@ -310,12 +310,12 @@ export const APP_ROUTE_MANIFESTS = [
     component: () => import('@/views/system/SystemCategoriesView.vue'),
   },
   {
-    path: 'system/settings/resources',
-    name: 'settings-resources',
+    path: 'system/settings/menus',
+    name: 'settings-menus',
     title: '菜单管理',
     hidden: true,
     requiredGrant: PERMISSIONS.SYSTEM_WRITE,
-    component: () => import('@/views/platform/ResourceManagementView.vue'),
+    component: () => import('@/views/platform/MenuManagementView.vue'),
   },
 ] satisfies AppRouteManifest[]
 
@@ -376,19 +376,12 @@ export function resolveRouteManifest(routeKey?: string | null) {
 
 export function resolveMenuPresentation(menu: MenuPresentationInput) {
   const routeManifest = resolveRouteManifest(menu.routeKey)
-  if (routeManifest) {
-    return {
-      title: routeManifest.title,
-      icon: routeManifest.icon ?? normalizeValue(menu.icon) ?? DEFAULT_ICON_NAME,
-    }
-  }
-
   const normalizedCode = normalizeValue(menu.code)
   const navManifest = normalizedCode ? NAV_CODE_MANIFEST_MAP[normalizedCode] : undefined
 
   return {
-    title: navManifest?.title ?? normalizeValue(menu.title) ?? '',
-    icon: navManifest?.icon ?? normalizeValue(menu.icon) ?? DEFAULT_ICON_NAME,
+    title: normalizeValue(menu.title) ?? navManifest?.title ?? routeManifest?.title ?? '',
+    icon: normalizeValue(menu.icon) ?? navManifest?.icon ?? routeManifest?.icon ?? DEFAULT_ICON_NAME,
   }
 }
 

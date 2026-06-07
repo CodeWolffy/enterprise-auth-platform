@@ -244,6 +244,9 @@
           <el-button @click="expandAll">全部展开</el-button>
           <el-button @click="collapseAll">全部折叠</el-button>
           <el-button :disabled="focusedResourceId == null" @click="selectFocusedDescendants">全选当前子级</el-button>
+          <el-button @click="selectByTypes(['DIR', 'MENU'])">全选菜单模块</el-button>
+          <el-button @click="selectByTypes(['BUTTON', 'API'])">全选操作权限</el-button>
+          <el-button @click="clearResourceSelection">清空选择</el-button>
           <span class="assignment-toolbar__meta">共 {{ allResourceCount }} 个菜单/权限节点</span>
         </div>
         <div class="resource-summary">
@@ -271,6 +274,7 @@
             <div class="resource-node__meta">
               <el-tag size="small" effect="plain">{{ typeLabel(data.resourceType) }}</el-tag>
               <el-tag v-if="data.grantKey" size="small" type="success" effect="plain">{{ data.grantKey }}</el-tag>
+              <el-tag v-if="data.path" size="small" type="info" effect="plain">{{ data.path }}</el-tag>
             </div>
           </div>
         </template>
@@ -289,31 +293,32 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import AdvancedSearch from '@/components/common/AdvancedSearch.vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import {
-  assignRoleResources,
+  assignRoleMenus,
   createRole,
   deleteRole,
-  queryAssignedRoleResources,
+  queryAssignedRoleMenus,
   queryDepartments,
-  queryResourceTree,
+  queryGrantableMenuTree,
   queryRoles,
   updateRole,
 } from '@/api/modules'
 import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { DepartmentView } from '@/types/dept'
-import type { ResourceTreeNode, ResourceType } from '@/types/resource'
+import type { MenuTreeNode, MenuType } from '@/api/modules/menu'
 import type { RoleView } from '@/types/role'
 
 type ResourceDisplayNode = {
   id: number
   label: string
   resourceKey: string
-  resourceType: ResourceType
+  resourceType: MenuType
   grantKey?: string
+  path?: string
   children?: ResourceDisplayNode[]
 }
 
 const roles = ref<RoleView[]>([])
-const resources = ref<ResourceTreeNode[]>([])
+const resources = ref<MenuTreeNode[]>([])
 const departments = ref<DepartmentView[]>([])
 const resourceTreeRef = ref<any>(null)
 const formRef = ref<FormInstance>()
@@ -414,7 +419,7 @@ void load()
 async function load() {
   loading.value = true
   try {
-    const [roleList, resourceTree, departmentList] = await Promise.all([queryRoles(), queryResourceTree(), queryDepartments()])
+    const [roleList, resourceTree, departmentList] = await Promise.all([queryRoles(), queryGrantableMenuTree(), queryDepartments()])
     roles.value = roleList
     resources.value = resourceTree
     departments.value = departmentList
@@ -451,7 +456,7 @@ function openRole(row?: RoleView) {
 
 async function openDetail(row: RoleView) {
   detailRole.value = row
-  assignedResourceIds.value = await queryAssignedRoleResources(row.id)
+  assignedResourceIds.value = await queryAssignedRoleMenus(row.id)
   assignedCountByRoleId[row.id] = assignedResourceIds.value.length
   detailVisible.value = true
 }
@@ -481,7 +486,7 @@ async function submitRole() {
 
 async function openResourceAssignment(row: RoleView) {
   resourceTargetRoleId.value = row.id
-  const assignedIds = await queryAssignedRoleResources(row.id)
+  const assignedIds = await queryAssignedRoleMenus(row.id)
   assignedCountByRoleId[row.id] = assignedIds.length
   resourceVisible.value = true
   resourceKeyword.value = ''
@@ -499,7 +504,7 @@ async function submitResourceAssignment() {
     .map((item) => Number(item))
     .filter((item) => Number.isFinite(item))
 
-  const assignedIds = await assignRoleResources(resourceTargetRoleId.value, selectedIds)
+  const assignedIds = await assignRoleMenus(resourceTargetRoleId.value, selectedIds)
   assignedCountByRoleId[resourceTargetRoleId.value] = assignedIds.length
   resourceVisible.value = false
   ElMessage.success('角色权限已更新')
@@ -542,6 +547,24 @@ function selectFocusedDescendants() {
   selectedResourceIds.value = checkedIds
 }
 
+function selectByTypes(types: MenuType[]) {
+  const targetTypes = new Set<MenuType>(types)
+  const checked = new Set<number>(selectedResourceIds.value)
+  for (const node of flattenTree(resourceTreeData.value)) {
+    if (targetTypes.has(node.resourceType)) {
+      checked.add(node.id)
+    }
+  }
+  const checkedIds = Array.from(checked)
+  resourceTreeRef.value?.setCheckedKeys(checkedIds)
+  selectedResourceIds.value = checkedIds
+}
+
+function clearResourceSelection() {
+  resourceTreeRef.value?.setCheckedKeys([])
+  selectedResourceIds.value = []
+}
+
 async function removeRole(id: number) {
   await ElMessageBox.confirm('删除角色后，原有关联授权将失效，是否继续？', '删除确认', { type: 'warning' })
   await deleteRole(id)
@@ -559,13 +582,14 @@ function setTreeExpanded(expanded: boolean) {
   })
 }
 
-function toResourceDisplayTree(source: ResourceTreeNode[]): ResourceDisplayNode[] {
+function toResourceDisplayTree(source: MenuTreeNode[]): ResourceDisplayNode[] {
   return source.map((item) => ({
     id: item.id,
-    label: `${item.resourceName} (${item.resourceKey})`,
+    label: `${item.menuName} (${item.resourceKey})`,
     resourceKey: item.resourceKey,
-    resourceType: item.resourceType,
+    resourceType: item.menuType,
     grantKey: item.grantKey || undefined,
+    path: item.path || undefined,
     children: item.children?.length ? toResourceDisplayTree(item.children) : undefined,
   }))
 }
@@ -614,6 +638,7 @@ function filterTreeByKeyword(nodes: ResourceDisplayNode[], keywordValue: string)
     const matched =
       node.label.toLowerCase().includes(keywordValue) ||
       node.resourceType.toLowerCase().includes(keywordValue) ||
+      (node.path || '').toLowerCase().includes(keywordValue) ||
       (node.grantKey || '').toLowerCase().includes(keywordValue)
     if (matched || children.length > 0) {
       filtered.push({
@@ -641,7 +666,7 @@ function filterTreeBySelected(nodes: ResourceDisplayNode[], selectedIds: Set<num
 }
 
 function summarizeByType(selectedIds: Set<number>, tree: ResourceDisplayNode[]) {
-  const counter = new Map<ResourceType, number>()
+  const counter = new Map<MenuType, number>()
   for (const node of flattenTree(tree)) {
     if (!selectedIds.has(node.id)) {
       continue
@@ -651,8 +676,8 @@ function summarizeByType(selectedIds: Set<number>, tree: ResourceDisplayNode[]) 
   return Array.from(counter.entries()).map(([type, count]) => ({ type, count }))
 }
 
-function typeLabel(type: ResourceType) {
-  const labels: Record<ResourceType, string> = {
+function typeLabel(type: MenuType) {
+  const labels: Record<MenuType, string> = {
     DIR: '目录',
     MENU: '菜单',
     BUTTON: '按钮',
@@ -700,7 +725,8 @@ function onRoleHeaderDragEnd(newWidth: number, _oldWidth: number, column: { prop
 .assignment-toolbar__actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .resource-node {

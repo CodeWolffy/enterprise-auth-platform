@@ -102,17 +102,23 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="排序" width="120">
+        <el-table-column label="排序" width="190">
           <template #default="{ row }">
-            <el-input-number
-              v-model="sortDrafts[row.id]"
-              v-permission="'system:write'"
-              :min="0"
-              :max="9999"
-              size="small"
-              controls-position="right"
-              @change="(value) => saveSort(row, Number(value || 0))"
-            />
+            <div class="sort-control">
+              <el-button-group>
+                <el-button v-permission="'system:write'" :icon="ArrowUp" size="small" :disabled="sortDrafts[row.id] <= 0" @click="moveSort(row, -10)" />
+                <el-button v-permission="'system:write'" :icon="ArrowDown" size="small" @click="moveSort(row, 10)" />
+              </el-button-group>
+              <el-input-number
+                v-model="sortDrafts[row.id]"
+                v-permission="'system:write'"
+                :min="0"
+                :max="9999"
+                size="small"
+                controls-position="right"
+                @change="(value) => saveSort(row, Number(value || 0))"
+              />
+            </div>
           </template>
         </el-table-column>
 
@@ -186,11 +192,21 @@
           <el-col :span="12">
             <el-form-item label="路由标识" prop="routeKey">
               <el-input v-model.trim="resourceForm.routeKey" placeholder="例如 users" />
+              <p v-if="routePreview" :class="['field-hint', `field-hint--${routePreview.type}`]">
+                {{ routePreview.message }}
+              </p>
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="路由路径" prop="path">
-              <el-input v-model.trim="resourceForm.path" placeholder="/system/users" />
+              <el-input v-model.trim="resourceForm.path" placeholder="/system/users">
+                <template v-if="suggestedRoutePath" #append>
+                  <el-button @click="resourceForm.path = suggestedRoutePath">套用</el-button>
+                </template>
+              </el-input>
+              <p v-if="pathPreview" :class="['field-hint', `field-hint--${pathPreview.type}`]">
+                {{ pathPreview.message }}
+              </p>
             </el-form-item>
           </el-col>
         </el-row>
@@ -219,7 +235,9 @@
         <el-row :gutter="16">
           <el-col v-if="resourceForm.resourceType === 'DIR' || resourceForm.resourceType === 'MENU'" :span="12">
             <el-form-item label="图标">
-              <el-input v-model.trim="resourceForm.icon" placeholder="例如 Setting" />
+              <el-select v-model="resourceForm.icon" clearable filterable allow-create default-first-option placeholder="选择或输入图标名">
+                <el-option v-for="icon in iconOptions" :key="icon" :label="icon" :value="icon" />
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -253,7 +271,8 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import { Aim, Delete, Edit, Folder, Menu as MenuIcon, Plus, Refresh, Search, SwitchButton } from '@element-plus/icons-vue'
+import { Aim, ArrowDown, ArrowUp, Delete, Edit, Folder, Menu as MenuIcon, Plus, Refresh, Search, SwitchButton } from '@element-plus/icons-vue'
+import { ROUTE_KEY_PATH_MAP } from '@/app/registry/module-manifest'
 import {
   createResource,
   deleteResource,
@@ -304,6 +323,41 @@ const typeOptions: Array<{ label: string; value: ResourceType }> = [
   { label: '按钮', value: 'BUTTON' },
   { label: 'API', value: 'API' },
 ]
+
+const iconOptions = ['Setting', 'Platform', 'Monitor', 'Avatar', 'Connection', 'OfficeBuilding', 'Tickets', 'Document', 'FolderOpened', 'Message', 'Histogram', 'Flag']
+
+const routePreview = computed(() => {
+  const routeKey = resourceForm.routeKey.trim()
+  if (!routeKey || resourceForm.resourceType !== 'MENU') {
+    return null
+  }
+  const manifestPath = ROUTE_KEY_PATH_MAP[routeKey]
+  const existing = flatNodes.value.find((item) => item.routeKey === routeKey && item.id !== editingResourceId.value)
+  if (existing) {
+    return { type: 'error' as const, message: `路由标识已被「${existing.resourceName}」使用` }
+  }
+  if (manifestPath) {
+    return { type: 'success' as const, message: `已匹配前端路由 ${manifestPath}` }
+  }
+  return { type: 'warning' as const, message: '前端路由白名单中未找到该 routeKey，保存后可能无法访问' }
+})
+
+const pathPreview = computed(() => {
+  const path = resourceForm.path.trim()
+  if (!path || resourceForm.resourceType !== 'MENU') {
+    return null
+  }
+  const existing = flatNodes.value.find((item) => item.path === path && item.id !== editingResourceId.value)
+  if (existing) {
+    return { type: 'error' as const, message: `访问路径已被「${existing.resourceName}」使用` }
+  }
+  return null
+})
+
+const suggestedRoutePath = computed(() => {
+  const routeKey = resourceForm.routeKey.trim()
+  return routeKey ? ROUTE_KEY_PATH_MAP[routeKey] : ''
+})
 
 const formRules = reactive<FormRules>({
   parentId: [{ validator: validateParent, trigger: 'change' }],
@@ -408,10 +462,10 @@ async function submitForm() {
   }
   if (dialogMode.value === 'create') {
     await createResource(payload)
-    ElMessage.success('菜单/权限已创建')
+    ElMessage.success('菜单/权限已创建，重新登录或刷新权限快照后对当前会话生效')
   } else if (editingResourceId.value != null) {
     await updateResource(editingResourceId.value, payload)
-    ElMessage.success('菜单/权限已更新')
+    ElMessage.success('菜单/权限已更新，重新登录或刷新权限快照后对当前会话生效')
   }
   dialogVisible.value = false
   await load()
@@ -431,6 +485,12 @@ async function saveSort(row: ResourceTreeNode, orderNo: number) {
   await sortResource(row.id, orderNo)
   ElMessage.success('排序已更新')
   await load()
+}
+
+async function moveSort(row: ResourceTreeNode, delta: number) {
+  const nextOrderNo = Math.min(9999, Math.max(0, (sortDrafts[row.id] ?? row.orderNo ?? 0) + delta))
+  sortDrafts[row.id] = nextOrderNo
+  await saveSort(row, nextOrderNo)
 }
 
 function handleTypeChange() {
@@ -876,6 +936,30 @@ function blankToNull(value?: string | null) {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.sort-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.field-hint {
+  margin: 6px 0 0;
+  line-height: 1.4;
+  font-size: 12px;
+}
+
+.field-hint--success {
+  color: var(--success);
+}
+
+.field-hint--warning {
+  color: var(--warning);
+}
+
+.field-hint--error {
+  color: var(--danger);
 }
 
 .menu-permission-table :deep(.el-input-number--small) {

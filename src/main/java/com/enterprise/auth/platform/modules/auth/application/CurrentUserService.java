@@ -121,8 +121,9 @@ public class CurrentUserService {
     }
 
     private UserAccount mergeSessionAuthorities(UserAccount user, SaSession tokenSession) {
-        Set<String> roles = mergeStringSet(user.roles(), tokenSession.get("roles"));
-        Set<String> permissions = mergeStringSet(user.permissions(), tokenSession.get("permissions"));
+        boolean sessionAuthoritiesTrusted = sessionAuthoritiesMatchActiveTenant(tokenSession);
+        Set<String> roles = sessionAuthoritiesTrusted ? mergeStringSet(user.roles(), tokenSession.get("roles")) : user.roles();
+        Set<String> permissions = sessionAuthoritiesTrusted ? mergeStringSet(user.permissions(), tokenSession.get("permissions")) : user.permissions();
         return new UserAccount(
                 user.id(),
                 user.tenantId(),
@@ -138,6 +139,18 @@ public class CurrentUserService {
                 user.mustChangePassword(),
                 user.passwordUpdatedAt()
         );
+    }
+
+    private boolean sessionAuthoritiesMatchActiveTenant(SaSession tokenSession) {
+        String permissionsTenantId = sessionString(tokenSession, "permissionsTenantId");
+        if (!StringUtils.hasText(permissionsTenantId)) {
+            return false;
+        }
+        String activeTenantId = sessionString(tokenSession, "activeTenantId");
+        if (!StringUtils.hasText(activeTenantId)) {
+            activeTenantId = sessionString(tokenSession, "tenantId");
+        }
+        return permissionsTenantId.equals(activeTenantId);
     }
 
     private Set<String> mergeStringSet(Set<String> base, Object sessionValue) {

@@ -8,7 +8,7 @@ import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.user.application.AuthenticationUser;
 import com.enterprise.auth.platform.modules.user.application.UserAuthenticationFacade;
-import com.enterprise.auth.platform.modules.resource.application.ResourceService;
+import com.enterprise.auth.platform.modules.role.application.RoleGrantQueryFacade;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -20,44 +20,48 @@ import org.springframework.util.StringUtils;
 public class SaTokenPermissionProvider implements StpInterface {
 
     private final UserAuthenticationFacade userAuthenticationFacade;
-    private final ResourceService resourceService;
+    private final RoleGrantQueryFacade roleGrantQueryFacade;
     private final PlatformAdminSupport platformAdminSupport;
 
     public SaTokenPermissionProvider(
             UserAuthenticationFacade userAuthenticationFacade,
-            ResourceService resourceService,
+            RoleGrantQueryFacade roleGrantQueryFacade,
             PlatformAdminSupport platformAdminSupport
     ) {
         this.userAuthenticationFacade = userAuthenticationFacade;
-        this.resourceService = resourceService;
+        this.roleGrantQueryFacade = roleGrantQueryFacade;
         this.platformAdminSupport = platformAdminSupport;
     }
 
     @Override
     public List<String> getPermissionList(Object loginId, String loginType) {
-        Optional<List<String>> sessionPermissions = currentTokenSession()
-                .map(session -> sessionStringList(session, "permissions"));
+        Optional<AuthenticationUser> user = loadUser(loginId);
+        Optional<List<String>> sessionPermissions = user.flatMap(loadedUser -> currentTokenSession()
+                .filter(session -> activeTenantId(loadedUser).equals(sessionString(session, "permissionsTenantId")))
+                .map(session -> sessionStringList(session, "permissions")));
         if (sessionPermissions.isPresent()) {
             return sessionPermissions.get();
         }
-        return loadUser(loginId)
-                .map(user -> new ArrayList<>(resourceService.resolveGrantKeys(
-                        activeTenantId(user),
-                        user.roles(),
-                        platformAdminSupport.isPlatformSuperAdmin(toUserAccount(user))
+        return user
+                .map(loadedUser -> new ArrayList<>(roleGrantQueryFacade.resolveGrantKeys(
+                        activeTenantId(loadedUser),
+                        loadedUser.roles(),
+                        platformAdminSupport.isPlatformSuperAdmin(toUserAccount(loadedUser))
                 )))
                 .orElseGet(ArrayList::new);
     }
 
     @Override
     public List<String> getRoleList(Object loginId, String loginType) {
-        Optional<List<String>> sessionRoles = currentTokenSession()
-                .map(session -> sessionStringList(session, "roles"));
+        Optional<AuthenticationUser> user = loadUser(loginId);
+        Optional<List<String>> sessionRoles = user.flatMap(loadedUser -> currentTokenSession()
+                .filter(session -> activeTenantId(loadedUser).equals(sessionString(session, "permissionsTenantId")))
+                .map(session -> sessionStringList(session, "roles")));
         if (sessionRoles.isPresent()) {
             return sessionRoles.get();
         }
-        return loadUser(loginId)
-                .map(user -> new ArrayList<>(user.roles()))
+        return user
+                .map(loadedUser -> new ArrayList<>(loadedUser.roles()))
                 .orElseGet(ArrayList::new);
     }
 

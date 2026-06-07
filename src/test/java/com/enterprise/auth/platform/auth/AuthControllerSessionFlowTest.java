@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import cn.dev33.satoken.SaManager;
 import cn.dev33.satoken.dao.SaTokenDaoDefaultImpl;
+import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -181,6 +182,11 @@ class AuthControllerSessionFlowTest {
                 .andExpect(jsonPath("$.data.tenantId").value("platform"))
                 .andExpect(jsonPath("$.data.grants[?(@=='tenant:read')]").exists());
 
+        SaSession tokenSession = StpUtil.getTokenSessionByToken(token);
+        Assertions.assertEquals("platform", tokenSession.get("permissionsTenantId"));
+        Assertions.assertNotNull(tokenSession.get("permissions"));
+        Assertions.assertNotNull(tokenSession.get("roles"));
+
         mockMvc.perform(get("/api/auth/sessions")
                         .header("Authorization", authorization)
                         .header("X-Tenant-Id", "platform"))
@@ -292,6 +298,11 @@ class AuthControllerSessionFlowTest {
                 .andExpect(jsonPath("$.data.tenantId").value(TENANT_A))
                 .andExpect(jsonPath("$.data.operatorTenantId").value(ADMIN_TENANT))
                 .andExpect(jsonPath("$.data.superAdmin").value(true));
+
+        SaSession tokenSession = StpUtil.getTokenSessionByToken(token);
+        Assertions.assertEquals(TENANT_A, tokenSession.get("permissionsTenantId"));
+        Assertions.assertNotNull(tokenSession.get("permissions"));
+        Assertions.assertNotNull(tokenSession.get("roles"));
 
         mockMvc.perform(get("/api/tenants/current")
                         .header("Authorization", "Bearer " + token))

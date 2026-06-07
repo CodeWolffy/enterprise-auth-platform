@@ -103,7 +103,7 @@ export function resolveFirstAllowedPath(snapshot: PermissionSnapshot | null) {
     if (!routeKey || !routeKeys.has(routeKey)) {
       continue
     }
-    const path = resolveRoutePath(routeKey)
+    const path = menu.path?.trim() || resolveRoutePath(routeKey)
     if (path) {
       return path
     }

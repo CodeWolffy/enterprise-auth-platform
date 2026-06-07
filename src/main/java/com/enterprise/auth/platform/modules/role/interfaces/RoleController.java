@@ -47,7 +47,7 @@ public class RoleController {
         return ApiResponse.ok(catalogService.roles());
     }
 
-    @Operation(summary = "查询角色已分配资源")
+    @Operation(summary = "查询角色已分配菜单")
     @GetMapping("/{roleId}/resources")
     @SaCheckPermission(PermissionCodes.ROLE_READ)
     public ApiResponse<Set<Long>> assignedResources(@Parameter(description = "角色 ID") @PathVariable Long roleId) {
@@ -71,14 +71,31 @@ public class RoleController {
         return ApiResponse.ok(roleManagementService.update(roleId, request));
     }
 
-    @Operation(summary = "分配角色资源")
+    @Operation(summary = "分配角色菜单")
     @PutMapping("/{roleId}/resources")
     @SaCheckPermission(PermissionCodes.ROLE_WRITE)
     public ApiResponse<Set<Long>> assignResources(
             @Parameter(description = "角色 ID") @PathVariable Long roleId,
-            @Valid @RequestBody AssignResourcesRequest request
+            @Valid @RequestBody AssignMenusRequest request
     ) {
-        return ApiResponse.ok(roleManagementService.assignResources(roleId, request.resourceIds()));
+        return ApiResponse.ok(roleManagementService.assignMenus(roleId, request.resolvedMenuIds()));
+    }
+
+    @Operation(summary = "查询角色已分配菜单")
+    @GetMapping("/{roleId}/menus")
+    @SaCheckPermission(PermissionCodes.ROLE_READ)
+    public ApiResponse<Set<Long>> assignedMenus(@Parameter(description = "角色 ID") @PathVariable Long roleId) {
+        return ApiResponse.ok(roleGrantQueryFacade.listRoleMenuIds(roleId));
+    }
+
+    @Operation(summary = "分配角色菜单")
+    @PutMapping("/{roleId}/menus")
+    @SaCheckPermission(PermissionCodes.ROLE_WRITE)
+    public ApiResponse<Set<Long>> assignMenus(
+            @Parameter(description = "角色 ID") @PathVariable Long roleId,
+            @Valid @RequestBody AssignMenusRequest request
+    ) {
+        return ApiResponse.ok(roleManagementService.assignMenus(roleId, request.resolvedMenuIds()));
     }
 
     @Operation(summary = "删除角色")

@@ -9,7 +9,7 @@ import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEn
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserRoleEntity;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserRoleMapper;
-import com.enterprise.auth.platform.modules.resource.application.ResourceService;
+import com.enterprise.auth.platform.modules.role.application.RoleGrantQueryFacade;
 import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.modules.user.interfaces.UserSummary;
@@ -27,20 +27,20 @@ public class UserDirectoryService {
     private final SysUserRoleMapper sysUserRoleMapper;
     private final RoleQueryFacade roleQueryFacade;
     private final DataScopeService dataScopeService;
-    private final ResourceService resourceService;
+    private final RoleGrantQueryFacade roleGrantQueryFacade;
 
     public UserDirectoryService(
             SysUserMapper sysUserMapper,
             SysUserRoleMapper sysUserRoleMapper,
             RoleQueryFacade roleQueryFacade,
             DataScopeService dataScopeService,
-            ResourceService resourceService
+            RoleGrantQueryFacade roleGrantQueryFacade
     ) {
         this.sysUserMapper = sysUserMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
         this.roleQueryFacade = roleQueryFacade;
         this.dataScopeService = dataScopeService;
-        this.resourceService = resourceService;
+        this.roleGrantQueryFacade = roleGrantQueryFacade;
     }
 
     public List<UserSummary> listUsers() {
@@ -128,7 +128,7 @@ public class UserDirectoryService {
                 Map.Entry::getKey,
                 entry -> {
                     Set<String> key = entry.getValue() == null ? Set.of() : new java.util.TreeSet<>(entry.getValue());
-                    return cache.computeIfAbsent(key, item -> resourceService.resolveGrantKeys(tenantId, item, false));
+                    return cache.computeIfAbsent(key, item -> roleGrantQueryFacade.resolveGrantKeys(tenantId, item, false));
                 }
         ));
     }

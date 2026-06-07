@@ -369,7 +369,7 @@ INSERT INTO `sys_resource` VALUES (24, 'platform', 30, '1,30', 'MENU', 'tenants'
 INSERT INTO `sys_resource` VALUES (25, 'platform', 1, '1', 'MENU', 'audit', '安全审计', 'audit', 'audit:read', '/system/audit', 'AuditView', 'Histogram', 40, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
 INSERT INTO `sys_resource` VALUES (26, 'platform', 20, '1,20', 'MENU', 'settings', '系统设置', 'settings', 'system:read', '/system/settings', 'SystemManagementView', 'Setting', 60, 0, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
 INSERT INTO `sys_resource` VALUES (27, 'platform', 20, '1,20', 'MENU', 'online-users', '在线用户', 'online-users', 'session:write', '/system/online-users', 'OnlineUsersView', 'Monitor', 40, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
-INSERT INTO `sys_resource` VALUES (28, 'platform', 20, '1,20', 'MENU', 'resources', '菜单管理', 'resources', 'system:write', '/system/resources', 'ResourceManagementView', 'Tickets', 50, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
+INSERT INTO `sys_resource` VALUES (28, 'platform', 20, '1,20', 'MENU', 'menus', '菜单管理', 'menus', 'system:write', '/system/menus', 'MenuManagementView', 'Tickets', 50, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
 INSERT INTO `sys_resource` VALUES (30, 'platform', 1, '1', 'DIR', 'platform-management', '平台管理', NULL, NULL, NULL, NULL, 'Platform', 30, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
 INSERT INTO `sys_resource` VALUES (31, 'platform', 30, '1,30', 'MENU', 'dicts', '字典管理', 'dicts', 'system:read', '/platform/dicts', 'SystemDictsView', 'Tickets', 10, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
 INSERT INTO `sys_resource` VALUES (32, 'platform', 30, '1,30', 'MENU', 'tenant-catalog', '租户套餐', 'tenant-catalog', 'tenant:read', '/platform/tenant-catalog', 'TenantCatalogView', 'Tickets', 30, 1, 1, 1, 'system', 'system', 0, '2026-04-05 20:33:52', '2026-04-05 20:33:52');
@@ -563,6 +563,94 @@ INSERT INTO `sys_tenant_capability` VALUES (5, 'platform', 'tenant', '租户治�
 INSERT INTO `sys_tenant_capability` VALUES (6, 'platform', 'system', '系统管理', '字典、参数、公告与分类配置管理', 60, 1, 'system', 'system', 0, '2026-03-21 06:26:06', '2026-03-21 06:26:06');
 INSERT INTO `sys_tenant_capability` VALUES (7, 'platform', 'audit', '安全审计', '审计查询、导出与授权记录联动', 70, 1, 'system', 'system', 0, '2026-03-21 06:26:06', '2026-03-21 06:26:06');
 INSERT INTO `sys_tenant_capability` VALUES (8, 'platform', 'notice', '通知公告', '公告发布与租户通知能力', 80, 1, 'system', 'system', 0, '2026-03-21 06:26:06', '2026-03-21 06:26:06');
+INSERT INTO `sys_tenant_capability` VALUES (9, 'platform', 'file', '文件存储', '文件上传、预览与存储治理能力', 90, 1, 'system', 'system', 0, '2026-03-21 06:26:06', '2026-03-21 06:26:06');
+INSERT INTO `sys_tenant_capability` VALUES (10, 'platform', 'workflow', '工作流', '流程定义、待办、已办与流程设计能力', 100, 1, 'system', 'system', 0, '2026-03-21 06:26:06', '2026-03-21 06:26:06');
+INSERT INTO `sys_tenant_capability` VALUES (11, 'platform', 'codegen', '代码生成', '代码生成、下载与生成模块治理能力', 110, 1, 'system', 'system', 0, '2026-03-21 06:26:06', '2026-03-21 06:26:06');
+
+-- ----------------------------
+-- Table structure for sys_tenant_capability_resource_scope
+-- ----------------------------
+DROP TABLE IF EXISTS `sys_tenant_capability_resource_scope`;
+CREATE TABLE `sys_tenant_capability_resource_scope`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `tenant_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'platform' COMMENT '所属租户，当前固定为 platform',
+  `capability_code` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '能力编码',
+  `resource_key` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '资源键',
+  `scope_type` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'VISIBLE' COMMENT '范围类型：VISIBLE 控制菜单可见，GRANT 控制授权建议',
+  `required` tinyint NOT NULL DEFAULT 0 COMMENT '是否为能力基础资源',
+  `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT 'system' COMMENT '创建人',
+  `updated_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT 'system' COMMENT '更新人',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_tenant_capability_resource_scope`(`tenant_id` ASC, `capability_code` ASC, `resource_key` ASC, `scope_type` ASC) USING BTREE,
+  INDEX `idx_capability_resource_scope_resource`(`tenant_id` ASC, `resource_key` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 61 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户能力资源范围表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of sys_tenant_capability_resource_scope
+-- ----------------------------
+INSERT INTO `sys_tenant_capability_resource_scope` (`tenant_id`, `capability_code`, `resource_key`, `scope_type`, `required`, `created_by`, `updated_by`) VALUES
+  ('platform', 'auth', 'dashboard', 'VISIBLE', 1, 'system', 'system'),
+  ('platform', 'auth', 'dashboard:read', 'GRANT', 1, 'system', 'system'),
+  ('platform', 'auth', 'auth:read', 'GRANT', 1, 'system', 'system'),
+  ('platform', 'user', 'system', 'VISIBLE', 1, 'system', 'system'),
+  ('platform', 'user', 'users', 'VISIBLE', 1, 'system', 'system'),
+  ('platform', 'user', 'user:read', 'GRANT', 1, 'system', 'system'),
+  ('platform', 'user', 'user:write', 'GRANT', 1, 'system', 'system'),
+  ('platform', 'role', 'system', 'VISIBLE', 1, 'system', 'system'),
+  ('platform', 'role', 'roles', 'VISIBLE', 1, 'system', 'system'),
+  ('platform', 'role', 'menus', 'VISIBLE', 1, 'system', 'system'),
+  ('platform', 'role', 'role:read', 'GRANT', 1, 'system', 'system'),
+  ('platform', 'role', 'role:write', 'GRANT', 1, 'system', 'system'),
+  ('platform', 'role', 'system:read', 'GRANT', 0, 'system', 'system'),
+  ('platform', 'role', 'system:write', 'GRANT', 0, 'system', 'system'),
+  ('platform', 'dept', 'system', 'VISIBLE', 1, 'system', 'system'),
+  ('platform', 'dept', 'depts', 'VISIBLE', 1, 'system', 'system'),
+  ('platform', 'dept', 'dept:read', 'GRANT', 1, 'system', 'system'),
+  ('platform', 'dept', 'dept:write', 'GRANT', 1, 'system', 'system'),
+  ('platform', 'tenant', 'platform-management', 'VISIBLE', 1, 'system', 'system'),
+  ('platform', 'tenant', 'tenants', 'VISIBLE', 1, 'system', 'system'),
+  ('platform', 'tenant', 'tenant-catalog', 'VISIBLE', 1, 'system', 'system'),
+  ('platform', 'tenant', 'tenant:read', 'GRANT', 1, 'system', 'system'),
+  ('platform', 'tenant', 'tenant:write', 'GRANT', 1, 'system', 'system'),
+  ('platform', 'system', 'system', 'VISIBLE', 1, 'system', 'system'),
+  ('platform', 'system', 'settings', 'VISIBLE', 0, 'system', 'system'),
+  ('platform', 'system', 'online-users', 'VISIBLE', 0, 'system', 'system'),
+  ('platform', 'system', 'dicts', 'VISIBLE', 0, 'system', 'system'),
+  ('platform', 'system', 'configs', 'VISIBLE', 0, 'system', 'system'),
+  ('platform', 'system', 'mail-channel', 'VISIBLE', 0, 'system', 'system'),
+  ('platform', 'system', 'categories', 'VISIBLE', 0, 'system', 'system'),
+  ('platform', 'system', 'system:read', 'GRANT', 1, 'system', 'system'),
+  ('platform', 'system', 'system:write', 'GRANT', 1, 'system', 'system'),
+  ('platform', 'system', 'session:write', 'GRANT', 0, 'system', 'system'),
+  ('platform', 'audit', 'audit', 'VISIBLE', 1, 'system', 'system'),
+  ('platform', 'audit', 'operation-logs', 'VISIBLE', 0, 'system', 'system'),
+  ('platform', 'audit', 'audit:read', 'GRANT', 1, 'system', 'system'),
+  ('platform', 'audit', 'audit:write', 'GRANT', 0, 'system', 'system'),
+  ('platform', 'audit', 'operation-log:read', 'GRANT', 0, 'system', 'system'),
+  ('platform', 'audit', 'operation-log:export', 'GRANT', 0, 'system', 'system'),
+  ('platform', 'notice', 'platform-management', 'VISIBLE', 1, 'system', 'system'),
+  ('platform', 'notice', 'notices', 'VISIBLE', 0, 'system', 'system'),
+  ('platform', 'notice', 'system:read', 'GRANT', 0, 'system', 'system'),
+  ('platform', 'file', 'platform-management', 'VISIBLE', 1, 'system', 'system'),
+  ('platform', 'file', 'files', 'VISIBLE', 1, 'system', 'system'),
+  ('platform', 'file', 'file:read', 'GRANT', 1, 'system', 'system'),
+  ('platform', 'file', 'file:write', 'GRANT', 1, 'system', 'system'),
+  ('platform', 'workflow', 'platform-management', 'VISIBLE', 1, 'system', 'system'),
+  ('platform', 'workflow', 'workflow', 'VISIBLE', 1, 'system', 'system'),
+  ('platform', 'workflow', 'workflow-definitions', 'VISIBLE', 0, 'system', 'system'),
+  ('platform', 'workflow', 'workflow-my-instances', 'VISIBLE', 0, 'system', 'system'),
+  ('platform', 'workflow', 'workflow-todo', 'VISIBLE', 0, 'system', 'system'),
+  ('platform', 'workflow', 'workflow-done', 'VISIBLE', 0, 'system', 'system'),
+  ('platform', 'workflow', 'workflow-designer', 'VISIBLE', 0, 'system', 'system'),
+  ('platform', 'workflow', 'workflow:read', 'GRANT', 1, 'system', 'system'),
+  ('platform', 'workflow', 'workflow:write', 'GRANT', 1, 'system', 'system'),
+  ('platform', 'codegen', 'platform-management', 'VISIBLE', 1, 'system', 'system'),
+  ('platform', 'codegen', 'codegen', 'VISIBLE', 1, 'system', 'system'),
+  ('platform', 'codegen', 'codegen:read', 'GRANT', 1, 'system', 'system'),
+  ('platform', 'codegen', 'codegen:write', 'GRANT', 1, 'system', 'system'),
+  ('platform', 'codegen', 'codegen:download', 'GRANT', 1, 'system', 'system');
 
 -- ----------------------------
 -- Table structure for sys_tenant_capability_override

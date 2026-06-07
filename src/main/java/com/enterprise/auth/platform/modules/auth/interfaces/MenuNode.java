@@ -13,6 +13,7 @@ public record MenuNode(
         @Schema(description = "路由键") String routeKey,
         @Schema(description = "图标") String icon,
         @Schema(description = "排序值") Integer orderNo,
+        @Schema(description = "可见状态") boolean visible,
         @Schema(description = "子节点") List<MenuNode> children
 ) {
     public record MenuItem(String code, String title, String path, String component) {

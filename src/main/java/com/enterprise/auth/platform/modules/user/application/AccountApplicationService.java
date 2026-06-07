@@ -10,7 +10,7 @@ import com.enterprise.auth.platform.modules.audit.application.AuditService;
 import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
-import com.enterprise.auth.platform.modules.auth.infrastructure.AuthPrincipalCacheService;
+import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
 import com.enterprise.auth.platform.modules.file.application.FileApplicationService;
 import com.enterprise.auth.platform.modules.file.application.FileMetadataView;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
@@ -31,7 +31,7 @@ public class AccountApplicationService {
     private final CurrentUserService currentUserService;
     private final SysUserMapper sysUserMapper;
     private final PasswordHasher passwordHasher;
-    private final AuthPrincipalCacheService authPrincipalCacheService;
+    private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
     private final FileApplicationService fileApplicationService;
     private final AuditService auditService;
 
@@ -39,14 +39,14 @@ public class AccountApplicationService {
             CurrentUserService currentUserService,
             SysUserMapper sysUserMapper,
             PasswordHasher passwordHasher,
-            AuthPrincipalCacheService authPrincipalCacheService,
+            AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
             FileApplicationService fileApplicationService,
             AuditService auditService
     ) {
         this.currentUserService = currentUserService;
         this.sysUserMapper = sysUserMapper;
         this.passwordHasher = passwordHasher;
-        this.authPrincipalCacheService = authPrincipalCacheService;
+        this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
         this.fileApplicationService = fileApplicationService;
         this.auditService = auditService;
     }
@@ -69,7 +69,7 @@ public class AccountApplicationService {
             user.setEmail(normalizeProfileText(request.email(), 128));
             user.setUpdatedBy(user.getUsername());
             sysUserMapper.updateById(user);
-            authPrincipalCacheService.evictByUser(user.getId(), user.getTenantId(), user.getUsername());
+            permissionSnapshotInvalidationService.invalidateUser(user.getId(), user.getTenantId(), user.getUsername());
             auditService.record("PROFILE_UPDATED", user.getUsername(), user.getTenantId(), Map.of("userId", user.getId()));
             return toProfile(user);
         });
@@ -84,7 +84,7 @@ public class AccountApplicationService {
             user.setAvatarFileKey(uploaded.fileKey());
             user.setUpdatedBy(user.getUsername());
             sysUserMapper.updateById(user);
-            authPrincipalCacheService.evictByUser(user.getId(), user.getTenantId(), user.getUsername());
+            permissionSnapshotInvalidationService.invalidateUser(user.getId(), user.getTenantId(), user.getUsername());
             auditService.record("AVATAR_UPDATED", user.getUsername(), user.getTenantId(), Map.of(
                     "userId", user.getId(),
                     "fileKey", uploaded.fileKey()
@@ -117,7 +117,7 @@ public class AccountApplicationService {
             StpUtil.getTokenSession().set("sessionVersion", nextSessionVersion);
             StpUtil.getTokenSession().set("passwordChangeRequired", false);
             StpUtil.getTokenSession().delete("passwordChangeReason");
-            authPrincipalCacheService.evictByUser(user.getId(), user.getTenantId(), user.getUsername());
+            permissionSnapshotInvalidationService.invalidateUser(user.getId(), user.getTenantId(), user.getUsername());
             auditService.record("PASSWORD_CHANGED", user.getUsername(), user.getTenantId(), Map.of("userId", user.getId()));
             return toProfile(user);
         });

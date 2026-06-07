@@ -24,6 +24,7 @@ export interface MenuItem {
   routeKey?: string | null
   icon?: string | null
   orderNo?: number | null
+  visible?: boolean | null
   children?: MenuItem[]
 }
 

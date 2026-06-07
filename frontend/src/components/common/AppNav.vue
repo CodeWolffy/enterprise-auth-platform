@@ -65,7 +65,7 @@ function buildLinks(nodes: MenuItem[]): NavLink[] {
 
   for (const node of nodes) {
     const accessKey = node.routeKey?.trim() || node.code?.trim() || ''
-    const path = resolveRoutePath(accessKey)
+    const path = node.path?.trim() || resolveRoutePath(accessKey)
     const children = buildLinks(node.children ?? [])
     const fallbackPath = children[0]?.to ?? ''
     if (!path && !fallbackPath) {

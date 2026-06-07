@@ -1,7 +1,7 @@
 ﻿import { createRouter, createWebHistory, type RouteRecordName, type RouteRecordRaw } from 'vue-router'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import type { PermissionSnapshot } from '@/types/auth-models'
+import type { MenuItem, PermissionSnapshot } from '@/types/auth-models'
 import { useAuthStore } from '@/stores/auth'
 import { APP_ROUTE_MANIFESTS, type AppRouteManifest } from '@/app/registry/module-manifest'
 import { collectAllowedRouteKeys, isAllowedRoute, resolveFirstAllowedPath } from './route-access'
@@ -129,11 +129,12 @@ function registerDynamicRoutes(snapshot?: PermissionSnapshot | null) {
   }
 
   const allowedRouteKeys = collectAllowedRouteKeys(snapshot.menus ?? [])
+  const menuByRouteKey = collectMenuByRouteKey(snapshot.menus ?? [])
   for (const manifest of APP_ROUTE_MANIFESTS) {
     if (!canRegisterRoute(manifest, snapshot, allowedRouteKeys)) {
       continue
     }
-    router.addRoute(CONSOLE_SHELL_ROUTE_NAME, toRouteRecord(manifest))
+    router.addRoute(CONSOLE_SHELL_ROUTE_NAME, toRouteRecord(manifest, manifest.routeKey ? menuByRouteKey.get(manifest.routeKey) : undefined))
     dynamicRouteNames.add(manifest.name)
   }
 }
@@ -162,17 +163,42 @@ function canRegisterRoute(
   return !requiredGrant || snapshot.superAdmin || (snapshot.grants ?? []).includes(requiredGrant)
 }
 
-function toRouteRecord(manifest: AppRouteManifest): RouteRecordRaw {
+function collectMenuByRouteKey(menus: MenuItem[]) {
+  const result = new Map<string, MenuItem>()
+  const walk = (items: MenuItem[]) => {
+    for (const item of items) {
+      const routeKey = item.routeKey?.trim()
+      if (routeKey && !result.has(routeKey)) {
+        result.set(routeKey, item)
+      }
+      if (item.children?.length) {
+        walk(item.children)
+      }
+    }
+  }
+  walk(menus)
+  return result
+}
+
+function normalizeChildRoutePath(path?: string | null) {
+  const normalized = path?.trim()
+  if (!normalized) {
+    return undefined
+  }
+  return normalized.startsWith('/') ? normalized.slice(1) : normalized
+}
+
+function toRouteRecord(manifest: AppRouteManifest, menu?: MenuItem): RouteRecordRaw {
   return {
-    path: manifest.path,
+    path: normalizeChildRoutePath(menu?.path) ?? manifest.path,
     name: manifest.name,
     component: manifest.component,
     meta: {
-      title: manifest.title,
+      title: menu?.title?.trim() || manifest.title,
       routeKey: manifest.routeKey,
       requiresGrant: manifest.requiredGrant,
       hidden: manifest.hidden,
-      icon: manifest.icon,
+      icon: menu?.icon?.trim() || manifest.icon,
       generatedRoute: manifest.generatedRoute,
     },
   }

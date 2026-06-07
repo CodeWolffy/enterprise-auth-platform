@@ -13,7 +13,7 @@ import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEn
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserRoleEntity;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserRoleMapper;
-import com.enterprise.auth.platform.modules.auth.infrastructure.AuthPrincipalCacheService;
+import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
 import com.enterprise.auth.platform.modules.security.application.SecurityPolicyApplicationService;
 import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
@@ -44,7 +44,7 @@ public class UserManagementService {
     private final CatalogService catalogService;
     private final AuditService auditService;
     private final DataScopeService dataScopeService;
-    private final AuthPrincipalCacheService authPrincipalCacheService;
+    private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
     private final SessionIndexService sessionIndexService;
     private final SecurityPolicyApplicationService securityPolicyApplicationService;
 
@@ -57,7 +57,7 @@ public class UserManagementService {
             CatalogService catalogService,
             AuditService auditService,
             DataScopeService dataScopeService,
-            AuthPrincipalCacheService authPrincipalCacheService,
+            AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
             SessionIndexService sessionIndexService,
             SecurityPolicyApplicationService securityPolicyApplicationService
     ) {
@@ -69,7 +69,7 @@ public class UserManagementService {
         this.catalogService = catalogService;
         this.auditService = auditService;
         this.dataScopeService = dataScopeService;
-        this.authPrincipalCacheService = authPrincipalCacheService;
+        this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
         this.sessionIndexService = sessionIndexService;
         this.securityPolicyApplicationService = securityPolicyApplicationService;
     }
@@ -101,7 +101,7 @@ public class UserManagementService {
         }
 
         syncUserRoles(tenantId, entity.getId(), request.roleCodes());
-        authPrincipalCacheService.evictByUser(entity.getId(), tenantId, entity.getUsername());
+        permissionSnapshotInvalidationService.invalidateUser(entity.getId(), tenantId, entity.getUsername());
         auditService.record("USER_CREATED", operator, tenantId, Map.of("userId", entity.getId(), "username", entity.getUsername()));
         return loadSummary(entity.getId(), tenantId);
     }
@@ -140,7 +140,7 @@ public class UserManagementService {
         if (request.roleCodes() != null) {
             syncUserRoles(tenantId, entity.getId(), request.roleCodes());
         }
-        authPrincipalCacheService.evictByUser(entity.getId(), tenantId, entity.getUsername());
+        permissionSnapshotInvalidationService.invalidateUser(entity.getId(), tenantId, entity.getUsername());
         if (invalidateSessions) {
             kickoutUserSessions(entity.getId());
         }
@@ -154,7 +154,7 @@ public class UserManagementService {
         String operator = SecuritySupport.currentOperator();
         SysUserEntity entity = getUser(userId, tenantId);
         syncUserRoles(tenantId, userId, roleCodes);
-        authPrincipalCacheService.evictByUser(entity.getId(), tenantId, entity.getUsername());
+        permissionSnapshotInvalidationService.invalidateUser(entity.getId(), tenantId, entity.getUsername());
         auditService.record("USER_ROLE_ASSIGNED", operator, tenantId, Map.of("userId", userId, "roleCodes", roleCodes));
         return loadSummary(userId, tenantId);
     }
@@ -193,7 +193,7 @@ public class UserManagementService {
         entity.setEnabled(0);
         sysUserMapper.updateById(entity);
         sysUserMapper.deleteById(entity.getId());
-        authPrincipalCacheService.evictByUser(entity.getId(), tenantId, entity.getUsername());
+        permissionSnapshotInvalidationService.invalidateUser(entity.getId(), tenantId, entity.getUsername());
         kickoutUserSessions(entity.getId());
         auditService.record("USER_DELETED", operator, tenantId, Map.of("userId", userId, "username", entity.getUsername()));
     }

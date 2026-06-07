@@ -35,7 +35,7 @@ class RoleManagementServiceTest {
     void cleanUp() {
         for (String tenant : new String[]{TENANT, "platform"}) {
             jdbcTemplate.update(
-                    "DELETE FROM sys_role_resource WHERE tenant_id = ? AND role_id IN (SELECT id FROM sys_role WHERE tenant_id = ? AND role_code = ?)",
+                    "DELETE FROM sys_role_menu WHERE tenant_id = ? AND role_id IN (SELECT id FROM sys_role WHERE tenant_id = ? AND role_code = ?)",
                     tenant, tenant, ROLE_CODE);
             jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id = ? AND role_code = ?", tenant, ROLE_CODE);
         }

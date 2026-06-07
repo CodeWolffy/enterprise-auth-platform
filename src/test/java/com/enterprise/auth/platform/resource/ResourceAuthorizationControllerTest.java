@@ -2,17 +2,23 @@ package com.enterprise.auth.platform.resource;
 
 import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.bearer;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import cn.dev33.satoken.session.SaSession;
+import cn.dev33.satoken.stp.SaLoginModel;
+import cn.dev33.satoken.stp.StpUtil;
 import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
+import com.enterprise.auth.platform.modules.auth.infrastructure.AuthPrincipalCacheService;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,7 +27,9 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -36,6 +44,9 @@ class ResourceAuthorizationControllerTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @SpyBean
+    private AuthPrincipalCacheService authPrincipalCacheService;
 
     @BeforeEach
     void cleanUp() {
@@ -52,7 +63,7 @@ class ResourceAuthorizationControllerTest {
         );
         if (!roleIds.isEmpty()) {
             String inClause = roleIds.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
-            jdbcTemplate.update("DELETE FROM sys_role_resource WHERE tenant_id = ? AND role_id IN (" + inClause + ")", "tenant-a");
+            jdbcTemplate.update("DELETE FROM sys_role_menu WHERE tenant_id = ? AND role_id IN (" + inClause + ")", "tenant-a");
             jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id = ? AND id IN (" + inClause + ")", "tenant-a");
         }
         jdbcTemplate.update(
@@ -61,6 +72,65 @@ class ResourceAuthorizationControllerTest {
                 25L
         );
         jdbcTemplate.update("DELETE FROM sys_user WHERE username IN (?, ?)", PLATFORM_USER, TENANT_USER);
+        jdbcTemplate.update(
+                "DELETE FROM sys_menu WHERE tenant_id = ? AND resource_key LIKE ?",
+                "platform",
+                "ut.menu.%"
+        );
+    }
+
+    @Test
+    void updateSystemResourceShouldRejectIdentityFieldChanges() throws Exception {
+        mockMvc.perform(put("/api/resources/{resourceId}", 20L)
+                        .with(bearer(principal("platform", Set.of("system:write"))))
+                        .header("X-Tenant-Id", "platform")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "parentId": 1,
+                                  "resourceType": "DIR",
+                                  "resourceKey": "system-renamed",
+                                  "resourceName": "系统模块",
+                                  "routeKey": null,
+                                  "grantKey": null,
+                                  "path": null,
+                                  "component": null,
+                                  "icon": "Setting",
+                                  "orderNo": 20,
+                                  "visible": true,
+                                  "enabled": true
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"))
+                .andExpect(jsonPath("$.message").value("系统资源不允许修改资源键"));
+    }
+
+    @Test
+    void createMenuShouldRejectDuplicateRouteKey() throws Exception {
+        mockMvc.perform(post("/api/resources")
+                        .with(bearer(principal("platform", Set.of("system:write"))))
+                        .header("X-Tenant-Id", "platform")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "parentId": 20,
+                                  "resourceType": "MENU",
+                                  "resourceKey": "ut.duplicate.route",
+                                  "resourceName": "UT Duplicate Route",
+                                  "routeKey": "users",
+                                  "grantKey": "user:read",
+                                  "path": "/ut/duplicate-route",
+                                  "component": "UsersView",
+                                  "icon": null,
+                                  "orderNo": 999,
+                                  "visible": true,
+                                  "enabled": true
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"))
+                .andExpect(jsonPath("$.message").value("路由标识已存在"));
     }
 
     @Test
@@ -145,6 +215,99 @@ class ResourceAuthorizationControllerTest {
     }
 
     @Test
+    void createMenuShouldAllowGrantKeyReuseAndEvictPermissionSnapshots() throws Exception {
+        AtomicReference<String> tokenRef = new AtomicReference<>();
+
+        mockMvc.perform(post("/api/menus")
+                        .with(bearerWithSnapshotCapture(principal("platform", Set.of("system:write", "stale:grant")), tokenRef))
+                        .header("X-Tenant-Id", "platform")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "parentId": 21,
+                                  "menuType": "BUTTON",
+                                  "resourceKey": "ut.menu.reuse.button",
+                                  "menuName": "UT Reuse Button",
+                                  "routeKey": null,
+                                  "grantKey": "user:read",
+                                  "path": null,
+                                  "component": null,
+                                  "icon": null,
+                                  "orderNo": 999,
+                                  "visible": false,
+                                  "enabled": true
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.grantKey").value("user:read"));
+
+        Long count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_menu WHERE tenant_id = ? AND resource_key = ? AND grant_key = ?",
+                Long.class,
+                "platform",
+                "ut.menu.reuse.button",
+                "user:read"
+        );
+        assertThat(count).isEqualTo(1L);
+        verify(authPrincipalCacheService).evictAll();
+
+        SaSession tokenSession = StpUtil.getTokenSessionByToken(tokenRef.get());
+        assertThat(tokenSession.get("permissions")).isNull();
+        assertThat(tokenSession.get("permissionsTenantId")).isNull();
+        assertThat(tokenSession.get("roles")).isNull();
+    }
+
+    private RequestPostProcessor bearerWithSnapshotCapture(UserAccount user, AtomicReference<String> tokenRef) {
+        return request -> {
+            String token = StpUtil.createLoginSession(user.id(), new SaLoginModel().setDevice("mockmvc"));
+            SaSession tokenSession = StpUtil.getTokenSessionByToken(token);
+            tokenSession.set("username", user.username());
+            tokenSession.set("userId", user.id());
+            tokenSession.set("tenantId", user.tenantId());
+            tokenSession.set("activeTenantId", user.tenantId());
+            tokenSession.set("sessionVersion", user.sessionVersion());
+            tokenSession.set("roles", List.copyOf(user.roles()));
+            tokenSession.set("permissions", List.copyOf(user.permissions()));
+            tokenSession.set("permissionsTenantId", user.tenantId());
+            tokenSession.set("clientIp", "127.0.0.1");
+            tokenSession.set("device", "mockmvc");
+            long now = System.currentTimeMillis();
+            tokenSession.set("issuedAt", now);
+            tokenSession.set("expiresAt", now + 7 * 24 * 60 * 60 * 1000L);
+            tokenRef.set(token);
+            request.addHeader("Authorization", "Bearer " + token);
+            return request;
+        };
+    }
+
+    @Test
+    void tenantCannotMutatePlatformMenuTemplate() throws Exception {
+        mockMvc.perform(post("/api/menus")
+                        .with(bearer(principal("tenant-a", Set.of("system:write"))))
+                        .header("X-Tenant-Id", "tenant-a")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "parentId": 21,
+                                  "menuType": "BUTTON",
+                                  "resourceKey": "ut.menu.tenant.boundary",
+                                  "menuName": "UT Tenant Boundary",
+                                  "routeKey": null,
+                                  "grantKey": "user:read",
+                                  "path": null,
+                                  "component": null,
+                                  "icon": null,
+                                  "orderNo": 999,
+                                  "visible": false,
+                                  "enabled": true
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"))
+                .andExpect(jsonPath("$.message").value("仅平台租户允许维护菜单模板"));
+    }
+
+    @Test
     void assignRoleResourcesShouldAutoFillAncestors() throws Exception {
         Long roleId = createTempRole("tenant-a");
 
@@ -154,21 +317,21 @@ class ResourceAuthorizationControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "resourceIds": [24]
+                                  "resourceIds": [21]
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[?(@==1)]").exists())
-                .andExpect(jsonPath("$.data[?(@==30)]").exists())
-                .andExpect(jsonPath("$.data[?(@==24)]").exists());
+                .andExpect(jsonPath("$.data[?(@==20)]").exists())
+                .andExpect(jsonPath("$.data[?(@==21)]").exists());
 
         mockMvc.perform(get("/api/roles/{roleId}/resources", roleId)
                         .with(bearer(principal("tenant-a", Set.of("role:read"))))
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[?(@==1)]").exists())
-                .andExpect(jsonPath("$.data[?(@==30)]").exists())
-                .andExpect(jsonPath("$.data[?(@==24)]").exists());
+                .andExpect(jsonPath("$.data[?(@==20)]").exists())
+                .andExpect(jsonPath("$.data[?(@==21)]").exists());
     }
 
     @Test
@@ -190,7 +353,7 @@ class ResourceAuthorizationControllerTest {
                 .andExpect(jsonPath("$.data[?(@==21)]").exists());
 
         List<Long> assignedIds = jdbcTemplate.queryForList(
-                "SELECT resource_id FROM sys_role_resource WHERE tenant_id = ? AND role_id = ?",
+                "SELECT menu_id FROM sys_role_menu WHERE tenant_id = ? AND role_id = ?",
                 Long.class,
                 "tenant-a",
                 roleId
@@ -219,7 +382,7 @@ class ResourceAuthorizationControllerTest {
                 .andExpect(jsonPath("$.data[?(@==210)]").exists());
 
         List<Long> assignedIds = jdbcTemplate.queryForList(
-                "SELECT resource_id FROM sys_role_resource WHERE tenant_id = ? AND role_id = ?",
+                "SELECT menu_id FROM sys_role_menu WHERE tenant_id = ? AND role_id = ?",
                 Long.class,
                 "tenant-a",
                 roleId

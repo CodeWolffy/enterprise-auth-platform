@@ -68,6 +68,7 @@ public class TenantSwitchApplicationService {
         try {
             tokenSession.set("activeTenantId", normalizedTargetTenantId);
             tokenSession.delete("permissions");
+            tokenSession.delete("permissionsTenantId");
             tokenSession.delete("roles");
             switched = true;
             TenantContext.setTenantId(normalizedTargetTenantId);
@@ -89,6 +90,7 @@ public class TenantSwitchApplicationService {
             if (switched) {
                 tokenSession.set("activeTenantId", fromTenantId);
                 tokenSession.delete("permissions");
+                tokenSession.delete("permissionsTenantId");
                 tokenSession.delete("roles");
                 sessionIndexService.updateActiveTenant(sessionId, fromTenantId);
             }

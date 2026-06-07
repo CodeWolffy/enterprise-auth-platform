@@ -7,13 +7,14 @@ import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.modules.dept.application.DeptQueryFacade;
 import com.enterprise.auth.platform.modules.role.infrastructure.entity.SysRoleEntity;
+import com.enterprise.auth.platform.modules.role.infrastructure.entity.SysRoleMenuEntity;
 import com.enterprise.auth.platform.modules.user.application.UserQueryFacade;
 import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMapper;
-import com.enterprise.auth.platform.modules.role.interfaces.CreateRoleRequest;
+import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMenuMapper;
 import com.enterprise.auth.platform.modules.role.interfaces.CreateRoleRequest;
 import com.enterprise.auth.platform.modules.role.application.RolePayloadCodec;
-import com.enterprise.auth.platform.modules.resource.application.ResourceService;
-import com.enterprise.auth.platform.modules.auth.infrastructure.AuthPrincipalCacheService;
+import com.enterprise.auth.platform.modules.menu.application.MenuService;
+import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
 import com.enterprise.auth.platform.common.authz.SecuritySupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import java.util.List;
@@ -27,32 +28,35 @@ import org.springframework.util.StringUtils;
 public class RoleManagementService {
 
     private final SysRoleMapper sysRoleMapper;
+    private final SysRoleMenuMapper sysRoleMenuMapper;
     private final UserQueryFacade userQueryFacade;
     private final DeptQueryFacade deptQueryFacade;
     private final CatalogService catalogService;
     private final AuditService auditService;
-    private final AuthPrincipalCacheService authPrincipalCacheService;
+    private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
     private final RolePayloadCodec rolePayloadCodec;
-    private final ResourceService resourceService;
+    private final MenuService menuService;
 
     public RoleManagementService(
             SysRoleMapper sysRoleMapper,
+            SysRoleMenuMapper sysRoleMenuMapper,
             UserQueryFacade userQueryFacade,
             DeptQueryFacade deptQueryFacade,
             CatalogService catalogService,
             AuditService auditService,
-            AuthPrincipalCacheService authPrincipalCacheService,
+            AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
             RolePayloadCodec rolePayloadCodec,
-            ResourceService resourceService
+            MenuService menuService
     ) {
         this.sysRoleMapper = sysRoleMapper;
+        this.sysRoleMenuMapper = sysRoleMenuMapper;
         this.userQueryFacade = userQueryFacade;
         this.deptQueryFacade = deptQueryFacade;
         this.catalogService = catalogService;
         this.auditService = auditService;
-        this.authPrincipalCacheService = authPrincipalCacheService;
+        this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
         this.rolePayloadCodec = rolePayloadCodec;
-        this.resourceService = resourceService;
+        this.menuService = menuService;
     }
 
     @Transactional
@@ -90,20 +94,32 @@ public class RoleManagementService {
     }
 
     @Transactional
-    public Set<Long> assignResources(Long roleId, Set<Long> resourceIds) {
+    public Set<Long> assignMenus(Long roleId, Set<Long> menuIds) {
         String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
         SysRoleEntity entity = getRole(roleId, tenantId);
-        Set<Long> assigned = resourceService.assignRoleResources(tenantId, roleId, resourceIds);
+        Set<Long> assigned = menuService.expandMenuIdsWithAncestors(tenantId, menuIds);
+        sysRoleMenuMapper.delete(new LambdaQueryWrapper<SysRoleMenuEntity>()
+                .eq(SysRoleMenuEntity::getTenantId, tenantId)
+                .eq(SysRoleMenuEntity::getRoleId, roleId));
+        for (Long menuId : assigned) {
+            SysRoleMenuEntity relation = new SysRoleMenuEntity();
+            relation.setTenantId(tenantId);
+            relation.setRoleId(roleId);
+            relation.setMenuId(menuId);
+            relation.setCreatedBy(operator);
+            sysRoleMenuMapper.insert(relation);
+        }
         evictPrincipalsByRole(tenantId, roleId);
-        auditService.record("ROLE_RESOURCE_ASSIGNED", operator, tenantId, Map.of("roleId", entity.getId(), "roleCode", entity.getRoleCode(), "resourceIds", assigned));
+        auditService.record("ROLE_MENU_ASSIGNED", operator, tenantId,
+                Map.of("roleId", entity.getId(), "roleCode", entity.getRoleCode(), "menuIds", assigned));
         return assigned;
     }
 
-    public Set<Long> listAssignedResources(Long roleId) {
+    public Set<Long> listAssignedMenus(Long roleId) {
         String tenantId = currentTenantId();
         getRole(roleId, tenantId);
-        return resourceService.listRoleResourceIds(tenantId, roleId);
+        return listRoleMenuIds(tenantId, roleId);
     }
 
     @Transactional
@@ -117,8 +133,43 @@ public class RoleManagementService {
         }
 
         sysRoleMapper.deleteById(entity.getId());
+        sysRoleMenuMapper.delete(new LambdaQueryWrapper<SysRoleMenuEntity>()
+                .eq(SysRoleMenuEntity::getTenantId, tenantId)
+                .eq(SysRoleMenuEntity::getRoleId, roleId));
         evictPrincipalsByRole(tenantId, roleId);
         auditService.record("ROLE_DELETED", operator, tenantId, Map.of("roleId", roleId, "roleCode", entity.getRoleCode()));
+    }
+
+    public Set<Long> listRoleMenuIds(String tenantId, Long roleId) {
+        return sysRoleMenuMapper.selectList(new LambdaQueryWrapper<SysRoleMenuEntity>()
+                        .eq(SysRoleMenuEntity::getTenantId, tenantId)
+                        .eq(SysRoleMenuEntity::getRoleId, roleId))
+                .stream()
+                .map(SysRoleMenuEntity::getMenuId)
+                .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
+    }
+
+    public Set<Long> listMenuIdsByRoleCodes(String tenantId, Set<String> roleCodes) {
+        if (roleCodes == null || roleCodes.isEmpty()) {
+            return Set.of();
+        }
+        List<Long> roleIds = sysRoleMapper.selectList(new LambdaQueryWrapper<SysRoleEntity>()
+                        .eq(SysRoleEntity::getTenantId, tenantId)
+                        .eq(SysRoleEntity::getDeleted, 0)
+                        .in(SysRoleEntity::getRoleCode, roleCodes))
+                .stream()
+                .map(SysRoleEntity::getId)
+                .distinct()
+                .toList();
+        if (roleIds.isEmpty()) {
+            return Set.of();
+        }
+        return sysRoleMenuMapper.selectList(new LambdaQueryWrapper<SysRoleMenuEntity>()
+                        .eq(SysRoleMenuEntity::getTenantId, tenantId)
+                        .in(SysRoleMenuEntity::getRoleId, roleIds))
+                .stream()
+                .map(SysRoleMenuEntity::getMenuId)
+                .collect(java.util.stream.Collectors.toCollection(java.util.LinkedHashSet::new));
     }
 
     private void applyDataScope(SysRoleEntity entity, String tenantId, DataScopeType scopeType, List<Long> customDeptIds) {
@@ -151,7 +202,7 @@ public class RoleManagementService {
             return;
         }
         for (var user : users) {
-            authPrincipalCacheService.evictByUser(user.getId(), user.getTenantId(), user.getUsername());
+            permissionSnapshotInvalidationService.invalidateUser(user.getId(), user.getTenantId(), user.getUsername());
         }
     }
 

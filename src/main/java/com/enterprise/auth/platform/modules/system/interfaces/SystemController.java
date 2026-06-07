@@ -10,6 +10,7 @@ import com.enterprise.auth.platform.modules.system.interfaces.NoticeCrudRequest;
 import com.enterprise.auth.platform.modules.system.application.CategoryRuleApplicationService;
 import com.enterprise.auth.platform.modules.system.application.ConfigApplicationService;
 import com.enterprise.auth.platform.modules.system.application.DictApplicationService;
+import com.enterprise.auth.platform.modules.system.application.DictValueApplicationService;
 import com.enterprise.auth.platform.modules.system.application.NoticeApplicationService;
 import com.enterprise.auth.platform.modules.system.application.SystemViewModels;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,17 +37,20 @@ import org.springframework.web.bind.annotation.RestController;
 public class SystemController {
 
     private final DictApplicationService dictApplicationService;
+    private final DictValueApplicationService dictValueApplicationService;
     private final ConfigApplicationService configApplicationService;
     private final NoticeApplicationService noticeApplicationService;
     private final CategoryRuleApplicationService categoryRuleApplicationService;
 
     public SystemController(
             DictApplicationService dictApplicationService,
+            DictValueApplicationService dictValueApplicationService,
             ConfigApplicationService configApplicationService,
             NoticeApplicationService noticeApplicationService,
             CategoryRuleApplicationService categoryRuleApplicationService
     ) {
         this.dictApplicationService = dictApplicationService;
+        this.dictValueApplicationService = dictValueApplicationService;
         this.configApplicationService = configApplicationService;
         this.noticeApplicationService = noticeApplicationService;
         this.categoryRuleApplicationService = categoryRuleApplicationService;
@@ -161,6 +165,28 @@ public class SystemController {
     @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
     public ApiResponse<Void> deleteDict(@Parameter(description = "字典 ID") @PathVariable Long id) {
         dictApplicationService.deleteDict(id);
+        return ApiResponse.ok();
+    }
+
+    @Operation(summary = "按字典类型查询字典值列表")
+    @GetMapping("/dicts/values")
+    @SaCheckPermission(PermissionCodes.SYSTEM_READ)
+    public ApiResponse<List<SystemViewModels.DictValueView>> dictValues(
+            @Parameter(description = "字典类型") @RequestParam String dictType
+    ) {
+        return ApiResponse.ok(dictValueApplicationService.listByType(dictType).stream()
+                .map(v -> new SystemViewModels.DictValueView(
+                        v.getId(), v.getDictId(), v.getDictType(),
+                        v.getDictLabel(), v.getDictValue(), v.getSort(),
+                        v.getShowClass(), v.getEnabled() != null && v.getEnabled() == 1))
+                .toList());
+    }
+
+    @Operation(summary = "刷新字典缓存")
+    @DeleteMapping("/dicts/cache")
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
+    public ApiResponse<Void> evictDictCache() {
+        dictValueApplicationService.refreshCache();
         return ApiResponse.ok();
     }
 
