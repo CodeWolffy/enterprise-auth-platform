@@ -18,6 +18,7 @@ import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMa
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,7 +47,6 @@ class FileControllerP1Test {
     private static final String PLATFORM_TENANT_ID = "platform";
     private static final String OTHER_FILE_KEY = "file_p1_other_tenant_ut";
     private static final String OTHER_OBJECT_KEY = "tenant/tenant-b/file_p1_other_tenant_ut.png";
-    private static final String PLATFORM_ADMIN_ROLE = "FILE_P1_PLATFORM_ADMIN_UT";
 
     @Autowired
     private MockMvc mockMvc;
@@ -67,7 +67,6 @@ class FileControllerP1Test {
     void setUp() throws Exception {
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username = ?", TENANT_ID, USERNAME);
         jdbcTemplate.update("DELETE ur FROM sys_user_role ur JOIN sys_user u ON ur.user_id = u.id WHERE ur.tenant_id = ? AND u.username = ?", PLATFORM_TENANT_ID, PLATFORM_ADMIN_USERNAME);
-        jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id = ? AND role_code = ?", PLATFORM_TENANT_ID, PLATFORM_ADMIN_ROLE);
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username = ?", PLATFORM_TENANT_ID, PLATFORM_ADMIN_USERNAME);
         SysUserEntity entity = new SysUserEntity();
         entity.setTenantId(TENANT_ID);
@@ -86,7 +85,6 @@ class FileControllerP1Test {
         jdbcTemplate.update("DELETE FROM sys_storage_file WHERE tenant_id = ? AND owner_user_id = ?", TENANT_ID, userId);
         jdbcTemplate.update("DELETE FROM sys_storage_file WHERE file_key = ?", OTHER_FILE_KEY);
         jdbcTemplate.update("DELETE FROM sys_user_role WHERE tenant_id = ? AND user_id = ?", PLATFORM_TENANT_ID, platformAdminUserId);
-        jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id = ? AND role_code = ?", PLATFORM_TENANT_ID, PLATFORM_ADMIN_ROLE);
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username = ?", PLATFORM_TENANT_ID, PLATFORM_ADMIN_USERNAME);
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username = ?", TENANT_ID, USERNAME);
         Files.deleteIfExists(Path.of("target/test-files", OTHER_OBJECT_KEY));
@@ -245,18 +243,10 @@ class FileControllerP1Test {
         entity.setEnabled(1);
         entity.setSessionVersion(1);
         sysUserMapper.insert(entity);
-        jdbcTemplate.update(
-                "INSERT INTO sys_role(tenant_id, role_code, role_name, data_scope_type, deleted, created_at, updated_at) VALUES(?,?,?,?,0,NOW(),NOW())",
-                PLATFORM_TENANT_ID,
-                PLATFORM_ADMIN_ROLE,
-                "文件平台管理员测试角色",
-                "ALL"
-        );
         Long roleId = jdbcTemplate.queryForObject(
-                "SELECT id FROM sys_role WHERE tenant_id = ? AND role_code = ?",
+                "SELECT id FROM sys_role WHERE tenant_id = ? AND role_code = 'ADMIN' AND deleted = 0",
                 Long.class,
-                PLATFORM_TENANT_ID,
-                PLATFORM_ADMIN_ROLE
+                PLATFORM_TENANT_ID
         );
         jdbcTemplate.update(
                 "INSERT INTO sys_user_role(tenant_id, user_id, role_id, created_at, updated_at) VALUES(?,?,?,?,?)",

@@ -113,11 +113,11 @@
           :width="roleTablePrefs.getColumnWidth('dataScopeType')"
         />
         <el-table-column
-          v-if="roleTablePrefs.visibleColumnMap.resourceCount"
-          column-key="resourceCount"
+          v-if="roleTablePrefs.visibleColumnMap.menuCount"
+          column-key="menuCount"
           label="权限数"
           min-width="100"
-          :width="roleTablePrefs.getColumnWidth('resourceCount')"
+          :width="roleTablePrefs.getColumnWidth('menuCount')"
         >
           <template #default="{ row }">{{ assignedCountByRoleId[row.id] ?? 0 }}</template>
         </el-table-column>
@@ -125,7 +125,7 @@
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button v-permission="'role:write'" link type="primary" @click="openRole(row)">编辑</el-button>
-            <el-button v-permission="'role:write'" link type="primary" @click="openResourceAssignment(row)">分配权限</el-button>
+            <el-button v-permission="'role:write'" link type="primary" @click="openMenuAssignment(row)">分配权限</el-button>
             <el-button v-permission="'role:write'" link type="danger" @click="removeRole(row.id)">删除</el-button>
           </template>
         </el-table-column>
@@ -154,7 +154,7 @@
           <el-descriptions-item label="角色名称">{{ detailRole.name }}</el-descriptions-item>
           <el-descriptions-item label="数据范围">{{ detailRole.dataScopeType }}</el-descriptions-item>
           <el-descriptions-item label="自定义部门">{{ detailRole.customDeptIds?.length || 0 }}</el-descriptions-item>
-          <el-descriptions-item label="已分配权限">{{ assignedResourceIds.length }}</el-descriptions-item>
+          <el-descriptions-item label="已分配权限">{{ assignedMenuIds.length }}</el-descriptions-item>
           <el-descriptions-item label="角色描述" :span="2">{{ detailRole.description || '-' }}</el-descriptions-item>
         </el-descriptions>
 
@@ -167,24 +167,24 @@
         <div class="tree-panel drawer-section drawer-section--history">
           <div class="tree-panel__head">
             <strong>权限树</strong>
-            <span>{{ assignedResourceIds.length }} 个菜单/权限节点</span>
+            <span>{{ assignedMenuIds.length }} 个菜单/权限节点</span>
           </div>
-          <div class="resource-summary">
-            <el-tag v-for="item in detailResourceSummary" :key="item.type" effect="plain">
+          <div class="menu-summary">
+            <el-tag v-for="item in detailMenuSummary" :key="item.type" effect="plain">
               {{ typeLabel(item.type) }} / {{ item.count }}
             </el-tag>
           </div>
           <el-tree
-            :data="detailResourceTree"
+            :data="detailMenuTree"
             node-key="id"
             default-expand-all
             :props="{ children: 'children', label: 'label' }"
-            empty-text="暂无资源"
+            empty-text="暂无菜单"
           >
             <template #default="{ data }">
-              <div class="resource-node">
+              <div class="menu-node">
                 <span>{{ data.label }}</span>
-                <el-tag size="small" effect="plain">{{ typeLabel(data.resourceType) }}</el-tag>
+                <el-tag size="small" effect="plain">{{ typeLabel(data.menuType) }}</el-tag>
               </div>
             </template>
           </el-tree>
@@ -237,27 +237,27 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="resourceVisible" title="分配角色权限" width="800px">
+    <el-dialog v-model="menuVisible" title="分配角色权限" width="800px">
       <div class="assignment-toolbar">
-        <el-input v-model="resourceKeyword" placeholder="筛选菜单名、编码或授权标识" clearable />
+        <el-input v-model="menuKeyword" placeholder="筛选菜单名、编码或授权标识" clearable />
         <div class="assignment-toolbar__actions">
           <el-button @click="expandAll">全部展开</el-button>
           <el-button @click="collapseAll">全部折叠</el-button>
-          <el-button :disabled="focusedResourceId == null" @click="selectFocusedDescendants">全选当前子级</el-button>
+          <el-button :disabled="focusedMenuId == null" @click="selectFocusedDescendants">全选当前子级</el-button>
           <el-button @click="selectByTypes(['DIR', 'MENU'])">全选菜单模块</el-button>
           <el-button @click="selectByTypes(['BUTTON', 'API'])">全选操作权限</el-button>
-          <el-button @click="clearResourceSelection">清空选择</el-button>
-          <span class="assignment-toolbar__meta">共 {{ allResourceCount }} 个菜单/权限节点</span>
+          <el-button @click="clearMenuSelection">清空选择</el-button>
+          <span class="assignment-toolbar__meta">共 {{ allMenuCount }} 个菜单/权限节点</span>
         </div>
-        <div class="resource-summary">
-          <el-tag v-for="item in selectedResourceSummary" :key="item.type" effect="plain">
+        <div class="menu-summary">
+          <el-tag v-for="item in selectedMenuSummary" :key="item.type" effect="plain">
             {{ typeLabel(item.type) }} / {{ item.count }}
           </el-tag>
         </div>
       </div>
       <el-tree
-        ref="resourceTreeRef"
-        :data="filteredResourceTree"
+        ref="menuTreeRef"
+        :data="filteredMenuTree"
         show-checkbox
         check-strictly
         highlight-current
@@ -265,14 +265,14 @@
         default-expand-all
         :props="{ children: 'children', label: 'label' }"
         class="permission-tree"
-        @check="syncSelectedResourceIds"
-        @node-click="handleResourceNodeClick"
+        @check="syncSelectedMenuIds"
+        @node-click="handleMenuNodeClick"
       >
         <template #default="{ data }">
-          <div class="resource-node">
+          <div class="menu-node">
             <span>{{ data.label }}</span>
-            <div class="resource-node__meta">
-              <el-tag size="small" effect="plain">{{ typeLabel(data.resourceType) }}</el-tag>
+            <div class="menu-node__meta">
+              <el-tag size="small" effect="plain">{{ typeLabel(data.menuType) }}</el-tag>
               <el-tag v-if="data.grantKey" size="small" type="success" effect="plain">{{ data.grantKey }}</el-tag>
               <el-tag v-if="data.path" size="small" type="info" effect="plain">{{ data.path }}</el-tag>
             </div>
@@ -280,8 +280,8 @@
         </template>
       </el-tree>
       <template #footer>
-        <el-button @click="resourceVisible = false">取消</el-button>
-        <el-button v-permission="'role:write'" type="primary" @click="submitResourceAssignment">保存</el-button>
+        <el-button @click="menuVisible = false">取消</el-button>
+        <el-button v-permission="'role:write'" type="primary" @click="submitMenuAssignment">保存</el-button>
       </template>
     </el-dialog>
   </div>
@@ -307,35 +307,35 @@ import type { DepartmentView } from '@/types/dept'
 import type { MenuTreeNode, MenuType } from '@/api/modules/menu'
 import type { RoleView } from '@/types/role'
 
-type ResourceDisplayNode = {
+type MenuDisplayNode = {
   id: number
   label: string
-  resourceKey: string
-  resourceType: MenuType
+  menuKey: string
+  menuType: MenuType
   grantKey?: string
   path?: string
-  children?: ResourceDisplayNode[]
+  children?: MenuDisplayNode[]
 }
 
 const roles = ref<RoleView[]>([])
-const resources = ref<MenuTreeNode[]>([])
+const menus = ref<MenuTreeNode[]>([])
 const departments = ref<DepartmentView[]>([])
-const resourceTreeRef = ref<any>(null)
+const menuTreeRef = ref<any>(null)
 const formRef = ref<FormInstance>()
 const roleVisible = ref(false)
-const resourceVisible = ref(false)
+const menuVisible = ref(false)
 const detailVisible = ref(false)
 const editingRoleId = ref<number | null>(null)
-const resourceTargetRoleId = ref<number | null>(null)
+const menuTargetRoleId = ref<number | null>(null)
 const detailRole = ref<RoleView | null>(null)
-const assignedResourceIds = ref<number[]>([])
+const assignedMenuIds = ref<number[]>([])
 const assignedCountByRoleId = reactive<Record<number, number>>({})
-const focusedResourceId = ref<number | null>(null)
+const focusedMenuId = ref<number | null>(null)
 const loading = ref(false)
 const keyword = ref('')
 const scopeFilter = ref('')
-const resourceKeyword = ref('')
-const selectedResourceIds = ref<number[]>([])
+const menuKeyword = ref('')
+const selectedMenuIds = ref<number[]>([])
 const page = ref(1)
 const size = ref(10)
 
@@ -368,16 +368,16 @@ const roleRules = reactive<FormRules>({
   ],
 })
 
-const resourceTreeData = computed(() => toResourceDisplayTree(resources.value))
-const detailResourceTree = computed(() => filterTreeBySelected(resourceTreeData.value, new Set(assignedResourceIds.value)))
+const menuTreeData = computed(() => toMenuDisplayTree(menus.value))
+const detailMenuTree = computed(() => filterTreeBySelected(menuTreeData.value, new Set(assignedMenuIds.value)))
 const departmentTree = computed(() => buildDepartmentTree(departments.value))
 
-const filteredResourceTree = computed(() => {
-  const normalizedKeyword = resourceKeyword.value.trim().toLowerCase()
+const filteredMenuTree = computed(() => {
+  const normalizedKeyword = menuKeyword.value.trim().toLowerCase()
   if (!normalizedKeyword) {
-    return resourceTreeData.value
+    return menuTreeData.value
   }
-  return filterTreeByKeyword(resourceTreeData.value, normalizedKeyword)
+  return filterTreeByKeyword(menuTreeData.value, normalizedKeyword)
 })
 
 const filteredRoles = computed(() =>
@@ -396,21 +396,21 @@ const pagedRoles = computed(() => {
   return filteredRoles.value.slice(start, start + size.value)
 })
 
-const detailResourceSummary = computed(() => summarizeByType(new Set(assignedResourceIds.value), resourceTreeData.value))
-const selectedResourceSummary = computed(() => summarizeByType(new Set(selectedResourceIds.value), resourceTreeData.value))
+const detailMenuSummary = computed(() => summarizeByType(new Set(assignedMenuIds.value), menuTreeData.value))
+const selectedMenuSummary = computed(() => summarizeByType(new Set(selectedMenuIds.value), menuTreeData.value))
 const allScopeCount = computed(() => filteredRoles.value.filter((item) => item.dataScopeType === 'ALL').length)
 const deptScopeCount = computed(() =>
   filteredRoles.value.filter((item) => item.dataScopeType === 'DEPT_AND_CHILDREN' || item.dataScopeType === 'DEPT').length,
 )
 const customScopeCount = computed(() => filteredRoles.value.filter((item) => item.dataScopeType === 'CUSTOM').length)
-const allResourceCount = computed(() => flattenTree(resourceTreeData.value).length)
+const allMenuCount = computed(() => flattenTree(menuTreeData.value).length)
 
 const roleTablePrefs = useTablePreferences('eap.table.roles', [
   { key: 'code', label: '角色编码', width: 140 },
   { key: 'name', label: '角色名称', width: 160 },
   { key: 'description', label: '角色描述', width: 220 },
   { key: 'dataScopeType', label: '数据范围', width: 140 },
-  { key: 'resourceCount', label: '权限数', width: 100 },
+  { key: 'menuCount', label: '权限数', width: 100 },
   { key: 'actions', label: '操作', width: 320 },
 ])
 
@@ -419,9 +419,9 @@ void load()
 async function load() {
   loading.value = true
   try {
-    const [roleList, resourceTree, departmentList] = await Promise.all([queryRoles(), queryGrantableMenuTree(), queryDepartments()])
+    const [roleList, menuTree, departmentList] = await Promise.all([queryRoles(), queryGrantableMenuTree(), queryDepartments()])
     roles.value = roleList
-    resources.value = resourceTree
+    menus.value = menuTree
     departments.value = departmentList
   } finally {
     loading.value = false
@@ -456,8 +456,8 @@ function openRole(row?: RoleView) {
 
 async function openDetail(row: RoleView) {
   detailRole.value = row
-  assignedResourceIds.value = await queryAssignedRoleMenus(row.id)
-  assignedCountByRoleId[row.id] = assignedResourceIds.value.length
+  assignedMenuIds.value = await queryAssignedRoleMenus(row.id)
+  assignedCountByRoleId[row.id] = assignedMenuIds.value.length
   detailVisible.value = true
 }
 
@@ -484,33 +484,33 @@ async function submitRole() {
   await load()
 }
 
-async function openResourceAssignment(row: RoleView) {
-  resourceTargetRoleId.value = row.id
+async function openMenuAssignment(row: RoleView) {
+  menuTargetRoleId.value = row.id
   const assignedIds = await queryAssignedRoleMenus(row.id)
   assignedCountByRoleId[row.id] = assignedIds.length
-  resourceVisible.value = true
-  resourceKeyword.value = ''
-  focusedResourceId.value = null
+  menuVisible.value = true
+  menuKeyword.value = ''
+  focusedMenuId.value = null
   await nextTick()
-  resourceTreeRef.value?.setCheckedKeys(assignedIds)
-  selectedResourceIds.value = [...assignedIds]
+  menuTreeRef.value?.setCheckedKeys(assignedIds)
+  selectedMenuIds.value = [...assignedIds]
 }
 
-async function submitResourceAssignment() {
-  if (!resourceTargetRoleId.value) {
+async function submitMenuAssignment() {
+  if (!menuTargetRoleId.value) {
     return
   }
-  const selectedIds = ((resourceTreeRef.value?.getCheckedKeys(false) || []) as Array<string | number>)
+  const selectedIds = ((menuTreeRef.value?.getCheckedKeys(false) || []) as Array<string | number>)
     .map((item) => Number(item))
     .filter((item) => Number.isFinite(item))
 
-  const assignedIds = await assignRoleMenus(resourceTargetRoleId.value, selectedIds)
-  assignedCountByRoleId[resourceTargetRoleId.value] = assignedIds.length
-  resourceVisible.value = false
+  const assignedIds = await assignRoleMenus(menuTargetRoleId.value, selectedIds)
+  assignedCountByRoleId[menuTargetRoleId.value] = assignedIds.length
+  menuVisible.value = false
   ElMessage.success('角色权限已更新')
 
-  if (detailRole.value?.id === resourceTargetRoleId.value) {
-    assignedResourceIds.value = assignedIds
+  if (detailRole.value?.id === menuTargetRoleId.value) {
+    assignedMenuIds.value = assignedIds
   }
 }
 
@@ -522,47 +522,47 @@ function collapseAll() {
   setTreeExpanded(false)
 }
 
-function syncSelectedResourceIds() {
-  selectedResourceIds.value = ((resourceTreeRef.value?.getCheckedKeys(false) || []) as Array<string | number>)
+function syncSelectedMenuIds() {
+  selectedMenuIds.value = ((menuTreeRef.value?.getCheckedKeys(false) || []) as Array<string | number>)
     .map((item) => Number(item))
     .filter((item) => Number.isFinite(item))
 }
 
-function handleResourceNodeClick(data: ResourceDisplayNode) {
-  focusedResourceId.value = data.id
+function handleMenuNodeClick(data: MenuDisplayNode) {
+  focusedMenuId.value = data.id
 }
 
 function selectFocusedDescendants() {
-  if (focusedResourceId.value == null) {
+  if (focusedMenuId.value == null) {
     return
   }
-  const focused = findResourceNode(resourceTreeData.value, focusedResourceId.value)
+  const focused = findMenuNode(menuTreeData.value, focusedMenuId.value)
   if (!focused) {
     return
   }
-  const checked = new Set<number>(selectedResourceIds.value)
+  const checked = new Set<number>(selectedMenuIds.value)
   collectNodeAndDescendantIds(focused).forEach((id) => checked.add(id))
   const checkedIds = Array.from(checked)
-  resourceTreeRef.value?.setCheckedKeys(checkedIds)
-  selectedResourceIds.value = checkedIds
+  menuTreeRef.value?.setCheckedKeys(checkedIds)
+  selectedMenuIds.value = checkedIds
 }
 
 function selectByTypes(types: MenuType[]) {
   const targetTypes = new Set<MenuType>(types)
-  const checked = new Set<number>(selectedResourceIds.value)
-  for (const node of flattenTree(resourceTreeData.value)) {
-    if (targetTypes.has(node.resourceType)) {
+  const checked = new Set<number>(selectedMenuIds.value)
+  for (const node of flattenTree(menuTreeData.value)) {
+    if (targetTypes.has(node.menuType)) {
       checked.add(node.id)
     }
   }
   const checkedIds = Array.from(checked)
-  resourceTreeRef.value?.setCheckedKeys(checkedIds)
-  selectedResourceIds.value = checkedIds
+  menuTreeRef.value?.setCheckedKeys(checkedIds)
+  selectedMenuIds.value = checkedIds
 }
 
-function clearResourceSelection() {
-  resourceTreeRef.value?.setCheckedKeys([])
-  selectedResourceIds.value = []
+function clearMenuSelection() {
+  menuTreeRef.value?.setCheckedKeys([])
+  selectedMenuIds.value = []
 }
 
 async function removeRole(id: number) {
@@ -573,7 +573,7 @@ async function removeRole(id: number) {
 }
 
 function setTreeExpanded(expanded: boolean) {
-  const treeStore = (resourceTreeRef.value as unknown as { store?: { nodesMap?: Record<string, { expanded: boolean }> } })?.store
+  const treeStore = (menuTreeRef.value as unknown as { store?: { nodesMap?: Record<string, { expanded: boolean }> } })?.store
   if (!treeStore?.nodesMap) {
     return
   }
@@ -582,24 +582,24 @@ function setTreeExpanded(expanded: boolean) {
   })
 }
 
-function toResourceDisplayTree(source: MenuTreeNode[]): ResourceDisplayNode[] {
+function toMenuDisplayTree(source: MenuTreeNode[]): MenuDisplayNode[] {
   return source.map((item) => ({
     id: item.id,
     label: `${item.menuName} (${item.resourceKey})`,
-    resourceKey: item.resourceKey,
-    resourceType: item.menuType,
+    menuKey: item.resourceKey,
+    menuType: item.menuType,
     grantKey: item.grantKey || undefined,
     path: item.path || undefined,
-    children: item.children?.length ? toResourceDisplayTree(item.children) : undefined,
+    children: item.children?.length ? toMenuDisplayTree(item.children) : undefined,
   }))
 }
 
-function findResourceNode(nodes: ResourceDisplayNode[], id: number): ResourceDisplayNode | null {
+function findMenuNode(nodes: MenuDisplayNode[], id: number): MenuDisplayNode | null {
   for (const node of nodes) {
     if (node.id === id) {
       return node
     }
-    const child = node.children?.length ? findResourceNode(node.children, id) : null
+    const child = node.children?.length ? findMenuNode(node.children, id) : null
     if (child) {
       return child
     }
@@ -607,9 +607,9 @@ function findResourceNode(nodes: ResourceDisplayNode[], id: number): ResourceDis
   return null
 }
 
-function collectNodeAndDescendantIds(node: ResourceDisplayNode) {
+function collectNodeAndDescendantIds(node: MenuDisplayNode) {
   const ids: number[] = []
-  const walk = (item: ResourceDisplayNode) => {
+  const walk = (item: MenuDisplayNode) => {
     ids.push(item.id)
     item.children?.forEach(walk)
   }
@@ -617,9 +617,9 @@ function collectNodeAndDescendantIds(node: ResourceDisplayNode) {
   return ids
 }
 
-function flattenTree(nodes: ResourceDisplayNode[]): ResourceDisplayNode[] {
-  const result: ResourceDisplayNode[] = []
-  const walk = (items: ResourceDisplayNode[]) => {
+function flattenTree(nodes: MenuDisplayNode[]): MenuDisplayNode[] {
+  const result: MenuDisplayNode[] = []
+  const walk = (items: MenuDisplayNode[]) => {
     for (const item of items) {
       result.push(item)
       if (item.children?.length) {
@@ -631,13 +631,13 @@ function flattenTree(nodes: ResourceDisplayNode[]): ResourceDisplayNode[] {
   return result
 }
 
-function filterTreeByKeyword(nodes: ResourceDisplayNode[], keywordValue: string): ResourceDisplayNode[] {
-  const filtered: ResourceDisplayNode[] = []
+function filterTreeByKeyword(nodes: MenuDisplayNode[], keywordValue: string): MenuDisplayNode[] {
+  const filtered: MenuDisplayNode[] = []
   for (const node of nodes) {
     const children = node.children ? filterTreeByKeyword(node.children, keywordValue) : []
     const matched =
       node.label.toLowerCase().includes(keywordValue) ||
-      node.resourceType.toLowerCase().includes(keywordValue) ||
+      node.menuType.toLowerCase().includes(keywordValue) ||
       (node.path || '').toLowerCase().includes(keywordValue) ||
       (node.grantKey || '').toLowerCase().includes(keywordValue)
     if (matched || children.length > 0) {
@@ -650,8 +650,8 @@ function filterTreeByKeyword(nodes: ResourceDisplayNode[], keywordValue: string)
   return filtered
 }
 
-function filterTreeBySelected(nodes: ResourceDisplayNode[], selectedIds: Set<number>): ResourceDisplayNode[] {
-  const filtered: ResourceDisplayNode[] = []
+function filterTreeBySelected(nodes: MenuDisplayNode[], selectedIds: Set<number>): MenuDisplayNode[] {
+  const filtered: MenuDisplayNode[] = []
   for (const node of nodes) {
     const children = node.children ? filterTreeBySelected(node.children, selectedIds) : []
     const matched = selectedIds.has(node.id)
@@ -665,13 +665,13 @@ function filterTreeBySelected(nodes: ResourceDisplayNode[], selectedIds: Set<num
   return filtered
 }
 
-function summarizeByType(selectedIds: Set<number>, tree: ResourceDisplayNode[]) {
+function summarizeByType(selectedIds: Set<number>, tree: MenuDisplayNode[]) {
   const counter = new Map<MenuType, number>()
   for (const node of flattenTree(tree)) {
     if (!selectedIds.has(node.id)) {
       continue
     }
-    counter.set(node.resourceType, (counter.get(node.resourceType) || 0) + 1)
+    counter.set(node.menuType, (counter.get(node.menuType) || 0) + 1)
   }
   return Array.from(counter.entries()).map(([type, count]) => ({ type, count }))
 }
@@ -729,7 +729,7 @@ function onRoleHeaderDragEnd(newWidth: number, _oldWidth: number, column: { prop
   flex-wrap: wrap;
 }
 
-.resource-node {
+.menu-node {
   width: 100%;
   display: flex;
   justify-content: space-between;
@@ -737,7 +737,7 @@ function onRoleHeaderDragEnd(newWidth: number, _oldWidth: number, column: { prop
   gap: 12px;
 }
 
-.resource-node__meta {
+.menu-node__meta {
   display: flex;
   align-items: center;
   gap: 8px;

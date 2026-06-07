@@ -155,16 +155,16 @@ class AuthorizationBoundaryTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
-        mockMvc.perform(post("/api/resources")
+        mockMvc.perform(post("/api/menus")
                         .with(bearer(principal(Set.of("system:read"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "parentId": 20,
-                                  "resourceType": "MENU",
+                                  "menuType": "MENU",
                                   "resourceKey": "auth.boundary",
-                                  "resourceName": "Auth Boundary",
+                                  "menuName": "Auth Boundary",
                                   "routeKey": "auth-boundary",
                                   "grantKey": "auth:read",
                                   "path": "/auth-boundary",

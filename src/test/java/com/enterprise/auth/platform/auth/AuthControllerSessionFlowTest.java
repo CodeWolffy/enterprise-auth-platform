@@ -122,7 +122,6 @@ class AuthControllerSessionFlowTest {
         }
         jdbcTemplate.update("DELETE FROM sys_user_role WHERE tenant_id = ? AND user_id IN (SELECT id FROM sys_user WHERE tenant_id = ? AND username = ?)", "tenant-a", "tenant-a", TENANT_USER);
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username = ?", "tenant-a", TENANT_USER);
-        jdbcTemplate.update("DELETE FROM sys_tenant_resource_override WHERE tenant_id = ? AND resource_id = ? AND title_override = ?", TENANT_A, 10L, "租户A总览");
         jdbcTemplate.update("DELETE FROM sys_dict WHERE tenant_id = ? AND dict_type = ? AND dict_code = ?", TENANT_A, "tenant_context_audit", "tenant_context_audit_ut");
         jdbcTemplate.update("DELETE FROM sys_audit_log WHERE request_id = ?", "tenant-context-audit-ut");
         jdbcTemplate.update("DELETE FROM sys_audit_log WHERE request_id = ?", "tenant-switch-ut");
@@ -255,17 +254,6 @@ class AuthControllerSessionFlowTest {
 
     @Test
     void platformAdminMeShouldUseSwitchedTenantSnapshot() throws Exception {
-        jdbcTemplate.update(
-                "INSERT INTO sys_tenant_resource_override (tenant_id, resource_id, enabled, visible, title_override, created_by, updated_by) " +
-                        "VALUES (?, ?, ?, ?, ?, 'test', 'test') " +
-                        "ON DUPLICATE KEY UPDATE enabled = VALUES(enabled), visible = VALUES(visible), title_override = VALUES(title_override), updated_by = VALUES(updated_by)",
-                TENANT_A,
-                10L,
-                0,
-                0,
-                "租户A总览"
-        );
-
         String token = extractToken(loginAsAdmin());
         mockMvc.perform(post("/api/auth/tenants/{tenantId}/switch", TENANT_A)
                         .header("Authorization", "Bearer " + token))

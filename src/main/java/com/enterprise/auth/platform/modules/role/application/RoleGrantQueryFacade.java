@@ -27,10 +27,6 @@ public class RoleGrantQueryFacade {
         return menuService.resolveMenuTree(activeTenantId, menuIds, superAdmin);
     }
 
-    public Set<Long> listRoleResourceIds(Long roleId) {
-        return menuService.filterGrantableMenuIds(currentTenantId(), roleManagementService.listAssignedMenus(roleId));
-    }
-
     public Set<Long> listRoleMenuIds(Long roleId) {
         return menuService.filterGrantableMenuIds(currentTenantId(), roleManagementService.listRoleMenuIds(currentTenantId(), roleId));
     }

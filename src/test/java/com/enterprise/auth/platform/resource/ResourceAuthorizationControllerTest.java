@@ -66,11 +66,6 @@ class ResourceAuthorizationControllerTest {
             jdbcTemplate.update("DELETE FROM sys_role_menu WHERE tenant_id = ? AND role_id IN (" + inClause + ")", "tenant-a");
             jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id = ? AND id IN (" + inClause + ")", "tenant-a");
         }
-        jdbcTemplate.update(
-                "DELETE FROM sys_tenant_resource_override WHERE tenant_id = ? AND resource_id = ?",
-                "tenant-a",
-                25L
-        );
         jdbcTemplate.update("DELETE FROM sys_user WHERE username IN (?, ?)", PLATFORM_USER, TENANT_USER);
         jdbcTemplate.update(
                 "DELETE FROM sys_menu WHERE tenant_id = ? AND resource_key LIKE ?",
@@ -80,17 +75,17 @@ class ResourceAuthorizationControllerTest {
     }
 
     @Test
-    void updateSystemResourceShouldRejectIdentityFieldChanges() throws Exception {
-        mockMvc.perform(put("/api/resources/{resourceId}", 20L)
+    void updateSystemMenuShouldRejectIdentityFieldChanges() throws Exception {
+        mockMvc.perform(put("/api/menus/{menuId}", 20L)
                         .with(bearer(principal("platform", Set.of("system:write"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "parentId": 1,
-                                  "resourceType": "DIR",
+                                  "menuType": "DIR",
                                   "resourceKey": "system-renamed",
-                                  "resourceName": "系统模块",
+                                  "menuName": "系统模块",
                                   "routeKey": null,
                                   "grantKey": null,
                                   "path": null,
@@ -103,21 +98,21 @@ class ResourceAuthorizationControllerTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"))
-                .andExpect(jsonPath("$.message").value("系统资源不允许修改资源键"));
+                .andExpect(jsonPath("$.message").value("系统节点不允许修改资源唯一标识"));
     }
 
     @Test
     void createMenuShouldRejectDuplicateRouteKey() throws Exception {
-        mockMvc.perform(post("/api/resources")
+        mockMvc.perform(post("/api/menus")
                         .with(bearer(principal("platform", Set.of("system:write"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "parentId": 20,
-                                  "resourceType": "MENU",
+                                  "menuType": "MENU",
                                   "resourceKey": "ut.duplicate.route",
-                                  "resourceName": "UT Duplicate Route",
+                                  "menuName": "UT Duplicate Route",
                                   "routeKey": "users",
                                   "grantKey": "user:read",
                                   "path": "/ut/duplicate-route",
@@ -134,17 +129,17 @@ class ResourceAuthorizationControllerTest {
     }
 
     @Test
-    void updateResourceShouldRejectDescendantAsParent() throws Exception {
-        mockMvc.perform(put("/api/resources/{resourceId}", 20L)
+    void updateMenuShouldRejectDescendantAsParent() throws Exception {
+        mockMvc.perform(put("/api/menus/{menuId}", 20L)
                         .with(bearer(principal("platform", Set.of("system:write"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "parentId": 21,
-                                  "resourceType": "DIR",
+                                  "menuType": "DIR",
                                   "resourceKey": "system",
-                                  "resourceName": "系统模块",
+                                  "menuName": "系统模块",
                                   "routeKey": null,
                                   "grantKey": null,
                                   "path": null,
@@ -162,16 +157,16 @@ class ResourceAuthorizationControllerTest {
 
     @Test
     void createMenuShouldRequireRouteAndGrantFields() throws Exception {
-        mockMvc.perform(post("/api/resources")
+        mockMvc.perform(post("/api/menus")
                         .with(bearer(principal("platform", Set.of("system:write"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "parentId": 20,
-                                  "resourceType": "MENU",
+                                  "menuType": "MENU",
                                   "resourceKey": "ut.missing.route",
-                                  "resourceName": "UT Missing Route",
+                                  "menuName": "UT Missing Route",
                                   "routeKey": null,
                                   "grantKey": null,
                                   "path": null,
@@ -189,16 +184,16 @@ class ResourceAuthorizationControllerTest {
 
     @Test
     void createButtonShouldRequireMenuParentAndGrantKey() throws Exception {
-        mockMvc.perform(post("/api/resources")
+        mockMvc.perform(post("/api/menus")
                         .with(bearer(principal("platform", Set.of("system:write"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "parentId": 20,
-                                  "resourceType": "BUTTON",
+                                  "menuType": "BUTTON",
                                   "resourceKey": "ut.button.invalid.parent",
-                                  "resourceName": "UT Invalid Button",
+                                  "menuName": "UT Invalid Button",
                                   "routeKey": null,
                                   "grantKey": null,
                                   "path": null,
@@ -308,16 +303,16 @@ class ResourceAuthorizationControllerTest {
     }
 
     @Test
-    void assignRoleResourcesShouldAutoFillAncestors() throws Exception {
+    void assignRoleMenusShouldAutoFillAncestors() throws Exception {
         Long roleId = createTempRole("tenant-a");
 
-        mockMvc.perform(put("/api/roles/{roleId}/resources", roleId)
+        mockMvc.perform(put("/api/roles/{roleId}/menus", roleId)
                         .with(bearer(principal("tenant-a", Set.of("role:write"))))
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "resourceIds": [21]
+                                  "menuIds": [21]
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -325,7 +320,7 @@ class ResourceAuthorizationControllerTest {
                 .andExpect(jsonPath("$.data[?(@==20)]").exists())
                 .andExpect(jsonPath("$.data[?(@==21)]").exists());
 
-        mockMvc.perform(get("/api/roles/{roleId}/resources", roleId)
+        mockMvc.perform(get("/api/roles/{roleId}/menus", roleId)
                         .with(bearer(principal("tenant-a", Set.of("role:read"))))
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isOk())
@@ -338,13 +333,13 @@ class ResourceAuthorizationControllerTest {
     void assignMenuShouldNotGrantChildButtonsUnlessSelected() throws Exception {
         Long roleId = createTempRole("tenant-a");
 
-        mockMvc.perform(put("/api/roles/{roleId}/resources", roleId)
+        mockMvc.perform(put("/api/roles/{roleId}/menus", roleId)
                         .with(bearer(principal("tenant-a", Set.of("role:write"))))
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "resourceIds": [21]
+                                  "menuIds": [21]
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -366,13 +361,13 @@ class ResourceAuthorizationControllerTest {
     void assignButtonShouldAutoFillAncestorMenuOnly() throws Exception {
         Long roleId = createTempRole("tenant-a");
 
-        mockMvc.perform(put("/api/roles/{roleId}/resources", roleId)
+        mockMvc.perform(put("/api/roles/{roleId}/menus", roleId)
                         .with(bearer(principal("tenant-a", Set.of("role:write"))))
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "resourceIds": [210]
+                                  "menuIds": [210]
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -389,50 +384,6 @@ class ResourceAuthorizationControllerTest {
         );
         assertThat(assignedIds).contains(1L, 20L, 21L, 210L);
         assertThat(assignedIds).doesNotContain(211L, 212L);
-    }
-
-    @Test
-    void tenantResourceOverridesShouldUpdateAndQuery() throws Exception {
-        mockMvc.perform(put("/api/tenants/{tenantId}/resource-overrides", "tenant-a")
-                        .with(bearer(principal("platform", Set.of("tenant:write"))))
-                        .header("X-Tenant-Id", "platform")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "overrides": [
-                                    {
-                                      "resourceId": 25,
-                                      "enabled": false,
-                                      "visible": false,
-                                      "orderNo": 777,
-                                      "titleOverride": "审计中心",
-                                      "iconOverride": "Histogram"
-                                    }
-                                  ]
-                                }
-                                """))
-                .andExpect(status().isOk());
-
-        Integer enabled = jdbcTemplate.queryForObject(
-                "SELECT enabled FROM sys_tenant_resource_override WHERE tenant_id = ? AND resource_id = ?",
-                Integer.class,
-                "tenant-a",
-                25L
-        );
-        Integer visible = jdbcTemplate.queryForObject(
-                "SELECT visible FROM sys_tenant_resource_override WHERE tenant_id = ? AND resource_id = ?",
-                Integer.class,
-                "tenant-a",
-                25L
-        );
-        assertThat(enabled).isEqualTo(0);
-        assertThat(visible).isEqualTo(0);
-
-        mockMvc.perform(get("/api/tenants/{tenantId}/resource-overrides", "tenant-a")
-                        .with(bearer(principal("platform", Set.of("tenant:read"))))
-                        .header("X-Tenant-Id", "platform"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[?(@.resourceId==25)]").exists());
     }
 
     private Long createTempRole(String tenantId) {

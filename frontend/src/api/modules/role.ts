@@ -23,16 +23,6 @@ export async function deleteRole(id: number) {
   await http.delete(`/api/roles/${id}`)
 }
 
-export async function queryAssignedRoleResources(roleId: number) {
-  const { data } = await http.get<ApiResponse<number[]>>(`/api/roles/${roleId}/resources`)
-  return data.data
-}
-
-export async function assignRoleResources(roleId: number, resourceIds: number[]) {
-  const { data } = await http.put<ApiResponse<number[]>>(`/api/roles/${roleId}/resources`, { resourceIds })
-  return data.data
-}
-
 export async function queryAssignedRoleMenus(roleId: number) {
   const { data } = await http.get<ApiResponse<number[]>>(`/api/roles/${roleId}/menus`)
   return data.data
@@ -40,15 +30,5 @@ export async function queryAssignedRoleMenus(roleId: number) {
 
 export async function assignRoleMenus(roleId: number, menuIds: number[]) {
   const { data } = await http.put<ApiResponse<number[]>>(`/api/roles/${roleId}/menus`, { menuIds })
-  return data.data
-}
-
-export async function queryAssignedRolePermissions(roleId: number) {
-  const { data } = await http.get<ApiResponse<number[]>>(`/api/roles/${roleId}/permissions`)
-  return data.data
-}
-
-export async function assignRolePermissions(roleId: number, resourceIds: number[]) {
-  const { data } = await http.put<ApiResponse<number[]>>(`/api/roles/${roleId}/permissions`, { resourceIds })
   return data.data
 }

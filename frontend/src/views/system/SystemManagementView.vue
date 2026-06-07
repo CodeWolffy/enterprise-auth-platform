@@ -79,11 +79,11 @@
 
         <article class="setting-card">
           <div>
-            <span class="eyebrow">资源授权</span>
+            <span class="eyebrow">菜单权限</span>
             <h4>菜单管理</h4>
-            <p>维护统一资源树（目录/菜单/按钮/API），支持授权键、路由键、可见性与排序配置。</p>
+            <p>维护目录、菜单、按钮和 API 权限节点，支持授权键、路由键、可见性与排序配置。</p>
           </div>
-          <el-button v-permission="'system:write'" type="primary" data-testid="settings-resources-entry" @click="goTo('settings-resources')">进入菜单管理</el-button>
+          <el-button v-permission="'system:write'" type="primary" data-testid="settings-menus-entry" @click="goTo('settings-menus')">进入菜单管理</el-button>
         </article>
       </div>
     </section>
@@ -153,7 +153,7 @@ async function load() {
 }
 
 function goTo(
-  name: 'settings-dicts' | 'settings-configs' | 'settings-notices' | 'settings-categories' | 'tenant-catalog' | 'settings-resources',
+  name: 'settings-dicts' | 'settings-configs' | 'settings-notices' | 'settings-categories' | 'tenant-catalog' | 'settings-menus',
 ) {
   void router.push({ name })
 }

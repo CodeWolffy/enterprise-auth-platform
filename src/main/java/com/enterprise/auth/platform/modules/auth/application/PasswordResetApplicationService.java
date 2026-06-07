@@ -13,8 +13,8 @@ import com.enterprise.auth.platform.modules.auth.infrastructure.SecurityProperti
 import com.enterprise.auth.platform.modules.auth.infrastructure.entity.SysPasswordResetTokenEntity;
 import com.enterprise.auth.platform.modules.auth.infrastructure.mapper.SysPasswordResetTokenMapper;
 import com.enterprise.auth.platform.modules.security.application.SecurityPolicyApplicationService;
+import com.enterprise.auth.platform.modules.user.application.UserAuthenticationFacade;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
-import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -38,7 +38,7 @@ public class PasswordResetApplicationService {
 
     private static final String GENERIC_REQUEST_MESSAGE = "如果账号存在且已配置邮箱，将会收到密码重置邮件";
 
-    private final SysUserMapper sysUserMapper;
+    private final UserAuthenticationFacade userAuthenticationFacade;
     private final SysPasswordResetTokenMapper tokenMapper;
     private final PasswordHasher passwordHasher;
     private final SecurityPolicyApplicationService securityPolicyApplicationService;
@@ -50,7 +50,7 @@ public class PasswordResetApplicationService {
     private final SecureRandom secureRandom = new SecureRandom();
 
     public PasswordResetApplicationService(
-            SysUserMapper sysUserMapper,
+            UserAuthenticationFacade userAuthenticationFacade,
             SysPasswordResetTokenMapper tokenMapper,
             PasswordHasher passwordHasher,
             SecurityPolicyApplicationService securityPolicyApplicationService,
@@ -60,7 +60,7 @@ public class PasswordResetApplicationService {
             ClientIpResolver clientIpResolver,
             SessionIndexService sessionIndexService
     ) {
-        this.sysUserMapper = sysUserMapper;
+        this.userAuthenticationFacade = userAuthenticationFacade;
         this.tokenMapper = tokenMapper;
         this.passwordHasher = passwordHasher;
         this.securityPolicyApplicationService = securityPolicyApplicationService;
@@ -78,7 +78,7 @@ public class PasswordResetApplicationService {
 
         // 快速存在性检查：失败分支只写审计，不向客户端暴露账号状态
         if (!StringUtils.hasText(request.tenantId())) {
-            List<String> tenantIds = sysUserMapper.selectActiveTenantIdsByUsername(username);
+            List<String> tenantIds = userAuthenticationFacade.activeTenantIdsByUsername(username);
             if (tenantIds.isEmpty()) {
                 auditService.record("PASSWORD_RESET_REQUESTED", username, "unknown",
                         Map.of("result", "not_found", "clientIp", clientIp));
@@ -156,7 +156,7 @@ public class PasswordResetApplicationService {
             auditService.record("PASSWORD_RESET_FAILED", "anonymous", "unknown", Map.of("reason", "invalid_or_expired"));
             throw new BusinessException("PASSWORD_RESET_TOKEN_INVALID", "重置链接无效、已使用或已过期");
         }
-        SysUserEntity user = withTenant(token.getTenantId(), () -> sysUserMapper.selectById(token.getUserId()));
+        SysUserEntity user = userAuthenticationFacade.findActiveEntityById(token.getTenantId(), token.getUserId()).orElse(null);
         if (user == null || (user.getDeleted() != null && user.getDeleted() == 1) || user.getEnabled() == null || user.getEnabled() != 1) {
             tokenMapper.revokeIfActive(token.getId(), TimeSupport.utcNowDateTime(), "password-reset");
             auditService.record("PASSWORD_RESET_FAILED", token.getUsername(), token.getTenantId(), Map.of("reason", "user_unavailable"));
@@ -175,10 +175,7 @@ public class PasswordResetApplicationService {
         user.setMustChangePassword(0);
         user.setPasswordUpdatedAt(now);
         user.setUpdatedBy("password-reset");
-        withTenant(user.getTenantId(), () -> {
-            sysUserMapper.updateById(user);
-            return null;
-        });
+        userAuthenticationFacade.update(user);
 
         token.setUsedAt(now);
         token.setUpdatedBy("password-reset");
@@ -298,18 +295,14 @@ public class PasswordResetApplicationService {
     }
 
     private SysUserEntity findUser(String tenantId, String username) {
-        return withTenant(tenantId, () -> sysUserMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>()
-                .eq(SysUserEntity::getTenantId, tenantId)
-                .eq(SysUserEntity::getUsername, username)
-                .eq(SysUserEntity::getDeleted, 0)
-                .last("limit 1")));
+        return userAuthenticationFacade.findActiveEntity(tenantId, username).orElse(null);
     }
 
     private String resolveTenantId(String requestedTenantId, String username) {
         if (StringUtils.hasText(requestedTenantId)) {
             return requestedTenantId.trim();
         }
-        var tenantIds = sysUserMapper.selectActiveTenantIdsByUsername(username).stream()
+        var tenantIds = userAuthenticationFacade.activeTenantIdsByUsername(username).stream()
                 .filter(StringUtils::hasText)
                 .map(String::trim)
                 .toList();
