@@ -52,7 +52,7 @@ export async function loginWithPassword(payload: {
   return data.data
 }
 
-export async function requestPasswordReset(payload: { username: string; tenantId?: string }) {
+export async function requestPasswordReset(payload: { username: string; email: string; tenantId?: string }) {
   const { data } = await http.post<ApiResponse<{ message: string; result: string }>>('/api/auth/password/reset/request', payload)
   return data.data
 }

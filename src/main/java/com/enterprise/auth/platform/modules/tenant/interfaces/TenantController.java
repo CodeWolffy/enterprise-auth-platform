@@ -154,6 +154,7 @@ public class TenantController {
 
     @Operation(summary = "获取当前租户上下文")
     @GetMapping("/current")
+    @SaCheckPermission(PermissionCodes.TENANT_READ)
     public ApiResponse<Map<String, String>> current() {
         return ApiResponse.ok(Map.of("tenantId", TenantContext.getTenantId()));
     }

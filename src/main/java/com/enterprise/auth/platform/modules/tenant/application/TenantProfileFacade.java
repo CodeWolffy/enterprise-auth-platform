@@ -121,4 +121,67 @@ public class TenantProfileFacade {
         }
         return capability.getCapabilityDesc();
     }
+
+    // Projection methods for cross-module use (no infrastructure entity exposure)
+
+    public List<TenantRecord> listTenantRecords() {
+        return listTenants().stream()
+                .map(t -> new TenantRecord(t.getTenantId(), t.getTenantName(),
+                        t.getPlatformLevel(), t.getTenantStatus(),
+                        t.getExpireAt(), t.getLifecycleNote(), t.getPackageCode()))
+                .toList();
+    }
+
+    public Map<String, PackageRecord> loadPackageRecords(List<String> packageCodes) {
+        return loadPackages(packageCodes).entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        e -> {
+                            SysTenantPackageEntity p = e.getValue();
+                            return new PackageRecord(p.getPackageCode(), p.getPackageName(),
+                                    p.getUserQuota(), p.getStorageQuotaGb());
+                        },
+                        (left, right) -> right,
+                        LinkedHashMap::new));
+    }
+
+    public Map<String, CapabilityRecord> loadCapabilityRecords() {
+        return loadCapabilities().entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        e -> {
+                            SysTenantCapabilityEntity c = e.getValue();
+                            return new CapabilityRecord(c.getCapabilityCode(), c.getCapabilityDesc());
+                        },
+                        (left, right) -> right,
+                        LinkedHashMap::new));
+    }
+
+    public Map<String, List<OverrideRecord>> loadOverrideRecords(List<String> tenantIds) {
+        return loadOverrides(tenantIds).entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        e -> e.getValue().stream()
+                                .map(o -> new OverrideRecord(o.getTenantId(), o.getCapabilityCode(),
+                                        o.getEnabled(), o.getCapabilityDescOverride()))
+                                .toList(),
+                        (left, right) -> right,
+                        LinkedHashMap::new));
+    }
+
+    public String capabilityDescription(CapabilityRecord capability) {
+        if (capability == null || !StringUtils.hasText(capability.capabilityDesc())) {
+            return "该能力已启用，可在租户侧使用对应模块。";
+        }
+        return capability.capabilityDesc();
+    }
+
+    public record TenantRecord(String tenantId, String tenantName, Integer platformLevel, Integer tenantStatus,
+                               java.time.LocalDateTime expireAt, String lifecycleNote, String packageCode) {}
+
+    public record PackageRecord(String packageCode, String packageName, Integer userQuota, Integer storageQuotaGb) {}
+
+    public record CapabilityRecord(String capabilityCode, String capabilityDesc) {}
+
+    public record OverrideRecord(String tenantId, String capabilityCode, Integer enabled, String capabilityDescOverride) {}
 }

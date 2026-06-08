@@ -22,20 +22,24 @@ public class RegistrationApplicationService {
     private final RegistrationPolicyService registrationPolicyService;
     private final UserManagementService userManagementService;
     private final ClientIpResolver clientIpResolver;
+    private final CaptchaService captchaService;
 
     public RegistrationApplicationService(
             RegisterAttemptService registerAttemptService,
             RegistrationPolicyService registrationPolicyService,
             UserManagementService userManagementService,
-            ClientIpResolver clientIpResolver
+            ClientIpResolver clientIpResolver,
+            CaptchaService captchaService
     ) {
         this.registerAttemptService = registerAttemptService;
         this.registrationPolicyService = registrationPolicyService;
         this.userManagementService = userManagementService;
         this.clientIpResolver = clientIpResolver;
+        this.captchaService = captchaService;
     }
 
     public UserSummary register(RegisterRequest request, HttpServletRequest servletRequest) {
+        captchaService.secondaryVerify(request.captchaId());
         String clientIp = clientIpResolver.resolve(servletRequest);
         registerAttemptService.checkRateLimit(request.username(), clientIp);
         String defaultTenantId = registrationPolicyService.resolveDefaultTenantId();

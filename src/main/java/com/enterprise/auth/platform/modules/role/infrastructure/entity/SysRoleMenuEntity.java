@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.modules.role.infrastructure.entity;
 
+import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -16,7 +17,8 @@ public class SysRoleMenuEntity {
     private String tenantId;
     private Long roleId;
     private Long menuId;
+    @TableField(fill = FieldFill.INSERT)
     private String createdBy;
-    @TableField(fill = com.baomidou.mybatisplus.annotation.FieldFill.INSERT)
+    @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 }

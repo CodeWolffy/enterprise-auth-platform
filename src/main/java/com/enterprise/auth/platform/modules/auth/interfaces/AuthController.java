@@ -125,6 +125,7 @@ public class AuthController {
     }
 
     @Operation(summary = "确认重置密码")
+    @RateLimit(key = "password-reset-confirm", strategy = RateLimit.Strategy.IP)
     @PostMapping("/password/reset/confirm")
     public ApiResponse<PasswordResetApplicationService.PasswordResetConfirmResponse> confirmPasswordReset(
             @Valid @RequestBody PasswordResetApplicationService.PasswordResetConfirmRequest request

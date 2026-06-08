@@ -17,6 +17,9 @@ public record RegisterRequest(
 
         @Schema(description = "手机号") String mobile,
 
-        @Schema(description = "邮箱") String email
+        @Schema(description = "邮箱") String email,
+
+        @Schema(description = "验证码ID", requiredMode = Schema.RequiredMode.REQUIRED)
+        @NotBlank String captchaId
 ) {
 }

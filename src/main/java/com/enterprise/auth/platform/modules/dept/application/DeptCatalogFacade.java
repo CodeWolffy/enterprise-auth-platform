@@ -21,4 +21,12 @@ public class DeptCatalogFacade {
                 .eq(SysDeptEntity::getDeleted, 0)
                 .orderByAsc(SysDeptEntity::getId));
     }
+
+    public List<DeptItem> listDeptItems(String tenantId) {
+        return listDepartments(tenantId).stream()
+                .map(d -> new DeptItem(d.getId(), d.getDeptCode(), d.getDeptName(), d.getParentId(), d.getLeaderUserId()))
+                .toList();
+    }
+
+    public record DeptItem(Long id, String deptCode, String deptName, Long parentId, Long leaderUserId) {}
 }

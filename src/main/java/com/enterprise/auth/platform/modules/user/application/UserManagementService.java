@@ -118,10 +118,10 @@ public class UserManagementService {
         SysUserEntity entity = getUser(userId, tenantId);
         validateDeptAccess(tenantId, request.deptId());
 
-        entity.setDisplayName(request.displayName());
-        entity.setMobile(request.mobile());
-        entity.setEmail(request.email());
-        entity.setDeptId(request.deptId());
+        entity.setDisplayName(StringUtils.hasText(request.displayName()) ? request.displayName() : entity.getDisplayName());
+        entity.setMobile(request.mobile() != null ? request.mobile() : entity.getMobile());
+        entity.setEmail(request.email() != null ? request.email() : entity.getEmail());
+        entity.setDeptId(request.deptId() != null ? request.deptId() : entity.getDeptId());
         boolean invalidateSessions = false;
         if (request.enabled() != null) {
             invalidateSessions = !request.enabled() && (entity.getEnabled() == null || entity.getEnabled() == 1);

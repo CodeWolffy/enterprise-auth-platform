@@ -6,12 +6,15 @@
       </div>
       <h1 class="auth-title">重置密码</h1>
       <p class="auth-subtitle">
-        {{ token ? '请设置新密码，完成后使用新密码登录。' : '输入用户名后，如果账号存在且绑定邮箱，将收到重置链接。' }}
+        {{ token ? '请设置新密码，完成后使用新密码登录。' : '输入用户名和绑定邮箱后，如果信息匹配，将收到重置链接。' }}
       </p>
 
       <form v-if="!token" class="auth-form" @submit.prevent="submitRequest">
         <div class="auth-field">
           <input v-model.trim="username" type="text" placeholder="用户名（5-16 位）" autocomplete="username" />
+        </div>
+        <div class="auth-field">
+          <input v-model.trim="email" type="email" placeholder="绑定邮箱" autocomplete="email" />
           <p v-if="fieldError" class="auth-error">{{ fieldError }}</p>
         </div>
         <div v-if="statusMessage" class="auth-status" :class="sceneStatus">{{ statusMessage }}</div>
@@ -57,6 +60,7 @@ const route = useRoute()
 const router = useRouter()
 const token = ref(String(route.query.token ?? ''))
 const username = ref('')
+const email = ref('')
 const newPassword = ref('')
 const confirmPassword = ref('')
 const resetUsername = ref('')
@@ -92,9 +96,17 @@ async function submitRequest() {
     fieldError.value = '用户名长度需为 5-16 位'
     return
   }
+  if (!email.value) {
+    fieldError.value = '请输入绑定邮箱'
+    return
+  }
+  if (!isValidEmail(email.value)) {
+    fieldError.value = '请输入有效的邮箱地址'
+    return
+  }
   loading.value = true
   try {
-    const result = await requestPasswordReset({ username: username.value })
+    const result = await requestPasswordReset({ username: username.value, email: email.value })
     if (result?.result === 'NOT_FOUND') {
       sceneStatus.value = 'error'
       statusMessage.value = result.message || '用户名不存在'
@@ -103,7 +115,7 @@ async function submitRequest() {
       statusMessage.value = result.message || '该账号未绑定邮箱，无法通过邮件重置密码'
     } else {
       sceneStatus.value = 'success'
-      statusMessage.value = result?.message || '如果账号存在且已配置邮箱，将会收到密码重置邮件'
+      statusMessage.value = result?.message || '如果账号存在且邮箱匹配，将会收到密码重置邮件'
     }
   } catch (error) {
     sceneStatus.value = 'error'
@@ -136,6 +148,10 @@ async function submitConfirm() {
   } finally {
     loading.value = false
   }
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
 
 function resolveErrorMessage(error: unknown, fallback: string) {

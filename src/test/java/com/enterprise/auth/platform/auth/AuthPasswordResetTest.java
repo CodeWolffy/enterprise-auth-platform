@@ -30,6 +30,8 @@ class AuthPasswordResetTest {
 
     private static final String TENANT_ID = "tenant-a";
     private static final String USERNAME = "pwdresetut";
+    private static final String EMAIL = "pwd-reset.ut@example.com";
+    private static final String WRONG_EMAIL = "pwd-reset-wrong.ut@example.com";
     private static final String MISSING_USERNAME = "pwdmissut";
 
     @Autowired
@@ -60,7 +62,7 @@ class AuthPasswordResetTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.result").value("EMAIL_SENT"))
-                .andExpect(jsonPath("$.data.message").value("如果账号存在且已配置邮箱，将会收到密码重置邮件"))
+                .andExpect(jsonPath("$.data.message").value("如果账号存在且邮箱匹配，将会收到密码重置邮件"))
                 .andExpect(jsonPath("$.data.token").doesNotExist());
 
         mockMvc.perform(post("/api/auth/password/reset/request")
@@ -69,7 +71,7 @@ class AuthPasswordResetTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.result").value("EMAIL_SENT"))
-                .andExpect(jsonPath("$.data.message").value("如果账号存在且已配置邮箱，将会收到密码重置邮件"))
+                .andExpect(jsonPath("$.data.message").value("如果账号存在且邮箱匹配，将会收到密码重置邮件"))
                 .andExpect(jsonPath("$.data.token").doesNotExist());
 
         Integer existingTokenCount = tokenCount(USERNAME);
@@ -83,6 +85,20 @@ class AuthPasswordResetTest {
         assertThat(existingTokenCount).isEqualTo(1);
         assertThat(missingTokenCount).isZero();
         assertThat(storedTokenHash).hasSize(64).matches("[0-9a-f]{64}");
+    }
+
+    @Test
+    void passwordResetRequestShouldRequireMatchingEmail() throws Exception {
+        mockMvc.perform(post("/api/auth/password/reset/request")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestPayload(USERNAME, TENANT_ID, WRONG_EMAIL)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.result").value("EMAIL_SENT"))
+                .andExpect(jsonPath("$.data.message").value("如果账号存在且邮箱匹配，将会收到密码重置邮件"))
+                .andExpect(jsonPath("$.data.token").doesNotExist());
+
+        assertThat(tokenCount(USERNAME)).isZero();
     }
 
     @Test
@@ -192,7 +208,7 @@ class AuthPasswordResetTest {
                 1L,
                 USERNAME,
                 USERNAME,
-                "pwd-reset.ut@example.com",
+                EMAIL,
                 passwordHasher.hash("ResetOld@123"),
                 1,
                 1,
@@ -220,12 +236,17 @@ class AuthPasswordResetTest {
     }
 
     private String requestPayload(String username, String tenantId) {
+        return requestPayload(username, tenantId, EMAIL);
+    }
+
+    private String requestPayload(String username, String tenantId, String email) {
         return """
                 {
                   "username": "%s",
+                  "email": "%s",
                   "tenantId": "%s"
                 }
-                """.formatted(username, tenantId);
+                """.formatted(username, email, tenantId);
     }
 
     private String tokenPayload(String token) {

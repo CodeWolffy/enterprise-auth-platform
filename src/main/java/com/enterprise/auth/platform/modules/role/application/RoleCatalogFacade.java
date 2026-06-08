@@ -24,7 +24,17 @@ public class RoleCatalogFacade {
                 .orderByAsc(SysRoleEntity::getId));
     }
 
+    public List<RoleItem> listRoleItems(String tenantId) {
+        return listRoles(tenantId).stream()
+                .map(r -> new RoleItem(r.getId(), r.getRoleCode(), r.getRoleName(), r.getRoleDesc(),
+                        r.getDataScopeType(), r.getDataScopeValueJson()))
+                .toList();
+    }
+
     public RolePayloadCodec payloadCodec() {
         return rolePayloadCodec;
     }
+
+    public record RoleItem(Long id, String roleCode, String roleName, String roleDesc,
+                           String dataScopeType, String dataScopeValueJson) {}
 }

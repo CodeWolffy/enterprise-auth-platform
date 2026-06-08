@@ -1,15 +1,8 @@
 package com.enterprise.auth.platform.modules.resource.application;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.common.TimeSupport;
-import com.enterprise.auth.platform.modules.dept.infrastructure.entity.SysDeptEntity;
-import com.enterprise.auth.platform.modules.role.infrastructure.entity.SysRoleEntity;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantCapabilityEntity;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantCapabilityOverrideEntity;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantEntity;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantPackageEntity;
 import com.enterprise.auth.platform.modules.dept.application.DeptCatalogFacade;
 import com.enterprise.auth.platform.modules.role.application.RoleCatalogFacade;
 import com.enterprise.auth.platform.modules.role.application.RolePayloadCodec;
@@ -20,6 +13,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -49,44 +43,49 @@ public class CatalogService {
 
     public List<RoleView> roles() {
         String tenantId = currentTenantId();
-        return roleCatalogFacade.listRoles(tenantId)
+        return roleCatalogFacade.listRoleItems(tenantId)
                 .stream()
                 .map(role -> new RoleView(
-                        role.getId(),
-                        role.getRoleCode(),
-                        role.getRoleName(),
-                        role.getRoleDesc(),
-                        parseScope(role.getDataScopeType()),
-                        rolePayloadCodec.readDeptIds(role.getDataScopeValueJson()).stream().sorted().toList()
+                        role.id(),
+                        role.roleCode(),
+                        role.roleName(),
+                        role.roleDesc(),
+                        parseScope(role.dataScopeType()),
+                        rolePayloadCodec.readDeptIds(role.dataScopeValueJson()).stream().sorted().toList()
                 ))
                 .toList();
     }
     public List<DepartmentView> departments() {
         String tenantId = currentTenantId();
-        List<SysDeptEntity> departments = deptCatalogFacade.listDepartments(tenantId);
-        departments = dataScopeService.filterDepartments(tenantId, departments);
+        List<DeptCatalogFacade.DeptItem> departments = deptCatalogFacade.listDeptItems(tenantId);
+        Set<Long> visibleDeptIds = dataScopeService.visibleDeptIds(tenantId).orElse(null);
+        if (visibleDeptIds != null) {
+            departments = departments.stream()
+                    .filter(d -> d.id() != null && visibleDeptIds.contains(d.id()))
+                    .toList();
+        }
         return departments.stream()
                 .map(dept -> new DepartmentView(
-                        dept.getId(),
-                        dept.getDeptCode(),
-                        dept.getDeptName(),
-                        dept.getParentId(),
-                        dept.getLeaderUserId()
+                        dept.id(),
+                        dept.deptCode(),
+                        dept.deptName(),
+                        dept.parentId(),
+                        dept.leaderUserId()
                 ))
                 .toList();
     }
     public List<TenantView> tenants() {
-        List<SysTenantEntity> tenants = tenantProfileFacade.listTenants();
+        List<TenantProfileFacade.TenantRecord> tenants = tenantProfileFacade.listTenantRecords();
         Map<String, TenantProfile> profiles = loadTenantProfiles(tenants);
         return tenants.stream()
                 .map(tenant -> {
-                    TenantProfile profile = profiles.getOrDefault(tenant.getTenantId(), TenantProfile.empty());
+                    TenantProfile profile = profiles.getOrDefault(tenant.tenantId(), TenantProfile.empty());
                     return new TenantView(
-                            tenant.getTenantId(),
-                            tenant.getTenantName(),
-                            tenant.getPlatformLevel() != null && tenant.getPlatformLevel() == 1,
-                            tenant.getTenantStatus(),
-                            TimeSupport.toEpochMilli(tenant.getExpireAt()),
+                            tenant.tenantId(),
+                            tenant.tenantName(),
+                            tenant.platformLevel() != null && tenant.platformLevel() == 1,
+                            tenant.tenantStatus(),
+                            TimeSupport.toEpochMilli(tenant.expireAt()),
                             profile.packageCode(),
                             profile.packageName(),
                             profile.userQuota(),
@@ -125,61 +124,54 @@ public class CatalogService {
         }
     }
 
-    private Map<String, TenantProfile> loadTenantProfiles(List<SysTenantEntity> tenants) {
+    private Map<String, TenantProfile> loadTenantProfiles(List<TenantProfileFacade.TenantRecord> tenants) {
         if (tenants.isEmpty()) {
             return Map.of();
         }
-        List<String> tenantIds = tenants.stream().map(SysTenantEntity::getTenantId).toList();
+        List<String> tenantIds = tenants.stream().map(TenantProfileFacade.TenantRecord::tenantId).toList();
         List<String> packageCodes = tenants.stream()
-                .map(SysTenantEntity::getPackageCode)
+                .map(TenantProfileFacade.TenantRecord::packageCode)
                 .filter(StringUtils::hasText)
                 .distinct()
                 .toList();
-        Map<String, SysTenantPackageEntity> packages = tenantProfileFacade.loadPackages(packageCodes);
-        Map<String, SysTenantCapabilityEntity> capabilities = tenantProfileFacade.loadCapabilities();
+        Map<String, TenantProfileFacade.PackageRecord> packages = tenantProfileFacade.loadPackageRecords(packageCodes);
+        Map<String, TenantProfileFacade.CapabilityRecord> capabilities = tenantProfileFacade.loadCapabilityRecords();
         Map<String, List<String>> packageCapabilities = tenantProfileFacade.loadPackageCapabilities(packageCodes);
-        Map<String, List<SysTenantCapabilityOverrideEntity>> overrides = tenantProfileFacade.loadOverrides(tenantIds);
+        Map<String, List<TenantProfileFacade.OverrideRecord>> overrides = tenantProfileFacade.loadOverrideRecords(tenantIds);
         Map<String, TenantProfile> result = new LinkedHashMap<>();
-        for (SysTenantEntity tenant : tenants) {
-            SysTenantPackageEntity pkg = packages.get(tenant.getPackageCode());
-            List<String> capabilityCodes = new java.util.ArrayList<>(packageCapabilities.getOrDefault(tenant.getPackageCode(), List.of()));
+        for (TenantProfileFacade.TenantRecord tenant : tenants) {
+            TenantProfileFacade.PackageRecord pkg = packages.get(tenant.packageCode());
+            List<String> capabilityCodes = new java.util.ArrayList<>(packageCapabilities.getOrDefault(tenant.packageCode(), List.of()));
             Map<String, String> descriptions = capabilityCodes.stream().collect(Collectors.toMap(
                     java.util.function.Function.identity(),
                     code -> tenantProfileFacade.capabilityDescription(capabilities.get(code)),
                     (left, right) -> right,
                     LinkedHashMap::new
             ));
-            for (SysTenantCapabilityOverrideEntity override : overrides.getOrDefault(tenant.getTenantId(), List.of())) {
-                if (override.getEnabled() != null && override.getEnabled() == 1) {
-                    if (!capabilityCodes.contains(override.getCapabilityCode())) {
-                        capabilityCodes.add(override.getCapabilityCode());
+            for (TenantProfileFacade.OverrideRecord override : overrides.getOrDefault(tenant.tenantId(), List.of())) {
+                if (override.enabled() != null && override.enabled() == 1) {
+                    if (!capabilityCodes.contains(override.capabilityCode())) {
+                        capabilityCodes.add(override.capabilityCode());
                     }
-                    descriptions.put(override.getCapabilityCode(), StringUtils.hasText(override.getCapabilityDescOverride())
-                            ? override.getCapabilityDescOverride()
-                            : tenantProfileFacade.capabilityDescription(capabilities.get(override.getCapabilityCode())));
+                    descriptions.put(override.capabilityCode(), StringUtils.hasText(override.capabilityDescOverride())
+                            ? override.capabilityDescOverride()
+                            : tenantProfileFacade.capabilityDescription(capabilities.get(override.capabilityCode())));
                 } else {
-                    capabilityCodes.remove(override.getCapabilityCode());
-                    descriptions.remove(override.getCapabilityCode());
+                    capabilityCodes.remove(override.capabilityCode());
+                    descriptions.remove(override.capabilityCode());
                 }
             }
-            result.put(tenant.getTenantId(), new TenantProfile(
-                    tenant.getPackageCode(),
-                    pkg == null ? null : pkg.getPackageName(),
-                    pkg == null ? null : pkg.getUserQuota(),
-                    pkg == null ? null : pkg.getStorageQuotaGb(),
+            result.put(tenant.tenantId(), new TenantProfile(
+                    tenant.packageCode(),
+                    pkg == null ? null : pkg.packageName(),
+                    pkg == null ? null : pkg.userQuota(),
+                    pkg == null ? null : pkg.storageQuotaGb(),
                     capabilityCodes,
                     descriptions,
-                    tenant.getLifecycleNote()
+                    tenant.lifecycleNote()
             ));
         }
         return result;
-    }
-
-    private String capabilityDescription(SysTenantCapabilityEntity capability) {
-        if (capability == null || !StringUtils.hasText(capability.getCapabilityDesc())) {
-            return "该能力已启用，可在租户侧使用对应模块。";
-        }
-        return capability.getCapabilityDesc();
     }
 
     @Schema(description = "角色目录项")

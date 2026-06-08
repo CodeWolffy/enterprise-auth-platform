@@ -47,7 +47,14 @@ export const useAuthStore = defineStore('auth', () => {
     if (!raw) {
       return
     }
-    const parsed = JSON.parse(raw) as PersistedSession
+    let parsed: PersistedSession
+    try {
+      parsed = JSON.parse(raw) as PersistedSession
+    } catch {
+      sessionStorage.removeItem(storageKey)
+      localStorage.removeItem(storageKey)
+      return
+    }
     sessionStore.restoreSession(parsed)
     tenantStore.restoreTenant(parsed)
     permissionStore.setSnapshot(parsed.snapshot)

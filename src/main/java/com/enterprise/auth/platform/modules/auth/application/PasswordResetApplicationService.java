@@ -16,6 +16,7 @@ import com.enterprise.auth.platform.modules.security.application.SecurityPolicyA
 import com.enterprise.auth.platform.modules.user.application.UserAuthenticationFacade;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.net.URLEncoder;
@@ -36,7 +37,7 @@ import org.springframework.util.StringUtils;
 @Service
 public class PasswordResetApplicationService {
 
-    private static final String GENERIC_REQUEST_MESSAGE = "如果账号存在且已配置邮箱，将会收到密码重置邮件";
+    private static final String GENERIC_REQUEST_MESSAGE = "如果账号存在且邮箱匹配，将会收到密码重置邮件";
 
     private final UserAuthenticationFacade userAuthenticationFacade;
     private final SysPasswordResetTokenMapper tokenMapper;
@@ -74,6 +75,7 @@ public class PasswordResetApplicationService {
     @Transactional
     public PasswordResetRequestResponse request(PasswordResetRequest request, HttpServletRequest servletRequest) {
         String username = normalize(request.username());
+        String email = normalize(request.email());
         String clientIp = clientIpResolver.resolve(servletRequest);
 
         // 快速存在性检查：失败分支只写审计，不向客户端暴露账号状态
@@ -110,6 +112,12 @@ public class PasswordResetApplicationService {
         if (!StringUtils.hasText(user.getEmail())) {
             auditService.record("PASSWORD_RESET_REQUESTED", username, tenantId,
                     Map.of("result", "no_email", "clientIp", clientIp));
+            return acceptedPasswordResetRequest();
+        }
+
+        if (!emailMatches(user.getEmail(), email)) {
+            auditService.record("PASSWORD_RESET_REQUESTED", username, tenantId,
+                    Map.of("result", "email_mismatch", "clientIp", clientIp));
             return acceptedPasswordResetRequest();
         }
 
@@ -298,6 +306,12 @@ public class PasswordResetApplicationService {
         return userAuthenticationFacade.findActiveEntity(tenantId, username).orElse(null);
     }
 
+    private boolean emailMatches(String storedEmail, String submittedEmail) {
+        return StringUtils.hasText(storedEmail)
+                && StringUtils.hasText(submittedEmail)
+                && storedEmail.trim().equalsIgnoreCase(submittedEmail.trim());
+    }
+
     private String resolveTenantId(String requestedTenantId, String username) {
         if (StringUtils.hasText(requestedTenantId)) {
             return requestedTenantId.trim();
@@ -336,6 +350,7 @@ public class PasswordResetApplicationService {
 
     public record PasswordResetRequest(
             @NotBlank @Size(min = 5, max = 16) String username,
+            @NotBlank @Email @Size(max = 128) String email,
             String tenantId
     ) {}
 
