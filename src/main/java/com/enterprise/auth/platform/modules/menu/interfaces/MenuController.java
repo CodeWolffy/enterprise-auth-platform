@@ -89,6 +89,16 @@ public class MenuController {
         return ApiResponse.ok();
     }
 
+    @Operation(summary = "批量生成按钮权限")
+    @PostMapping("/{menuId}/actions")
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
+    public ApiResponse<List<MenuTreeNode>> batchActions(
+            @Parameter(description = "菜单 ID") @PathVariable Long menuId,
+            @Valid @RequestBody BatchMenuActionRequest request
+    ) {
+        return ApiResponse.ok(menuService.batchCreateActions(menuId, request.actions()));
+    }
+
     @Operation(summary = "修改菜单排序")
     @PutMapping("/{menuId}/sort")
     @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)

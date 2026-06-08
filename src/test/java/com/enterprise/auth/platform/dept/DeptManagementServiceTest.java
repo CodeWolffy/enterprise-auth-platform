@@ -63,10 +63,22 @@ class DeptManagementServiceTest {
         TenantContext.setTenantId("platform");
         String deptCode = "TEST_DEPT_" + System.nanoTime();
         CatalogService.DepartmentView created = deptManagementService.create(
-                new DeptCrudRequest(null, deptCode, "测试部门", null)
+                new DeptCrudRequest(null, deptCode, "测试部门", null, "测试负责人", "13800138000", 12, 0)
         );
 
-        assertThat(catalogService.departments()).extracting(CatalogService.DepartmentView::id).contains(created.id());
+        assertThat(created.leaderName()).isEqualTo("测试负责人");
+        assertThat(created.leaderPhone()).isEqualTo("13800138000");
+        assertThat(created.orderNo()).isEqualTo(12);
+        assertThat(created.enabled()).isZero();
+        assertThat(catalogService.departments())
+                .filteredOn(item -> item.id().equals(created.id()))
+                .first()
+                .satisfies(item -> {
+                    assertThat(item.leaderName()).isEqualTo("测试负责人");
+                    assertThat(item.leaderPhone()).isEqualTo("13800138000");
+                    assertThat(item.orderNo()).isEqualTo(12);
+                    assertThat(item.enabled()).isZero();
+                });
 
         deptManagementService.delete(created.id());
 

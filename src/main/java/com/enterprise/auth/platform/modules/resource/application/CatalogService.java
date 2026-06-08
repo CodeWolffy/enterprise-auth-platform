@@ -70,7 +70,11 @@ public class CatalogService {
                         dept.deptCode(),
                         dept.deptName(),
                         dept.parentId(),
-                        dept.leaderUserId()
+                        dept.leaderUserId(),
+                        dept.leaderName(),
+                        dept.leaderPhone(),
+                        dept.orderNo(),
+                        dept.enabled()
                 ))
                 .toList();
     }
@@ -191,7 +195,11 @@ public class CatalogService {
             @Schema(description = "部门编码") String code,
             @Schema(description = "部门名称") String name,
             @Schema(description = "父部门 ID") Long parentId,
-            @Schema(description = "负责人用户 ID") Long leaderUserId
+            @Schema(description = "负责人用户 ID") Long leaderUserId,
+            @Schema(description = "负责人姓名") String leaderName,
+            @Schema(description = "负责人电话") String leaderPhone,
+            @Schema(description = "排序序号") Integer orderNo,
+            @Schema(description = "启用状态：0 停用，1 启用") Integer enabled
     ) {
     }
 

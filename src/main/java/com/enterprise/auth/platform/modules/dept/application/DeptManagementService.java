@@ -50,9 +50,13 @@ public class DeptManagementService {
         entity.setDeptCode(request.deptCode());
         entity.setDeptName(request.deptName());
         entity.setLeaderUserId(request.leaderUserId());
+        entity.setLeaderName(normalizeText(request.leaderName()));
+        entity.setLeaderPhone(normalizeText(request.leaderPhone()));
+        entity.setOrderNo(request.orderNo() == null ? 0 : request.orderNo());
+        entity.setEnabled(request.enabled() == null ? 1 : request.enabled());
         sysDeptMapper.insert(entity);
         auditService.record("DEPT_CREATED", operator, tenantId, Map.of("deptId", entity.getId()));
-        return new CatalogService.DepartmentView(entity.getId(), entity.getDeptCode(), entity.getDeptName(), entity.getParentId(), entity.getLeaderUserId());
+        return toDepartmentView(entity);
     }
 
     @Transactional
@@ -66,9 +70,13 @@ public class DeptManagementService {
         entity.setDeptCode(request.deptCode());
         entity.setDeptName(request.deptName());
         entity.setLeaderUserId(request.leaderUserId());
+        entity.setLeaderName(normalizeText(request.leaderName()));
+        entity.setLeaderPhone(normalizeText(request.leaderPhone()));
+        entity.setOrderNo(request.orderNo() == null ? 0 : request.orderNo());
+        entity.setEnabled(request.enabled() == null ? 1 : request.enabled());
         sysDeptMapper.updateById(entity);
         auditService.record("DEPT_UPDATED", SecuritySupport.currentOperator(), tenantId, Map.of("deptId", entity.getId()));
-        return new CatalogService.DepartmentView(entity.getId(), entity.getDeptCode(), entity.getDeptName(), entity.getParentId(), entity.getLeaderUserId());
+        return toDepartmentView(entity);
     }
 
     @Transactional
@@ -118,5 +126,23 @@ public class DeptManagementService {
     private String currentTenantId() {
         String tenantId = TenantContext.getTenantId();
         return StringUtils.hasText(tenantId) ? tenantId : "platform";
+    }
+
+    private CatalogService.DepartmentView toDepartmentView(SysDeptEntity entity) {
+        return new CatalogService.DepartmentView(
+                entity.getId(),
+                entity.getDeptCode(),
+                entity.getDeptName(),
+                entity.getParentId(),
+                entity.getLeaderUserId(),
+                entity.getLeaderName(),
+                entity.getLeaderPhone(),
+                entity.getOrderNo(),
+                entity.getEnabled()
+        );
+    }
+
+    private String normalizeText(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
     }
 }

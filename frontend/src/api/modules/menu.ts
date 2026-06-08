@@ -22,6 +22,8 @@ export interface MenuTreeNode {
   visible: boolean
   enabled: boolean
   system: boolean
+  outerStatus: boolean
+  applicationKey: string | null
   children: MenuTreeNode[]
 }
 
@@ -39,6 +41,12 @@ export interface MenuMutationPayload {
   orderNo?: number | null
   visible?: boolean | null
   enabled?: boolean | null
+  outerStatus?: boolean | null
+  applicationKey?: string | null
+}
+
+export interface BatchMenuActionPayload {
+  actions: string[]
 }
 
 export async function queryMenuTree() {
@@ -68,6 +76,11 @@ export async function updateMenu(menuId: number, payload: MenuMutationPayload) {
 
 export async function deleteMenu(menuId: number) {
   await http.delete(`/api/menus/${menuId}`)
+}
+
+export async function batchCreateMenuActions(menuId: number, payload: BatchMenuActionPayload) {
+  const { data } = await http.post<ApiResponse<MenuTreeNode[]>>(`/api/menus/${menuId}/actions`, payload)
+  return data.data
 }
 
 export async function sortMenu(menuId: number, orderNo: number) {

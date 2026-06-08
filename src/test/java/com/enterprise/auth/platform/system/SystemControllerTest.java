@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.system;
 
 import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.bearer;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -39,6 +40,9 @@ class SystemControllerTest {
     private static final String ALPHA_DICT_CODE = "SYSTEM_ALPHA_DICT_UT";
     private static final String OMEGA_DICT_CODE = "SYSTEM_OMEGA_DICT_UT";
     private static final String CATEGORY_CODE = "system-test-ut";
+    private static final String VISIBLE_DICT_VALUE = "system-visible-value-ut";
+    private static final String CREATED_DICT_VALUE = "system-created-value-ut";
+    private static final String UPDATED_DICT_VALUE = "system-updated-value-ut";
 
     @Autowired
     private MockMvc mockMvc;
@@ -71,6 +75,13 @@ class SystemControllerTest {
         ensureUser(HIDDEN_USER, 3L);
 
         jdbcTemplate.update(
+                "DELETE FROM sys_dict_value WHERE tenant_id = ? AND dict_value IN (?, ?, ?)",
+                "tenant-a",
+                VISIBLE_DICT_VALUE,
+                CREATED_DICT_VALUE,
+                UPDATED_DICT_VALUE
+        );
+        jdbcTemplate.update(
                 "DELETE FROM sys_dict WHERE tenant_id = ? AND dict_code IN (?, ?, ?, ?)",
                 "tenant-a",
                 VISIBLE_DICT_CODE,
@@ -100,11 +111,28 @@ class SystemControllerTest {
                 "tenant-a",
                 HIDDEN_DICT_CODE
         );
+        Long visibleDictId = jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_dict WHERE tenant_id = ? AND dict_code = ?",
+                Long.class,
+                "tenant-a",
+                VISIBLE_DICT_CODE
+        );
+        jdbcTemplate.update(
+                "INSERT INTO sys_dict_value(tenant_id, dict_id, dict_type, dict_label, dict_value, show_class, sort, enabled, created_by, updated_by, deleted, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,0,NOW(),NOW())",
+                "tenant-a", visibleDictId, "system_scope", "可见字典值", VISIBLE_DICT_VALUE, "success", 3, 1, VISIBLE_USER, VISIBLE_USER
+        );
         jdbcTemplate.update("DELETE FROM sys_category_rule WHERE tenant_id = ? AND target_type = ? AND category_code = ?", "tenant-a", "dict", CATEGORY_CODE);
     }
 
     @AfterEach
     void tearDown() {
+        jdbcTemplate.update(
+                "DELETE FROM sys_dict_value WHERE tenant_id = ? AND dict_value IN (?, ?, ?)",
+                "tenant-a",
+                VISIBLE_DICT_VALUE,
+                CREATED_DICT_VALUE,
+                UPDATED_DICT_VALUE
+        );
         jdbcTemplate.update(
                 "DELETE FROM sys_dict WHERE tenant_id = ? AND dict_code IN (?, ?, ?, ?)",
                 "tenant-a",
@@ -188,6 +216,83 @@ class SystemControllerTest {
     }
 
     @Test
+    void dictDetailShouldReturnTypeAndValues() throws Exception {
+        Long visibleDictId = visibleDictId();
+
+        mockMvc.perform(get("/api/system/dicts/{id}", visibleDictId)
+                        .with(bearer(principal(Set.of("system:read"))))
+                        .header("X-Tenant-Id", "tenant-a"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.dict.dictCode").value(VISIBLE_DICT_CODE))
+                .andExpect(jsonPath("$.data.dict.valueCount").value(1))
+                .andExpect(jsonPath("$.data.values[0].dictLabel").value("可见字典值"))
+                .andExpect(jsonPath("$.data.values[0].dictValue").value(VISIBLE_DICT_VALUE))
+                .andExpect(jsonPath("$.data.values[0].showClass").value("success"));
+    }
+
+    @Test
+    void shouldManageDictValuesByDictTypeDetail() throws Exception {
+        Long visibleDictId = visibleDictId();
+
+        mockMvc.perform(post("/api/system/dicts/{id}/values", visibleDictId)
+                        .with(bearer(principal(Set.of("system:write"))))
+                        .header("X-Tenant-Id", "tenant-a")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "dictLabel": "新字典值",
+                                  "dictValue": "system-created-value-ut",
+                                  "sort": 7,
+                                  "showClass": "warning",
+                                  "enabled": true,
+                                  "remarks": "接口测试创建"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.dictId").value(visibleDictId))
+                .andExpect(jsonPath("$.data.dictType").value("system_scope"))
+                .andExpect(jsonPath("$.data.dictLabel").value("新字典值"))
+                .andExpect(jsonPath("$.data.showClass").value("warning"));
+
+        Long valueId = jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_dict_value WHERE tenant_id = ? AND dict_value = ?",
+                Long.class,
+                "tenant-a",
+                CREATED_DICT_VALUE
+        );
+
+        mockMvc.perform(put("/api/system/dict-values/{valueId}", valueId)
+                        .with(bearer(principal(Set.of("system:write"))))
+                        .header("X-Tenant-Id", "tenant-a")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "dictLabel": "已更新字典值",
+                                  "dictValue": "system-updated-value-ut",
+                                  "sort": 8,
+                                  "showClass": "danger",
+                                  "enabled": false,
+                                  "remarks": "接口测试更新"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.dictLabel").value("已更新字典值"))
+                .andExpect(jsonPath("$.data.dictValue").value(UPDATED_DICT_VALUE))
+                .andExpect(jsonPath("$.data.enabled").value(false));
+
+        mockMvc.perform(delete("/api/system/dict-values/{valueId}", valueId)
+                        .with(bearer(principal(Set.of("system:write"))))
+                        .header("X-Tenant-Id", "tenant-a"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/system/dicts/{id}", visibleDictId)
+                        .with(bearer(principal(Set.of("system:read"))))
+                        .header("X-Tenant-Id", "tenant-a"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.values[?(@.dictValue=='" + UPDATED_DICT_VALUE + "')]").doesNotExist());
+    }
+
+    @Test
     void shouldCreateCategoryOption() throws Exception {
         mockMvc.perform(post("/api/system/categories/dict")
                         .with(bearer(principal(Set.of("system:write"))))
@@ -233,6 +338,15 @@ class SystemControllerTest {
                 Set.of(),
                 DataScopeType.DEPT_AND_CHILDREN,
                 1
+        );
+    }
+
+    private Long visibleDictId() {
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_dict WHERE tenant_id = ? AND dict_code = ?",
+                Long.class,
+                "tenant-a",
+                VISIBLE_DICT_CODE
         );
     }
 

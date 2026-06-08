@@ -7,10 +7,13 @@ import com.enterprise.auth.platform.common.authz.SecuritySupport;
 import com.enterprise.auth.platform.common.cache.CacheNames;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysCategoryRuleEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysDictEntity;
+import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysDictValueEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysCategoryRuleMapper;
 import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysDictMapper;
+import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysDictValueMapper;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.system.interfaces.DictCrudRequest;
 import com.enterprise.auth.platform.modules.audit.application.AuditService;
@@ -33,17 +36,20 @@ public class DictApplicationService {
     private static final String DICT_CATEGORY_PREFIX = "system.category.dict.";
 
     private final SysDictMapper sysDictMapper;
+    private final SysDictValueMapper sysDictValueMapper;
     private final SysCategoryRuleMapper sysCategoryRuleMapper;
     private final AuditService auditService;
     private final DataScopeService dataScopeService;
 
     public DictApplicationService(
             SysDictMapper sysDictMapper,
+            SysDictValueMapper sysDictValueMapper,
             SysCategoryRuleMapper sysCategoryRuleMapper,
             AuditService auditService,
             DataScopeService dataScopeService
     ) {
         this.sysDictMapper = sysDictMapper;
+        this.sysDictValueMapper = sysDictValueMapper;
         this.sysCategoryRuleMapper = sysCategoryRuleMapper;
         this.auditService = auditService;
         this.dataScopeService = dataScopeService;
@@ -80,11 +86,14 @@ public class DictApplicationService {
         String operator = SecuritySupport.currentOperator();
         SysDictEntity entity = new SysDictEntity();
         entity.setTenantId(tenantId);
-        entity.setDictType(request.dictType());
-        entity.setDictCode(request.dictCode());
-        entity.setDictValue(request.dictValue());
+        entity.setDictType(normalizeRequired(request.dictType(), "字典类型不能为空"));
+        entity.setDictCode(normalizeOrDefault(request.dictCode(), entity.getDictType()));
+        entity.setDictValue(normalizeOrDefault(request.dictValue(), normalizeOrDefault(request.description(), entity.getDictType())));
+        entity.setDescription(blankToNull(request.description()));
+        entity.setEnabled(Boolean.FALSE.equals(request.enabled()) ? 0 : 1);
+        entity.setRemarks(blankToNull(request.remarks()));
         sysDictMapper.insert(entity);
-        auditService.record("DICT_CREATED", operator, tenantId, Map.of("dictId", entity.getId()));
+        auditService.record("DICT_CREATED", operator, tenantId, Map.of("dictId", entity.getId(), "dictType", entity.getDictType()));
         return toDictView(entity);
     }
 
@@ -93,12 +102,22 @@ public class DictApplicationService {
     public SystemViewModels.DictView updateDict(Long id, DictCrudRequest request) {
         String tenantId = currentTenantId();
         SysDictEntity entity = getDict(id, tenantId);
-        entity.setDictType(request.dictType());
-        entity.setDictCode(request.dictCode());
-        entity.setDictValue(request.dictValue());
+        entity.setDictType(normalizeRequired(request.dictType(), "字典类型不能为空"));
+        entity.setDictCode(normalizeOrDefault(request.dictCode(), entity.getDictType()));
+        entity.setDictValue(normalizeOrDefault(request.dictValue(), normalizeOrDefault(request.description(), entity.getDictType())));
+        entity.setDescription(blankToNull(request.description()));
+        entity.setEnabled(Boolean.FALSE.equals(request.enabled()) ? 0 : 1);
+        entity.setRemarks(blankToNull(request.remarks()));
         sysDictMapper.updateById(entity);
-        auditService.record("DICT_UPDATED", SecuritySupport.currentOperator(), tenantId, Map.of("dictId", id));
+        syncValueTypes(tenantId, id, entity.getDictType());
+        auditService.record("DICT_UPDATED", SecuritySupport.currentOperator(), tenantId, Map.of("dictId", id, "dictType", entity.getDictType()));
         return toDictView(entity);
+    }
+
+    public SystemViewModels.DictDetailView detail(Long id) {
+        String tenantId = currentTenantId();
+        SysDictEntity entity = getDict(id, tenantId);
+        return new SystemViewModels.DictDetailView(toDictView(entity), valueViews(listValues(tenantId, entity.getId(), false)));
     }
 
     @Transactional
@@ -106,8 +125,11 @@ public class DictApplicationService {
     public void deleteDict(Long id) {
         String tenantId = currentTenantId();
         SysDictEntity entity = getDict(id, tenantId);
+        for (SysDictValueEntity value : listValues(tenantId, entity.getId(), false)) {
+            sysDictValueMapper.deleteById(value.getId());
+        }
         sysDictMapper.deleteById(entity.getId());
-        auditService.record("DICT_DELETED", SecuritySupport.currentOperator(), tenantId, Map.of("dictId", id));
+        auditService.record("DICT_DELETED", SecuritySupport.currentOperator(), tenantId, Map.of("dictId", id, "dictType", entity.getDictType()));
     }
 
     public String currentTenantId() {
@@ -126,12 +148,18 @@ public class DictApplicationService {
     }
 
     private SystemViewModels.DictView toDictView(SysDictEntity entity) {
+        String tenantId = currentTenantId();
         return new SystemViewModels.DictView(
                 entity.getId(),
                 entity.getDictType(),
-                deriveCategory(currentTenantId(), entity.getDictType()),
+                deriveCategory(tenantId, entity.getDictType()),
                 entity.getDictCode(),
                 entity.getDictValue(),
+                StringUtils.hasText(entity.getDescription()) ? entity.getDescription() : entity.getDictValue(),
+                entity.getEnabled() == null || entity.getEnabled() == 1,
+                entity.getRemarks(),
+                countValues(tenantId, entity.getId()),
+                TimeSupport.toEpochMilli(entity.getUpdatedAt()),
                 entity.getCreatedBy()
         );
     }
@@ -148,9 +176,15 @@ public class DictApplicationService {
                 .eq(SysDictEntity::getDeleted, 0)
                 .eq(StringUtils.hasText(dictType), SysDictEntity::getDictType, dictType)
                 .and(StringUtils.hasText(keyword), wrapper -> wrapper
+                        .like(SysDictEntity::getDictType, keyword)
+                        .or()
                         .like(SysDictEntity::getDictCode, keyword)
                         .or()
-                        .like(SysDictEntity::getDictValue, keyword));
+                        .like(SysDictEntity::getDictValue, keyword)
+                        .or()
+                        .like(SysDictEntity::getDescription, keyword)
+                        .or()
+                        .like(SysDictEntity::getRemarks, keyword));
         applyCategoryFilter(query, tenantId, category, SysDictEntity::getDictType);
         applyCreatorScope(query, visibleCreators, SysDictEntity::getCreatedBy);
         return query;
@@ -195,6 +229,66 @@ public class DictApplicationService {
             throw new BusinessException("无权访问该字典项");
         }
         return entity;
+    }
+
+    private List<SysDictValueEntity> listValues(String tenantId, Long dictId, boolean onlyEnabled) {
+        return sysDictValueMapper.selectList(new LambdaQueryWrapper<SysDictValueEntity>()
+                .eq(SysDictValueEntity::getTenantId, tenantId)
+                .eq(SysDictValueEntity::getDictId, dictId)
+                .eq(SysDictValueEntity::getDeleted, 0)
+                .eq(onlyEnabled, SysDictValueEntity::getEnabled, 1)
+                .orderByAsc(SysDictValueEntity::getSort)
+                .orderByAsc(SysDictValueEntity::getId));
+    }
+
+    private Long countValues(String tenantId, Long dictId) {
+        return sysDictValueMapper.selectCount(new LambdaQueryWrapper<SysDictValueEntity>()
+                .eq(SysDictValueEntity::getTenantId, tenantId)
+                .eq(SysDictValueEntity::getDictId, dictId)
+                .eq(SysDictValueEntity::getDeleted, 0));
+    }
+
+    private List<SystemViewModels.DictValueView> valueViews(List<SysDictValueEntity> values) {
+        return values.stream().map(this::toValueView).toList();
+    }
+
+    private SystemViewModels.DictValueView toValueView(SysDictValueEntity value) {
+        return new SystemViewModels.DictValueView(
+                value.getId(),
+                value.getDictId(),
+                value.getDictType(),
+                value.getDictLabel(),
+                value.getDictValue(),
+                value.getSort(),
+                value.getShowClass(),
+                value.getEnabled() != null && value.getEnabled() == 1,
+                value.getRemarks(),
+                TimeSupport.toEpochMilli(value.getUpdatedAt())
+        );
+    }
+
+    private void syncValueTypes(String tenantId, Long dictId, String dictType) {
+        for (SysDictValueEntity value : listValues(tenantId, dictId, false)) {
+            value.setDictType(dictType);
+            sysDictValueMapper.updateById(value);
+        }
+    }
+
+    private String normalizeRequired(String value, String message) {
+        String normalized = blankToNull(value);
+        if (normalized == null) {
+            throw new BusinessException(message);
+        }
+        return normalized;
+    }
+
+    private String normalizeOrDefault(String value, String defaultValue) {
+        String normalized = blankToNull(value);
+        return normalized == null ? defaultValue : normalized;
+    }
+
+    private String blankToNull(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
     }
 
     private String currentScopeCacheKey() {

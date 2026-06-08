@@ -11,7 +11,7 @@
             v-model="keyword"
             class="resource-toolbar__search"
             clearable
-            placeholder="搜索菜单名称、资源标识、路由标识或授权键"
+            placeholder="搜索名称、资源、路由、授权键或应用标识"
           >
             <template #prefix>
               <el-icon><Search /></el-icon>
@@ -85,6 +85,20 @@
           </template>
         </el-table-column>
 
+        <el-table-column label="应用标识" width="140">
+          <template #default="{ row }">
+            <code v-if="row.applicationKey" class="route-key">{{ row.applicationKey }}</code>
+            <span v-else class="text-muted">—</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="外链" width="80" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.outerStatus" size="small" type="warning" effect="plain">外链</el-tag>
+            <span v-else class="text-muted">—</span>
+          </template>
+        </el-table-column>
+
         <el-table-column label="图标" width="80" align="center">
           <template #default="{ row }">
             <el-icon v-if="row.icon" :size="18"><component :is="row.icon" /></el-icon>
@@ -108,6 +122,25 @@
 
         <el-table-column label="操作" width="240" fixed="right">
           <template #default="{ row }">
+            <el-button
+              v-if="row.grantKey"
+              link
+              type="primary"
+              size="small"
+              @click="copyGrantKey(row)"
+            >
+              复制权限
+            </el-button>
+            <el-button
+              v-if="row.menuType === 'MENU'"
+              v-permission="'system:write'"
+              link
+              type="primary"
+              size="small"
+              @click="openBatchActions(row)"
+            >
+              批量按钮
+            </el-button>
             <el-button
               v-permission="'system:write'"
               link
@@ -182,7 +215,7 @@
           <el-input v-model="form.menuName" placeholder="输入菜单名称" maxlength="60" />
         </el-form-item>
 
-        <el-form-item label="路由标识" prop="routeKey">
+        <el-form-item v-if="form.menuType !== 'BUTTON' && form.menuType !== 'API'" label="路由标识" prop="routeKey">
           <el-input v-model="form.routeKey" placeholder="前端路由标识，如 users" />
         </el-form-item>
 
@@ -202,12 +235,20 @@
           <el-input v-model="form.redirect" placeholder="重定向路径（可选）" />
         </el-form-item>
 
-        <el-form-item label="图标">
+        <el-form-item label="图标" v-if="form.menuType === 'DIR' || form.menuType === 'MENU'">
           <el-input v-model="form.icon" placeholder="Element Plus 图标名">
             <template #prefix>
               <el-icon v-if="form.icon"><component :is="form.icon" /></el-icon>
             </template>
           </el-input>
+        </el-form-item>
+
+        <el-form-item label="应用标识">
+          <el-input v-model="form.applicationKey" placeholder="用于套餐/能力映射，如 app_base" clearable />
+        </el-form-item>
+
+        <el-form-item v-if="form.menuType === 'MENU'" label="外链">
+          <el-switch v-model="form.outerStatus" active-text="外链" inactive-text="内链" />
         </el-form-item>
 
         <el-form-item label="排序" prop="orderNo">
@@ -233,6 +274,31 @@
         <el-button type="primary" :loading="saving" @click="handleSave">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="actionDialogVisible"
+      title="批量生成按钮权限"
+      width="520px"
+      destroy-on-close
+    >
+      <el-alert
+        v-if="actionParent"
+        :title="`将为「${actionParent.menuName}」生成按钮权限节点`"
+        type="info"
+        :closable="false"
+        show-icon
+        class="action-alert"
+      />
+      <el-checkbox-group v-model="selectedActions" class="action-grid">
+        <el-checkbox v-for="item in actionOptions" :key="item.value" :value="item.value">
+          {{ item.label }}
+        </el-checkbox>
+      </el-checkbox-group>
+      <template #footer>
+        <el-button @click="actionDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="actionSaving" @click="handleBatchActions">生成</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -243,7 +309,7 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import {
-  queryMenuTree, createMenu, updateMenu, deleteMenu,
+  queryMenuTree, createMenu, updateMenu, deleteMenu, batchCreateMenuActions,
   type MenuTreeNode, type MenuMutationPayload,
 } from '@/api/modules/menu'
 
@@ -252,8 +318,12 @@ const saving = ref(false)
 const keyword = ref('')
 const tableData = ref<MenuTreeNode[]>([])
 const dialogVisible = ref(false)
+const actionDialogVisible = ref(false)
 const isEditing = ref(false)
 const editingId = ref<number | null>(null)
+const actionParent = ref<MenuTreeNode | null>(null)
+const selectedActions = ref<string[]>([])
+const actionSaving = ref(false)
 const formRef = ref<FormInstance>()
 
 const form = reactive<MenuMutationPayload & { parentId?: number | null }>({
@@ -270,7 +340,18 @@ const form = reactive<MenuMutationPayload & { parentId?: number | null }>({
   orderNo: 0,
   visible: true,
   enabled: true,
+  outerStatus: false,
+  applicationKey: null,
 })
+
+const actionOptions = [
+  { label: '查看', value: 'read' },
+  { label: '新增', value: 'create' },
+  { label: '修改', value: 'update' },
+  { label: '删除', value: 'delete' },
+  { label: '导出', value: 'export' },
+  { label: '导入', value: 'import' },
+]
 
 const menuTypeOptions = [
   { label: '目录', value: 'DIR' },
@@ -303,7 +384,8 @@ const filteredTableData = computed(() => {
           n.menuName.toLowerCase().includes(kw) ||
           n.resourceKey.toLowerCase().includes(kw) ||
           (n.routeKey && n.routeKey.toLowerCase().includes(kw)) ||
-          (n.grantKey && n.grantKey.toLowerCase().includes(kw))
+          (n.grantKey && n.grantKey.toLowerCase().includes(kw)) ||
+          (n.applicationKey && n.applicationKey.toLowerCase().includes(kw))
         if (match || children.length > 0) {
           return { ...n, children }
         }
@@ -340,6 +422,8 @@ function resetForm() {
   form.orderNo = 0
   form.visible = true
   form.enabled = true
+  form.outerStatus = false
+  form.applicationKey = null
   formRef.value?.resetFields()
 }
 
@@ -370,6 +454,8 @@ function openEdit(row: MenuTreeNode) {
   form.orderNo = row.orderNo
   form.visible = row.visible
   form.enabled = row.enabled
+  form.outerStatus = row.outerStatus
+  form.applicationKey = row.applicationKey
   dialogVisible.value = true
 }
 
@@ -393,6 +479,8 @@ async function handleSave() {
       orderNo: form.orderNo,
       visible: form.visible,
       enabled: form.enabled,
+      outerStatus: form.outerStatus,
+      applicationKey: form.applicationKey || null,
     }
 
     if (isEditing.value && editingId.value) {
@@ -425,6 +513,38 @@ async function handleDelete(row: MenuTreeNode) {
     if (e !== 'cancel') {
       ElMessage.error(e?.message || '删除失败')
     }
+  }
+}
+
+async function copyGrantKey(row: MenuTreeNode) {
+  if (!row.grantKey) {
+    return
+  }
+  await navigator.clipboard?.writeText(row.grantKey)
+  ElMessage.success('权限标识已复制')
+}
+
+function openBatchActions(row: MenuTreeNode) {
+  actionParent.value = row
+  selectedActions.value = ['read', 'create', 'update', 'delete']
+  actionDialogVisible.value = true
+}
+
+async function handleBatchActions() {
+  if (!actionParent.value || selectedActions.value.length === 0) {
+    ElMessage.warning('请选择要生成的按钮权限')
+    return
+  }
+  actionSaving.value = true
+  try {
+    await batchCreateMenuActions(actionParent.value.id, { actions: selectedActions.value })
+    ElMessage.success('按钮权限已生成')
+    actionDialogVisible.value = false
+    await load()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '生成失败')
+  } finally {
+    actionSaving.value = false
   }
 }
 

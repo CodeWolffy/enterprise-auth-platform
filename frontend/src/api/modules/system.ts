@@ -1,6 +1,14 @@
 import { http } from '../http'
 import type { ApiResponse, FeatureFlags } from '@/types/api'
-import type { CategoryAnalysis, CategoryOption, ConfigView, DictView, NoticeView } from '@/types/system'
+import type {
+  CategoryAnalysis,
+  CategoryOption,
+  ConfigView,
+  DictDetailView,
+  DictValueView,
+  DictView,
+  NoticeView,
+} from '@/types/system'
 
 export interface PageResult<T> {
   total: number
@@ -83,6 +91,11 @@ export async function queryDicts(params?: DictQueryParams) {
   return data.data
 }
 
+export async function queryDictDetail(id: number) {
+  const { data } = await http.get<ApiResponse<DictDetailView>>(`/api/system/dicts/${id}`)
+  return data.data
+}
+
 export async function createDict(payload: Record<string, unknown>) {
   const { data } = await http.post<ApiResponse<DictView>>('/api/system/dicts', payload)
   return data.data
@@ -95,6 +108,30 @@ export async function updateDict(id: number, payload: Record<string, unknown>) {
 
 export async function deleteDict(id: number) {
   await http.delete(`/api/system/dicts/${id}`)
+}
+
+export async function queryDictValues(id: number) {
+  const { data } = await http.get<ApiResponse<DictValueView[]>>(`/api/system/dicts/${id}/values`)
+  return data.data
+}
+
+export async function createDictValue(id: number, payload: Record<string, unknown>) {
+  const { data } = await http.post<ApiResponse<DictValueView>>(`/api/system/dicts/${id}/values`, payload)
+  return data.data
+}
+
+export async function updateDictValue(valueId: number, payload: Record<string, unknown>) {
+  const { data } = await http.put<ApiResponse<DictValueView>>(`/api/system/dict-values/${valueId}`, payload)
+  return data.data
+}
+
+export async function deleteDictValue(valueId: number) {
+  await http.delete(`/api/system/dict-values/${valueId}`)
+}
+
+export async function refreshDictCache() {
+  const { data } = await http.delete<ApiResponse<string>>('/api/system/dicts/cache')
+  return data.data
 }
 
 export async function queryConfigs(params?: ConfigQueryParams) {

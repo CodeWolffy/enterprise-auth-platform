@@ -19,6 +19,9 @@ public class SysDictEntity {
     private String dictType;
     private String dictCode;
     private String dictValue;
+    private String description;
+    private Integer enabled;
+    private String remarks;
     @TableField(fill = FieldFill.INSERT)
     private String createdBy;
     @TableField(fill = FieldFill.INSERT_UPDATE)

@@ -6,7 +6,13 @@ import jakarta.validation.constraints.NotBlank;
 @Schema(description = "字典新增或修改请求")
 public record DictCrudRequest(
         @Schema(description = "字典类型", requiredMode = Schema.RequiredMode.REQUIRED) @NotBlank String dictType,
-        @Schema(description = "字典编码", requiredMode = Schema.RequiredMode.REQUIRED) @NotBlank String dictCode,
-        @Schema(description = "字典值", requiredMode = Schema.RequiredMode.REQUIRED) @NotBlank String dictValue
+        @Schema(description = "兼容字段：字典编码") String dictCode,
+        @Schema(description = "兼容字段：字典值") String dictValue,
+        @Schema(description = "字典类型说明") String description,
+        @Schema(description = "是否启用") Boolean enabled,
+        @Schema(description = "备注") String remarks
 ) {
+    public DictCrudRequest(String dictType, String dictCode, String dictValue) {
+        this(dictType, dictCode, dictValue, dictValue, true, null);
+    }
 }

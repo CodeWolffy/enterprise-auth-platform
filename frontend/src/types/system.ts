@@ -30,7 +30,30 @@ export interface DictView {
   category: string
   dictCode: string
   dictValue: string
+  description?: string | null
+  enabled: boolean
+  remarks?: string | null
+  valueCount: number
+  updatedAt?: number | null
   createdBy: string
+}
+
+export interface DictValueView {
+  id: number
+  dictId: number
+  dictType: string
+  dictLabel: string
+  dictValue: string
+  sort: number
+  showClass?: string | null
+  enabled: boolean
+  remarks?: string | null
+  updatedAt?: number | null
+}
+
+export interface DictDetailView {
+  dict: DictView
+  values: DictValueView[]
 }
 
 export interface ConfigView {

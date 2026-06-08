@@ -10,6 +10,7 @@ import com.enterprise.auth.platform.modules.menu.domain.MenuType;
 import com.enterprise.auth.platform.modules.menu.infrastructure.entity.SysMenuEntity;
 import com.enterprise.auth.platform.modules.menu.infrastructure.mapper.SysMenuMapper;
 import com.enterprise.auth.platform.modules.menu.interfaces.CreateMenuRequest;
+import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMenuMapper;
 import com.enterprise.auth.platform.modules.tenant.application.TenantCapabilityResourceScopeFacade;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
 import java.util.ArrayList;
@@ -33,8 +34,17 @@ import org.springframework.util.StringUtils;
 public class MenuService {
 
     private static final String PLATFORM_TENANT = "platform";
+    private static final Map<String, String> ACTION_LABELS = Map.of(
+            "read", "查看",
+            "create", "新增",
+            "update", "修改",
+            "delete", "删除",
+            "export", "导出",
+            "import", "导入"
+    );
 
     private final SysMenuMapper sysMenuMapper;
+    private final SysRoleMenuMapper sysRoleMenuMapper;
     private final ApplicationEventPublisher eventPublisher;
     private final TenantCapabilityResourceScopeFacade tenantCapabilityResourceScopeFacade;
     private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
@@ -42,12 +52,14 @@ public class MenuService {
 
     public MenuService(
             SysMenuMapper sysMenuMapper,
+            SysRoleMenuMapper sysRoleMenuMapper,
             ApplicationEventPublisher eventPublisher,
             TenantCapabilityResourceScopeFacade tenantCapabilityResourceScopeFacade,
             AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
             TenantProperties tenantProperties
     ) {
         this.sysMenuMapper = sysMenuMapper;
+        this.sysRoleMenuMapper = sysRoleMenuMapper;
         this.eventPublisher = eventPublisher;
         this.tenantCapabilityResourceScopeFacade = tenantCapabilityResourceScopeFacade;
         this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
@@ -313,6 +325,52 @@ public class MenuService {
     }
 
     @Transactional
+    public List<MenuTreeNode> batchCreateActions(Long menuId, List<String> actions) {
+        requirePlatformTenant();
+        SysMenuEntity parent = getMenu(menuId);
+        if (parseType(parent.getMenuType()) != MenuType.MENU) {
+            throw new BusinessException("只有菜单节点可以批量生成按钮权限");
+        }
+        List<String> normalizedActions = normalizeActions(actions);
+        if (normalizedActions.isEmpty()) {
+            throw new BusinessException("请选择要生成的按钮权限");
+        }
+        List<MenuTreeNode> created = new ArrayList<>();
+        int orderNo = nextChildOrderNo(menuId);
+        for (String action : normalizedActions) {
+            String resourceKey = parent.getResourceKey() + ":" + action;
+            String grantKey = resolveActionGrantKey(parent, action);
+            ensureActionNotExists(resourceKey, grantKey);
+            SysMenuEntity entity = new SysMenuEntity();
+            entity.setTenantId(platformTenantId());
+            entity.setParentId(parent.getId());
+            entity.setAncestors(resolveAncestors(parent));
+            entity.setMenuType(MenuType.BUTTON.name());
+            entity.setResourceKey(resourceKey);
+            entity.setMenuName(parent.getMenuName() + ACTION_LABELS.getOrDefault(action, action));
+            entity.setRouteKey(null);
+            entity.setGrantKey(grantKey);
+            entity.setPath(null);
+            entity.setComponent(null);
+            entity.setRedirect(null);
+            entity.setIcon(null);
+            entity.setOrderNo(orderNo++);
+            entity.setVisible(1);
+            entity.setEnabled(1);
+            entity.setIsSystem(0);
+            entity.setOuterStatus(0);
+            entity.setApplicationKey(parent.getApplicationKey());
+            runWithPlatformTenant(() -> {
+                sysMenuMapper.insert(entity);
+                return null;
+            });
+            created.add(toMenuNode(entity, List.of()));
+        }
+        evictPrincipalSnapshots();
+        return created;
+    }
+
+    @Transactional
     public void delete(Long menuId) {
         requirePlatformTenant();
         SysMenuEntity entity = getMenu(menuId);
@@ -328,6 +386,10 @@ public class MenuService {
 
         if (children > 0) {
             throw new BusinessException("请先删除子节点");
+        }
+        long roleBindings = runWithPlatformTenant(() -> sysRoleMenuMapper.countByMenuIdAcrossTenants(menuId));
+        if (roleBindings > 0) {
+            throw new BusinessException("菜单已被角色授权引用，暂不允许删除");
         }
 
         runWithPlatformTenant(() -> {
@@ -415,6 +477,62 @@ public class MenuService {
                 entity.getOuterStatus() != null && entity.getOuterStatus() == 1,
                 entity.getApplicationKey(), children
         );
+    }
+
+    private List<String> normalizeActions(List<String> actions) {
+        if (actions == null || actions.isEmpty()) {
+            return List.of();
+        }
+        List<String> result = new ArrayList<>();
+        for (String action : actions) {
+            String normalized = blankToNull(action);
+            if (normalized == null) {
+                continue;
+            }
+            normalized = normalized.toLowerCase();
+            if (!ACTION_LABELS.containsKey(normalized)) {
+                throw new BusinessException("不支持的按钮动作：" + action);
+            }
+            if (!result.contains(normalized)) {
+                result.add(normalized);
+            }
+        }
+        return result;
+    }
+
+    private int nextChildOrderNo(Long menuId) {
+        return runWithPlatformTenant(() -> sysMenuMapper.selectList(new LambdaQueryWrapper<SysMenuEntity>()
+                        .eq(SysMenuEntity::getTenantId, platformTenantId())
+                        .eq(SysMenuEntity::getDeleted, 0)
+                        .eq(SysMenuEntity::getParentId, menuId))
+                .stream()
+                .map(SysMenuEntity::getOrderNo)
+                .filter(Objects::nonNull)
+                .max(Integer::compareTo)
+                .map(value -> value + 1)
+                .orElse(1));
+    }
+
+    private String resolveActionGrantKey(SysMenuEntity parent, String action) {
+        String grantKey = blankToNull(parent.getGrantKey());
+        if (grantKey == null || !grantKey.contains(":")) {
+            throw new BusinessException("父级菜单授权键不合法，无法生成按钮权限");
+        }
+        String module = grantKey.substring(0, grantKey.indexOf(':'));
+        return module + ":" + action;
+    }
+
+    private void ensureActionNotExists(String resourceKey, String grantKey) {
+        String normalizedResourceKey = blankToNull(resourceKey);
+        String normalizedGrantKey = blankToNull(grantKey);
+        boolean exists = listTemplateMenus().stream().anyMatch(menu ->
+                Objects.equals(normalizedResourceKey, blankToNull(menu.getResourceKey()))
+                        || (Objects.equals(MenuType.BUTTON.name(), menu.getMenuType())
+                        && Objects.equals(normalizedGrantKey, blankToNull(menu.getGrantKey())))
+        );
+        if (exists) {
+            throw new BusinessException("按钮权限已存在，请勿重复生成");
+        }
     }
 
     private void validateMenuShape(MenuType childType, SysMenuEntity parent, String routeKey, String path, String component, String grantKey) {

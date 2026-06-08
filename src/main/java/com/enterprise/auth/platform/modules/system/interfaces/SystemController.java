@@ -6,6 +6,7 @@ import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.system.interfaces.ConfigCrudRequest;
 import com.enterprise.auth.platform.modules.system.interfaces.CategoryConfigRequest;
 import com.enterprise.auth.platform.modules.system.interfaces.DictCrudRequest;
+import com.enterprise.auth.platform.modules.system.interfaces.DictValueCrudRequest;
 import com.enterprise.auth.platform.modules.system.interfaces.NoticeCrudRequest;
 import com.enterprise.auth.platform.modules.system.application.CategoryRuleApplicationService;
 import com.enterprise.auth.platform.modules.system.application.ConfigApplicationService;
@@ -143,6 +144,13 @@ public class SystemController {
         return ApiResponse.ok(dictApplicationService.dicts(dictType, category, keyword, page, size, sortBy, sortDirection));
     }
 
+    @Operation(summary = "查询字典详情")
+    @GetMapping("/dicts/{id}")
+    @SaCheckPermission(PermissionCodes.SYSTEM_READ)
+    public ApiResponse<SystemViewModels.DictDetailView> dictDetail(@Parameter(description = "字典 ID") @PathVariable Long id) {
+        return ApiResponse.ok(dictApplicationService.detail(id));
+    }
+
     @Operation(summary = "新增字典")
     @PostMapping("/dicts")
     @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
@@ -174,20 +182,51 @@ public class SystemController {
     public ApiResponse<List<SystemViewModels.DictValueView>> dictValues(
             @Parameter(description = "字典类型") @RequestParam String dictType
     ) {
-        return ApiResponse.ok(dictValueApplicationService.listByType(dictType).stream()
-                .map(v -> new SystemViewModels.DictValueView(
-                        v.getId(), v.getDictId(), v.getDictType(),
-                        v.getDictLabel(), v.getDictValue(), v.getSort(),
-                        v.getShowClass(), v.getEnabled() != null && v.getEnabled() == 1))
-                .toList());
+        return ApiResponse.ok(dictValueApplicationService.listByType(dictType));
+    }
+
+    @Operation(summary = "查询字典值列表")
+    @GetMapping("/dicts/{id}/values")
+    @SaCheckPermission(PermissionCodes.SYSTEM_READ)
+    public ApiResponse<List<SystemViewModels.DictValueView>> dictValuesByDict(
+            @Parameter(description = "字典 ID") @PathVariable Long id
+    ) {
+        return ApiResponse.ok(dictValueApplicationService.listByDictId(id));
+    }
+
+    @Operation(summary = "新增字典值")
+    @PostMapping("/dicts/{id}/values")
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
+    public ApiResponse<SystemViewModels.DictValueView> createDictValue(
+            @Parameter(description = "字典 ID") @PathVariable Long id,
+            @Valid @RequestBody DictValueCrudRequest request
+    ) {
+        return ApiResponse.ok(dictValueApplicationService.create(id, request));
+    }
+
+    @Operation(summary = "修改字典值")
+    @PutMapping("/dict-values/{valueId}")
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
+    public ApiResponse<SystemViewModels.DictValueView> updateDictValue(
+            @Parameter(description = "字典值 ID") @PathVariable Long valueId,
+            @Valid @RequestBody DictValueCrudRequest request
+    ) {
+        return ApiResponse.ok(dictValueApplicationService.update(valueId, request));
+    }
+
+    @Operation(summary = "删除字典值")
+    @DeleteMapping("/dict-values/{valueId}")
+    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
+    public ApiResponse<Void> deleteDictValue(@Parameter(description = "字典值 ID") @PathVariable Long valueId) {
+        dictValueApplicationService.delete(valueId);
+        return ApiResponse.ok();
     }
 
     @Operation(summary = "刷新字典缓存")
     @DeleteMapping("/dicts/cache")
     @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
-    public ApiResponse<Void> evictDictCache() {
-        dictValueApplicationService.refreshCache();
-        return ApiResponse.ok();
+    public ApiResponse<String> evictDictCache() {
+        return ApiResponse.ok(dictValueApplicationService.refreshCache());
     }
 
     @Operation(summary = "分页查询参数列表")

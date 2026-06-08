@@ -9,14 +9,27 @@ public final class SystemViewModels {
     private SystemViewModels() {
     }
 
-    @Schema(description = "字典项视图")
+    @Schema(description = "字典类型视图")
     public record DictView(
             @Schema(description = "字典 ID") Long id,
             @Schema(description = "字典类型") String dictType,
             @Schema(description = "字典分类") String category,
-            @Schema(description = "字典编码") String dictCode,
-            @Schema(description = "字典值") String dictValue,
+            @Schema(description = "兼容字段：字典编码") String dictCode,
+            @Schema(description = "兼容字段：字典值") String dictValue,
+            @Schema(description = "字典类型说明") String description,
+            @Schema(description = "是否启用") boolean enabled,
+            @Schema(description = "备注") String remarks,
+            @Schema(description = "字典值数量") Long valueCount,
+            @Schema(description = "更新时间") Long updatedAt,
             @Schema(description = "创建人") String createdBy
+    ) implements Serializable {
+        private static final long serialVersionUID = 1L;
+    }
+
+    @Schema(description = "字典详情视图")
+    public record DictDetailView(
+            @Schema(description = "字典类型") DictView dict,
+            @Schema(description = "字典值列表") List<DictValueView> values
     ) implements Serializable {
         private static final long serialVersionUID = 1L;
     }
@@ -30,7 +43,9 @@ public final class SystemViewModels {
             @Schema(description = "字典键值") String dictValue,
             @Schema(description = "排序") Integer sort,
             @Schema(description = "回显样式") String showClass,
-            @Schema(description = "是否启用") boolean enabled
+            @Schema(description = "是否启用") boolean enabled,
+            @Schema(description = "备注") String remarks,
+            @Schema(description = "更新时间") Long updatedAt
     ) implements Serializable {
         private static final long serialVersionUID = 1L;
     }

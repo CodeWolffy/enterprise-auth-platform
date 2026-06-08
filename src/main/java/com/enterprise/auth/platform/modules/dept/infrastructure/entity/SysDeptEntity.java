@@ -20,6 +20,10 @@ public class SysDeptEntity {
     private String deptCode;
     private String deptName;
     private Long leaderUserId;
+    private String leaderName;
+    private String leaderPhone;
+    private Integer orderNo;
+    private Integer enabled;
     @TableField(fill = FieldFill.INSERT)
     private String createdBy;
     @TableField(fill = FieldFill.INSERT_UPDATE)

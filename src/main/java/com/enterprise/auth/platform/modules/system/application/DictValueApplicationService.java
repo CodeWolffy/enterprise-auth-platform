@@ -1,19 +1,21 @@
 package com.enterprise.auth.platform.modules.system.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.cache.CacheNames;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysDictEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysDictValueEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysDictMapper;
 import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysDictValueMapper;
+import com.enterprise.auth.platform.modules.system.interfaces.DictValueCrudRequest;
+import java.util.List;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-
-import java.util.List;
 
 @Service
 public class DictValueApplicationService {
@@ -27,63 +29,138 @@ public class DictValueApplicationService {
     }
 
     @Cacheable(value = CacheNames.SYSTEM_DICTS, key = "'value:' + #dictType")
-    public List<SysDictValueEntity> listByType(String dictType) {
+    public List<SystemViewModels.DictValueView> listByType(String dictType) {
         String tenantId = currentTenantId();
         return sysDictValueMapper.selectList(new LambdaQueryWrapper<SysDictValueEntity>()
                 .eq(SysDictValueEntity::getTenantId, tenantId)
                 .eq(SysDictValueEntity::getDictType, dictType)
                 .eq(SysDictValueEntity::getDeleted, 0)
                 .eq(SysDictValueEntity::getEnabled, 1)
-                .orderByAsc(SysDictValueEntity::getSort));
+                .orderByAsc(SysDictValueEntity::getSort)
+                .orderByAsc(SysDictValueEntity::getId))
+                .stream()
+                .map(this::toValueView)
+                .toList();
+    }
+
+    public List<SystemViewModels.DictValueView> listByDictId(Long dictId) {
+        SysDictEntity dict = getDict(dictId);
+        return listEntitiesByDictId(dict.getId()).stream().map(this::toValueView).toList();
     }
 
     @Transactional
-    @CacheEvict(value = CacheNames.SYSTEM_DICTS, key = "'value:' + #dictType")
-    public SysDictValueEntity create(String dictType, Long dictId, String label, String value, Integer sort, String showClass) {
-        String tenantId = currentTenantId();
+    @CacheEvict(value = CacheNames.SYSTEM_DICTS, allEntries = true)
+    public SystemViewModels.DictValueView create(Long dictId, DictValueCrudRequest request) {
+        SysDictEntity dict = getDict(dictId);
         SysDictValueEntity entity = new SysDictValueEntity();
-        entity.setTenantId(tenantId);
-        entity.setDictId(dictId);
-        entity.setDictType(dictType);
-        entity.setDictLabel(label.trim());
-        entity.setDictValue(value.trim());
-        entity.setSort(sort != null ? sort : 0);
-        entity.setShowClass(showClass);
-        entity.setEnabled(1);
+        entity.setTenantId(currentTenantId());
+        entity.setDictId(dict.getId());
+        entity.setDictType(dict.getDictType());
+        entity.setDictLabel(normalizeRequired(request.dictLabel(), "字典标签不能为空"));
+        entity.setDictValue(normalizeRequired(request.dictValue(), "字典键值不能为空"));
+        entity.setSort(request.sort() == null ? nextSort(dict.getId()) : request.sort());
+        entity.setShowClass(blankToNull(request.showClass()));
+        entity.setEnabled(Boolean.FALSE.equals(request.enabled()) ? 0 : 1);
+        entity.setRemarks(blankToNull(request.remarks()));
         sysDictValueMapper.insert(entity);
-        return entity;
+        return toValueView(entity);
     }
 
     @Transactional
-    @CacheEvict(value = CacheNames.SYSTEM_DICTS, key = "'value:' + #dictType")
-    public SysDictValueEntity update(String dictType, Long valueId, String label, String value, Integer sort, String showClass) {
-        String tenantId = currentTenantId();
-        SysDictValueEntity entity = sysDictValueMapper.selectById(valueId);
-        if (entity == null || !entity.getTenantId().equals(tenantId)) {
-            throw new BusinessException("字典值不存在");
-        }
-        entity.setDictLabel(label.trim());
-        entity.setDictValue(value.trim());
-        if (sort != null) entity.setSort(sort);
-        entity.setShowClass(showClass);
+    @CacheEvict(value = CacheNames.SYSTEM_DICTS, allEntries = true)
+    public SystemViewModels.DictValueView update(Long valueId, DictValueCrudRequest request) {
+        SysDictValueEntity entity = getValue(valueId);
+        SysDictEntity dict = getDict(entity.getDictId());
+        entity.setDictType(dict.getDictType());
+        entity.setDictLabel(normalizeRequired(request.dictLabel(), "字典标签不能为空"));
+        entity.setDictValue(normalizeRequired(request.dictValue(), "字典键值不能为空"));
+        entity.setSort(request.sort() == null ? 0 : request.sort());
+        entity.setShowClass(blankToNull(request.showClass()));
+        entity.setEnabled(Boolean.FALSE.equals(request.enabled()) ? 0 : 1);
+        entity.setRemarks(blankToNull(request.remarks()));
         sysDictValueMapper.updateById(entity);
-        return entity;
+        return toValueView(entity);
     }
 
     @Transactional
-    @CacheEvict(value = CacheNames.SYSTEM_DICTS, key = "'value:' + #dictType")
-    public void delete(String dictType, Long valueId) {
-        String tenantId = currentTenantId();
-        SysDictValueEntity entity = sysDictValueMapper.selectById(valueId);
-        if (entity == null || !entity.getTenantId().equals(tenantId)) {
-            throw new BusinessException("字典值不存在");
-        }
-        sysDictValueMapper.deleteById(valueId);
+    @CacheEvict(value = CacheNames.SYSTEM_DICTS, allEntries = true)
+    public void delete(Long valueId) {
+        SysDictValueEntity entity = getValue(valueId);
+        sysDictValueMapper.deleteById(entity.getId());
     }
 
     @CacheEvict(value = CacheNames.SYSTEM_DICTS, allEntries = true)
-    public void refreshCache() {
-        // 清除所有字典缓存
+    public String refreshCache() {
+        return "system:dicts";
+    }
+
+    private SysDictEntity getDict(Long dictId) {
+        SysDictEntity entity = sysDictMapper.selectOne(new LambdaQueryWrapper<SysDictEntity>()
+                .eq(SysDictEntity::getTenantId, currentTenantId())
+                .eq(SysDictEntity::getId, dictId)
+                .eq(SysDictEntity::getDeleted, 0)
+                .last("limit 1"));
+        if (entity == null) {
+            throw new BusinessException("字典项不存在");
+        }
+        return entity;
+    }
+
+    private SysDictValueEntity getValue(Long valueId) {
+        SysDictValueEntity entity = sysDictValueMapper.selectOne(new LambdaQueryWrapper<SysDictValueEntity>()
+                .eq(SysDictValueEntity::getTenantId, currentTenantId())
+                .eq(SysDictValueEntity::getId, valueId)
+                .eq(SysDictValueEntity::getDeleted, 0)
+                .last("limit 1"));
+        if (entity == null) {
+            throw new BusinessException("字典值不存在");
+        }
+        return entity;
+    }
+
+    private List<SysDictValueEntity> listEntitiesByDictId(Long dictId) {
+        return sysDictValueMapper.selectList(new LambdaQueryWrapper<SysDictValueEntity>()
+                .eq(SysDictValueEntity::getTenantId, currentTenantId())
+                .eq(SysDictValueEntity::getDictId, dictId)
+                .eq(SysDictValueEntity::getDeleted, 0)
+                .orderByAsc(SysDictValueEntity::getSort)
+                .orderByAsc(SysDictValueEntity::getId));
+    }
+
+    private int nextSort(Long dictId) {
+        return listEntitiesByDictId(dictId).stream()
+                .map(SysDictValueEntity::getSort)
+                .filter(value -> value != null)
+                .max(Integer::compareTo)
+                .map(value -> value + 1)
+                .orElse(0);
+    }
+
+    private SystemViewModels.DictValueView toValueView(SysDictValueEntity value) {
+        return new SystemViewModels.DictValueView(
+                value.getId(),
+                value.getDictId(),
+                value.getDictType(),
+                value.getDictLabel(),
+                value.getDictValue(),
+                value.getSort(),
+                value.getShowClass(),
+                value.getEnabled() != null && value.getEnabled() == 1,
+                value.getRemarks(),
+                TimeSupport.toEpochMilli(value.getUpdatedAt())
+        );
+    }
+
+    private String normalizeRequired(String value, String message) {
+        String normalized = blankToNull(value);
+        if (normalized == null) {
+            throw new BusinessException(message);
+        }
+        return normalized;
+    }
+
+    private String blankToNull(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
     }
 
     private String currentTenantId() {

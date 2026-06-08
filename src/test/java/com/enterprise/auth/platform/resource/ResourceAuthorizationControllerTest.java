@@ -3,6 +3,7 @@ package com.enterprise.auth.platform.resource;
 import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.bearer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -31,7 +32,9 @@ import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+        "app.security.redis.session-enabled=false"
+})
 @AutoConfigureMockMvc
 class ResourceAuthorizationControllerTest {
 
@@ -71,6 +74,11 @@ class ResourceAuthorizationControllerTest {
                 "DELETE FROM sys_menu WHERE tenant_id = ? AND resource_key LIKE ?",
                 "platform",
                 "ut.menu.%"
+        );
+        jdbcTemplate.update(
+                "DELETE FROM sys_menu WHERE tenant_id = ? AND resource_key LIKE ?",
+                "platform",
+                "ut.batch.%"
         );
     }
 
@@ -252,6 +260,54 @@ class ResourceAuthorizationControllerTest {
         assertThat(tokenSession.get("roles")).isNull();
     }
 
+    @Test
+    void batchCreateActionsShouldCreateButtonNodes() throws Exception {
+        Long menuId = createTempMenu();
+
+        mockMvc.perform(post("/api/menus/{menuId}/actions", menuId)
+                        .with(bearer(principal("platform", Set.of("system:write"))))
+                        .header("X-Tenant-Id", "platform")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "actions": ["read", "create"]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.resourceKey=='ut.menu.batch.actions:read')]").exists())
+                .andExpect(jsonPath("$.data[?(@.grantKey=='utbatch:read')]").exists())
+                .andExpect(jsonPath("$.data[?(@.resourceKey=='ut.menu.batch.actions:create')]").exists())
+                .andExpect(jsonPath("$.data[?(@.grantKey=='utbatch:create')]").exists());
+
+        Long count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_menu WHERE tenant_id = ? AND parent_id = ? AND resource_key LIKE ?",
+                Long.class,
+                "platform",
+                menuId,
+                "ut.menu.batch.actions:%"
+        );
+        assertThat(count).isEqualTo(2L);
+    }
+
+    @Test
+    void deleteMenuShouldRejectRoleBindings() throws Exception {
+        Long menuId = createTempMenu();
+        Long roleId = createTempRole("tenant-a");
+        jdbcTemplate.update(
+                "INSERT INTO sys_role_menu(tenant_id, role_id, menu_id, created_at) VALUES(?, ?, ?, NOW())",
+                "tenant-a",
+                roleId,
+                menuId
+        );
+
+        mockMvc.perform(delete("/api/menus/{menuId}", menuId)
+                        .with(bearer(principal("platform", Set.of("system:write"))))
+                        .header("X-Tenant-Id", "platform"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"))
+                .andExpect(jsonPath("$.message").value("菜单已被角色授权引用，暂不允许删除"));
+    }
+
     private RequestPostProcessor bearerWithSnapshotCapture(UserAccount user, AtomicReference<String> tokenRef) {
         return request -> {
             String token = StpUtil.createLoginSession(user.id(), new SaLoginModel().setDevice("mockmvc"));
@@ -384,6 +440,38 @@ class ResourceAuthorizationControllerTest {
         );
         assertThat(assignedIds).contains(1L, 20L, 21L, 210L);
         assertThat(assignedIds).doesNotContain(211L, 212L);
+    }
+
+    private Long createTempMenu() {
+        jdbcTemplate.update("DELETE FROM sys_menu WHERE tenant_id = ? AND resource_key LIKE ?", "platform", "ut.menu.batch.actions%");
+        jdbcTemplate.update(
+                """
+                INSERT INTO sys_menu (
+                    tenant_id, parent_id, ancestors, menu_type, resource_key, menu_name, route_key,
+                    grant_key, path, component, icon, order_no, visible, enabled, is_system,
+                    outer_status, application_key, deleted
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 0, 0, ?, 0)
+                """,
+                "platform",
+                20L,
+                "1,20",
+                "MENU",
+                "ut.menu.batch.actions",
+                "UT 批量按钮菜单",
+                "ut-batch-actions",
+                "utbatch:read",
+                "/ut/batch-actions",
+                "UtBatchActionsView",
+                null,
+                998,
+                "app_ut"
+        );
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_menu WHERE tenant_id = ? AND resource_key = ?",
+                Long.class,
+                "platform",
+                "ut.menu.batch.actions"
+        );
     }
 
     private Long createTempRole(String tenantId) {
