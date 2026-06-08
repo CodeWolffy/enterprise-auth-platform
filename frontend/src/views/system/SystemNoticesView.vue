@@ -110,12 +110,15 @@
         <el-table-column
           v-if="noticeTablePrefs.visibleColumnMap.noticeContent"
           column-key="noticeContent"
-          prop="noticeContent"
           label="内容"
           min-width="260"
           show-overflow-tooltip
           :width="noticeTablePrefs.getColumnWidth('noticeContent')"
-        />
+        >
+          <template #default="{ row }">
+            {{ plainText(row.noticeContent) }}
+          </template>
+        </el-table-column>
         <el-table-column
           v-if="noticeTablePrefs.visibleColumnMap.published"
           column-key="published"
@@ -185,34 +188,44 @@
       </div>
     </section>
 
-    <el-drawer v-model="detailVisible" title="公告详情" size="620px">
+    <el-drawer v-model="detailVisible" title="公告详情" size="760px">
       <template v-if="detailItem">
-        <el-descriptions :column="2" border class="drawer-section drawer-section--overview">
-          <el-descriptions-item label="标题" :span="2">{{ detailItem.noticeTitle }}</el-descriptions-item>
-          <el-descriptions-item label="发布状态">{{ detailItem.published ? '已发布' : '草稿' }}</el-descriptions-item>
-          <el-descriptions-item label="工作流状态">{{ detailItem.workflowStatus }}</el-descriptions-item>
-          <el-descriptions-item label="发布时间">{{ formatDateTime(detailItem.publishTime) }}</el-descriptions-item>
-          <el-descriptions-item label="创建人">{{ detailItem.createdBy }}</el-descriptions-item>
-          <el-descriptions-item label="ID">{{ detailItem.id }}</el-descriptions-item>
-          <el-descriptions-item label="公告内容" :span="2">{{ detailItem.noticeContent }}</el-descriptions-item>
-        </el-descriptions>
+        <article class="notice-detail-card">
+          <header>
+            <div class="notice-detail-card__meta">
+              <el-tag :type="detailItem.published ? 'success' : 'info'">{{ detailItem.published ? '已发布' : '草稿' }}</el-tag>
+              <el-tag effect="plain">{{ detailItem.workflowStatus }}</el-tag>
+              <span>{{ formatDateTime(detailItem.publishTime) }}</span>
+              <span>创建人：{{ detailItem.createdBy }}</span>
+            </div>
+            <h1>{{ detailItem.noticeTitle }}</h1>
+          </header>
+          <div class="notice-rich-content" v-html="sanitizeRichText(detailItem.noticeContent)"></div>
+        </article>
       </template>
     </el-drawer>
 
-    <el-dialog v-model="visible" :title="editingId ? '编辑公告' : '新增公告'" width="680px">
+    <el-dialog v-model="visible" :title="editingId ? '编辑公告' : '新增公告'" width="980px" class="notice-editor-dialog">
       <el-form ref="formRef" label-position="top" :model="form" :rules="rules">
         <el-form-item label="公告标题" prop="noticeTitle">
-          <el-input v-model="form.noticeTitle" />
+          <el-input v-model="form.noticeTitle" placeholder="请输入公告标题" maxlength="80" show-word-limit />
         </el-form-item>
         <el-form-item label="公告内容" prop="noticeContent">
-          <el-input v-model="form.noticeContent" type="textarea" :rows="5" />
+          <RichTextEditor
+            v-model="form.noticeContent"
+            :preview-title="form.noticeTitle"
+            :published="form.published"
+            :preview-publish-time="form.publishTime ? formatDateTime(toEpochMs(form.publishTime)) : '未设置发布时间'"
+          />
         </el-form-item>
-        <el-form-item label="发布时间">
-          <el-date-picker v-model="form.publishTime" type="datetime" />
-        </el-form-item>
-        <el-form-item label="是否发布">
-          <el-switch v-model="form.published" inline-prompt active-text="发布" inactive-text="草稿" />
-        </el-form-item>
+        <div class="notice-editor-options">
+          <el-form-item label="发布时间">
+            <el-date-picker v-model="form.publishTime" type="datetime" />
+          </el-form-item>
+          <el-form-item label="是否发布">
+            <el-switch v-model="form.published" inline-prompt active-text="发布" inactive-text="草稿" />
+          </el-form-item>
+        </div>
       </el-form>
       <template #footer>
         <el-button @click="visible = false">取消</el-button>
@@ -226,11 +239,13 @@
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AdvancedSearch from '@/components/common/AdvancedSearch.vue'
+import RichTextEditor from '@/components/common/RichTextEditor.vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { createNotice, deleteNotice, queryNotices, updateNotice } from '@/api/modules'
 import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { NoticeView } from '@/types/system'
 import { formatDateTime, toDate, toEpochMs } from '@/utils/datetime'
+import { hasMeaningfulRichText, richTextToPlainText, sanitizeRichText } from '@/utils/richText'
 
 const notices = ref<NoticeView[]>([])
 const loading = ref(false)
@@ -268,7 +283,18 @@ const form = reactive({
 
 const rules = reactive<FormRules>({
   noticeTitle: [{ required: true, message: '请输入公告标题', trigger: 'blur' }],
-  noticeContent: [{ required: true, message: '请输入公告内容', trigger: 'blur' }],
+  noticeContent: [
+    {
+      validator: (_rule, value, callback) => {
+        if (hasMeaningfulRichText(value as string)) {
+          callback()
+        } else {
+          callback(new Error('请输入公告内容'))
+        }
+      },
+      trigger: 'blur',
+    },
+  ],
 })
 
 const publishedCount = computed(() => notices.value.filter((item) => item.published).length)
@@ -335,7 +361,7 @@ function openNotice(row?: NoticeView) {
   editingId.value = row?.id ?? null
   Object.assign(form, {
     noticeTitle: row?.noticeTitle ?? '',
-    noticeContent: row?.noticeContent ?? '',
+    noticeContent: sanitizeRichText(row?.noticeContent),
     published: row?.published ?? false,
     publishTime: toDate(row?.publishTime),
   })
@@ -347,9 +373,10 @@ async function submit() {
     return
   }
   await formRef.value.validate()
+  const safeContent = sanitizeRichText(form.noticeContent)
   const payload = {
     noticeTitle: form.noticeTitle,
-    noticeContent: form.noticeContent,
+    noticeContent: safeContent,
     published: form.published,
     publishTime: toEpochMs(form.publishTime),
   }
@@ -378,4 +405,131 @@ function onNoticeHeaderDragEnd(newWidth: number, _oldWidth: number, column: { pr
   }
   noticeTablePrefs.setColumnWidth(key, newWidth)
 }
+
+function plainText(value?: string | null) {
+  return richTextToPlainText(value)
+}
 </script>
+
+<style scoped lang="scss">
+.notice-editor-dialog :deep(.el-dialog__body) {
+  padding-top: 12px;
+}
+
+.notice-editor-options {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+.notice-detail-card {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid #edf0f5;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+
+  h1 {
+    margin: 10px 0 0;
+    color: #111827;
+    font-size: 26px;
+    line-height: 1.35;
+  }
+}
+
+.notice-detail-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: #8a94a6;
+  font-size: 12px;
+}
+
+.notice-rich-content {
+  color: #1f2937;
+  font-size: 14px;
+  line-height: 1.75;
+  word-break: break-word;
+
+  :deep(h1),
+  :deep(h2),
+  :deep(h3) {
+    margin: 16px 0 10px;
+    color: #111827;
+    line-height: 1.35;
+  }
+
+  :deep(h1) {
+    font-size: 26px;
+  }
+
+  :deep(h2) {
+    font-size: 22px;
+  }
+
+  :deep(h3) {
+    font-size: 18px;
+  }
+
+  :deep(p) {
+    margin: 0 0 10px;
+  }
+
+  :deep(blockquote) {
+    margin: 12px 0;
+    padding: 10px 14px;
+    border-left: 4px solid #7aa7ff;
+    border-radius: 8px;
+    background: #f4f7ff;
+    color: #475569;
+  }
+
+  :deep(pre) {
+    overflow: auto;
+    margin: 12px 0;
+    padding: 12px;
+    border-radius: 10px;
+    background: #111827;
+    color: #e5e7eb;
+  }
+
+  :deep(ul),
+  :deep(ol) {
+    margin: 0 0 10px 22px;
+    padding: 0;
+  }
+
+  :deep(a) {
+    color: #1677ff;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  :deep(hr) {
+    height: 1px;
+    margin: 18px 0;
+    border: 0;
+    background: #e5e7eb;
+  }
+
+  :deep(img) {
+    max-width: 100%;
+    margin: 8px 0;
+    border-radius: 10px;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+  }
+}
+
+@media (max-width: 900px) {
+  .notice-editor-options {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+</style>

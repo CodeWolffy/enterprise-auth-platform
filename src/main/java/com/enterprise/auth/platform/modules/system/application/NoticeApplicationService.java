@@ -3,6 +3,7 @@ package com.enterprise.auth.platform.modules.system.application;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.enterprise.auth.platform.common.TimeSupport;
+import com.enterprise.auth.platform.common.HtmlSanitizer;
 import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.common.authz.SecuritySupport;
 import com.enterprise.auth.platform.common.cache.CacheNames;
@@ -11,6 +12,7 @@ import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysNoticeEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysNoticeMapper;
 import com.enterprise.auth.platform.common.web.PageResult;
+import com.enterprise.auth.platform.modules.notification.application.NotificationScenarioPublisher;
 import com.enterprise.auth.platform.modules.system.interfaces.NoticeCrudRequest;
 import com.enterprise.auth.platform.modules.audit.application.AuditService;
 import java.util.List;
@@ -33,15 +35,18 @@ public class NoticeApplicationService {
     private final SysNoticeMapper sysNoticeMapper;
     private final AuditService auditService;
     private final DataScopeService dataScopeService;
+    private final NotificationScenarioPublisher notificationScenarioPublisher;
 
     public NoticeApplicationService(
             SysNoticeMapper sysNoticeMapper,
             AuditService auditService,
-            DataScopeService dataScopeService
+            DataScopeService dataScopeService,
+            NotificationScenarioPublisher notificationScenarioPublisher
     ) {
         this.sysNoticeMapper = sysNoticeMapper;
         this.auditService = auditService;
         this.dataScopeService = dataScopeService;
+        this.notificationScenarioPublisher = notificationScenarioPublisher;
     }
 
     @Cacheable(value = CacheNames.SYSTEM_NOTICES, key = "#root.target.generateCacheKey(new Object[]{#published, #workflowStatus, #keyword, #page, #size, #sortBy, #sortDirection})")
@@ -76,11 +81,12 @@ public class NoticeApplicationService {
         SysNoticeEntity entity = new SysNoticeEntity();
         entity.setTenantId(tenantId);
         entity.setNoticeTitle(request.noticeTitle());
-        entity.setNoticeContent(request.noticeContent());
+        entity.setNoticeContent(HtmlSanitizer.clean(request.noticeContent()));
         entity.setPublished(Boolean.TRUE.equals(request.published()) ? 1 : 0);
         entity.setPublishTime(TimeSupport.localDateTimeFromEpochMilli(request.publishTime()));
         sysNoticeMapper.insert(entity);
         auditService.record("NOTICE_CREATED", operator, tenantId, Map.of("noticeId", entity.getId(), "workflowStatus", workflowStatus(entity)));
+        publishNoticeNotificationIfActive(entity, operator, false);
         return toNoticeView(entity);
     }
 
@@ -89,12 +95,14 @@ public class NoticeApplicationService {
     public SystemViewModels.NoticeView updateNotice(Long id, NoticeCrudRequest request) {
         String tenantId = currentTenantId();
         SysNoticeEntity entity = getNotice(id, tenantId);
+        boolean wasActivePublished = activePublished(entity);
         entity.setNoticeTitle(request.noticeTitle());
-        entity.setNoticeContent(request.noticeContent());
+        entity.setNoticeContent(HtmlSanitizer.clean(request.noticeContent()));
         entity.setPublished(Boolean.TRUE.equals(request.published()) ? 1 : 0);
         entity.setPublishTime(TimeSupport.localDateTimeFromEpochMilli(request.publishTime()));
         sysNoticeMapper.updateById(entity);
         auditService.record("NOTICE_UPDATED", SecuritySupport.currentOperator(), tenantId, Map.of("noticeId", id, "workflowStatus", workflowStatus(entity)));
+        publishNoticeNotificationIfActive(entity, SecuritySupport.currentOperator(), wasActivePublished);
         return toNoticeView(entity);
     }
 
@@ -210,6 +218,26 @@ public class NoticeApplicationService {
         return dataScopeService.currentUser()
                 .map(user -> user.username() + "|" + user.dataScopeType() + "|" + user.customDeptIds().stream().sorted().toList())
                 .orElse("anonymous");
+    }
+
+    private void publishNoticeNotificationIfActive(SysNoticeEntity entity, String operator, boolean alreadyActivePublished) {
+        if (entity == null || alreadyActivePublished || !activePublished(entity)) {
+            return;
+        }
+        notificationScenarioPublisher.systemNoticePublished(
+                entity.getTenantId(),
+                entity.getId(),
+                entity.getNoticeTitle(),
+                entity.getNoticeContent(),
+                operator
+        );
+    }
+
+    private boolean activePublished(SysNoticeEntity entity) {
+        if (entity == null || entity.getPublished() == null || entity.getPublished() != 1) {
+            return false;
+        }
+        return entity.getPublishTime() == null || !entity.getPublishTime().isAfter(TimeSupport.utcNowDateTime());
     }
 
     private SFunction<SysNoticeEntity, ?> resolveNoticeSort(String sortBy) {

@@ -24,9 +24,10 @@ public class NotificationController {
     @GetMapping
     public ApiResponse<PageResult<NotificationView>> myNotifications(
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) Boolean read
     ) {
-        return ApiResponse.ok(notificationInboxService.myNotifications(page, size));
+        return ApiResponse.ok(notificationInboxService.myNotifications(page, size, read));
     }
 
     @GetMapping("/unread-count")

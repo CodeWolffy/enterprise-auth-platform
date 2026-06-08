@@ -23,6 +23,7 @@ export interface NotificationView {
 export interface NotificationQueryParams {
   page?: number
   size?: number
+  read?: boolean
 }
 
 export async function queryNotifications(params?: NotificationQueryParams) {

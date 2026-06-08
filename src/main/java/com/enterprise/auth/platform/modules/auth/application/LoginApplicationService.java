@@ -7,6 +7,7 @@ import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.auth.infrastructure.SecurityProperties;
+import com.enterprise.auth.platform.modules.notification.application.NotificationScenarioPublisher;
 import com.enterprise.auth.platform.modules.security.application.SecurityPolicyApplicationService;
 import com.enterprise.auth.platform.modules.user.application.AuthenticationUser;
 import com.enterprise.auth.platform.modules.user.application.UserAuthenticationFacade;
@@ -37,6 +38,7 @@ public class LoginApplicationService {
     private final SessionIndexService sessionIndexService;
     private final ClientIpResolver clientIpResolver;
     private final SecurityPolicyApplicationService securityPolicyApplicationService;
+    private final NotificationScenarioPublisher notificationScenarioPublisher;
 
     public LoginApplicationService(
             CaptchaService captchaService,
@@ -48,7 +50,8 @@ public class LoginApplicationService {
             SecurityProperties securityProperties,
             SessionIndexService sessionIndexService,
             ClientIpResolver clientIpResolver,
-            SecurityPolicyApplicationService securityPolicyApplicationService
+            SecurityPolicyApplicationService securityPolicyApplicationService,
+            NotificationScenarioPublisher notificationScenarioPublisher
     ) {
         this.captchaService = captchaService;
         this.passwordHasher = passwordHasher;
@@ -60,6 +63,7 @@ public class LoginApplicationService {
         this.sessionIndexService = sessionIndexService;
         this.clientIpResolver = clientIpResolver;
         this.securityPolicyApplicationService = securityPolicyApplicationService;
+        this.notificationScenarioPublisher = notificationScenarioPublisher;
     }
 
     public TokenSessionResponse login(LoginRequest request, HttpServletRequest servletRequest) {
@@ -182,6 +186,7 @@ public class LoginApplicationService {
     ) {
         LoginAttemptService.LoginFailureResult result = loginAttemptService.recordFailure(tenantId, username, reason, clientIp);
         if (result.locked()) {
+            notificationScenarioPublisher.accountLocked(tenantId, username, clientIp);
             return new BusinessException("BAD_CREDENTIALS", "用户名或密码错误");
         }
         return new BusinessException("BAD_CREDENTIALS", "用户名或密码错误");

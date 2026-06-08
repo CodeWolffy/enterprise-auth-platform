@@ -17,6 +17,7 @@ import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnaps
 import com.enterprise.auth.platform.modules.security.application.SecurityPolicyApplicationService;
 import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
+import com.enterprise.auth.platform.modules.notification.application.NotificationScenarioPublisher;
 import com.enterprise.auth.platform.common.authz.SecuritySupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.modules.user.interfaces.CreateUserRequest;
@@ -47,6 +48,7 @@ public class UserManagementService {
     private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
     private final SessionIndexService sessionIndexService;
     private final SecurityPolicyApplicationService securityPolicyApplicationService;
+    private final NotificationScenarioPublisher notificationScenarioPublisher;
 
     public UserManagementService(
             SysUserMapper sysUserMapper,
@@ -59,7 +61,8 @@ public class UserManagementService {
             DataScopeService dataScopeService,
             AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
             SessionIndexService sessionIndexService,
-            SecurityPolicyApplicationService securityPolicyApplicationService
+            SecurityPolicyApplicationService securityPolicyApplicationService,
+            NotificationScenarioPublisher notificationScenarioPublisher
     ) {
         this.sysUserMapper = sysUserMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
@@ -72,6 +75,7 @@ public class UserManagementService {
         this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
         this.sessionIndexService = sessionIndexService;
         this.securityPolicyApplicationService = securityPolicyApplicationService;
+        this.notificationScenarioPublisher = notificationScenarioPublisher;
     }
 
     @Transactional
@@ -123,8 +127,11 @@ public class UserManagementService {
         entity.setEmail(request.email() != null ? request.email() : entity.getEmail());
         entity.setDeptId(request.deptId() != null ? request.deptId() : entity.getDeptId());
         boolean invalidateSessions = false;
+        boolean disabledByUpdate = false;
+        boolean passwordResetByAdmin = false;
         if (request.enabled() != null) {
-            invalidateSessions = !request.enabled() && (entity.getEnabled() == null || entity.getEnabled() == 1);
+            disabledByUpdate = !request.enabled() && (entity.getEnabled() == null || entity.getEnabled() == 1);
+            invalidateSessions = disabledByUpdate;
             entity.setEnabled(request.enabled() ? 1 : 0);
         }
         if (StringUtils.hasText(request.password())) {
@@ -134,6 +141,7 @@ public class UserManagementService {
             entity.setMustChangePassword(1);
             entity.setPasswordUpdatedAt(TimeSupport.utcNowDateTime());
             invalidateSessions = true;
+            passwordResetByAdmin = true;
         }
         sysUserMapper.updateById(entity);
 
@@ -145,6 +153,12 @@ public class UserManagementService {
             kickoutUserSessions(entity.getId());
         }
         auditService.record("USER_UPDATED", operator, tenantId, Map.of("userId", entity.getId(), "username", entity.getUsername()));
+        if (passwordResetByAdmin) {
+            notificationScenarioPublisher.adminPasswordReset(tenantId, entity.getId(), entity.getUsername(), operator);
+        }
+        if (disabledByUpdate) {
+            notificationScenarioPublisher.accountDisabled(tenantId, entity.getId(), entity.getUsername(), operator);
+        }
         return loadSummary(entity.getId(), tenantId);
     }
 
@@ -196,6 +210,7 @@ public class UserManagementService {
         permissionSnapshotInvalidationService.invalidateUser(entity.getId(), tenantId, entity.getUsername());
         kickoutUserSessions(entity.getId());
         auditService.record("USER_DELETED", operator, tenantId, Map.of("userId", userId, "username", entity.getUsername()));
+        notificationScenarioPublisher.accountDisabled(tenantId, entity.getId(), entity.getUsername(), operator);
     }
 
     private void kickoutUserSessions(Long userId) {

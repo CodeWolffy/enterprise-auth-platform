@@ -12,6 +12,7 @@ import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 import com.enterprise.auth.platform.modules.auth.infrastructure.SecurityProperties;
 import com.enterprise.auth.platform.modules.auth.infrastructure.entity.SysPasswordResetTokenEntity;
 import com.enterprise.auth.platform.modules.auth.infrastructure.mapper.SysPasswordResetTokenMapper;
+import com.enterprise.auth.platform.modules.notification.application.NotificationScenarioPublisher;
 import com.enterprise.auth.platform.modules.security.application.SecurityPolicyApplicationService;
 import com.enterprise.auth.platform.modules.user.application.UserAuthenticationFacade;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
@@ -48,6 +49,7 @@ public class PasswordResetApplicationService {
     private final SecurityProperties securityProperties;
     private final ClientIpResolver clientIpResolver;
     private final SessionIndexService sessionIndexService;
+    private final NotificationScenarioPublisher notificationScenarioPublisher;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public PasswordResetApplicationService(
@@ -59,7 +61,8 @@ public class PasswordResetApplicationService {
             AuditService auditService,
             SecurityProperties securityProperties,
             ClientIpResolver clientIpResolver,
-            SessionIndexService sessionIndexService
+            SessionIndexService sessionIndexService,
+            NotificationScenarioPublisher notificationScenarioPublisher
     ) {
         this.userAuthenticationFacade = userAuthenticationFacade;
         this.tokenMapper = tokenMapper;
@@ -70,6 +73,7 @@ public class PasswordResetApplicationService {
         this.securityProperties = securityProperties;
         this.clientIpResolver = clientIpResolver;
         this.sessionIndexService = sessionIndexService;
+        this.notificationScenarioPublisher = notificationScenarioPublisher;
     }
 
     @Transactional
@@ -143,6 +147,7 @@ public class PasswordResetApplicationService {
 
         String resetLink = buildResetLink(rawToken);
         notificationService.sendPasswordResetLink(user.getTenantId(), user.getEmail(), user.getUsername(), resetLink);
+        notificationScenarioPublisher.passwordResetRequested(user.getTenantId(), user.getId(), user.getUsername(), clientIp);
         auditService.record("PASSWORD_RESET_REQUESTED", user.getUsername(), user.getTenantId(),
                 Map.of("userId", user.getId(), "clientIp", clientIp));
         return new PasswordResetRequestResponse(GENERIC_REQUEST_MESSAGE, "EMAIL_SENT");
@@ -197,6 +202,7 @@ public class PasswordResetApplicationService {
             StpUtil.kickout(user.getId());
         });
         auditService.record("PASSWORD_RESET_COMPLETED", user.getUsername(), user.getTenantId(), Map.of("userId", user.getId()));
+        notificationScenarioPublisher.passwordResetCompleted(user.getTenantId(), user.getId(), user.getUsername());
         return new PasswordResetConfirmResponse("密码已重置，请使用新密码登录");
     }
 

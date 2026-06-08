@@ -7,7 +7,7 @@
 
   <el-drawer v-model="notificationsVisible" title="站内通知" size="420px">
     <div class="notification-toolbar">
-      <span>共 {{ notificationPage.total }} 条通知</span>
+      <span>{{ notificationSummaryText }}</span>
       <div>
         <el-button size="small" text :loading="notificationsLoading" @click="loadNotifications()">刷新</el-button>
         <el-button size="small" type="primary" text :disabled="unreadNotificationCount === 0" @click="markAllNotificationsReadAction">
@@ -15,6 +15,15 @@
         </el-button>
       </div>
     </div>
+    <el-segmented
+      v-model="notificationReadFilter"
+      class="notification-filter"
+      :options="[
+        { label: '全部', value: 'all' },
+        { label: `未读 ${unreadNotificationCount}`, value: 'unread' },
+      ]"
+      @change="changeNotificationReadFilter"
+    />
     <div v-loading="notificationsLoading" class="notification-list">
       <el-empty v-if="!notificationPage.records.length" description="暂无站内通知" />
       <article
@@ -24,13 +33,15 @@
         :class="{ 'notification-item--unread': !notification.read }"
       >
         <div class="notification-item__head">
-          <strong>{{ notification.title }}</strong>
+          <strong :class="{ 'notification-item__title--link': !!notification.link }" @click="notification.link && openNotificationLink(notification)">
+            {{ notification.title }}
+          </strong>
           <div class="notification-item__tags">
             <el-tag v-if="notification.level" :type="notificationLevelTagType(notification.level)" effect="plain" size="small">
-              {{ notification.level }}
+              {{ notificationLevelLabel(notification.level) }}
             </el-tag>
-            <el-tag v-if="notification.sourceType" type="info" effect="plain" size="small">
-              {{ notification.sourceType }}
+            <el-tag v-if="notification.scenarioCode" type="info" effect="plain" size="small">
+              {{ notificationScenarioLabel(notification.scenarioCode) }}
             </el-tag>
             <el-tag :type="notification.read ? 'info' : 'warning'" effect="plain" size="small">
               {{ notification.read ? '已读' : '未读' }}
@@ -71,10 +82,13 @@ const {
   notificationsVisible,
   notificationsLoading,
   unreadNotificationCount,
+  notificationReadFilter,
+  notificationSummaryText,
   notificationPage,
   loadUnreadNotificationCount,
   openNotifications,
   loadNotifications,
+  changeNotificationReadFilter,
   handleNotificationPageChange,
   markNotificationRead,
   markAllNotificationsReadAction,
@@ -89,6 +103,33 @@ function notificationLevelTagType(level?: string | null): TagProps['type'] {
   if (level === 'ERROR') return 'danger'
   return 'info'
 }
+
+function notificationLevelLabel(level?: string | null) {
+  if (level === 'SUCCESS') return '成功'
+  if (level === 'WARNING') return '提醒'
+  if (level === 'ERROR') return '重要'
+  return '通知'
+}
+
+function notificationScenarioLabel(scenarioCode?: string | null) {
+  const labels: Record<string, string> = {
+    WORKFLOW_TODO_CREATED: '新待办',
+    WORKFLOW_TASK_APPROVED: '审批通过',
+    WORKFLOW_TASK_REJECTED: '审批驳回',
+    WORKFLOW_TASK_TRANSFERRED: '转签',
+    WORKFLOW_INSTANCE_WITHDRAWN: '已撤回',
+    WORKFLOW_INSTANCE_TERMINATED: '已终止',
+    ACCOUNT_LOCKED: '账号锁定',
+    PASSWORD_RESET_REQUESTED: '重置请求',
+    PASSWORD_RESET_COMPLETED: '重置完成',
+    PASSWORD_CHANGED: '密码修改',
+    ADMIN_PASSWORD_RESET: '管理员重置',
+    ACCOUNT_DISABLED: '账号禁用',
+    SESSION_FORCED_OFFLINE: '强制下线',
+    SYSTEM_NOTICE_PUBLISHED: '系统公告',
+  }
+  return scenarioCode ? labels[scenarioCode] || scenarioCode : '通知'
+}
 </script>
 
 <style scoped lang="scss">
@@ -100,6 +141,11 @@ function notificationLevelTagType(level?: string | null): TagProps['type'] {
   margin: -4px 0 12px;
   color: #606b7a;
   font-size: 13px;
+}
+
+.notification-filter {
+  width: 100%;
+  margin-bottom: 12px;
 }
 
 .notification-badge :deep(.el-badge__content) {
@@ -144,6 +190,14 @@ function notificationLevelTagType(level?: string | null): TagProps['type'] {
     min-width: 0;
     color: #1f2937;
     font-size: 14px;
+  }
+
+  &__title--link {
+    cursor: pointer;
+
+    &:hover {
+      color: #1677ff;
+    }
   }
 
   p {

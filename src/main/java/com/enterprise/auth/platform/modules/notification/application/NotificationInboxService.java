@@ -30,15 +30,15 @@ public class NotificationInboxService {
         this.currentUserService = currentUserService;
     }
 
-    public PageResult<NotificationView> myNotifications(int page, int size) {
+    public PageResult<NotificationView> myNotifications(int page, int size, Boolean read) {
         UserAccount user = currentUserService.requireCurrentUser();
         String tenantId = currentTenantId(user);
         int safePage = Math.max(page, 1);
         int safeSize = Math.min(Math.max(size, 1), 100);
-        LambdaQueryWrapper<SysUserNotificationEntity> countWrapper = visibleMineWrapper(tenantId, user.id());
+        LambdaQueryWrapper<SysUserNotificationEntity> countWrapper = visibleMineWrapper(tenantId, user.id(), read);
         long total = notificationMapper.selectCount(countWrapper);
         int offset = (safePage - 1) * safeSize;
-        List<NotificationView> records = notificationMapper.selectList(visibleMineWrapper(tenantId, user.id())
+        List<NotificationView> records = notificationMapper.selectList(visibleMineWrapper(tenantId, user.id(), read)
                         .orderByAsc(SysUserNotificationEntity::getReadAt)
                         .orderByDesc(SysUserNotificationEntity::getCreatedAt)
                         .orderByDesc(SysUserNotificationEntity::getId)
@@ -52,15 +52,14 @@ public class NotificationInboxService {
     public long unreadCount() {
         UserAccount user = currentUserService.requireCurrentUser();
         String tenantId = currentTenantId(user);
-        return notificationMapper.selectCount(visibleMineWrapper(tenantId, user.id())
-                .isNull(SysUserNotificationEntity::getReadAt));
+        return notificationMapper.selectCount(visibleMineWrapper(tenantId, user.id(), false));
     }
 
     @Transactional
     public NotificationView markRead(Long notificationId) {
         UserAccount user = currentUserService.requireCurrentUser();
         String tenantId = currentTenantId(user);
-        SysUserNotificationEntity entity = notificationMapper.selectOne(visibleMineWrapper(tenantId, user.id())
+        SysUserNotificationEntity entity = notificationMapper.selectOne(visibleMineWrapper(tenantId, user.id(), null)
                 .eq(SysUserNotificationEntity::getId, notificationId)
                 .last("limit 1"));
         if (entity == null) {
@@ -83,12 +82,20 @@ public class NotificationInboxService {
                 .set(SysUserNotificationEntity::getReadAt, now));
     }
 
-    private LambdaQueryWrapper<SysUserNotificationEntity> visibleMineWrapper(String tenantId, Long userId) {
+    private LambdaQueryWrapper<SysUserNotificationEntity> visibleMineWrapper(String tenantId, Long userId, Boolean read) {
         LocalDateTime now = TimeSupport.utcNowDateTime();
-        return baseMineWrapper(tenantId, userId)
-                .and(wrapper -> wrapper.isNull(SysUserNotificationEntity::getExpiresAt)
+        LambdaQueryWrapper<SysUserNotificationEntity> wrapper = baseMineWrapper(tenantId, userId)
+                .and(query -> query.isNull(SysUserNotificationEntity::getExpiresAt)
                         .or()
                         .gt(SysUserNotificationEntity::getExpiresAt, now));
+        if (read != null) {
+            if (Boolean.TRUE.equals(read)) {
+                wrapper.isNotNull(SysUserNotificationEntity::getReadAt);
+            } else {
+                wrapper.isNull(SysUserNotificationEntity::getReadAt);
+            }
+        }
+        return wrapper;
     }
 
     private LambdaUpdateWrapper<SysUserNotificationEntity> visibleMineUpdateWrapper(String tenantId, Long userId, LocalDateTime now) {

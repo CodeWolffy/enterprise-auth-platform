@@ -11,6 +11,7 @@ import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.auth.interfaces.UserSessionResponse;
 import com.enterprise.auth.platform.modules.auth.application.SessionIndexService;
 import com.enterprise.auth.platform.modules.auth.application.SessionIndexService.Page;
+import com.enterprise.auth.platform.modules.notification.application.NotificationScenarioPublisher;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,17 +28,20 @@ public class SessionApplicationService {
     private final DataScopeService dataScopeService;
     private final PlatformAdminSupport platformAdminSupport;
     private final SessionIndexService sessionIndexService;
+    private final NotificationScenarioPublisher notificationScenarioPublisher;
 
     public SessionApplicationService(
             AuditEventPublisher auditEventPublisher,
             DataScopeService dataScopeService,
             PlatformAdminSupport platformAdminSupport,
-            SessionIndexService sessionIndexService
+            SessionIndexService sessionIndexService,
+            NotificationScenarioPublisher notificationScenarioPublisher
     ) {
         this.auditEventPublisher = auditEventPublisher;
         this.dataScopeService = dataScopeService;
         this.platformAdminSupport = platformAdminSupport;
         this.sessionIndexService = sessionIndexService;
+        this.notificationScenarioPublisher = notificationScenarioPublisher;
     }
 
     public void logout(String sessionId, String username, String tenantId) {
@@ -83,6 +87,7 @@ public class SessionApplicationService {
         sessionIndexService.remove(sessionId);
         payload.put("targetUserId", targetUserId);
         auditEventPublisher.publish("SESSION_FORCED_OFFLINE", currentUser.username(), currentUser.tenantId(), payload);
+        notificationScenarioPublisher.sessionForcedOffline(targetTenantId, targetUserId, currentUser.username(), payload);
     }
 
     private List<UserSessionResponse> ownSessions(UserAccount currentUser, String currentToken) {

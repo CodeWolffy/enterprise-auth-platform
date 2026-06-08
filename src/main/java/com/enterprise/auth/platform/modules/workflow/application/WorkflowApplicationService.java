@@ -10,6 +10,7 @@ import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.modules.notification.application.NotificationScenarioPublisher;
 import com.enterprise.auth.platform.modules.role.application.RoleQueryFacade;
 import com.enterprise.auth.platform.modules.user.application.UserQueryFacade;
 import com.enterprise.auth.platform.modules.user.application.UserQueryFacade.EnabledUser;
@@ -56,6 +57,7 @@ public class WorkflowApplicationService {
     private final AuditEventPublisher auditEventPublisher;
     private final ObjectMapper objectMapper;
     private final WorkflowTaskUrgeService urgeService;
+    private final NotificationScenarioPublisher notificationScenarioPublisher;
 
     public WorkflowApplicationService(
             WfProcessDefinitionMapper definitionMapper,
@@ -66,7 +68,8 @@ public class WorkflowApplicationService {
             CurrentUserService currentUserService,
             AuditEventPublisher auditEventPublisher,
             ObjectMapper objectMapper,
-            WorkflowTaskUrgeService urgeService
+            WorkflowTaskUrgeService urgeService,
+            NotificationScenarioPublisher notificationScenarioPublisher
     ) {
         this.definitionMapper = definitionMapper;
         this.instanceMapper = instanceMapper;
@@ -77,6 +80,7 @@ public class WorkflowApplicationService {
         this.auditEventPublisher = auditEventPublisher;
         this.objectMapper = objectMapper;
         this.urgeService = urgeService;
+        this.notificationScenarioPublisher = notificationScenarioPublisher;
     }
 
     @Transactional
@@ -203,6 +207,7 @@ public class WorkflowApplicationService {
                 "definitionVersion", definition.getVersion(),
                 "businessKey", instance.getBusinessKey()
         ));
+        publishWorkflowTodoCreated(tenantId, instance, task, user.username());
         return new WorkflowStartResult(toInstanceView(instance), toTaskView(task, user));
     }
 
@@ -257,14 +262,15 @@ public class WorkflowApplicationService {
         completePendingTask(task);
 
         WorkflowTaskView nextTask = null;
+        WfTaskEntity nextTaskEntity = null;
         int nextStepIndex = task.getStepIndex() < 0 ? 0 : task.getStepIndex() + 1;
         if (nextStepIndex >= steps.size()) {
             instance.setStatus(WorkflowInstanceStatus.APPROVED.name());
             instance.setEndedAt(TimeSupport.utcNowDateTime());
         } else {
             instance.setCurrentStepIndex(nextStepIndex);
-            WfTaskEntity created = createPendingTask(tenantId, instance, definition, steps.get(nextStepIndex), nextStepIndex);
-            nextTask = toTaskView(created, user);
+            nextTaskEntity = createPendingTask(tenantId, instance, definition, steps.get(nextStepIndex), nextStepIndex);
+            nextTask = toTaskView(nextTaskEntity, user);
         }
         instanceMapper.updateById(instance);
         publish("WORKFLOW_TASK_APPROVED", user, tenantId, Map.of(
@@ -273,6 +279,10 @@ public class WorkflowApplicationService {
                 "stepIndex", task.getStepIndex(),
                 "ended", WorkflowInstanceStatus.APPROVED.name().equals(instance.getStatus())
         ));
+        publishWorkflowTaskDecision(tenantId, instance, task, user.username(), true);
+        if (nextTaskEntity != null) {
+            publishWorkflowTodoCreated(tenantId, instance, nextTaskEntity, user.username());
+        }
         return new WorkflowActionResult(toInstanceView(instance), nextTask);
     }
 
@@ -298,17 +308,18 @@ public class WorkflowApplicationService {
         completePendingTask(task);
 
         WorkflowTaskView nextTask = null;
+        WfTaskEntity nextTaskEntity = null;
         if (nextStepIndex == -1) {
             instance.setStatus(WorkflowInstanceStatus.REJECTED.name());
             instance.setEndedAt(TimeSupport.utcNowDateTime());
         } else if (nextStepIndex == -2) {
             instance.setCurrentStepIndex(-1);
-            WfTaskEntity created = createStarterReworkTask(tenantId, instance, definition, currentStep);
-            nextTask = toTaskView(created, user);
+            nextTaskEntity = createStarterReworkTask(tenantId, instance, definition, currentStep);
+            nextTask = toTaskView(nextTaskEntity, user);
         } else {
             instance.setCurrentStepIndex(nextStepIndex);
-            WfTaskEntity created = createPendingTask(tenantId, instance, definition, steps.get(nextStepIndex), nextStepIndex);
-            nextTask = toTaskView(created, user);
+            nextTaskEntity = createPendingTask(tenantId, instance, definition, steps.get(nextStepIndex), nextStepIndex);
+            nextTask = toTaskView(nextTaskEntity, user);
         }
         instanceMapper.updateById(instance);
         publish("WORKFLOW_TASK_REJECTED", user, tenantId, Map.of(
@@ -319,6 +330,10 @@ public class WorkflowApplicationService {
                 "nextStepIndex", nextStepIndex,
                 "ended", nextStepIndex == -1
         ));
+        publishWorkflowTaskDecision(tenantId, instance, task, user.username(), false);
+        if (nextTaskEntity != null) {
+            publishWorkflowTodoCreated(tenantId, instance, nextTaskEntity, user.username());
+        }
         return new WorkflowActionResult(toInstanceView(instance), nextTask);
     }
 
@@ -398,6 +413,8 @@ public class WorkflowApplicationService {
                 "targetUserId", targetUser.id(),
                 "targetUsername", targetUser.username()
         ));
+        publishWorkflowTaskTransferred(tenantId, instance, task, transferredTask, targetUser, user.username());
+        publishWorkflowTodoCreated(tenantId, instance, transferredTask, user.username());
         return new WorkflowActionResult(toInstanceView(instance), toTaskView(transferredTask, user));
     }
 
@@ -409,11 +426,13 @@ public class WorkflowApplicationService {
         if (!Objects.equals(instance.getStarterUserId(), user.id())) {
             throw new BusinessException("ACCESS_DENIED", "只有发起人可以撤回流程");
         }
+        WorkflowNotificationRecipients recipients = pendingTaskRecipients(tenantId, instance.getId());
         cancelPendingTasks(tenantId, instance.getId(), WorkflowTaskStatus.CANCELLED, "发起人撤回");
         instance.setStatus(WorkflowInstanceStatus.WITHDRAWN.name());
         instance.setEndedAt(TimeSupport.utcNowDateTime());
         instanceMapper.updateById(instance);
         publish("WORKFLOW_INSTANCE_WITHDRAWN", user, tenantId, Map.of("instanceId", instance.getId()));
+        publishWorkflowInstanceClosed(tenantId, instance, recipients, user.id(), user.username(), true);
         return toInstanceView(instance);
     }
 
@@ -422,11 +441,13 @@ public class WorkflowApplicationService {
         UserAccount user = currentUserService.requireCurrentUser();
         String tenantId = currentTenantId(user);
         WfProcessInstanceEntity instance = requireRunningInstance(tenantId, instanceId);
+        WorkflowNotificationRecipients recipients = pendingTaskRecipients(tenantId, instance.getId());
         cancelPendingTasks(tenantId, instance.getId(), WorkflowTaskStatus.CANCELLED, normalizeText(command.comment()));
         instance.setStatus(WorkflowInstanceStatus.TERMINATED.name());
         instance.setEndedAt(TimeSupport.utcNowDateTime());
         instanceMapper.updateById(instance);
         publish("WORKFLOW_INSTANCE_TERMINATED", user, tenantId, Map.of("instanceId", instance.getId()));
+        publishWorkflowInstanceClosed(tenantId, instance, recipients, user.id(), user.username(), false);
         return toInstanceView(instance);
     }
 
@@ -517,6 +538,130 @@ public class WorkflowApplicationService {
         task.setComment("由节点「" + rejectedStep.name() + "」驳回发起人重提");
         taskMapper.insert(task);
         return task;
+    }
+
+    private void publishWorkflowTodoCreated(String tenantId, WfProcessInstanceEntity instance, WfTaskEntity task, String operator) {
+        WorkflowNotificationRecipients recipients = notificationRecipients(task);
+        notificationScenarioPublisher.workflowTodoCreated(new NotificationScenarioPublisher.WorkflowTodoCreatedEvent(
+                tenantId,
+                instance.getId(),
+                instance.getTitle(),
+                instance.getBusinessKey(),
+                task.getId(),
+                task.getStepName(),
+                recipients.userIds(),
+                recipients.roleCodes(),
+                operator
+        ));
+    }
+
+    private void publishWorkflowTaskDecision(
+            String tenantId,
+            WfProcessInstanceEntity instance,
+            WfTaskEntity task,
+            String operator,
+            boolean approved
+    ) {
+        NotificationScenarioPublisher.WorkflowTaskDecisionEvent event = new NotificationScenarioPublisher.WorkflowTaskDecisionEvent(
+                tenantId,
+                instance.getId(),
+                instance.getTitle(),
+                instance.getBusinessKey(),
+                instance.getStarterUserId(),
+                task.getId(),
+                task.getStepName(),
+                operator,
+                !WorkflowInstanceStatus.RUNNING.name().equals(instance.getStatus())
+        );
+        if (approved) {
+            notificationScenarioPublisher.workflowTaskApproved(event);
+        } else {
+            notificationScenarioPublisher.workflowTaskRejected(event);
+        }
+    }
+
+    private void publishWorkflowTaskTransferred(
+            String tenantId,
+            WfProcessInstanceEntity instance,
+            WfTaskEntity originalTask,
+            WfTaskEntity newTask,
+            EnabledUser targetUser,
+            String operator
+    ) {
+        notificationScenarioPublisher.workflowTaskTransferred(new NotificationScenarioPublisher.WorkflowTaskTransferEvent(
+                tenantId,
+                instance.getId(),
+                instance.getTitle(),
+                instance.getBusinessKey(),
+                instance.getStarterUserId(),
+                originalTask.getId(),
+                newTask.getId(),
+                newTask.getStepName(),
+                targetUser.id(),
+                targetUser.username(),
+                operator
+        ));
+    }
+
+    private void publishWorkflowInstanceClosed(
+            String tenantId,
+            WfProcessInstanceEntity instance,
+            WorkflowNotificationRecipients recipients,
+            Long operatorUserId,
+            String operator,
+            boolean withdrawn
+    ) {
+        Set<Long> userIds = new LinkedHashSet<>(recipients.userIds());
+        if (instance.getStarterUserId() != null && !Objects.equals(instance.getStarterUserId(), operatorUserId)) {
+            userIds.add(instance.getStarterUserId());
+        }
+        NotificationScenarioPublisher.WorkflowInstanceClosedEvent event = new NotificationScenarioPublisher.WorkflowInstanceClosedEvent(
+                tenantId,
+                instance.getId(),
+                instance.getTitle(),
+                instance.getBusinessKey(),
+                userIds,
+                recipients.roleCodes(),
+                operator
+        );
+        if (withdrawn) {
+            notificationScenarioPublisher.workflowInstanceWithdrawn(event);
+        } else {
+            notificationScenarioPublisher.workflowInstanceTerminated(event);
+        }
+    }
+
+    private WorkflowNotificationRecipients pendingTaskRecipients(String tenantId, Long instanceId) {
+        Set<Long> userIds = new LinkedHashSet<>();
+        Set<String> roleCodes = new LinkedHashSet<>();
+        taskMapper.selectList(new LambdaQueryWrapper<WfTaskEntity>()
+                        .eq(WfTaskEntity::getTenantId, tenantId)
+                        .eq(WfTaskEntity::getInstanceId, instanceId)
+                        .eq(WfTaskEntity::getStatus, WorkflowTaskStatus.PENDING.name())
+                        .eq(WfTaskEntity::getDeleted, 0))
+                .forEach(task -> addTaskRecipients(task, userIds, roleCodes));
+        return new WorkflowNotificationRecipients(userIds, roleCodes);
+    }
+
+    private WorkflowNotificationRecipients notificationRecipients(WfTaskEntity task) {
+        Set<Long> userIds = new LinkedHashSet<>();
+        Set<String> roleCodes = new LinkedHashSet<>();
+        addTaskRecipients(task, userIds, roleCodes);
+        return new WorkflowNotificationRecipients(userIds, roleCodes);
+    }
+
+    private void addTaskRecipients(WfTaskEntity task, Set<Long> userIds, Set<String> roleCodes) {
+        if (task == null) {
+            return;
+        }
+        if (task.getAssigneeUserId() != null) {
+            userIds.add(task.getAssigneeUserId());
+        }
+        userIds.addAll(readLongSet(task.getCandidateUserIdsJson()));
+        roleCodes.addAll(readStringSet(task.getCandidateGroupCodesJson()));
+    }
+
+    private record WorkflowNotificationRecipients(Set<Long> userIds, Set<String> roleCodes) {
     }
 
     private void cancelPendingTasks(String tenantId, Long instanceId, WorkflowTaskStatus status, String comment) {

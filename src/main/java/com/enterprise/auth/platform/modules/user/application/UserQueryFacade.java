@@ -64,6 +64,21 @@ public class UserQueryFacade {
                 .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
+    public Set<Long> listAllEnabledUserIds(String tenantId) {
+        if (!StringUtils.hasText(tenantId)) {
+            return Set.of();
+        }
+        return sysUserMapper.selectList(new LambdaQueryWrapper<SysUserEntity>()
+                        .eq(SysUserEntity::getTenantId, tenantId)
+                        .eq(SysUserEntity::getEnabled, 1)
+                        .eq(SysUserEntity::getDeleted, 0)
+                        .select(SysUserEntity::getId))
+                .stream()
+                .map(SysUserEntity::getId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
     public long countEnabledByIds(String tenantId, Set<Long> userIds) {
         if (!StringUtils.hasText(tenantId) || userIds == null || userIds.isEmpty()) {
             return 0;
