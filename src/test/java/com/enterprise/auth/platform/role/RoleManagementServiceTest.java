@@ -103,6 +103,34 @@ class RoleManagementServiceTest {
         assertThat(updated.name()).isEqualTo("新名");
     }
 
+    @Test
+    void impactShouldBlockDeleteWhenRoleAssignedToUsers() {
+        setupContext();
+
+        CreateRoleRequest request = new CreateRoleRequest(ROLE_CODE, "UT 角色", "测试", DataScopeType.ALL, null);
+        roleManagementService.create(request);
+        Long roleId = jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_role WHERE tenant_id = ? AND role_code = ?",
+                Long.class, TENANT, ROLE_CODE
+        );
+        jdbcTemplate.update(
+                "INSERT INTO sys_user_role(tenant_id, user_id, role_id, created_by, updated_by) VALUES(?, ?, ?, 'tester', 'tester')",
+                TENANT, 99101L, roleId
+        );
+
+        var impact = roleManagementService.impact(roleId);
+
+        assertThat(impact.assignedUserCount()).isEqualTo(1);
+        assertThat(impact.sampleUserIds()).containsExactly(99101L);
+        assertThat(impact.deleteBlocked()).isTrue();
+        assertThat(impact.warnings()).anyMatch(item -> item.contains("需先调整用户角色"));
+
+        setupContext();
+        assertThatThrownBy(() -> roleManagementService.delete(roleId))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("角色已分配给用户");
+    }
+
     private static UserAccount tenantAdmin(String tenantId, Set<String> permissions) {
         return new UserAccount(
                 1L, tenantId, "test_admin", "{noop}ignored",

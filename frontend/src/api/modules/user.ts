@@ -9,6 +9,7 @@ export interface UserQueryParams {
   username?: string
   mobile?: string
   email?: string
+  deptId?: number
   enabled?: boolean
   page?: number
   size?: number

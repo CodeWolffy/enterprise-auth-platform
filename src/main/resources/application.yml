@@ -213,7 +213,7 @@ app:
 
   cache:
     key-prefix: "eap:cache:"
-    namespace-version: "v5"
+    namespace-version: "v6"
     default-ttl: 10m
     auth-principal-ttl: 15m
     registration-policy-ttl: 5m

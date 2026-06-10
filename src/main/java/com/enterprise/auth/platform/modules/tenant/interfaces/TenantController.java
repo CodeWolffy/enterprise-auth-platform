@@ -108,6 +108,15 @@ public class TenantController {
         ));
     }
 
+    @Operation(summary = "获取租户能力摘要")
+    @GetMapping("/{tenantId}/capability-summary")
+    @SaCheckPermission(PermissionCodes.TENANT_READ)
+    public ApiResponse<TenantCapabilityApplicationService.TenantCapabilitySummaryView> capabilitySummary(
+            @Parameter(description = "租户编码") @PathVariable String tenantId
+    ) {
+        return ApiResponse.ok(tenantCapabilityApplicationService.capabilitySummary(tenantId));
+    }
+
     @Operation(summary = "获取租户能力覆盖")
     @GetMapping("/{tenantId}/capability-overrides")
     @SaCheckPermission(PermissionCodes.TENANT_READ)

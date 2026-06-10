@@ -122,7 +122,7 @@ class AuthControllerSessionFlowTest {
         }
         jdbcTemplate.update("DELETE FROM sys_user_role WHERE tenant_id = ? AND user_id IN (SELECT id FROM sys_user WHERE tenant_id = ? AND username = ?)", "tenant-a", "tenant-a", TENANT_USER);
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username = ?", "tenant-a", TENANT_USER);
-        jdbcTemplate.update("DELETE FROM sys_dict WHERE tenant_id = ? AND dict_type = ? AND dict_code = ?", TENANT_A, "tenant_context_audit", "tenant_context_audit_ut");
+        jdbcTemplate.update("DELETE FROM sys_dict WHERE tenant_id = ? AND dict_type = ?", TENANT_A, "tenant_context_audit");
         jdbcTemplate.update("DELETE FROM sys_audit_log WHERE request_id = ?", "tenant-context-audit-ut");
         jdbcTemplate.update("DELETE FROM sys_audit_log WHERE request_id = ?", "tenant-switch-ut");
         clearAuthState();
@@ -253,6 +253,38 @@ class AuthControllerSessionFlowTest {
     }
 
     @Test
+    void loginShouldRejectTenantOutsideAuthorizationWindow() throws Exception {
+        ensureTenantUser();
+        java.time.LocalDateTime previousAuthBeginAt = jdbcTemplate.queryForObject(
+                "SELECT auth_begin_at FROM sys_tenant WHERE tenant_id = ? AND deleted = 0",
+                java.time.LocalDateTime.class,
+                TENANT_A
+        );
+        java.time.LocalDateTime previousExpireAt = jdbcTemplate.queryForObject(
+                "SELECT expire_at FROM sys_tenant WHERE tenant_id = ? AND deleted = 0",
+                java.time.LocalDateTime.class,
+                TENANT_A
+        );
+        try {
+            jdbcTemplate.update("UPDATE sys_tenant SET auth_begin_at = DATE_ADD(NOW(), INTERVAL 1 DAY), expire_at = DATE_ADD(NOW(), INTERVAL 30 DAY) WHERE tenant_id = ? AND deleted = 0", TENANT_A);
+            mockMvc.perform(post("/api/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(loginPayload(TENANT_USER, TENANT_USER_PASSWORD, TENANT_A)))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("TENANT_DISABLED"));
+
+            jdbcTemplate.update("UPDATE sys_tenant SET auth_begin_at = DATE_SUB(NOW(), INTERVAL 30 DAY), expire_at = DATE_SUB(NOW(), INTERVAL 1 DAY) WHERE tenant_id = ? AND deleted = 0", TENANT_A);
+            mockMvc.perform(post("/api/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(loginPayload(TENANT_USER, TENANT_USER_PASSWORD, TENANT_A)))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("TENANT_DISABLED"));
+        } finally {
+            jdbcTemplate.update("UPDATE sys_tenant SET auth_begin_at = ?, expire_at = ? WHERE tenant_id = ? AND deleted = 0", previousAuthBeginAt, previousExpireAt, TENANT_A);
+        }
+    }
+
+    @Test
     void platformAdminMeShouldUseSwitchedTenantSnapshot() throws Exception {
         String token = extractToken(loginAsAdmin());
         mockMvc.perform(post("/api/auth/tenants/{tenantId}/switch", TENANT_A)
@@ -288,14 +320,15 @@ class AuthControllerSessionFlowTest {
                 .andExpect(jsonPath("$.data.superAdmin").value(true));
 
         SaSession tokenSession = StpUtil.getTokenSessionByToken(token);
+        Assertions.assertEquals(TENANT_A, tokenSession.get("activeTenantId"));
         Assertions.assertEquals(TENANT_A, tokenSession.get("permissionsTenantId"));
         Assertions.assertNotNull(tokenSession.get("permissions"));
         Assertions.assertNotNull(tokenSession.get("roles"));
 
-        mockMvc.perform(get("/api/tenants/current")
+        mockMvc.perform(get("/api/auth/sessions")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.tenantId").value(TENANT_A));
+                .andExpect(jsonPath("$.data[?(@.sessionId=='" + token + "' && @.activeTenantId=='" + TENANT_A + "')]").exists());
 
         JsonNode payload = latestAuditPayload("TENANT_SWITCH", requestId);
         Assertions.assertEquals(ADMIN_TENANT, payload.path("operatorTenantId").asText());
@@ -369,6 +402,8 @@ class AuthControllerSessionFlowTest {
         String token = extractToken(loginAsAdmin());
         String requestId = "tenant-context-audit-ut";
         String dictCode = "tenant_context_audit_ut";
+        jdbcTemplate.update("DELETE FROM sys_dict WHERE tenant_id = ? AND dict_type = ?", TENANT_A, "tenant_context_audit");
+        jdbcTemplate.update("DELETE FROM sys_audit_log WHERE request_id = ?", requestId);
 
         mockMvc.perform(post("/api/auth/tenants/{tenantId}/switch", TENANT_A)
                         .header("Authorization", "Bearer " + token)

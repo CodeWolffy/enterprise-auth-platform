@@ -29,9 +29,9 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 class UserControllerTest {
 
-    private static final String SCOPE_USER = "user_controller_scope_ut";
-    private static final String VISIBLE_USER = "user_controller_visible_ut";
-    private static final String HIDDEN_USER = "user_controller_hidden_ut";
+    private static final String SCOPE_USER = "uc_scope_ut";
+    private static final String VISIBLE_USER = "uc_visible_ut";
+    private static final String HIDDEN_USER = "uc_hidden_ut";
     private static final String SCOPE_ROLE = "USER_CONTROLLER_SCOPE_ROLE_UT";
     private static final String PARENT_DEPT_CODE = "USER_CONTROLLER_PARENT_UT";
     private static final String CHILD_DEPT_CODE = "USER_CONTROLLER_CHILD_UT";
@@ -133,7 +133,7 @@ class UserControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "username": "blocked_user_ut",
+                                  "username": "blocked_ut",
                                   "displayName": "Blocked User",
                                   "password": "UserTest@123",
                                   "deptId": %d,

@@ -26,7 +26,7 @@ public record AppCacheProperties(
 
     public String resolvedNamespaceVersion() {
         if (namespaceVersion == null || namespaceVersion.isBlank()) {
-            return "v1";
+            return "v2";
         }
         return namespaceVersion.trim();
     }

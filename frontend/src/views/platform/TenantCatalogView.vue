@@ -29,6 +29,10 @@
           <span class="eyebrow">租户套餐</span>
           <h3>租户套餐与能力</h3>
         </div>
+        <div class="panel-actions">
+          <span class="toolbar-tip">{{ catalogRefreshTip }}</span>
+          <el-button :loading="loadingPackages || loadingCapabilities" @click="refreshCatalog">刷新</el-button>
+        </div>
       </div>
 
       <el-tabs v-model="activeTab">
@@ -81,25 +85,53 @@
             <el-table-column
               v-if="packageTablePrefs.visibleColumnMap.packageName"
               column-key="packageName"
-              prop="packageName"
               label="套餐名称"
-              min-width="180"
+              min-width="220"
               :width="packageTablePrefs.getColumnWidth('packageName')"
+            >
+              <template #default="{ row }">
+                <div class="package-name-cell">
+                  <strong>{{ row.packageName }}</strong>
+                  <span>{{ row.subtitle || row.packageDesc || '未配置运营副标题' }}</span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column
+              v-if="packageTablePrefs.visibleColumnMap.appKey"
+              column-key="appKey"
+              prop="appKey"
+              label="应用标识"
+              min-width="130"
+              :width="packageTablePrefs.getColumnWidth('appKey')"
             />
             <el-table-column
-              v-if="packageTablePrefs.visibleColumnMap.userQuota"
-              column-key="userQuota"
-              prop="userQuota"
-              label="用户配额"
-              :width="packageTablePrefs.getColumnWidth('userQuota') || 110"
-            />
+              v-if="packageTablePrefs.visibleColumnMap.price"
+              column-key="price"
+              label="价格"
+              min-width="140"
+              :width="packageTablePrefs.getColumnWidth('price')"
+            >
+              <template #default="{ row }">
+                <div class="price-cell">
+                  <strong>{{ formatPrice(row.salesPrice) }}</strong>
+                  <span v-if="row.originalPrice">原价 {{ formatPrice(row.originalPrice) }}</span>
+                </div>
+              </template>
+            </el-table-column>
             <el-table-column
-              v-if="packageTablePrefs.visibleColumnMap.storageQuotaGb"
-              column-key="storageQuotaGb"
-              prop="storageQuotaGb"
-              label="存储配额(GB)"
-              :width="packageTablePrefs.getColumnWidth('storageQuotaGb') || 130"
-            />
+              v-if="packageTablePrefs.visibleColumnMap.resourceImpact"
+              column-key="resourceImpact"
+              label="影响资源"
+              min-width="130"
+              :width="packageTablePrefs.getColumnWidth('resourceImpact')"
+            >
+              <template #default="{ row }">
+                <div class="resource-impact-cell">
+                  <span>可见 {{ row.visibleResourceCount || 0 }}</span>
+                  <span>授权 {{ row.grantResourceCount || 0 }}</span>
+                </div>
+              </template>
+            </el-table-column>
             <el-table-column
               v-if="packageTablePrefs.visibleColumnMap.capabilityCodes"
               column-key="capabilityCodes"
@@ -121,15 +153,6 @@
                 <el-tag type="info" effect="plain">{{ row.referencedTenantCount || 0 }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column
-              v-if="packageTablePrefs.visibleColumnMap.packageDesc"
-              column-key="packageDesc"
-              prop="packageDesc"
-              label="套餐说明"
-              min-width="220"
-              show-overflow-tooltip
-              :width="packageTablePrefs.getColumnWidth('packageDesc')"
-            />
             <el-table-column
               v-if="packageTablePrefs.visibleColumnMap.enabled"
               column-key="enabled"
@@ -280,6 +303,35 @@
         </el-row>
         <el-row :gutter="16">
           <el-col :span="12">
+            <el-form-item label="运营副标题">
+              <el-input v-model="packageForm.subtitle" placeholder="用于套餐卡片展示" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="应用标识">
+              <el-input v-model="packageForm.appKey" placeholder="例如 app_base" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="8">
+            <el-form-item label="销售价">
+              <el-input-number v-model="packageForm.salesPrice" :min="0" :precision="2" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="原价">
+              <el-input-number v-model="packageForm.originalPrice" :min="0" :precision="2" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="展示排序">
+              <el-input-number v-model="packageForm.orderNo" :min="0" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="12">
             <el-form-item label="用户配额">
               <el-input-number v-model="packageForm.userQuota" :min="0" style="width: 100%" />
             </el-form-item>
@@ -291,7 +343,10 @@
           </el-col>
         </el-row>
         <el-form-item label="套餐说明">
-          <el-input v-model="packageForm.packageDesc" type="textarea" :rows="3" />
+          <el-input v-model="packageForm.packageDesc" type="textarea" :rows="3" placeholder="列表和摘要展示" />
+        </el-form-item>
+        <el-form-item label="详细描述">
+          <el-input v-model="packageForm.descriptionMd" type="textarea" :rows="4" placeholder="支持富文本或 Markdown 内容" />
         </el-form-item>
         <el-form-item label="能力集合" prop="capabilityCodes">
           <el-select v-model="packageForm.capabilityCodes" multiple style="width: 100%">
@@ -354,6 +409,12 @@
         <el-descriptions :column="1" border class="drawer-section drawer-section--overview">
           <el-descriptions-item label="套餐编码">{{ detailPackage.packageCode }}</el-descriptions-item>
           <el-descriptions-item label="套餐名称">{{ detailPackage.packageName }}</el-descriptions-item>
+          <el-descriptions-item label="运营副标题">{{ detailPackage.subtitle || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="应用标识">{{ detailPackage.appKey || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="价格">
+            {{ formatPrice(detailPackage.salesPrice) }}
+            <span v-if="detailPackage.originalPrice"> / 原价 {{ formatPrice(detailPackage.originalPrice) }}</span>
+          </el-descriptions-item>
           <el-descriptions-item label="用户配额">{{ detailPackage.userQuota ?? '-' }}</el-descriptions-item>
           <el-descriptions-item label="存储配额(GB)">{{ detailPackage.storageQuotaGb ?? '-' }}</el-descriptions-item>
           <el-descriptions-item label="套餐说明">{{ detailPackage.packageDesc || '未配置说明' }}</el-descriptions-item>
@@ -366,6 +427,49 @@
           <div class="tag-wrap">
             <el-tag v-for="code in detailPackage.capabilityCodes" :key="code" type="info" effect="plain">{{ code }}</el-tag>
           </div>
+        </div>
+
+        <div class="detail-block drawer-section drawer-section--scopes" v-loading="packageImpactLoading">
+          <div class="eyebrow">能力影响范围</div>
+          <div class="impact-grid">
+            <div>
+              <strong>{{ detailPackageImpact?.visibleResourceCount ?? detailPackage.visibleResourceCount ?? 0 }}</strong>
+              <span>可见资源</span>
+            </div>
+            <div>
+              <strong>{{ detailPackageImpact?.grantResourceCount ?? detailPackage.grantResourceCount ?? 0 }}</strong>
+              <span>可授权资源</span>
+            </div>
+            <div>
+              <strong>{{ detailPackageImpact?.referencedTenantCount ?? detailPackage.referencedTenantCount ?? 0 }}</strong>
+              <span>引用租户</span>
+            </div>
+          </div>
+          <div v-if="(detailPackageImpact?.sampleResourceKeys?.length || detailPackage.sampleResourceKeys?.length)" class="tag-wrap" style="margin-top: 10px">
+            <el-tag
+              v-for="key in detailPackageImpact?.sampleResourceKeys || detailPackage.sampleResourceKeys"
+              :key="key"
+              type="success"
+              effect="plain"
+            >
+              {{ key }}
+            </el-tag>
+          </div>
+        </div>
+
+        <div v-if="detailPackageImpact?.rules?.length" class="detail-block drawer-section drawer-section--guide">
+          <div class="eyebrow">影响规则</div>
+          <div v-if="activeRules(detailPackageImpact.rules).length" class="rule-list">
+            <el-tag v-for="rule in activeRules(detailPackageImpact.rules)" :key="rule.ruleCode" :type="ruleTagType(rule)" effect="plain">
+              {{ rule.message }}
+            </el-tag>
+          </div>
+          <el-alert v-else title="当前未命中风险规则。" type="success" :closable="false" style="margin-top: 8px" />
+        </div>
+
+        <div class="detail-block drawer-section drawer-section--guide" v-if="detailPackage.descriptionMd">
+          <div class="eyebrow">详细描述</div>
+          <p class="description-text">{{ detailPackage.descriptionMd }}</p>
         </div>
 
         <div class="detail-block drawer-section drawer-section--guide">
@@ -387,6 +491,9 @@
           <div v-if="detailPackage.referencedTenantIds?.length" class="tag-wrap" style="margin-top: 10px">
             <el-tag v-for="tenantId in detailPackage.referencedTenantIds" :key="tenantId">{{ tenantId }}</el-tag>
           </div>
+          <ul v-if="detailPackageImpact?.recommendedActions?.length" class="action-list">
+            <li v-for="item in detailPackageImpact.recommendedActions" :key="item">{{ item }}</li>
+          </ul>
         </div>
       </template>
     </el-drawer>
@@ -404,10 +511,10 @@
           <el-descriptions-item label="覆盖记录数">{{ detailCapability.overrideReferenceCount || 0 }}</el-descriptions-item>
         </el-descriptions>
 
-        <div class="detail-block drawer-section drawer-section--guide">
+        <div class="detail-block drawer-section drawer-section--guide" v-loading="capabilityImpactLoading">
           <div class="eyebrow">引用提示</div>
           <el-alert
-            v-if="(detailCapability.referencedPackageCount || 0) > 0 || (detailCapability.overrideReferenceCount || 0) > 0"
+            v-if="(detailCapabilityImpact?.referencedPackageCount ?? detailCapability.referencedPackageCount ?? 0) > 0 || (detailCapabilityImpact?.overrideReferenceCount ?? detailCapability.overrideReferenceCount ?? 0) > 0"
             title="该能力存在引用关系，删除前请先解除套餐绑定并清理租户覆盖配置。"
             type="warning"
             :closable="false"
@@ -420,12 +527,25 @@
             :closable="false"
             style="margin-top: 8px"
           />
-          <div v-if="detailCapability.referencedPackageCodes?.length" class="tag-wrap" style="margin-top: 10px">
-            <el-tag v-for="pkg in detailCapability.referencedPackageCodes" :key="pkg" type="info" effect="plain">套餐: {{ pkg }}</el-tag>
+          <div v-if="(detailCapabilityImpact?.referencedPackageCodes?.length || detailCapability.referencedPackageCodes?.length)" class="tag-wrap" style="margin-top: 10px">
+            <el-tag
+              v-for="pkg in detailCapabilityImpact?.referencedPackageCodes || detailCapability.referencedPackageCodes"
+              :key="pkg"
+              type="info"
+              effect="plain"
+            >套餐: {{ pkg }}</el-tag>
           </div>
-          <div v-if="detailCapability.referencedTenantIds?.length" class="tag-wrap" style="margin-top: 10px">
-            <el-tag v-for="tenantId in detailCapability.referencedTenantIds" :key="tenantId">租户: {{ tenantId }}</el-tag>
+          <div v-if="(detailCapabilityImpact?.referencedTenantIds?.length || detailCapability.referencedTenantIds?.length)" class="tag-wrap" style="margin-top: 10px">
+            <el-tag v-for="tenantId in detailCapabilityImpact?.referencedTenantIds || detailCapability.referencedTenantIds" :key="tenantId">租户: {{ tenantId }}</el-tag>
           </div>
+          <div v-if="detailCapabilityImpact?.rules?.length" class="rule-list">
+            <el-tag v-for="rule in activeRules(detailCapabilityImpact.rules)" :key="rule.ruleCode" :type="ruleTagType(rule)" effect="plain">
+              {{ rule.message }}
+            </el-tag>
+          </div>
+          <ul v-if="detailCapabilityImpact?.recommendedActions?.length" class="action-list">
+            <li v-for="item in detailCapabilityImpact.recommendedActions" :key="item">{{ item }}</li>
+          </ul>
         </div>
       </template>
     </el-drawer>
@@ -443,15 +563,25 @@ import {
   deleteTenantCapability,
   deleteTenantPackage,
   queryTenantCapabilities,
+  queryTenantCapabilityImpact,
+  queryTenantPackageImpact,
   queryTenantPackages,
   updateTenantCapability,
   updateTenantPackage,
 } from '@/api/modules'
-import type { TenantCapabilityView, TenantPackageView } from '@/types/tenant'
+import type {
+  ImpactRuleView,
+  TenantCapabilityImpactView,
+  TenantCapabilityView,
+  TenantPackageImpactView,
+  TenantPackageView,
+} from '@/types/tenant'
 
 const activeTab = ref<'packages' | 'capabilities'>('packages')
 const loadingPackages = ref(false)
 const loadingCapabilities = ref(false)
+const packageImpactLoading = ref(false)
+const capabilityImpactLoading = ref(false)
 const packageVisible = ref(false)
 const capabilityVisible = ref(false)
 const packageDetailVisible = ref(false)
@@ -462,16 +592,19 @@ const packageFormRef = ref<FormInstance>()
 const capabilityFormRef = ref<FormInstance>()
 const packages = ref<TenantPackageView[]>([])
 const capabilities = ref<TenantCapabilityView[]>([])
+const catalogLoadedAt = ref<number | null>(null)
 const detailPackage = ref<TenantPackageView | null>(null)
+const detailPackageImpact = ref<TenantPackageImpactView | null>(null)
 const detailCapability = ref<TenantCapabilityView | null>(null)
+const detailCapabilityImpact = ref<TenantCapabilityImpactView | null>(null)
 const packageTablePrefs = useTablePreferences('eap.table.tenant.catalog.packages', [
-  { key: 'packageCode', label: '套餐编码', width: 160 },
-  { key: 'packageName', label: '套餐名称', width: 180 },
-  { key: 'userQuota', label: '用户配额', width: 110 },
-  { key: 'storageQuotaGb', label: '存储配额(GB)', width: 130 },
+  { key: 'packageCode', label: '套餐编码', width: 150 },
+  { key: 'packageName', label: '套餐名称', width: 220 },
+  { key: 'appKey', label: '应用标识', width: 130 },
+  { key: 'price', label: '价格', width: 140 },
+  { key: 'resourceImpact', label: '影响资源', width: 130 },
   { key: 'capabilityCodes', label: '能力集合', width: 240 },
   { key: 'referencedTenantCount', label: '引用租户', width: 110 },
-  { key: 'packageDesc', label: '套餐说明', width: 220 },
   { key: 'enabled', label: '状态', width: 100 },
   { key: 'actions', label: '操作', width: 220 },
 ])
@@ -488,6 +621,12 @@ const capabilityTablePrefs = useTablePreferences('eap.table.tenant.catalog.capab
 const packageForm = reactive({
   packageCode: '',
   packageName: '',
+  subtitle: '',
+  salesPrice: undefined as number | undefined,
+  originalPrice: undefined as number | undefined,
+  descriptionMd: '',
+  appKey: '',
+  orderNo: 0,
   userQuota: 0,
   storageQuotaGb: 0,
   packageDesc: '',
@@ -522,8 +661,14 @@ const capabilityRules = reactive<FormRules>({
 
 const enabledPackageCount = computed(() => packages.value.filter((item) => item.enabled).length)
 const enabledCapabilityCount = computed(() => capabilities.value.filter((item) => item.enabled).length)
+const catalogRefreshTip = computed(() => catalogLoadedAt.value ? `上次刷新：${new Date(catalogLoadedAt.value).toLocaleString()}` : '尚未刷新')
 
-void Promise.all([loadPackages(), loadCapabilities()])
+void refreshCatalog()
+
+async function refreshCatalog() {
+  await Promise.all([loadPackages(), loadCapabilities()])
+  catalogLoadedAt.value = Date.now()
+}
 
 async function loadPackages() {
   loadingPackages.value = true
@@ -547,6 +692,12 @@ function openPackageDialog(row?: TenantPackageView) {
   editingPackageId.value = row?.id ?? null
   packageForm.packageCode = row?.packageCode ?? ''
   packageForm.packageName = row?.packageName ?? ''
+  packageForm.subtitle = row?.subtitle ?? ''
+  packageForm.salesPrice = row?.salesPrice ?? undefined
+  packageForm.originalPrice = row?.originalPrice ?? undefined
+  packageForm.descriptionMd = row?.descriptionMd ?? ''
+  packageForm.appKey = row?.appKey ?? ''
+  packageForm.orderNo = row?.orderNo ?? 0
   packageForm.userQuota = row?.userQuota ?? 0
   packageForm.storageQuotaGb = row?.storageQuotaGb ?? 0
   packageForm.packageDesc = row?.packageDesc ?? ''
@@ -565,14 +716,28 @@ function openCapabilityDialog(row?: TenantCapabilityView) {
   capabilityVisible.value = true
 }
 
-function openPackageDetail(row: TenantPackageView) {
+async function openPackageDetail(row: TenantPackageView) {
   detailPackage.value = row
+  detailPackageImpact.value = null
   packageDetailVisible.value = true
+  packageImpactLoading.value = true
+  try {
+    detailPackageImpact.value = await queryTenantPackageImpact(row.id)
+  } finally {
+    packageImpactLoading.value = false
+  }
 }
 
-function openCapabilityDetail(row: TenantCapabilityView) {
+async function openCapabilityDetail(row: TenantCapabilityView) {
   detailCapability.value = row
+  detailCapabilityImpact.value = null
   capabilityDetailVisible.value = true
+  capabilityImpactLoading.value = true
+  try {
+    detailCapabilityImpact.value = await queryTenantCapabilityImpact(row.id)
+  } finally {
+    capabilityImpactLoading.value = false
+  }
 }
 
 async function submitPackage() {
@@ -604,8 +769,10 @@ async function submitCapability() {
 }
 
 async function removePackage(row: TenantPackageView) {
-  if ((row.referencedTenantCount || 0) > 0) {
-    ElMessage.warning(`套餐仍被 ${row.referencedTenantCount} 个租户使用，请先迁移租户后再删除`)
+  const impact = await queryTenantPackageImpact(row.id)
+  const blockingRules = impact.rules.filter((rule) => rule.hit && rule.blocking)
+  if (blockingRules.length > 0) {
+    ElMessage.warning(blockingRules[0].message)
     return
   }
   await ElMessageBox.confirm(`确认删除套餐 ${row.packageName} 吗？`, '删除确认', { type: 'warning' })
@@ -615,8 +782,10 @@ async function removePackage(row: TenantPackageView) {
 }
 
 async function removeCapability(row: TenantCapabilityView) {
-  if ((row.referencedPackageCount || 0) > 0 || (row.overrideReferenceCount || 0) > 0) {
-    ElMessage.warning('能力仍存在套餐或租户覆盖引用，请先解除引用后再删除')
+  const impact = await queryTenantCapabilityImpact(row.id)
+  const blockingRules = impact.rules.filter((rule) => rule.hit && rule.blocking)
+  if (blockingRules.length > 0) {
+    ElMessage.warning(blockingRules[0].message)
     return
   }
   await ElMessageBox.confirm(`确认删除能力 ${row.capabilityName} 吗？`, '删除确认', { type: 'warning' })
@@ -633,6 +802,27 @@ function onPackageHeaderDragEnd(newWidth: number, _oldWidth: number, column: { p
   packageTablePrefs.setColumnWidth(key, newWidth)
 }
 
+function formatPrice(value?: number | null) {
+  if (value === null || value === undefined) {
+    return '未配置'
+  }
+  return `¥${Number(value).toFixed(2)}`
+}
+
+function activeRules(rules: ImpactRuleView[]) {
+  return rules.filter((rule) => rule.hit)
+}
+
+function ruleTagType(rule: ImpactRuleView) {
+  if (rule.blocking || rule.level === 'ERROR') {
+    return 'danger'
+  }
+  if (rule.level === 'WARN') {
+    return 'warning'
+  }
+  return 'info'
+}
+
 function onCapabilityHeaderDragEnd(newWidth: number, _oldWidth: number, column: { property?: string; columnKey?: string }) {
   const key = String(column.columnKey || column.property || '')
   if (!key) {
@@ -647,8 +837,70 @@ function onCapabilityHeaderDragEnd(newWidth: number, _oldWidth: number, column: 
   margin-bottom: 16px;
 }
 
+.toolbar-tip {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
 .scope-tag {
   margin-right: 6px;
   margin-bottom: 6px;
+}
+
+.package-name-cell,
+.price-cell,
+.resource-impact-cell {
+  display: grid;
+  gap: 4px;
+}
+
+.package-name-cell strong,
+.price-cell strong,
+.impact-grid strong {
+  color: #0f172a;
+}
+
+.package-name-cell span,
+.price-cell span,
+.resource-impact-cell span,
+.description-text,
+.action-list {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.impact-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.impact-grid > div {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px;
+  background: #f8fafc;
+  display: grid;
+  gap: 4px;
+}
+
+.description-text {
+  margin: 8px 0 0;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.rule-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.action-list {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  line-height: 1.7;
 }
 </style>

@@ -10,7 +10,7 @@ import com.enterprise.auth.platform.modules.menu.domain.MenuType;
 import com.enterprise.auth.platform.modules.menu.infrastructure.entity.SysMenuEntity;
 import com.enterprise.auth.platform.modules.menu.infrastructure.mapper.SysMenuMapper;
 import com.enterprise.auth.platform.modules.menu.interfaces.CreateMenuRequest;
-import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMenuMapper;
+import com.enterprise.auth.platform.modules.role.application.RoleMenuReferenceFacade;
 import com.enterprise.auth.platform.modules.tenant.application.TenantCapabilityResourceScopeFacade;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
 import java.util.ArrayList;
@@ -44,7 +44,7 @@ public class MenuService {
     );
 
     private final SysMenuMapper sysMenuMapper;
-    private final SysRoleMenuMapper sysRoleMenuMapper;
+    private final RoleMenuReferenceFacade roleMenuReferenceFacade;
     private final ApplicationEventPublisher eventPublisher;
     private final TenantCapabilityResourceScopeFacade tenantCapabilityResourceScopeFacade;
     private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
@@ -52,14 +52,14 @@ public class MenuService {
 
     public MenuService(
             SysMenuMapper sysMenuMapper,
-            SysRoleMenuMapper sysRoleMenuMapper,
+            RoleMenuReferenceFacade roleMenuReferenceFacade,
             ApplicationEventPublisher eventPublisher,
             TenantCapabilityResourceScopeFacade tenantCapabilityResourceScopeFacade,
             AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
             TenantProperties tenantProperties
     ) {
         this.sysMenuMapper = sysMenuMapper;
-        this.sysRoleMenuMapper = sysRoleMenuMapper;
+        this.roleMenuReferenceFacade = roleMenuReferenceFacade;
         this.eventPublisher = eventPublisher;
         this.tenantCapabilityResourceScopeFacade = tenantCapabilityResourceScopeFacade;
         this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
@@ -387,7 +387,7 @@ public class MenuService {
         if (children > 0) {
             throw new BusinessException("请先删除子节点");
         }
-        long roleBindings = runWithPlatformTenant(() -> sysRoleMenuMapper.countByMenuIdAcrossTenants(menuId));
+        long roleBindings = roleMenuReferenceFacade.countMenuReferencesAcrossTenants(menuId);
         if (roleBindings > 0) {
             throw new BusinessException("菜单已被角色授权引用，暂不允许删除");
         }

@@ -3,11 +3,13 @@ package com.enterprise.auth.platform.infrastructure.redis;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.enterprise.auth.platform.common.web.PageResult;
+import com.enterprise.auth.platform.modules.system.application.SystemViewModels;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
@@ -33,6 +35,29 @@ class RedisCacheConfigTest {
         assertThat(page.page()).isEqualTo(1);
         assertThat(page.size()).isEqualTo(10);
         assertThat(page.records()).singleElement().isEqualTo(new SampleView("config-a"));
+    }
+
+    @Test
+    void valueSerializerShouldPreserveCategoryCacheStructures() {
+        RedisCacheConfig config = new RedisCacheConfig();
+        RedisCacheConfiguration cacheConfiguration = config.redisCacheConfiguration(
+                cacheProperties(),
+                new ObjectMapper().findAndRegisterModules()
+        );
+        RedisSerializationContext.SerializationPair<Object> serializer = cacheConfiguration.getValueSerializationPair();
+        List<SystemViewModels.CategoryOption> categoryOptions = List.of(
+                new SystemViewModels.CategoryOption("base", "基础配置", List.of("system.*"))
+        );
+        Map<String, List<SystemViewModels.CategoryOption>> categories = Map.of(
+                "dict", categoryOptions,
+                "config", List.of()
+        );
+
+        Object restoredOptions = serializer.read(serializer.write(categoryOptions));
+        Object restoredCategories = serializer.read(serializer.write(categories));
+
+        assertThat(restoredOptions).isEqualTo(categoryOptions);
+        assertThat(restoredCategories).isEqualTo(categories);
     }
 
     private AppCacheProperties cacheProperties() {

@@ -2,7 +2,7 @@
 
 import { http } from '../http'
 import type { ApiResponse } from '@/types/api'
-import type { RoleView } from '@/types/role'
+import type { RoleImpactView, RoleView } from '@/types/role'
 
 export async function queryRoles() {
   const { data } = await http.get<ApiResponse<RoleView[]>>('/api/roles')
@@ -16,6 +16,11 @@ export async function createRole(payload: Record<string, unknown>) {
 
 export async function updateRole(id: number, payload: Record<string, unknown>) {
   const { data } = await http.put<ApiResponse<RoleView>>(`/api/roles/${id}`, payload)
+  return data.data
+}
+
+export async function queryRoleImpact(id: number) {
+  const { data } = await http.get<ApiResponse<RoleImpactView>>(`/api/roles/${id}/impact`)
   return data.data
 }
 

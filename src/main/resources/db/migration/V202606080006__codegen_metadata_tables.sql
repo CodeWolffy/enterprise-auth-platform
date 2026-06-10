@@ -1,0 +1,85 @@
+CREATE TABLE IF NOT EXISTS `codegen_data_source` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `tenant_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '所属租户',
+  `name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '数据源名称',
+  `jdbc_url` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'JDBC 地址',
+  `username` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '用户名',
+  `password_cipher` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '密码密文',
+  `db_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '数据库名',
+  `host` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '主机',
+  `port` int NULL DEFAULT NULL COMMENT '端口',
+  `enabled` tinyint NOT NULL DEFAULT 1 COMMENT '是否启用',
+  `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '创建人',
+  `updated_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '更新人',
+  `deleted` tinyint NOT NULL DEFAULT 0 COMMENT '逻辑删除标记',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `uk_codegen_data_source_tenant_name` (`tenant_id`, `name`, `deleted`) USING BTREE,
+  KEY `idx_codegen_data_source_tenant_enabled` (`tenant_id`, `enabled`, `deleted`) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '代码生成数据源' ROW_FORMAT = DYNAMIC;
+
+CREATE TABLE IF NOT EXISTS `codegen_table` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `tenant_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '所属租户',
+  `data_source_id` bigint NOT NULL COMMENT '数据源 ID',
+  `table_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '表名',
+  `table_comment` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '表注释',
+  `class_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '类名',
+  `tpl_category` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT 'crud' COMMENT '模板分类',
+  `package_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '包名',
+  `module_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '模块名',
+  `business_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '业务名',
+  `function_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '功能名',
+  `function_author` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '作者',
+  `gen_type` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT 'preview' COMMENT '生成方式',
+  `gen_path` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '生成路径',
+  `options` json NULL COMMENT '扩展选项',
+  `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '创建人',
+  `updated_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '更新人',
+  `deleted` tinyint NOT NULL DEFAULT 0 COMMENT '逻辑删除标记',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `uk_codegen_table_tenant_ds_table` (`tenant_id`, `data_source_id`, `table_name`, `deleted`) USING BTREE,
+  KEY `idx_codegen_table_tenant_table` (`tenant_id`, `table_name`, `deleted`) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '代码生成表配置' ROW_FORMAT = DYNAMIC;
+
+CREATE TABLE IF NOT EXISTS `codegen_table_column` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `tenant_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '所属租户',
+  `table_id` bigint NOT NULL COMMENT '表配置 ID',
+  `column_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '字段名',
+  `column_comment` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '字段注释',
+  `column_type` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '字段类型',
+  `data_type` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '数据类型',
+  `java_type` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT 'Java 类型',
+  `java_field` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT 'Java 字段',
+  `is_pk` tinyint NOT NULL DEFAULT 0 COMMENT '是否主键',
+  `is_required` tinyint NOT NULL DEFAULT 0 COMMENT '是否必填',
+  `is_insert` tinyint NOT NULL DEFAULT 1 COMMENT '是否插入',
+  `is_edit` tinyint NOT NULL DEFAULT 1 COMMENT '是否编辑',
+  `is_list` tinyint NOT NULL DEFAULT 1 COMMENT '是否列表',
+  `is_query` tinyint NOT NULL DEFAULT 0 COMMENT '是否查询',
+  `query_type` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT 'EQ' COMMENT '查询方式',
+  `html_type` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT 'input' COMMENT '表单控件',
+  `dict_type` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '字典类型',
+  `sort` int NOT NULL DEFAULT 0 COMMENT '排序',
+  `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '创建人',
+  `updated_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '更新人',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `uk_codegen_column_table_column` (`tenant_id`, `table_id`, `column_name`) USING BTREE,
+  KEY `idx_codegen_column_table_sort` (`tenant_id`, `table_id`, `sort`) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '代码生成字段配置' ROW_FORMAT = DYNAMIC;
+
+INSERT INTO `codegen_data_source` (`tenant_id`, `name`, `jdbc_url`, `username`, `password_cipher`, `db_name`, `host`, `port`, `enabled`, `created_by`, `updated_by`, `deleted`)
+VALUES ('platform', '当前应用库', 'LOCAL', NULL, NULL, DATABASE(), 'LOCAL', NULL, 1, 'system', 'system', 0)
+ON DUPLICATE KEY UPDATE
+  `jdbc_url` = VALUES(`jdbc_url`),
+  `db_name` = VALUES(`db_name`),
+  `enabled` = VALUES(`enabled`),
+  `updated_by` = VALUES(`updated_by`),
+  `deleted` = VALUES(`deleted`),
+  `updated_at` = NOW();

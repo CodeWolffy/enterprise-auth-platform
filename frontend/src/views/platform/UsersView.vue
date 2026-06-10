@@ -43,6 +43,18 @@
         <el-form-item label="邮箱">
           <el-input v-model="queryParams.email" placeholder="按邮箱搜索" clearable />
         </el-form-item>
+        <el-form-item label="部门">
+          <el-tree-select
+            v-model="queryParams.deptId"
+            :data="departmentTree"
+            clearable
+            check-strictly
+            node-key="id"
+            :props="{ label: 'label', children: 'children' }"
+            placeholder="按部门筛选"
+            style="width: 180px"
+          />
+        </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="queryParams.enabled" placeholder="全部" clearable style="width: 120px">
             <el-option label="启用" :value="true" />
@@ -142,7 +154,7 @@
             <el-button v-permission="'user:write'" link type="primary" data-testid="users-edit" @click="openUser(row)">编辑</el-button>
             <el-button v-permission="'user:write'" link type="primary" @click="openRoleAssignment(row)">分配角色</el-button>
             <el-button v-permission="'user:write'" link type="warning" @click="promptResetPassword(row)">重置密码</el-button>
-            <el-button v-permission="'user:write'" link type="danger" data-testid="users-delete" @click="removeUser(row.id)">删除</el-button>
+            <el-button v-permission="'user:write'" link type="danger" data-testid="users-delete" @click="removeUser(row)">删除</el-button>
           </template>
         </el-table-column>
         <template #empty>
@@ -230,11 +242,29 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="部门 ID" prop="deptId">
-              <el-input-number v-model="userForm.deptId" :min="1" style="width: 100%" />
+            <el-form-item label="所属部门" prop="deptId">
+              <el-tree-select
+                v-model="userForm.deptId"
+                :data="departmentTree"
+                check-strictly
+                node-key="id"
+                :props="{ label: 'label', children: 'children' }"
+                placeholder="请选择部门"
+                style="width: 100%"
+              />
             </el-form-item>
           </el-col>
         </el-row>
+        <el-form-item label="角色" prop="roleCodes">
+          <el-select v-model="userForm.roleCodes" multiple style="width: 100%" placeholder="请选择至少一个角色">
+            <el-option
+              v-for="role in roles"
+              :key="role.code"
+              :label="`${role.name} (${role.code})`"
+              :value="role.code"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="启用状态">
           <el-switch v-model="userForm.enabled" inline-prompt active-text="启用" inactive-text="禁用" />
         </el-form-item>
@@ -276,17 +306,20 @@ import {
   createUser,
   deleteUser,
   queryAssignedRoles,
+  queryDepartments,
   queryRoles,
   queryUsers,
   updateUser,
 } from '@/api/modules'
 import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { RoleView } from '@/types/role'
+import type { DepartmentView } from '@/types/dept'
 import type { UserSummary } from '@/types/user'
 import { useAuthStore } from '@/stores/auth'
 
 const users = ref<UserSummary[]>([])
 const roles = ref<RoleView[]>([])
+const departments = ref<DepartmentView[]>([])
 const authStore = useAuthStore()
 const totalUsers = ref(0)
 const userVisible = ref(false)
@@ -294,6 +327,7 @@ const roleVisible = ref(false)
 const detailVisible = ref(false)
 const editingUserId = ref<number | null>(null)
 const roleTargetUserId = ref<number | null>(null)
+const roleTargetIsCurrentUser = ref(false)
 const detailData = ref<UserSummary | null>(null)
 const selectedRoleCodes = ref<string[]>([])
 const loading = ref(false)
@@ -303,6 +337,7 @@ const queryParams = reactive({
   username: '',
   mobile: '',
   email: '',
+  deptId: undefined as number | undefined,
   enabled: undefined as boolean | undefined,
   page: 1,
   size: 10,
@@ -316,6 +351,7 @@ const userForm = reactive({
   password: '',
   deptId: 1 as number | null,
   enabled: true,
+  roleCodes: [] as string[],
 })
 
 const userRules = reactive<FormRules>({
@@ -356,6 +392,18 @@ const userRules = reactive<FormRules>({
       trigger: 'change',
     },
   ],
+  roleCodes: [
+    {
+      validator: (_rule, value, callback) => {
+        if (!Array.isArray(value) || value.length === 0) {
+          callback(new Error('请至少选择一个角色'))
+          return
+        }
+        callback()
+      },
+      trigger: 'change',
+    },
+  ],
 })
 
 const enabledCount = computed(() => users.value.filter((item) => item.enabled).length)
@@ -367,6 +415,7 @@ const averageRoleCount = computed(() => {
   const total = users.value.reduce((sum, item) => sum + item.roles.length, 0)
   return (total / users.value.length).toFixed(1)
 })
+const departmentTree = computed(() => buildDepartmentTree(departments.value))
 const userTablePrefs = useTablePreferences('eap.table.users', [
   { key: 'username', label: '用户名', width: 140 },
   { key: 'displayName', label: '显示名称', width: 140 },
@@ -383,13 +432,15 @@ async function load() {
   loading.value = true
   try {
     const shouldLoadRoles = authStore.snapshot?.grants.includes('role:read')
-    const [userPage, roleList] = await Promise.all([
+    const [userPage, roleList, departmentList] = await Promise.all([
       queryUsers(queryParams),
       shouldLoadRoles ? queryRoles() : Promise.resolve([] as RoleView[]),
+      queryDepartments(),
     ])
     users.value = userPage.records
     totalUsers.value = userPage.total
     roles.value = roleList
+    departments.value = departmentList
   } finally {
     loading.value = false
   }
@@ -404,6 +455,7 @@ function resetSearch() {
   queryParams.username = ''
   queryParams.mobile = ''
   queryParams.email = ''
+  queryParams.deptId = undefined
   queryParams.enabled = undefined
   queryParams.page = 1
   void load()
@@ -412,6 +464,10 @@ function resetSearch() {
 function openDetail(row: UserSummary) {
   detailData.value = row
   detailVisible.value = true
+}
+
+function isCurrentUser(row: UserSummary) {
+  return authStore.snapshot?.userId === row.id
 }
 
 function openUser(row?: UserSummary) {
@@ -424,6 +480,7 @@ function openUser(row?: UserSummary) {
     password: '',
     deptId: row?.deptId ?? 1,
     enabled: row?.enabled ?? true,
+    roleCodes: [...(row?.roles ?? [])],
   })
   userVisible.value = true
 }
@@ -434,6 +491,10 @@ async function submitUser() {
   }
   await formRef.value.validate()
 
+  if (editingUserId.value && editingUserId.value === authStore.snapshot?.userId && !userForm.enabled) {
+    ElMessage.warning('不能停用当前登录用户')
+    return
+  }
   const payload = {
     username: userForm.username,
     displayName: userForm.displayName || null,
@@ -442,7 +503,7 @@ async function submitUser() {
     password: userForm.password || undefined,
     deptId: userForm.deptId,
     enabled: userForm.enabled,
-    roleCodes: undefined,
+    roleCodes: userForm.roleCodes,
   }
 
   if (editingUserId.value) {
@@ -461,6 +522,7 @@ async function submitUser() {
 
 async function openRoleAssignment(row: UserSummary) {
   roleTargetUserId.value = row.id
+  roleTargetIsCurrentUser.value = isCurrentUser(row)
   const assignedRoles = await queryAssignedRoles(row.id)
   selectedRoleCodes.value = assignedRoles.map((item) => item.code)
   roleVisible.value = true
@@ -468,6 +530,10 @@ async function openRoleAssignment(row: UserSummary) {
 
 async function submitRoleAssignment() {
   if (!roleTargetUserId.value) {
+    return
+  }
+  if (selectedRoleCodes.value.length === 0) {
+    ElMessage.warning(roleTargetIsCurrentUser.value ? '不能移除当前登录用户的全部角色' : '请至少选择一个角色')
     return
   }
   try {
@@ -502,11 +568,35 @@ function promptResetPassword(row: UserSummary) {
     .catch(() => {})
 }
 
-async function removeUser(id: number) {
+async function removeUser(row: UserSummary) {
+  if (isCurrentUser(row)) {
+    ElMessage.warning('不能删除当前登录用户')
+    return
+  }
   await ElMessageBox.confirm('删除用户后将无法继续登录，是否继续？', '删除确认', { type: 'warning' })
-  await deleteUser(id)
+  await deleteUser(row.id)
   ElMessage.success('用户已删除')
   await load()
+}
+
+function buildDepartmentTree(source: DepartmentView[]) {
+  const nodes = source.map((item) => ({
+    id: item.id,
+    label: item.name,
+    parentId: item.parentId ?? 0,
+    children: [] as Array<{ id: number; label: string; parentId: number; children: unknown[] }>,
+  }))
+  const map = new Map(nodes.map((item) => [item.id, item]))
+  const roots: typeof nodes = []
+  nodes.forEach((node) => {
+    const parent = node.parentId ? map.get(node.parentId) : null
+    if (parent) {
+      parent.children.push(node)
+      return
+    }
+    roots.push(node)
+  })
+  return roots
 }
 
 function onUserHeaderDragEnd(newWidth: number, _oldWidth: number, column: { property?: string; columnKey?: string }) {

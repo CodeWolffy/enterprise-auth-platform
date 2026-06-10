@@ -46,12 +46,79 @@ public class TenantCapabilityApplicationService {
         return TenantCapabilityOverrideView.from(tenantManagementService.capabilityOverrides(tenantId));
     }
 
+    public TenantCapabilitySummaryView capabilitySummary(String tenantId) {
+        return TenantCapabilitySummaryView.from(tenantManagementService.capabilitySummary(tenantId));
+    }
+
     public TenantCapabilityOverrideView updateCapabilityOverrides(
             String tenantId,
             UpdateTenantCapabilityOverridesRequest request
     ) {
         return TenantCapabilityOverrideView.from(tenantManagementService.updateCapabilityOverrides(tenantId, request));
     }
+
+    @Schema(description = "租户能力摘要")
+    public record TenantCapabilitySummaryView(
+            @Schema(description = "租户编码") String tenantId,
+            @Schema(description = "套餐编码") String packageCode,
+            @Schema(description = "套餐名称") String packageName,
+            @Schema(description = "套餐默认能力编码集合") List<String> packageCapabilityCodes,
+            @Schema(description = "当前生效能力编码集合") List<String> effectiveCapabilityCodes,
+            @Schema(description = "相对套餐新增的能力编码集合") List<String> addedCapabilities,
+            @Schema(description = "相对套餐禁用的能力编码集合") List<String> disabledCapabilities,
+            @Schema(description = "套餐默认能力数量") int packageCapabilityCount,
+            @Schema(description = "当前生效能力数量") int effectiveCapabilityCount,
+            @Schema(description = "新增能力数量") int addedCapabilityCount,
+            @Schema(description = "禁用能力数量") int disabledCapabilityCount,
+            @Schema(description = "实际可见菜单") List<ResourceScopeMenuView> visibleMenus,
+            @Schema(description = "实际可授权菜单") List<ResourceScopeMenuView> grantableMenus,
+            @Schema(description = "实际可见菜单数量") int visibleMenuCount,
+            @Schema(description = "实际可授权菜单数量") int grantableMenuCount
+    ) {
+        static TenantCapabilitySummaryView from(TenantManagementService.TenantCapabilitySummaryView source) {
+            return new TenantCapabilitySummaryView(
+                    source.tenantId(),
+                    source.packageCode(),
+                    source.packageName(),
+                    source.packageCapabilityCodes(),
+                    source.effectiveCapabilityCodes(),
+                    source.addedCapabilities(),
+                    source.disabledCapabilities(),
+                    source.packageCapabilityCount(),
+                    source.effectiveCapabilityCount(),
+                    source.addedCapabilityCount(),
+                    source.disabledCapabilityCount(),
+                    source.visibleMenus().stream().map(ResourceScopeMenuView::from).toList(),
+                    source.grantableMenus().stream().map(ResourceScopeMenuView::from).toList(),
+                    source.visibleMenuCount(),
+                    source.grantableMenuCount()
+            );
+        }
+    }
+
+    @Schema(description = "租户资源范围菜单")
+    public record ResourceScopeMenuView(
+            @Schema(description = "菜单 ID") Long id,
+            @Schema(description = "父级菜单 ID") Long parentId,
+            @Schema(description = "菜单名称") String menuName,
+            @Schema(description = "菜单类型") String menuType,
+            @Schema(description = "资源键") String resourceKey,
+            @Schema(description = "授权键") String grantKey,
+            @Schema(description = "路由路径") String path
+    ) {
+        static ResourceScopeMenuView from(TenantManagementService.ResourceScopeMenuView source) {
+            return new ResourceScopeMenuView(
+                    source.id(),
+                    source.parentId(),
+                    source.menuName(),
+                    source.menuType(),
+                    source.resourceKey(),
+                    source.grantKey(),
+                    source.path()
+            );
+        }
+    }
+
     @Schema(description = "租户能力覆盖视图")
     public record TenantCapabilityOverrideView(
             @Schema(description = "租户编码") String tenantId,

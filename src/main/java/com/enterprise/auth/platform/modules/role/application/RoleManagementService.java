@@ -122,12 +122,40 @@ public class RoleManagementService {
         return listRoleMenuIds(tenantId, roleId);
     }
 
+    public RoleImpactView impact(Long roleId) {
+        String tenantId = currentTenantId();
+        SysRoleEntity entity = getRole(roleId, tenantId);
+        List<Long> assignedUserIds = userQueryFacade.listUserIdsByRole(tenantId, roleId);
+        Set<Long> assignedMenuIds = listRoleMenuIds(tenantId, roleId);
+        boolean deleteBlocked = !assignedUserIds.isEmpty();
+        List<String> warnings = new java.util.ArrayList<>();
+        if (deleteBlocked) {
+            warnings.add("角色已分配给用户，需先调整用户角色后才能删除。");
+        }
+        if (!assignedMenuIds.isEmpty()) {
+            warnings.add("删除角色会同步移除该角色的菜单授权关系。");
+        }
+        if (warnings.isEmpty()) {
+            warnings.add("当前未发现删除阻断项。");
+        }
+        return new RoleImpactView(
+                entity.getId(),
+                entity.getRoleCode(),
+                entity.getRoleName(),
+                assignedUserIds.size(),
+                assignedUserIds.stream().limit(5).toList(),
+                assignedMenuIds.size(),
+                deleteBlocked,
+                warnings
+        );
+    }
+
     @Transactional
     public void delete(Long roleId) {
         String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
         SysRoleEntity entity = getRole(roleId, tenantId);
-        long assignedUsers = userQueryFacade.countUsersByRole(roleId);
+        long assignedUsers = userQueryFacade.countUsersByRole(tenantId, roleId);
         if (assignedUsers > 0) {
             throw new BusinessException("角色已分配给用户，暂不允许删除");
         }
@@ -223,6 +251,18 @@ public class RoleManagementService {
             throw new BusinessException("角色不存在");
         }
         return entity;
+    }
+
+    public record RoleImpactView(
+            Long roleId,
+            String roleCode,
+            String roleName,
+            int assignedUserCount,
+            List<Long> sampleUserIds,
+            int assignedMenuCount,
+            boolean deleteBlocked,
+            List<String> warnings
+    ) {
     }
 
     private String currentTenantId() {

@@ -19,10 +19,10 @@ import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 import com.enterprise.auth.platform.modules.notification.application.NotificationScenarioPublisher;
 import com.enterprise.auth.platform.common.authz.SecuritySupport;
+import com.enterprise.auth.platform.common.context.AuthContextHolder;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.modules.user.interfaces.CreateUserRequest;
 import com.enterprise.auth.platform.modules.user.interfaces.UserSummary;
-import com.enterprise.auth.platform.modules.user.application.UserDirectoryService;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -84,6 +84,7 @@ public class UserManagementService {
             throw new BusinessException("用户名已存在");
         }
         validateDeptAccess(tenantId, request.deptId());
+        validateRoleCodesRequired(request.roleCodes());
         validatePassword(request.password());
 
         SysUserEntity entity = new SysUserEntity();
@@ -121,6 +122,7 @@ public class UserManagementService {
         String operator = SecuritySupport.currentOperator();
         SysUserEntity entity = getUser(userId, tenantId);
         validateDeptAccess(tenantId, request.deptId());
+        validateSelfProtection(entity, request);
 
         entity.setDisplayName(StringUtils.hasText(request.displayName()) ? request.displayName() : entity.getDisplayName());
         entity.setMobile(request.mobile() != null ? request.mobile() : entity.getMobile());
@@ -167,6 +169,8 @@ public class UserManagementService {
         String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
         SysUserEntity entity = getUser(userId, tenantId);
+        validateSelfRoleAssignment(entity, roleCodes);
+        validateRoleCodesRequired(roleCodes);
         syncUserRoles(tenantId, userId, roleCodes);
         permissionSnapshotInvalidationService.invalidateUser(entity.getId(), tenantId, entity.getUsername());
         auditService.record("USER_ROLE_ASSIGNED", operator, tenantId, Map.of("userId", userId, "roleCodes", roleCodes));
@@ -200,6 +204,7 @@ public class UserManagementService {
         String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
         SysUserEntity entity = getUser(userId, tenantId);
+        validateSelfDeletion(entity);
 
         sysUserRoleMapper.delete(new LambdaQueryWrapper<SysUserRoleEntity>()
                 .eq(SysUserRoleEntity::getTenantId, tenantId)
@@ -234,6 +239,46 @@ public class UserManagementService {
             return;
         }
         action.run();
+    }
+
+    private void validateRoleCodesRequired(Set<String> roleCodes) {
+        if (roleCodes == null || roleCodes.stream().filter(StringUtils::hasText).findAny().isEmpty()) {
+            throw new BusinessException("用户至少需要分配一个角色");
+        }
+    }
+
+    private void validateSelfProtection(SysUserEntity entity, CreateUserRequest request) {
+        if (!isCurrentUser(entity)) {
+            return;
+        }
+        if (Boolean.FALSE.equals(request.enabled())) {
+            throw new BusinessException("不能停用当前登录用户");
+        }
+        validateSelfRoleAssignment(entity, request.roleCodes());
+    }
+
+    private void validateSelfRoleAssignment(SysUserEntity entity, Set<String> roleCodes) {
+        if (!isCurrentUser(entity) || roleCodes == null) {
+            return;
+        }
+        if (roleCodes.stream().filter(StringUtils::hasText).findAny().isEmpty()) {
+            throw new BusinessException("不能移除当前登录用户的全部角色");
+        }
+    }
+
+    private void validateSelfDeletion(SysUserEntity entity) {
+        if (isCurrentUser(entity)) {
+            throw new BusinessException("不能删除当前登录用户");
+        }
+    }
+
+    private boolean isCurrentUser(SysUserEntity entity) {
+        if (entity == null || entity.getId() == null) {
+            return false;
+        }
+        return AuthContextHolder.currentUser()
+                .map(user -> entity.getId().equals(user.id()) && entity.getTenantId().equals(user.tenantId()))
+                .orElse(false);
     }
 
     private void syncUserRoles(String tenantId, Long userId, Set<String> roleCodes) {

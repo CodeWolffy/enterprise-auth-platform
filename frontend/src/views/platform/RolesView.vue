@@ -126,7 +126,7 @@
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
             <el-button v-permission="'role:write'" link type="primary" @click="openRole(row)">编辑</el-button>
             <el-button v-permission="'role:write'" link type="primary" @click="openMenuAssignment(row)">分配权限</el-button>
-            <el-button v-permission="'role:write'" link type="danger" @click="removeRole(row.id)">删除</el-button>
+            <el-button v-permission="'role:write'" link type="danger" @click="removeRole(row)">删除</el-button>
           </template>
         </el-table-column>
         <template #empty>
@@ -299,6 +299,7 @@ import {
   queryAssignedRoleMenus,
   queryDepartments,
   queryGrantableMenuTree,
+  queryRoleImpact,
   queryRoles,
   updateRole,
 } from '@/api/modules'
@@ -565,9 +566,19 @@ function clearMenuSelection() {
   selectedMenuIds.value = []
 }
 
-async function removeRole(id: number) {
-  await ElMessageBox.confirm('删除角色后，原有关联授权将失效，是否继续？', '删除确认', { type: 'warning' })
-  await deleteRole(id)
+async function removeRole(row: RoleView) {
+  const impact = await queryRoleImpact(row.id)
+  if (impact.deleteBlocked) {
+    ElMessage.warning(impact.warnings[0] || '角色存在引用，暂不允许删除')
+    return
+  }
+  const warningText = impact.warnings.join('\n')
+  await ElMessageBox.confirm(
+    `${warningText}\n\n确认删除角色 ${row.name} 吗？`,
+    '删除影响确认',
+    { type: impact.assignedMenuCount > 0 ? 'warning' : 'info' },
+  )
+  await deleteRole(row.id)
   ElMessage.success('角色已删除')
   await load()
 }

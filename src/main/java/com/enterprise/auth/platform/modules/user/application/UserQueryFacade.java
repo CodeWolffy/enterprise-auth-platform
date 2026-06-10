@@ -112,9 +112,25 @@ public class UserQueryFacade {
                 .eq(SysUserEntity::getDeleted, 0));
     }
 
+    public long countUsersByRole(String tenantId, Long roleId) {
+        return sysUserRoleMapper.selectCount(new LambdaQueryWrapper<SysUserRoleEntity>()
+                .eq(SysUserRoleEntity::getTenantId, tenantId)
+                .eq(SysUserRoleEntity::getRoleId, roleId));
+    }
+
     public long countUsersByRole(Long roleId) {
         return sysUserRoleMapper.selectCount(new LambdaQueryWrapper<SysUserRoleEntity>()
                 .eq(SysUserRoleEntity::getRoleId, roleId));
+    }
+
+    public List<Long> listUserIdsByRole(String tenantId, Long roleId) {
+        return sysUserRoleMapper.selectList(new LambdaQueryWrapper<SysUserRoleEntity>()
+                .eq(SysUserRoleEntity::getTenantId, tenantId)
+                .eq(SysUserRoleEntity::getRoleId, roleId)
+                .select(SysUserRoleEntity::getUserId))
+                .stream()
+                .map(SysUserRoleEntity::getUserId)
+                .toList();
     }
 
     public List<Long> listUserIdsByRole(Long roleId) {

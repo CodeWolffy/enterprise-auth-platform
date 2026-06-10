@@ -4,10 +4,6 @@ import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.modules.resource.application.CatalogService;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.common.web.PageResult;
-import com.enterprise.auth.platform.modules.user.interfaces.AssignRolesRequest;
-import com.enterprise.auth.platform.modules.user.interfaces.CreateUserRequest;
-import com.enterprise.auth.platform.modules.user.interfaces.CreateUserRequest;
-import com.enterprise.auth.platform.modules.user.interfaces.UserSummary;
 import com.enterprise.auth.platform.modules.user.application.UserDirectoryService;
 import com.enterprise.auth.platform.modules.user.application.UserManagementService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -47,10 +43,11 @@ public class UserController {
             @RequestParam(required = false) String mobile,
             @RequestParam(required = false) String email,
             @RequestParam(required = false) Boolean enabled,
+            @RequestParam(required = false) Long deptId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        return ApiResponse.ok(userDirectoryService.listUsers(username, mobile, email, enabled, page, size));
+        return ApiResponse.ok(userDirectoryService.listUsers(username, mobile, email, enabled, deptId, page, size));
     }
 
     @Operation(summary = "查询用户已分配角色")

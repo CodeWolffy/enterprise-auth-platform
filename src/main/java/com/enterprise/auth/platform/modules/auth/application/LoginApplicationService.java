@@ -7,7 +7,6 @@ import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.auth.infrastructure.SecurityProperties;
-import com.enterprise.auth.platform.modules.notification.application.NotificationScenarioPublisher;
 import com.enterprise.auth.platform.modules.security.application.SecurityPolicyApplicationService;
 import com.enterprise.auth.platform.modules.user.application.AuthenticationUser;
 import com.enterprise.auth.platform.modules.user.application.UserAuthenticationFacade;
@@ -38,7 +37,6 @@ public class LoginApplicationService {
     private final SessionIndexService sessionIndexService;
     private final ClientIpResolver clientIpResolver;
     private final SecurityPolicyApplicationService securityPolicyApplicationService;
-    private final NotificationScenarioPublisher notificationScenarioPublisher;
 
     public LoginApplicationService(
             CaptchaService captchaService,
@@ -50,8 +48,7 @@ public class LoginApplicationService {
             SecurityProperties securityProperties,
             SessionIndexService sessionIndexService,
             ClientIpResolver clientIpResolver,
-            SecurityPolicyApplicationService securityPolicyApplicationService,
-            NotificationScenarioPublisher notificationScenarioPublisher
+            SecurityPolicyApplicationService securityPolicyApplicationService
     ) {
         this.captchaService = captchaService;
         this.passwordHasher = passwordHasher;
@@ -63,7 +60,6 @@ public class LoginApplicationService {
         this.sessionIndexService = sessionIndexService;
         this.clientIpResolver = clientIpResolver;
         this.securityPolicyApplicationService = securityPolicyApplicationService;
-        this.notificationScenarioPublisher = notificationScenarioPublisher;
     }
 
     public TokenSessionResponse login(LoginRequest request, HttpServletRequest servletRequest) {
@@ -76,7 +72,7 @@ public class LoginApplicationService {
 
             if (loginAttemptService.isLocked(tenantId, request.username())) {
                 loginAttemptService.recordBlockedAttempt(tenantId, request.username(), clientIp);
-                throw new BusinessException("BAD_CREDENTIALS", "用户名或密码错误");
+                throw new BusinessException("ACCOUNT_LOCKED", "账户已锁定，请稍后再试");
             }
 
             AuthenticationUser user = userAuthenticationFacade.findByUsername(tenantId, request.username()).orElse(null);
@@ -88,8 +84,7 @@ public class LoginApplicationService {
             }
             if (!user.enabled()) {
                 auditService.record("LOGIN_FAILED", user.username(), tenantId, Map.of("reason", "disabled", "clientIp", clientIp));
-                auditService.record("LOGIN_BLOCKED_DISABLED", user.username(), tenantId, Map.of("reason", "disabled", "clientIp", clientIp));
-                throw new BusinessException("BAD_CREDENTIALS", "用户名或密码错误");
+                throw new BusinessException("USER_DISABLED", "用户已禁用");
             }
 
             loginAttemptService.clearFailures(tenantId, request.username());
@@ -109,9 +104,7 @@ public class LoginApplicationService {
             tokenSession.set("activeTenantId", user.tenantId());
             tokenSession.set("sessionVersion", user.sessionVersion());
             tokenSession.set("passwordChangeRequired", passwordChangeState.required());
-            if (StringUtils.hasText(passwordChangeState.reason())) {
-                tokenSession.set("passwordChangeReason", passwordChangeState.reason());
-            }
+            tokenSession.set("passwordChangeReason", passwordChangeState.reason());
             tokenSession.set("clientIp", clientIp);
             tokenSession.set("device", device);
             tokenSession.set("issuedAt", now.toEpochMilli());
@@ -186,9 +179,8 @@ public class LoginApplicationService {
     ) {
         LoginAttemptService.LoginFailureResult result = loginAttemptService.recordFailure(tenantId, username, reason, clientIp);
         if (result.locked()) {
-            notificationScenarioPublisher.accountLocked(tenantId, username, clientIp);
-            return new BusinessException("BAD_CREDENTIALS", "用户名或密码错误");
+            return new BusinessException("ACCOUNT_LOCKED", "账户已锁定，请稍后再试");
         }
-        return new BusinessException("BAD_CREDENTIALS", "用户名或密码错误");
+        return new BusinessException("BAD_CREDENTIALS", "用户名或密码错误，剩余尝试次数：" + result.remainingAttempts());
     }
 }

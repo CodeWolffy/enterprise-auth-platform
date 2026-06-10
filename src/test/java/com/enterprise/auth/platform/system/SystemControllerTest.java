@@ -35,10 +35,10 @@ class SystemControllerTest {
     private static final String VISIBLE_USER = "system_visible_user_ut";
     private static final String HIDDEN_USER = "system_hidden_user_ut";
     private static final String CHILD_DEPT_CODE = "SYSTEM_SCOPE_CHILD_UT";
-    private static final String VISIBLE_DICT_CODE = "SYSTEM_VISIBLE_DICT_UT";
-    private static final String HIDDEN_DICT_CODE = "SYSTEM_HIDDEN_DICT_UT";
-    private static final String ALPHA_DICT_CODE = "SYSTEM_ALPHA_DICT_UT";
-    private static final String OMEGA_DICT_CODE = "SYSTEM_OMEGA_DICT_UT";
+    private static final String VISIBLE_DICT_CODE = "system_scope_visible_ut";
+    private static final String HIDDEN_DICT_CODE = "system_scope_hidden_ut";
+    private static final String ALPHA_DICT_CODE = "system_scope_alpha_ut";
+    private static final String OMEGA_DICT_CODE = "system_scope_omega_ut";
     private static final String CATEGORY_CODE = "system-test-ut";
     private static final String VISIBLE_DICT_VALUE = "system-visible-value-ut";
     private static final String CREATED_DICT_VALUE = "system-created-value-ut";
@@ -82,29 +82,17 @@ class SystemControllerTest {
                 UPDATED_DICT_VALUE
         );
         jdbcTemplate.update(
-                "DELETE FROM sys_dict WHERE tenant_id = ? AND dict_code IN (?, ?, ?, ?)",
+                "DELETE FROM sys_dict WHERE tenant_id = ? AND dict_type IN (?, ?, ?, ?)",
                 "tenant-a",
                 VISIBLE_DICT_CODE,
                 HIDDEN_DICT_CODE,
                 ALPHA_DICT_CODE,
                 OMEGA_DICT_CODE
         );
-        jdbcTemplate.update(
-                "INSERT INTO sys_dict(tenant_id, dict_type, dict_code, dict_value, created_by, updated_by, deleted, created_at, updated_at) VALUES(?,?,?,?,?,?,0,NOW(),NOW())",
-                "tenant-a", "system_scope", VISIBLE_DICT_CODE, "可见字典", VISIBLE_USER, VISIBLE_USER
-        );
-        jdbcTemplate.update(
-                "INSERT INTO sys_dict(tenant_id, dict_type, dict_code, dict_value, created_by, updated_by, deleted, created_at, updated_at) VALUES(?,?,?,?,?,?,0,NOW(),NOW())",
-                "tenant-a", "system_scope", HIDDEN_DICT_CODE, "隐藏字典", HIDDEN_USER, HIDDEN_USER
-        );
-        jdbcTemplate.update(
-                "INSERT INTO sys_dict(tenant_id, dict_type, dict_code, dict_value, created_by, updated_by, deleted, created_at, updated_at) VALUES(?,?,?,?,?,?,0,NOW(),NOW())",
-                "tenant-a", "system_scope", ALPHA_DICT_CODE, "排序字典 A", VISIBLE_USER, VISIBLE_USER
-        );
-        jdbcTemplate.update(
-                "INSERT INTO sys_dict(tenant_id, dict_type, dict_code, dict_value, created_by, updated_by, deleted, created_at, updated_at) VALUES(?,?,?,?,?,?,0,NOW(),NOW())",
-                "tenant-a", "system_scope", OMEGA_DICT_CODE, "排序字典 Z", VISIBLE_USER, VISIBLE_USER
-        );
+        insertDictType(VISIBLE_DICT_CODE, "可见字典", VISIBLE_USER);
+        insertDictType(HIDDEN_DICT_CODE, "隐藏字典", HIDDEN_USER);
+        insertDictType(ALPHA_DICT_CODE, "排序字典 A", VISIBLE_USER);
+        insertDictType(OMEGA_DICT_CODE, "排序字典 Z", VISIBLE_USER);
         hiddenDictId = jdbcTemplate.queryForObject(
                 "SELECT id FROM sys_dict WHERE tenant_id = ? AND dict_code = ?",
                 Long.class,
@@ -119,7 +107,7 @@ class SystemControllerTest {
         );
         jdbcTemplate.update(
                 "INSERT INTO sys_dict_value(tenant_id, dict_id, dict_type, dict_label, dict_value, show_class, sort, enabled, created_by, updated_by, deleted, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,0,NOW(),NOW())",
-                "tenant-a", visibleDictId, "system_scope", "可见字典值", VISIBLE_DICT_VALUE, "success", 3, 1, VISIBLE_USER, VISIBLE_USER
+                "tenant-a", visibleDictId, VISIBLE_DICT_CODE, "可见字典值", VISIBLE_DICT_VALUE, "success", 3, 1, VISIBLE_USER, VISIBLE_USER
         );
         jdbcTemplate.update("DELETE FROM sys_category_rule WHERE tenant_id = ? AND target_type = ? AND category_code = ?", "tenant-a", "dict", CATEGORY_CODE);
     }
@@ -134,7 +122,7 @@ class SystemControllerTest {
                 UPDATED_DICT_VALUE
         );
         jdbcTemplate.update(
-                "DELETE FROM sys_dict WHERE tenant_id = ? AND dict_code IN (?, ?, ?, ?)",
+                "DELETE FROM sys_dict WHERE tenant_id = ? AND dict_type IN (?, ?, ?, ?)",
                 "tenant-a",
                 VISIBLE_DICT_CODE,
                 HIDDEN_DICT_CODE,
@@ -205,8 +193,8 @@ class SystemControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "dictType": "system_scope",
-                                  "dictCode": "SYSTEM_HIDDEN_DICT_UT",
+                                  "dictType": "system_scope_hidden_ut",
+                                  "dictCode": "system_scope_hidden_ut",
                                   "dictValue": "越权修改"
                                 }
                                 """))
@@ -250,7 +238,7 @@ class SystemControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.dictId").value(visibleDictId))
-                .andExpect(jsonPath("$.data.dictType").value("system_scope"))
+                .andExpect(jsonPath("$.data.dictType").value(VISIBLE_DICT_CODE))
                 .andExpect(jsonPath("$.data.dictLabel").value("新字典值"))
                 .andExpect(jsonPath("$.data.showClass").value("warning"));
 
@@ -373,6 +361,13 @@ class SystemControllerTest {
         entity.setSessionVersion(1);
         sysUserMapper.insert(entity);
         return entity.getId();
+    }
+
+    private void insertDictType(String dictType, String description, String operator) {
+        jdbcTemplate.update(
+                "INSERT INTO sys_dict(tenant_id, dict_type, dict_code, dict_value, description, enabled, created_by, updated_by, deleted, created_at, updated_at) VALUES(?,?,?,?,?,?,?,?,0,NOW(),NOW())",
+                "tenant-a", dictType, dictType, description, description, 1, operator, operator
+        );
     }
 
     private void ensureSystemScopeRole(Long userId) {

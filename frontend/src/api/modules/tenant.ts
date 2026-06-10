@@ -7,6 +7,7 @@ import type {
   TenantChangeView,
   TenantHistorySummaryView,
   TenantCapabilityOverrideView,
+  TenantCapabilitySummaryView,
 } from '@/types/tenant'
 
 export interface TenantQueryParams {
@@ -79,6 +80,13 @@ export async function queryTenantHistorySummary(tenantId: string, params?: Omit<
   const { data } = await http.get<ApiResponse<TenantHistorySummaryView>>(`/api/tenants/${tenantId}/history/summary`, {
     params,
   })
+  return data.data
+}
+
+export async function queryTenantCapabilitySummary(tenantId: string) {
+  const { data } = await http.get<ApiResponse<TenantCapabilitySummaryView>>(
+    `/api/tenants/${tenantId}/capability-summary`,
+  )
   return data.data
 }
 

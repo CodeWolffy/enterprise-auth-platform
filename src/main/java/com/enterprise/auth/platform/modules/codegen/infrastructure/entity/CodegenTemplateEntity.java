@@ -18,6 +18,7 @@ public class CodegenTemplateEntity {
     private String tenantId;
     private String name;
     private String language;
+    private String templateCategory;
     private String pathPattern;
     private String content;
     private String description;

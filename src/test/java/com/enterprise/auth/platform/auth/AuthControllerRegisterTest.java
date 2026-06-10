@@ -1,6 +1,8 @@
 package com.enterprise.auth.platform.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -16,7 +18,9 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import com.enterprise.auth.platform.modules.auth.application.CaptchaService;
 import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = {
@@ -32,6 +36,7 @@ class AuthControllerRegisterTest {
     private static final String USERNAME_PREFIX = "regut_";
     private static final String CONFIG_KEY_DEFAULT_TENANT = "registration.default_tenant_id";
     private static final String CONFIG_KEY_DEFAULT_ROLE_CODES = "registration.default_role_codes";
+    private static final String CAPTCHA_ID = "register-captcha-ut";
 
     @Autowired
     private MockMvc mockMvc;
@@ -41,6 +46,9 @@ class AuthControllerRegisterTest {
 
     @Autowired
     private PasswordHasher passwordHasher;
+
+    @MockitoBean
+    private CaptchaService captchaService;
 
     private ConfigSnapshot previousDefaultTenantConfig;
     private ConfigSnapshot previousDefaultRoleCodesConfig;
@@ -54,6 +62,7 @@ class AuthControllerRegisterTest {
 
         upsertConfig(CONFIG_KEY_DEFAULT_TENANT, DEFAULT_TENANT, "注册默认租户");
         upsertConfig(CONFIG_KEY_DEFAULT_ROLE_CODES, DEFAULT_ROLE_CODE, "注册默认角色");
+        doAnswer(invocation -> null).when(captchaService).secondaryVerify(anyString());
     }
 
     @AfterEach
@@ -85,7 +94,7 @@ class AuthControllerRegisterTest {
     @Test
     void registerShouldCreateUserInDefaultTenant() throws Exception {
         String username = nextUsername();
-        String rawPassword = "Register123";
+        String rawPassword = "Register@123";
         String mobile = "13800001111";
         String email = "register.ut@example.com";
 
@@ -168,7 +177,7 @@ class AuthControllerRegisterTest {
     @Test
     void registerShouldRejectDuplicateUsername() throws Exception {
         String username = nextUsername();
-        String payload = registerPayload(username, "重复用户名用户", "Repeat123", "13800003333", "repeat.ut@example.com");
+        String payload = registerPayload(username, "重复用户名用户", "Repeat@123", "13800003333", "repeat.ut@example.com");
 
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -190,7 +199,7 @@ class AuthControllerRegisterTest {
 
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(registerPayload(username, "跨租户重复用户", "Repeat123", "13800005555", "repeat.cross.ut@example.com")))
+                        .content(registerPayload(username, "跨租户重复用户", "Repeat@123", "13800005555", "repeat.cross.ut@example.com")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("USERNAME_EXISTS"));
     }
@@ -313,7 +322,7 @@ class AuthControllerRegisterTest {
                 1L,
                 username,
                 username,
-                passwordHasher.hash("Repeat123"),
+                passwordHasher.hash("Repeat@123"),
                 1,
                 1,
                 "test",
@@ -328,9 +337,10 @@ class AuthControllerRegisterTest {
                   "displayName": "%s",
                   "password": "%s",
                   "mobile": "%s",
-                  "email": "%s"
+                  "email": "%s",
+                  "captchaId": "%s"
                 }
-                """.formatted(username, displayName, password, mobile, email);
+                """.formatted(username, displayName, password, mobile, email, CAPTCHA_ID);
     }
 
     private record ConfigSnapshot(boolean exists, String value, String configName) {

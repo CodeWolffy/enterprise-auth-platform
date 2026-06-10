@@ -19,8 +19,15 @@ public class SysTenantEntity {
     private String tenantName;
     private Integer platformLevel;
     private Integer tenantStatus;
+    private LocalDateTime authBeginAt;
     private LocalDateTime expireAt;
     private String packageCode;
+    private String logoUrl;
+    private String contactName;
+    private String contactPhone;
+    private String contactEmail;
+    private String website;
+    private String address;
     private String lifecycleNote;
     @TableField(fill = FieldFill.INSERT)
     private String createdBy;

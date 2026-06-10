@@ -7,6 +7,8 @@ import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.codegen.application.CodegenApplicationService;
 import com.enterprise.auth.platform.modules.codegen.application.CodegenCommand;
+import com.enterprise.auth.platform.modules.codegen.application.CodegenMetadataDtos;
+import com.enterprise.auth.platform.modules.codegen.application.CodegenMetadataService;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,6 +29,9 @@ class CodegenApplicationServiceP2Test {
 
     @Autowired
     private CodegenApplicationService codegenApplicationService;
+
+    @Autowired
+    private CodegenMetadataService codegenMetadataService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -56,6 +61,8 @@ class CodegenApplicationServiceP2Test {
 
     @AfterEach
     void tearDown() throws IOException {
+        jdbcTemplate.update("DELETE FROM codegen_table_column WHERE table_id IN (SELECT id FROM codegen_table WHERE table_name = ?)", TABLE_NAME);
+        jdbcTemplate.update("DELETE FROM codegen_table WHERE table_name = ?", TABLE_NAME);
         jdbcTemplate.update("DELETE FROM sys_codegen_allowlist WHERE table_name = ?", TABLE_NAME);
         jdbcTemplate.execute("DROP TABLE IF EXISTS " + TABLE_NAME);
         cleanupOutput();
@@ -169,6 +176,64 @@ class CodegenApplicationServiceP2Test {
         assertThatThrownBy(() -> codegenApplicationService.generate(command))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("生成文件已存在");
+    }
+
+    @Test
+    void shouldImportTableAndUsePersistedColumnConfigInPreview() {
+        var dataSource = codegenMetadataService.dataSources().stream()
+                .filter(item -> "LOCAL".equals(item.jdbcUrl()))
+                .findFirst()
+                .orElseThrow();
+
+        var imported = codegenMetadataService.importTables(new CodegenMetadataDtos.ImportTableRequest(
+                dataSource.id(),
+                List.of(TABLE_NAME),
+                "com.enterprise.auth.platform.generated",
+                "tester"
+        ));
+        assertThat(imported).hasSize(1);
+
+        var detail = codegenMetadataService.tableConfig(imported.get(0).id());
+        var updatedColumns = detail.columns().stream()
+                .map(column -> "order_no".equals(column.columnName())
+                        ? new CodegenMetadataDtos.ColumnConfigView(
+                        column.id(),
+                        column.columnName(),
+                        "业务订单号",
+                        column.columnType(),
+                        column.dataType(),
+                        column.javaType(),
+                        "bizOrderNo",
+                        column.primaryKey(),
+                        column.required(),
+                        column.insert(),
+                        column.edit(),
+                        column.list(),
+                        true,
+                        "LIKE",
+                        column.htmlType(),
+                        column.dictType(),
+                        column.sort())
+                        : column)
+                .toList();
+        codegenMetadataService.updateColumns(imported.get(0).id(), new CodegenMetadataDtos.UpdateColumnsRequest(updatedColumns));
+
+        var preview = codegenApplicationService.preview(new CodegenCommand(
+                TABLE_NAME,
+                "orderGen",
+                "com.enterprise.auth.platform.generated",
+                "OrderGen",
+                true,
+                false,
+                false,
+                List.of(),
+                false
+        ));
+
+        assertThat(fileContent(preview, "OrderGenEntity.java"))
+                .contains("private String bizOrderNo;");
+        assertThat(fileContent(preview, "OrderGenCrudRequest.java"))
+                .contains("String bizOrderNo");
     }
 
     @Test

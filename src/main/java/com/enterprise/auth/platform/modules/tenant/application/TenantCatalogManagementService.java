@@ -7,11 +7,13 @@ import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantCapabilityEntity;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantCapabilityOverrideEntity;
+import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantCapabilityResourceScopeEntity;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantEntity;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantPackageCapabilityEntity;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantPackageEntity;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantCapabilityMapper;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantCapabilityOverrideMapper;
+import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantCapabilityResourceScopeMapper;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantMapper;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantPackageCapabilityMapper;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantPackageMapper;
@@ -20,12 +22,14 @@ import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.modules.tenant.interfaces.TenantCapabilityCrudRequest;
 import com.enterprise.auth.platform.modules.tenant.interfaces.TenantPackageCrudRequest;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -38,6 +42,7 @@ public class TenantCatalogManagementService {
     private final SysTenantPackageCapabilityMapper sysTenantPackageCapabilityMapper;
     private final SysTenantMapper sysTenantMapper;
     private final SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper;
+    private final SysTenantCapabilityResourceScopeMapper sysTenantCapabilityResourceScopeMapper;
     private final AuditService auditService;
     private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
 
@@ -47,6 +52,7 @@ public class TenantCatalogManagementService {
             SysTenantPackageCapabilityMapper sysTenantPackageCapabilityMapper,
             SysTenantMapper sysTenantMapper,
             SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper,
+            SysTenantCapabilityResourceScopeMapper sysTenantCapabilityResourceScopeMapper,
             AuditService auditService,
             AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService
     ) {
@@ -55,6 +61,7 @@ public class TenantCatalogManagementService {
         this.sysTenantPackageCapabilityMapper = sysTenantPackageCapabilityMapper;
         this.sysTenantMapper = sysTenantMapper;
         this.sysTenantCapabilityOverrideMapper = sysTenantCapabilityOverrideMapper;
+        this.sysTenantCapabilityResourceScopeMapper = sysTenantCapabilityResourceScopeMapper;
         this.auditService = auditService;
         this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
     }
@@ -66,6 +73,7 @@ public class TenantCatalogManagementService {
         return sysTenantPackageMapper.selectList(new LambdaQueryWrapper<SysTenantPackageEntity>()
                         .eq(SysTenantPackageEntity::getTenantId, "platform")
                         .eq(SysTenantPackageEntity::getDeleted, 0)
+                        .orderByAsc(SysTenantPackageEntity::getOrderNo)
                         .orderByAsc(SysTenantPackageEntity::getId))
                 .stream()
                 .map(item -> toPackageView(
@@ -96,6 +104,7 @@ public class TenantCatalogManagementService {
         Map<String, PackageReferenceHint> packageReferences = loadPackageReferences();
         List<String> capabilityCodes = packageCapabilities.getOrDefault(entity.getPackageCode(), List.of());
         PackageReferenceHint referenceHint = packageReferences.get(entity.getPackageCode());
+        ResourceScopeSummary resourceScopeSummary = summarizeResourceScope(capabilityCodes);
         int referencedTenantCount = referenceHint == null ? 0 : referenceHint.referencedTenantCount();
         List<String> referencedTenantIds = referenceHint == null ? List.of() : referenceHint.sampleTenantIds();
 
@@ -142,6 +151,9 @@ public class TenantCatalogManagementService {
                 entity.getPackageName(),
                 entity.getEnabled() == null || entity.getEnabled() == 1,
                 capabilityCodes,
+                resourceScopeSummary.visibleResourceCount(),
+                resourceScopeSummary.grantResourceCount(),
+                resourceScopeSummary.sampleResourceKeys(),
                 referencedTenantCount,
                 referencedTenantIds,
                 rules,
@@ -215,7 +227,8 @@ public class TenantCatalogManagementService {
     @Transactional
     public TenantPackageView createPackage(TenantPackageCrudRequest request) {
         requirePlatformTenant();
-        if (packageExists(request.packageCode(), null)) {
+        String packageCode = normalizeCode(request.packageCode());
+        if (packageExists(packageCode, null)) {
             throw new BusinessException("套餐编码已存在");
         }
         ensureCapabilitiesExist(request.capabilityCodes());
@@ -223,34 +236,33 @@ public class TenantCatalogManagementService {
         apply(entity, request);
         entity.setTenantId("platform");
         sysTenantPackageMapper.insert(entity);
-        replacePackageCapabilities(request.packageCode(), request.capabilityCodes());
+        replacePackageCapabilities(packageCode, request.capabilityCodes());
         auditService.record("TENANT_PACKAGE_CREATED", SecuritySupport.currentOperator(), "platform",
-                java.util.Map.of("packageCode", request.packageCode()));
+                java.util.Map.of("packageCode", packageCode));
         evictPrincipalSnapshots();
-        return toPackageView(entity, normalizedCodes(request.capabilityCodes()), loadPackageReferences().get(request.packageCode()));
+        return toPackageView(entity, normalizedCodes(request.capabilityCodes()), loadPackageReferences().get(packageCode));
     }
 
     @Transactional
     public TenantPackageView updatePackage(Long id, TenantPackageCrudRequest request) {
         requirePlatformTenant();
         SysTenantPackageEntity entity = getPackage(id);
-        if (packageExists(request.packageCode(), id)) {
+        String packageCode = normalizeCode(request.packageCode());
+        if (packageExists(packageCode, id)) {
             throw new BusinessException("套餐编码已存在");
         }
         ensureCapabilitiesExist(request.capabilityCodes());
         String oldCode = entity.getPackageCode();
         apply(entity, request);
         sysTenantPackageMapper.updateById(entity);
-        if (!oldCode.equals(request.packageCode())) {
-            sysTenantPackageCapabilityMapper.delete(new LambdaQueryWrapper<SysTenantPackageCapabilityEntity>()
-                    .eq(SysTenantPackageCapabilityEntity::getTenantId, "platform")
-                    .eq(SysTenantPackageCapabilityEntity::getPackageCode, oldCode));
+        if (!oldCode.equals(packageCode)) {
+            migratePackageReference(oldCode, packageCode);
         }
-        replacePackageCapabilities(request.packageCode(), request.capabilityCodes());
+        replacePackageCapabilities(packageCode, request.capabilityCodes());
         auditService.record("TENANT_PACKAGE_UPDATED", SecuritySupport.currentOperator(), "platform",
-                java.util.Map.of("packageId", id, "packageCode", request.packageCode()));
+                java.util.Map.of("packageId", id, "packageCode", packageCode));
         evictPrincipalSnapshots();
-        return toPackageView(entity, normalizedCodes(request.capabilityCodes()), loadPackageReferences().get(request.packageCode()));
+        return toPackageView(entity, normalizedCodes(request.capabilityCodes()), loadPackageReferences().get(packageCode));
     }
 
     @Transactional
@@ -273,7 +285,8 @@ public class TenantCatalogManagementService {
     @Transactional
     public TenantCapabilityView createCapability(TenantCapabilityCrudRequest request) {
         requirePlatformTenant();
-        if (capabilityExists(request.capabilityCode(), null)) {
+        String capabilityCode = normalizeCode(request.capabilityCode());
+        if (capabilityExists(capabilityCode, null)) {
             throw new BusinessException("能力编码已存在");
         }
         SysTenantCapabilityEntity entity = new SysTenantCapabilityEntity();
@@ -281,28 +294,29 @@ public class TenantCatalogManagementService {
         entity.setTenantId("platform");
         sysTenantCapabilityMapper.insert(entity);
         auditService.record("TENANT_CAPABILITY_CREATED", SecuritySupport.currentOperator(), "platform",
-                java.util.Map.of("capabilityCode", request.capabilityCode()));
+                java.util.Map.of("capabilityCode", capabilityCode));
         evictPrincipalSnapshots();
-        return toCapabilityView(entity, loadCapabilityReferences().get(request.capabilityCode()));
+        return toCapabilityView(entity, loadCapabilityReferences().get(capabilityCode));
     }
 
     @Transactional
     public TenantCapabilityView updateCapability(Long id, TenantCapabilityCrudRequest request) {
         requirePlatformTenant();
         SysTenantCapabilityEntity entity = getCapability(id);
-        if (capabilityExists(request.capabilityCode(), id)) {
+        String capabilityCode = normalizeCode(request.capabilityCode());
+        if (capabilityExists(capabilityCode, id)) {
             throw new BusinessException("能力编码已存在");
         }
         String oldCode = entity.getCapabilityCode();
         apply(entity, request);
         sysTenantCapabilityMapper.updateById(entity);
-        if (!oldCode.equals(request.capabilityCode())) {
-            migrateCapabilityReference(oldCode, request.capabilityCode());
+        if (!oldCode.equals(capabilityCode)) {
+            migrateCapabilityReference(oldCode, capabilityCode);
         }
         auditService.record("TENANT_CAPABILITY_UPDATED", SecuritySupport.currentOperator(), "platform",
-                java.util.Map.of("capabilityId", id, "capabilityCode", request.capabilityCode()));
+                java.util.Map.of("capabilityId", id, "capabilityCode", capabilityCode));
         evictPrincipalSnapshots();
-        return toCapabilityView(entity, loadCapabilityReferences().get(request.capabilityCode()));
+        return toCapabilityView(entity, loadCapabilityReferences().get(capabilityCode));
     }
 
     @Transactional
@@ -315,8 +329,9 @@ public class TenantCatalogManagementService {
         if (packageRefCount > 0) {
             throw new BusinessException("该能力仍被套餐引用，暂不允许删除");
         }
-        long overrideRefCount = sysTenantCapabilityOverrideMapper.selectCount(new LambdaQueryWrapper<SysTenantCapabilityOverrideEntity>()
-                .eq(SysTenantCapabilityOverrideEntity::getCapabilityCode, entity.getCapabilityCode()));
+        long overrideRefCount = loadAllTenantCapabilityOverrides().stream()
+                .filter(override -> entity.getCapabilityCode().equals(override.getCapabilityCode()))
+                .count();
         if (overrideRefCount > 0) {
             throw new BusinessException("该能力存在租户覆盖记录，暂不允许删除");
         }
@@ -360,6 +375,36 @@ public class TenantCatalogManagementService {
         return result;
     }
 
+    private ResourceScopeSummary summarizeResourceScope(List<String> capabilityCodes) {
+        List<String> normalizedCodes = normalizedCodes(capabilityCodes);
+        if (normalizedCodes.isEmpty()) {
+            return new ResourceScopeSummary(0, 0, List.of());
+        }
+        List<SysTenantCapabilityResourceScopeEntity> scopes = sysTenantCapabilityResourceScopeMapper.selectList(
+                new LambdaQueryWrapper<SysTenantCapabilityResourceScopeEntity>()
+                        .eq(SysTenantCapabilityResourceScopeEntity::getTenantId, "platform")
+                        .in(SysTenantCapabilityResourceScopeEntity::getCapabilityCode, normalizedCodes)
+        );
+        Set<String> visibleKeys = new LinkedHashSet<>();
+        Set<String> grantKeys = new LinkedHashSet<>();
+        Set<String> samples = new LinkedHashSet<>();
+        for (SysTenantCapabilityResourceScopeEntity scope : scopes) {
+            if (!StringUtils.hasText(scope.getResourceKey())) {
+                continue;
+            }
+            String resourceKey = scope.getResourceKey().trim();
+            if ("GRANT".equalsIgnoreCase(scope.getScopeType())) {
+                grantKeys.add(resourceKey);
+            } else {
+                visibleKeys.add(resourceKey);
+            }
+            if (samples.size() < 8) {
+                samples.add(resourceKey);
+            }
+        }
+        return new ResourceScopeSummary(visibleKeys.size(), grantKeys.size(), samples.stream().toList());
+    }
+
     private Map<String, CapabilityReferenceHint> loadCapabilityReferences() {
         Map<String, Set<String>> packageCodesByCapability = new LinkedHashMap<>();
         for (SysTenantPackageCapabilityEntity relation : sysTenantPackageCapabilityMapper.selectList(new LambdaQueryWrapper<SysTenantPackageCapabilityEntity>()
@@ -393,7 +438,7 @@ public class TenantCatalogManagementService {
         }
 
         Map<String, Integer> overrideRefCounts = new LinkedHashMap<>();
-        for (SysTenantCapabilityOverrideEntity override : sysTenantCapabilityOverrideMapper.selectList(new LambdaQueryWrapper<SysTenantCapabilityOverrideEntity>())) {
+        for (SysTenantCapabilityOverrideEntity override : loadAllTenantCapabilityOverrides()) {
             if (!StringUtils.hasText(override.getCapabilityCode())) {
                 continue;
             }
@@ -435,12 +480,42 @@ public class TenantCatalogManagementService {
         }
     }
 
+    private List<SysTenantCapabilityOverrideEntity> loadAllTenantCapabilityOverrides() {
+        List<SysTenantCapabilityOverrideEntity> result = new ArrayList<>();
+        List<SysTenantEntity> tenants = sysTenantMapper.selectList(new LambdaQueryWrapper<SysTenantEntity>()
+                .eq(SysTenantEntity::getDeleted, 0)
+                .orderByAsc(SysTenantEntity::getId));
+        for (SysTenantEntity tenant : tenants) {
+            if (!StringUtils.hasText(tenant.getTenantId())) {
+                continue;
+            }
+            result.addAll(TenantContext.runWithTenant(tenant.getTenantId(), () -> sysTenantCapabilityOverrideMapper.selectList(
+                    new LambdaQueryWrapper<SysTenantCapabilityOverrideEntity>()
+                            .eq(SysTenantCapabilityOverrideEntity::getTenantId, tenant.getTenantId())
+            )));
+        }
+        return result;
+    }
+
     private void ensureCapabilitiesExist(List<String> capabilityCodes) {
         for (String code : normalizedCodes(capabilityCodes)) {
             if (!capabilityExists(code, null)) {
                 throw new BusinessException("能力编码不存在: " + code);
             }
         }
+    }
+
+    private void migratePackageReference(String oldCode, String newCode) {
+        List<SysTenantEntity> tenants = sysTenantMapper.selectList(new LambdaQueryWrapper<SysTenantEntity>()
+                .eq(SysTenantEntity::getDeleted, 0)
+                .eq(SysTenantEntity::getPackageCode, oldCode));
+        for (SysTenantEntity tenant : tenants) {
+            tenant.setPackageCode(newCode);
+            sysTenantMapper.updateById(tenant);
+        }
+        sysTenantPackageCapabilityMapper.delete(new LambdaQueryWrapper<SysTenantPackageCapabilityEntity>()
+                .eq(SysTenantPackageCapabilityEntity::getTenantId, "platform")
+                .eq(SysTenantPackageCapabilityEntity::getPackageCode, oldCode));
     }
 
     private void migrateCapabilityReference(String oldCode, String newCode) {
@@ -451,26 +526,39 @@ public class TenantCatalogManagementService {
             relation.setCapabilityCode(newCode);
             sysTenantPackageCapabilityMapper.updateById(relation);
         }
-        List<SysTenantCapabilityOverrideEntity> overrides = sysTenantCapabilityOverrideMapper.selectList(new LambdaQueryWrapper<SysTenantCapabilityOverrideEntity>()
-                .eq(SysTenantCapabilityOverrideEntity::getCapabilityCode, oldCode));
-        for (SysTenantCapabilityOverrideEntity override : overrides) {
-            override.setCapabilityCode(newCode);
-            sysTenantCapabilityOverrideMapper.updateById(override);
+        for (SysTenantCapabilityOverrideEntity override : loadAllTenantCapabilityOverrides()) {
+            if (!oldCode.equals(override.getCapabilityCode()) || !StringUtils.hasText(override.getTenantId())) {
+                continue;
+            }
+            TenantContext.runWithTenant(override.getTenantId(), () -> {
+                override.setCapabilityCode(newCode);
+                sysTenantCapabilityOverrideMapper.updateById(override);
+                return null;
+            });
+        }
+        List<SysTenantCapabilityResourceScopeEntity> scopes = sysTenantCapabilityResourceScopeMapper.selectList(new LambdaQueryWrapper<SysTenantCapabilityResourceScopeEntity>()
+                .eq(SysTenantCapabilityResourceScopeEntity::getTenantId, "platform")
+                .eq(SysTenantCapabilityResourceScopeEntity::getCapabilityCode, oldCode));
+        for (SysTenantCapabilityResourceScopeEntity scope : scopes) {
+            scope.setCapabilityCode(newCode);
+            sysTenantCapabilityResourceScopeMapper.updateById(scope);
         }
     }
 
     private boolean packageExists(String packageCode, Long excludeId) {
+        String normalizedPackageCode = normalizeCode(packageCode);
         return sysTenantPackageMapper.selectCount(new LambdaQueryWrapper<SysTenantPackageEntity>()
                 .eq(SysTenantPackageEntity::getTenantId, "platform")
-                .eq(SysTenantPackageEntity::getPackageCode, packageCode)
+                .eq(SysTenantPackageEntity::getPackageCode, normalizedPackageCode)
                 .eq(SysTenantPackageEntity::getDeleted, 0)
                 .ne(excludeId != null, SysTenantPackageEntity::getId, excludeId)) > 0;
     }
 
     private boolean capabilityExists(String capabilityCode, Long excludeId) {
+        String normalizedCapabilityCode = normalizeCode(capabilityCode);
         return sysTenantCapabilityMapper.selectCount(new LambdaQueryWrapper<SysTenantCapabilityEntity>()
                 .eq(SysTenantCapabilityEntity::getTenantId, "platform")
-                .eq(SysTenantCapabilityEntity::getCapabilityCode, capabilityCode)
+                .eq(SysTenantCapabilityEntity::getCapabilityCode, normalizedCapabilityCode)
                 .eq(SysTenantCapabilityEntity::getDeleted, 0)
                 .ne(excludeId != null, SysTenantCapabilityEntity::getId, excludeId)) > 0;
     }
@@ -499,17 +587,27 @@ public class TenantCatalogManagementService {
         return entity;
     }
 
+    private String normalizeCode(String value) {
+        return StringUtils.hasText(value) ? value.trim() : "";
+    }
+
     private void apply(SysTenantPackageEntity entity, TenantPackageCrudRequest request) {
-        entity.setPackageCode(request.packageCode().trim());
+        entity.setPackageCode(normalizeCode(request.packageCode()));
         entity.setPackageName(request.packageName().trim());
+        entity.setSubtitle(blankToNull(request.subtitle()));
+        entity.setSalesPrice(request.salesPrice());
+        entity.setOriginalPrice(request.originalPrice());
+        entity.setDescriptionMd(blankToNull(request.descriptionMd()));
+        entity.setAppKey(blankToNull(request.appKey()));
+        entity.setOrderNo(request.orderNo() == null ? 0 : request.orderNo());
         entity.setUserQuota(request.userQuota());
         entity.setStorageQuotaGb(request.storageQuotaGb());
-        entity.setPackageDesc(StringUtils.hasText(request.packageDesc()) ? request.packageDesc().trim() : null);
+        entity.setPackageDesc(blankToNull(request.packageDesc()));
         entity.setEnabled(request.enabled() == null || Boolean.TRUE.equals(request.enabled()) ? 1 : 0);
     }
 
     private void apply(SysTenantCapabilityEntity entity, TenantCapabilityCrudRequest request) {
-        entity.setCapabilityCode(request.capabilityCode().trim());
+        entity.setCapabilityCode(normalizeCode(request.capabilityCode()));
         entity.setCapabilityName(request.capabilityName().trim());
         entity.setCapabilityDesc(StringUtils.hasText(request.capabilityDesc()) ? request.capabilityDesc().trim() : null);
         entity.setSortOrder(request.sortOrder() == null ? 0 : request.sortOrder());
@@ -533,6 +631,10 @@ public class TenantCatalogManagementService {
         return result;
     }
 
+    private String blankToNull(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
     private TenantPackageView toPackageView(
             SysTenantPackageEntity entity,
             List<String> capabilityCodes,
@@ -540,15 +642,25 @@ public class TenantCatalogManagementService {
     ) {
         int referencedTenantCount = referenceHint == null ? 0 : referenceHint.referencedTenantCount();
         List<String> referencedTenantIds = referenceHint == null ? List.of() : referenceHint.sampleTenantIds();
+        ResourceScopeSummary resourceScopeSummary = summarizeResourceScope(capabilityCodes);
         return new TenantPackageView(
                 entity.getId(),
                 entity.getPackageCode(),
                 entity.getPackageName(),
+                entity.getSubtitle(),
+                entity.getSalesPrice(),
+                entity.getOriginalPrice(),
+                entity.getDescriptionMd(),
+                entity.getAppKey(),
+                entity.getOrderNo(),
                 entity.getUserQuota(),
                 entity.getStorageQuotaGb(),
                 entity.getPackageDesc(),
                 entity.getEnabled() == null || entity.getEnabled() == 1,
                 capabilityCodes,
+                resourceScopeSummary.visibleResourceCount(),
+                resourceScopeSummary.grantResourceCount(),
+                resourceScopeSummary.sampleResourceKeys(),
                 TimeSupport.toEpochMilli(entity.getUpdatedAt() == null ? entity.getCreatedAt() : entity.getUpdatedAt()),
                 referencedTenantCount,
                 referencedTenantIds
@@ -589,11 +701,20 @@ public class TenantCatalogManagementService {
             @Schema(description = "主键 ID") Long id,
             @Schema(description = "套餐编码") String packageCode,
             @Schema(description = "套餐名称") String packageName,
+            @Schema(description = "运营副标题") String subtitle,
+            @Schema(description = "销售价") BigDecimal salesPrice,
+            @Schema(description = "原价") BigDecimal originalPrice,
+            @Schema(description = "富文本或 Markdown 描述") String descriptionMd,
+            @Schema(description = "应用标识") String appKey,
+            @Schema(description = "展示排序") Integer orderNo,
             @Schema(description = "用户配额") Integer userQuota,
             @Schema(description = "存储配额 GB") Integer storageQuotaGb,
             @Schema(description = "套餐说明") String packageDesc,
             @Schema(description = "是否启用") boolean enabled,
             @Schema(description = "能力编码集合") List<String> capabilityCodes,
+            @Schema(description = "影响可见资源数量") int visibleResourceCount,
+            @Schema(description = "影响授权资源数量") int grantResourceCount,
+            @Schema(description = "影响资源示例（最多 8 条）") List<String> sampleResourceKeys,
             @Schema(description = "更新时间") Long updatedAt,
             @Schema(description = "引用该套餐的租户数量") int referencedTenantCount,
             @Schema(description = "引用该套餐的租户示例（最多 5 条）") List<String> referencedTenantIds
@@ -624,6 +745,9 @@ public class TenantCatalogManagementService {
             @Schema(description = "套餐名称") String packageName,
             @Schema(description = "是否启用") boolean enabled,
             @Schema(description = "能力编码集合") List<String> capabilityCodes,
+            @Schema(description = "影响可见资源数量") int visibleResourceCount,
+            @Schema(description = "影响授权资源数量") int grantResourceCount,
+            @Schema(description = "影响资源示例（最多 8 条）") List<String> sampleResourceKeys,
             @Schema(description = "引用租户数量") int referencedTenantCount,
             @Schema(description = "引用租户示例（最多 5 条）") List<String> referencedTenantIds,
             @Schema(description = "命中的规则列表") List<ImpactRuleView> rules,
@@ -659,6 +783,9 @@ public class TenantCatalogManagementService {
     }
 
     private record PackageReferenceHint(int referencedTenantCount, List<String> sampleTenantIds) {
+    }
+
+    private record ResourceScopeSummary(int visibleResourceCount, int grantResourceCount, List<String> sampleResourceKeys) {
     }
 
     private record CapabilityReferenceHint(

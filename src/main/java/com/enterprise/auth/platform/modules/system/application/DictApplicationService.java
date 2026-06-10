@@ -34,6 +34,9 @@ public class DictApplicationService {
     private static final String SORT_ASC = "asc";
     private static final String SORT_DESC = "desc";
     private static final String DICT_CATEGORY_PREFIX = "system.category.dict.";
+    private static final int DICT_TYPE_MAX_LENGTH = 64;
+    private static final int DICT_CODE_MAX_LENGTH = 64;
+    private static final int DICT_VALUE_MAX_LENGTH = 255;
 
     private final SysDictMapper sysDictMapper;
     private final SysDictValueMapper sysDictValueMapper;
@@ -67,9 +70,12 @@ public class DictApplicationService {
     ) {
         String tenantId = currentTenantId();
         Optional<Set<String>> visibleCreators = dataScopeService.visibleUsernames(tenantId);
+        String normalizedDictType = blankToNull(dictType);
+        String normalizedCategory = blankToNull(category);
+        String normalizedKeyword = blankToNull(keyword);
         return pageQuery(
-                buildDictQuery(tenantId, dictType, category, keyword, visibleCreators),
-                buildDictQuery(tenantId, dictType, category, keyword, visibleCreators),
+                buildDictQuery(tenantId, normalizedDictType, normalizedCategory, normalizedKeyword, visibleCreators),
+                buildDictQuery(tenantId, normalizedDictType, normalizedCategory, normalizedKeyword, visibleCreators),
                 page,
                 size,
                 sysDictMapper::selectCount,
@@ -84,14 +90,12 @@ public class DictApplicationService {
     public SystemViewModels.DictView createDict(DictCrudRequest request) {
         String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
+        String dictType = normalizeCode(request.dictType(), "字典类型不能为空", DICT_TYPE_MAX_LENGTH, "字典类型长度不能超过64个字符");
+        ensureDictTypeUnique(tenantId, dictType, null);
+
         SysDictEntity entity = new SysDictEntity();
         entity.setTenantId(tenantId);
-        entity.setDictType(normalizeRequired(request.dictType(), "字典类型不能为空"));
-        entity.setDictCode(normalizeOrDefault(request.dictCode(), entity.getDictType()));
-        entity.setDictValue(normalizeOrDefault(request.dictValue(), normalizeOrDefault(request.description(), entity.getDictType())));
-        entity.setDescription(blankToNull(request.description()));
-        entity.setEnabled(Boolean.FALSE.equals(request.enabled()) ? 0 : 1);
-        entity.setRemarks(blankToNull(request.remarks()));
+        applyDictProfile(entity, request, dictType);
         sysDictMapper.insert(entity);
         auditService.record("DICT_CREATED", operator, tenantId, Map.of("dictId", entity.getId(), "dictType", entity.getDictType()));
         return toDictView(entity);
@@ -102,14 +106,14 @@ public class DictApplicationService {
     public SystemViewModels.DictView updateDict(Long id, DictCrudRequest request) {
         String tenantId = currentTenantId();
         SysDictEntity entity = getDict(id, tenantId);
-        entity.setDictType(normalizeRequired(request.dictType(), "字典类型不能为空"));
-        entity.setDictCode(normalizeOrDefault(request.dictCode(), entity.getDictType()));
-        entity.setDictValue(normalizeOrDefault(request.dictValue(), normalizeOrDefault(request.description(), entity.getDictType())));
-        entity.setDescription(blankToNull(request.description()));
-        entity.setEnabled(Boolean.FALSE.equals(request.enabled()) ? 0 : 1);
-        entity.setRemarks(blankToNull(request.remarks()));
+        String dictType = normalizeCode(request.dictType(), "字典类型不能为空", DICT_TYPE_MAX_LENGTH, "字典类型长度不能超过64个字符");
+        ensureDictTypeUnique(tenantId, dictType, id);
+        String oldType = entity.getDictType();
+        applyDictProfile(entity, request, dictType);
         sysDictMapper.updateById(entity);
-        syncValueTypes(tenantId, id, entity.getDictType());
+        if (!oldType.equals(dictType)) {
+            syncValueTypes(tenantId, id, dictType);
+        }
         auditService.record("DICT_UPDATED", SecuritySupport.currentOperator(), tenantId, Map.of("dictId", id, "dictType", entity.getDictType()));
         return toDictView(entity);
     }
@@ -126,8 +130,12 @@ public class DictApplicationService {
         String tenantId = currentTenantId();
         SysDictEntity entity = getDict(id, tenantId);
         for (SysDictValueEntity value : listValues(tenantId, entity.getId(), false)) {
+            releaseDeletedValueIdentity(value);
+            sysDictValueMapper.updateById(value);
             sysDictValueMapper.deleteById(value.getId());
         }
+        releaseDeletedDictIdentity(entity);
+        sysDictMapper.updateById(entity);
         sysDictMapper.deleteById(entity.getId());
         auditService.record("DICT_DELETED", SecuritySupport.currentOperator(), tenantId, Map.of("dictId", id, "dictType", entity.getDictType()));
     }
@@ -274,17 +282,68 @@ public class DictApplicationService {
         }
     }
 
-    private String normalizeRequired(String value, String message) {
+    private void applyDictProfile(SysDictEntity entity, DictCrudRequest request, String dictType) {
+        String description = normalizeOptional(
+                StringUtils.hasText(request.description()) ? request.description() : request.dictValue(),
+                DICT_VALUE_MAX_LENGTH,
+                "字典类型说明长度不能超过255个字符"
+        );
+        entity.setDictType(dictType);
+        entity.setDictCode(dictType);
+        entity.setDictValue(description == null ? dictType : description);
+        entity.setDescription(description);
+        entity.setEnabled(Boolean.FALSE.equals(request.enabled()) ? 0 : 1);
+        entity.setRemarks(normalizeOptional(request.remarks(), DICT_VALUE_MAX_LENGTH, "备注长度不能超过255个字符"));
+    }
+
+    private void ensureDictTypeUnique(String tenantId, String dictType, Long selfId) {
+        Long count = sysDictMapper.selectCount(new LambdaQueryWrapper<SysDictEntity>()
+                .eq(SysDictEntity::getTenantId, tenantId)
+                .eq(SysDictEntity::getDeleted, 0)
+                .eq(SysDictEntity::getDictType, dictType)
+                .ne(selfId != null, SysDictEntity::getId, selfId == null ? -1L : selfId));
+        if (count != null && count > 0) {
+            throw new BusinessException("CONFLICT", "字典类型已存在");
+        }
+    }
+
+    private void releaseDeletedDictIdentity(SysDictEntity entity) {
+        entity.setDictType(tombstone(entity.getDictType(), entity.getId(), DICT_TYPE_MAX_LENGTH));
+        entity.setDictCode(tombstone(entity.getDictCode(), entity.getId(), DICT_CODE_MAX_LENGTH));
+        entity.setDictValue(tombstone(entity.getDictValue(), entity.getId(), DICT_VALUE_MAX_LENGTH));
+    }
+
+    private void releaseDeletedValueIdentity(SysDictValueEntity entity) {
+        entity.setDictValue(tombstone(entity.getDictValue(), entity.getId(), DICT_VALUE_MAX_LENGTH));
+    }
+
+    private String normalizeCode(String value, String requiredMessage, int maxLength, String lengthMessage) {
         String normalized = blankToNull(value);
         if (normalized == null) {
-            throw new BusinessException(message);
+            throw new BusinessException(requiredMessage);
+        }
+        if (normalized.length() > maxLength) {
+            throw new BusinessException("VALIDATION_ERROR", lengthMessage);
         }
         return normalized;
     }
 
-    private String normalizeOrDefault(String value, String defaultValue) {
+    private String normalizeOptional(String value, int maxLength, String lengthMessage) {
         String normalized = blankToNull(value);
-        return normalized == null ? defaultValue : normalized;
+        if (normalized != null && normalized.length() > maxLength) {
+            throw new BusinessException("VALIDATION_ERROR", lengthMessage);
+        }
+        return normalized;
+    }
+
+    private String tombstone(String value, Long id, int maxLength) {
+        String suffix = "#deleted#" + id;
+        String base = StringUtils.hasText(value) ? value.trim() : "deleted";
+        int keepLength = Math.max(0, maxLength - suffix.length());
+        if (base.length() > keepLength) {
+            base = base.substring(0, keepLength);
+        }
+        return base + suffix;
     }
 
     private String blankToNull(String value) {

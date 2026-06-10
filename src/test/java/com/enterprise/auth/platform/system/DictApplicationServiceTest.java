@@ -25,19 +25,19 @@ class DictApplicationServiceTest {
     @Test
     void shouldCreateAndDeleteDictInDatabaseMode() {
         TenantContext.setTenantId("platform");
-        String dictCode = "k" + System.nanoTime();
+        String dictType = "demo_" + System.nanoTime();
         SystemViewModels.DictView created = dictApplicationService.createDict(
-                new DictCrudRequest("demo", dictCode, "v")
+                new DictCrudRequest(dictType, null, "演示字典")
         );
 
         assertThat(dictApplicationService.dicts(null, null, null, 1, 50, "createdAt", "asc").records())
-                .extracting(SystemViewModels.DictView::dictCode)
-                .contains(dictCode);
+                .extracting(SystemViewModels.DictView::dictType)
+                .contains(dictType);
 
         dictApplicationService.deleteDict(created.id());
 
         assertThat(dictApplicationService.dicts(null, null, null, 1, 50, "createdAt", "asc").records())
-                .extracting(SystemViewModels.DictView::dictCode)
-                .doesNotContain(dictCode);
+                .extracting(SystemViewModels.DictView::dictType)
+                .doesNotContain(dictType);
     }
 }

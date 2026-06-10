@@ -8,11 +8,12 @@ import jakarta.validation.constraints.Size;
 public record CodegenTemplateRequest(
         @NotBlank @Size(max = 128) String name,
         @NotBlank @Size(max = 32) @Pattern(regexp = "^(java|typescript|vue)$") String language,
+        @NotBlank @Size(max = 64) @Pattern(regexp = "^(backend|frontend|api|type|view)$") String templateCategory,
         @NotBlank @Size(max = 255) String pathPattern,
         @NotBlank String content,
         @Size(max = 500) String description
 ) {
     public CodegenTemplateView toView() {
-        return new CodegenTemplateView(null, name, language, pathPattern, content, description, false, null, null);
+        return new CodegenTemplateView(null, name, language, templateCategory, pathPattern, content, description, false, null, null);
     }
 }

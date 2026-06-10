@@ -1,10 +1,21 @@
 import { http } from '../http'
 import type { ApiResponse } from '@/types/api'
-import type { TenantCapabilityView, TenantPackageView } from '@/types/tenant'
+import type {
+  TenantCapabilityImpactView,
+  TenantCapabilityView,
+  TenantPackageImpactView,
+  TenantPackageView,
+} from '@/types/tenant'
 
 export interface TenantPackagePayload {
   packageCode: string
   packageName: string
+  subtitle?: string
+  salesPrice?: number
+  originalPrice?: number
+  descriptionMd?: string
+  appKey?: string
+  orderNo?: number
   userQuota?: number
   storageQuotaGb?: number
   packageDesc?: string
@@ -35,6 +46,11 @@ export async function updateTenantPackage(id: number, payload: TenantPackagePayl
   return data.data
 }
 
+export async function queryTenantPackageImpact(id: number) {
+  const { data } = await http.get<ApiResponse<TenantPackageImpactView>>(`/api/tenant-catalog/packages/${id}/impact`)
+  return data.data
+}
+
 export async function deleteTenantPackage(id: number) {
   await http.delete(`/api/tenant-catalog/packages/${id}`)
 }
@@ -51,6 +67,11 @@ export async function createTenantCapability(payload: TenantCapabilityPayload) {
 
 export async function updateTenantCapability(id: number, payload: TenantCapabilityPayload) {
   const { data } = await http.put<ApiResponse<TenantCapabilityView>>(`/api/tenant-catalog/capabilities/${id}`, payload)
+  return data.data
+}
+
+export async function queryTenantCapabilityImpact(id: number) {
+  const { data } = await http.get<ApiResponse<TenantCapabilityImpactView>>(`/api/tenant-catalog/capabilities/${id}/impact`)
   return data.data
 }
 

@@ -81,6 +81,13 @@ public class RoleController {
         return ApiResponse.ok(roleManagementService.assignMenus(roleId, request.menuIds()));
     }
 
+    @Operation(summary = "查询角色删除影响")
+    @GetMapping("/{roleId}/impact")
+    @SaCheckPermission(PermissionCodes.ROLE_READ)
+    public ApiResponse<RoleManagementService.RoleImpactView> impact(@Parameter(description = "角色 ID") @PathVariable Long roleId) {
+        return ApiResponse.ok(roleManagementService.impact(roleId));
+    }
+
     @Operation(summary = "删除角色")
     @DeleteMapping("/{roleId}")
     @SaCheckPermission(PermissionCodes.ROLE_WRITE)

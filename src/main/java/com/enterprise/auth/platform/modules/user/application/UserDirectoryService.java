@@ -44,10 +44,14 @@ public class UserDirectoryService {
     }
 
     public List<UserSummary> listUsers() {
-        return listUsers(null, null, null, null, 1, 10000).records();
+        return listUsers(null, null, null, null, null, 1, 10000).records();
     }
 
     public PageResult<UserSummary> listUsers(String username, String mobile, String email, Boolean enabled, int page, int size) {
+        return listUsers(username, mobile, email, enabled, null, page, size);
+    }
+
+    public PageResult<UserSummary> listUsers(String username, String mobile, String email, Boolean enabled, Long deptId, int page, int size) {
         String tenantId = currentTenantId();
 
         LambdaQueryWrapper<SysUserEntity> query = new LambdaQueryWrapper<SysUserEntity>()
@@ -64,6 +68,9 @@ public class UserDirectoryService {
         }
         if (enabled != null) {
             query.eq(SysUserEntity::getEnabled, enabled ? 1 : 0);
+        }
+        if (deptId != null) {
+            query.eq(SysUserEntity::getDeptId, deptId);
         }
         dataScopeService.visibleUserIds(tenantId).ifPresent(visibleUserIds -> {
             if (visibleUserIds.isEmpty()) {

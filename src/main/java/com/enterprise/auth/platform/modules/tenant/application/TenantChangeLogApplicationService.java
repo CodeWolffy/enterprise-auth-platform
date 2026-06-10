@@ -188,8 +188,13 @@ public class TenantChangeLogApplicationService {
         if ("tenantStatus".equals(fieldKey)) {
             return "租户状态变更会直接影响登录、访问和管理操作可用性。";
         }
-        if ("expireAt".equals(fieldKey)) {
-            return "到期时间变更会影响续费提醒、停用策略和运营排期。";
+        if ("authBeginAt".equals(fieldKey) || "expireAt".equals(fieldKey)) {
+            return "授权期限变更会影响租户登录、切换、续费提醒和运营排期。";
+        }
+        if ("logoUrl".equals(fieldKey) || "contactName".equals(fieldKey)
+                || "contactPhone".equals(fieldKey) || "contactEmail".equals(fieldKey)
+                || "website".equals(fieldKey) || "address".equals(fieldKey)) {
+            return "租户基础资料变更会影响管理端展示、交付沟通和运营联系信息。";
         }
         if ("lifecycleNote".equals(fieldKey)) {
             return "运营备注变更会影响租户交付说明、排期提示和内部协作口径。";

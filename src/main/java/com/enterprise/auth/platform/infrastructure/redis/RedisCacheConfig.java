@@ -2,6 +2,7 @@ package com.enterprise.auth.platform.infrastructure.redis;
 
 import com.enterprise.auth.platform.common.cache.CacheNames;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CachingConfigurer;
@@ -20,6 +21,7 @@ public class RedisCacheConfig implements CachingConfigurer {
     private static final Logger log = LoggerFactory.getLogger(RedisCacheConfig.class);
 
 
+    @SuppressWarnings("deprecation")
     @Bean
     public RedisCacheConfiguration redisCacheConfiguration(
             AppCacheProperties cacheProperties,
@@ -27,21 +29,25 @@ public class RedisCacheConfig implements CachingConfigurer {
     ) {
         ObjectMapper cacheObjectMapper = objectMapper.copy();
         cacheObjectMapper.disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        cacheObjectMapper.activateDefaultTyping(
+                BasicPolymorphicTypeValidator.builder()
+                        .allowIfBaseType(Object.class)
+                        .build(),
+                ObjectMapper.DefaultTyping.EVERYTHING
+        );
         cacheObjectMapper.addMixIn(
                 com.enterprise.auth.platform.modules.user.application.AuthenticationUser.class,
                 AuthenticationUserTypeMixin.class
         );
-        GenericJackson2JsonRedisSerializer valueSerializer = GenericJackson2JsonRedisSerializer.builder()
-                .objectMapper(cacheObjectMapper)
-                .defaultTyping(true)
-                .build();
+        GenericJackson2JsonRedisSerializer valueSerializer = new GenericJackson2JsonRedisSerializer(cacheObjectMapper);
         StringRedisSerializer keySerializer = new StringRedisSerializer();
-        return RedisCacheConfiguration.defaultCacheConfig()
+        RedisCacheConfiguration defaultConfiguration = RedisCacheConfiguration.defaultCacheConfig()
                 .entryTtl(cacheProperties.resolvedDefaultTtl())
                 .disableCachingNullValues()
                 .computePrefixWith(cacheName -> cacheProperties.resolvedNamespacePrefix() + cacheName + "::")
                 .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(keySerializer))
                 .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(valueSerializer));
+        return defaultConfiguration;
     }
 
     @Bean

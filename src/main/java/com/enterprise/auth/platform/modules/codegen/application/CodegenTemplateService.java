@@ -21,14 +21,16 @@ public class CodegenTemplateService {
         this.templateMapper = templateMapper;
     }
 
-    public PageResult<CodegenTemplateView> list(String keyword, int page, int size) {
+    public PageResult<CodegenTemplateView> list(String keyword, String templateCategory, int page, int size) {
         int safePage = Math.max(page, 1);
         int safeSize = Math.min(Math.max(size, 1), 100);
         String tenantId = currentTenantId();
         LambdaQueryWrapper<CodegenTemplateEntity> wrapper = new LambdaQueryWrapper<CodegenTemplateEntity>()
                 .eq(CodegenTemplateEntity::getTenantId, tenantId)
                 .eq(CodegenTemplateEntity::getDeleted, 0)
+                .eq(StringUtils.hasText(templateCategory), CodegenTemplateEntity::getTemplateCategory, normalizeCategory(templateCategory))
                 .orderByDesc(CodegenTemplateEntity::getBuiltin)
+                .orderByAsc(CodegenTemplateEntity::getTemplateCategory)
                 .orderByAsc(CodegenTemplateEntity::getName);
         if (StringUtils.hasText(keyword)) {
             String like = "%" + keyword.trim() + "%";
@@ -52,11 +54,13 @@ public class CodegenTemplateService {
     public CodegenTemplateView create(CodegenTemplateView view) {
         validateName(view.name(), null);
         validateLanguage(view.language());
+        validateCategory(view.templateCategory());
         validatePattern(view.pathPattern());
         CodegenTemplateEntity entity = new CodegenTemplateEntity();
         entity.setTenantId(currentTenantId());
         entity.setName(view.name().trim());
         entity.setLanguage(view.language().toLowerCase());
+        entity.setTemplateCategory(normalizeCategory(view.templateCategory()));
         entity.setPathPattern(view.pathPattern().trim());
         entity.setContent(view.content());
         entity.setDescription(StringUtils.hasText(view.description()) ? view.description().trim() : null);
@@ -73,9 +77,11 @@ public class CodegenTemplateService {
         }
         validateName(view.name(), id);
         validateLanguage(view.language());
+        validateCategory(view.templateCategory());
         validatePattern(view.pathPattern());
         entity.setName(view.name().trim());
         entity.setLanguage(view.language().toLowerCase());
+        entity.setTemplateCategory(normalizeCategory(view.templateCategory()));
         entity.setPathPattern(view.pathPattern().trim());
         entity.setContent(view.content());
         entity.setDescription(StringUtils.hasText(view.description()) ? view.description().trim() : null);
@@ -177,6 +183,16 @@ public class CodegenTemplateService {
         if (!StringUtils.hasText(language) || !language.matches("^(java|typescript|vue)$")) {
             throw new BusinessException("VALIDATION_ERROR", "模板语言仅支持 java/typescript/vue");
         }
+    }
+
+    private void validateCategory(String templateCategory) {
+        if (!StringUtils.hasText(templateCategory) || !normalizeCategory(templateCategory).matches("^(backend|frontend|api|type|view)$")) {
+            throw new BusinessException("VALIDATION_ERROR", "模板分类仅支持 backend/frontend/api/type/view");
+        }
+    }
+
+    private String normalizeCategory(String templateCategory) {
+        return StringUtils.hasText(templateCategory) ? templateCategory.trim().toLowerCase() : "backend";
     }
 
     private String currentTenantId() {

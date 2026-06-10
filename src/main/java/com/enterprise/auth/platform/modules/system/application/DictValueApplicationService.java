@@ -20,6 +20,11 @@ import org.springframework.util.StringUtils;
 @Service
 public class DictValueApplicationService {
 
+    private static final int DICT_LABEL_MAX_LENGTH = 128;
+    private static final int DICT_VALUE_MAX_LENGTH = 255;
+    private static final int SHOW_CLASS_MAX_LENGTH = 100;
+    private static final int REMARKS_MAX_LENGTH = 255;
+
     private final SysDictValueMapper sysDictValueMapper;
     private final SysDictMapper sysDictMapper;
 
@@ -31,9 +36,10 @@ public class DictValueApplicationService {
     @Cacheable(value = CacheNames.SYSTEM_DICTS, key = "'value:' + #dictType")
     public List<SystemViewModels.DictValueView> listByType(String dictType) {
         String tenantId = currentTenantId();
+        String normalizedDictType = normalizeRequired(dictType, "字典类型不能为空", 64, "字典类型长度不能超过64个字符");
         return sysDictValueMapper.selectList(new LambdaQueryWrapper<SysDictValueEntity>()
                 .eq(SysDictValueEntity::getTenantId, tenantId)
-                .eq(SysDictValueEntity::getDictType, dictType)
+                .eq(SysDictValueEntity::getDictType, normalizedDictType)
                 .eq(SysDictValueEntity::getDeleted, 0)
                 .eq(SysDictValueEntity::getEnabled, 1)
                 .orderByAsc(SysDictValueEntity::getSort)
@@ -52,16 +58,19 @@ public class DictValueApplicationService {
     @CacheEvict(value = CacheNames.SYSTEM_DICTS, allEntries = true)
     public SystemViewModels.DictValueView create(Long dictId, DictValueCrudRequest request) {
         SysDictEntity dict = getDict(dictId);
+        String dictValue = normalizeRequired(request.dictValue(), "字典键值不能为空", DICT_VALUE_MAX_LENGTH, "字典键值长度不能超过255个字符");
+        ensureDictValueUnique(dict.getTenantId(), dict.getId(), dictValue, null);
+
         SysDictValueEntity entity = new SysDictValueEntity();
         entity.setTenantId(currentTenantId());
         entity.setDictId(dict.getId());
         entity.setDictType(dict.getDictType());
-        entity.setDictLabel(normalizeRequired(request.dictLabel(), "字典标签不能为空"));
-        entity.setDictValue(normalizeRequired(request.dictValue(), "字典键值不能为空"));
+        entity.setDictLabel(normalizeRequired(request.dictLabel(), "字典标签不能为空", DICT_LABEL_MAX_LENGTH, "字典标签长度不能超过128个字符"));
+        entity.setDictValue(dictValue);
         entity.setSort(request.sort() == null ? nextSort(dict.getId()) : request.sort());
-        entity.setShowClass(blankToNull(request.showClass()));
+        entity.setShowClass(normalizeOptional(request.showClass(), SHOW_CLASS_MAX_LENGTH, "回显样式长度不能超过100个字符"));
         entity.setEnabled(Boolean.FALSE.equals(request.enabled()) ? 0 : 1);
-        entity.setRemarks(blankToNull(request.remarks()));
+        entity.setRemarks(normalizeOptional(request.remarks(), REMARKS_MAX_LENGTH, "备注长度不能超过255个字符"));
         sysDictValueMapper.insert(entity);
         return toValueView(entity);
     }
@@ -71,13 +80,16 @@ public class DictValueApplicationService {
     public SystemViewModels.DictValueView update(Long valueId, DictValueCrudRequest request) {
         SysDictValueEntity entity = getValue(valueId);
         SysDictEntity dict = getDict(entity.getDictId());
+        String dictValue = normalizeRequired(request.dictValue(), "字典键值不能为空", DICT_VALUE_MAX_LENGTH, "字典键值长度不能超过255个字符");
+        ensureDictValueUnique(dict.getTenantId(), dict.getId(), dictValue, valueId);
+
         entity.setDictType(dict.getDictType());
-        entity.setDictLabel(normalizeRequired(request.dictLabel(), "字典标签不能为空"));
-        entity.setDictValue(normalizeRequired(request.dictValue(), "字典键值不能为空"));
+        entity.setDictLabel(normalizeRequired(request.dictLabel(), "字典标签不能为空", DICT_LABEL_MAX_LENGTH, "字典标签长度不能超过128个字符"));
+        entity.setDictValue(dictValue);
         entity.setSort(request.sort() == null ? 0 : request.sort());
-        entity.setShowClass(blankToNull(request.showClass()));
+        entity.setShowClass(normalizeOptional(request.showClass(), SHOW_CLASS_MAX_LENGTH, "回显样式长度不能超过100个字符"));
         entity.setEnabled(Boolean.FALSE.equals(request.enabled()) ? 0 : 1);
-        entity.setRemarks(blankToNull(request.remarks()));
+        entity.setRemarks(normalizeOptional(request.remarks(), REMARKS_MAX_LENGTH, "备注长度不能超过255个字符"));
         sysDictValueMapper.updateById(entity);
         return toValueView(entity);
     }
@@ -86,6 +98,8 @@ public class DictValueApplicationService {
     @CacheEvict(value = CacheNames.SYSTEM_DICTS, allEntries = true)
     public void delete(Long valueId) {
         SysDictValueEntity entity = getValue(valueId);
+        releaseDeletedValueIdentity(entity);
+        sysDictValueMapper.updateById(entity);
         sysDictValueMapper.deleteById(entity.getId());
     }
 
@@ -151,12 +165,49 @@ public class DictValueApplicationService {
         );
     }
 
-    private String normalizeRequired(String value, String message) {
+    private void ensureDictValueUnique(String tenantId, Long dictId, String dictValue, Long selfId) {
+        Long count = sysDictValueMapper.selectCount(new LambdaQueryWrapper<SysDictValueEntity>()
+                .eq(SysDictValueEntity::getTenantId, tenantId)
+                .eq(SysDictValueEntity::getDictId, dictId)
+                .eq(SysDictValueEntity::getDeleted, 0)
+                .eq(SysDictValueEntity::getDictValue, dictValue)
+                .ne(selfId != null, SysDictValueEntity::getId, selfId == null ? -1L : selfId));
+        if (count != null && count > 0) {
+            throw new BusinessException("CONFLICT", "字典键值已存在");
+        }
+    }
+
+    private void releaseDeletedValueIdentity(SysDictValueEntity entity) {
+        entity.setDictValue(tombstone(entity.getDictValue(), entity.getId(), DICT_VALUE_MAX_LENGTH));
+    }
+
+    private String normalizeRequired(String value, String message, int maxLength, String lengthMessage) {
         String normalized = blankToNull(value);
         if (normalized == null) {
             throw new BusinessException(message);
         }
+        if (normalized.length() > maxLength) {
+            throw new BusinessException("VALIDATION_ERROR", lengthMessage);
+        }
         return normalized;
+    }
+
+    private String normalizeOptional(String value, int maxLength, String lengthMessage) {
+        String normalized = blankToNull(value);
+        if (normalized != null && normalized.length() > maxLength) {
+            throw new BusinessException("VALIDATION_ERROR", lengthMessage);
+        }
+        return normalized;
+    }
+
+    private String tombstone(String value, Long id, int maxLength) {
+        String suffix = "#deleted#" + id;
+        String base = StringUtils.hasText(value) ? value.trim() : "deleted";
+        int keepLength = Math.max(0, maxLength - suffix.length());
+        if (base.length() > keepLength) {
+            base = base.substring(0, keepLength);
+        }
+        return base + suffix;
     }
 
     private String blankToNull(String value) {

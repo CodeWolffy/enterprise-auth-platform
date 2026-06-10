@@ -10,6 +10,8 @@ import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
+import com.enterprise.auth.platform.modules.role.infrastructure.entity.SysRoleEntity;
+import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMapper;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.modules.user.interfaces.CreateUserRequest;
 import com.enterprise.auth.platform.modules.user.interfaces.CreateUserRequest;
@@ -30,12 +32,17 @@ class UserManagementServiceTest {
     private static final String HIDDEN_USER = "user_hidden_user_ut";
     private static final String CREATED_USER = "user_created_hidden_dept_ut";
     private static final String CROSS_TENANT_USER = "user_cross_tenant_ut";
+    private static final String ADMIN_ROLE = "USER_SELF_ADMIN_UT";
+    private static final String STAFF_ROLE = "USER_SELF_STAFF_UT";
 
     @Autowired
     private UserManagementService userManagementService;
 
     @Autowired
     private SysUserMapper sysUserMapper;
+
+    @Autowired
+    private SysRoleMapper sysRoleMapper;
 
     @Autowired
     private PasswordHasher passwordHasher;
@@ -47,6 +54,24 @@ class UserManagementServiceTest {
     void tearDown() {
         TenantContext.clear();
         clear();
+        jdbcTemplate.update(
+                "DELETE FROM sys_user_role WHERE tenant_id IN (?, ?) AND (user_id IN (SELECT id FROM sys_user WHERE username IN (?, ?, ?, ?)) OR role_id IN (SELECT id FROM sys_role WHERE role_code IN (?, ?)))",
+                "tenant-a",
+                "platform",
+                SCOPE_USER,
+                HIDDEN_USER,
+                CREATED_USER,
+                CROSS_TENANT_USER,
+                ADMIN_ROLE,
+                STAFF_ROLE
+        );
+        jdbcTemplate.update(
+                "DELETE FROM sys_role WHERE tenant_id IN (?, ?) AND role_code IN (?, ?)",
+                "tenant-a",
+                "platform",
+                ADMIN_ROLE,
+                STAFF_ROLE
+        );
         jdbcTemplate.update(
                 "DELETE FROM sys_user WHERE tenant_id = ? AND username IN (?, ?, ?, ?)",
                 "tenant-a",
@@ -126,6 +151,49 @@ class UserManagementServiceTest {
                 });
     }
 
+    @Test
+    void shouldRejectDeletingCurrentUser() {
+        TenantContext.setTenantId("tenant-a");
+        Long currentUserId = ensureUser("tenant-a", SCOPE_USER, 2L);
+        authenticateScopedUser(currentUserId, "user:write");
+
+        assertThatThrownBy(() -> userManagementService.delete(currentUserId))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("当前登录用户");
+    }
+
+    @Test
+    void shouldRejectDisablingCurrentUser() {
+        TenantContext.setTenantId("tenant-a");
+        Long currentUserId = ensureUser("tenant-a", SCOPE_USER, 2L);
+        authenticateScopedUser(currentUserId, "user:write");
+
+        assertThatThrownBy(() -> userManagementService.update(currentUserId, new CreateUserRequest(
+                null,
+                "Current User",
+                null,
+                null,
+                null,
+                2L,
+                false,
+                null
+        )))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("当前登录用户");
+    }
+
+    @Test
+    void shouldRejectRemovingAllRolesFromCurrentUser() {
+        TenantContext.setTenantId("tenant-a");
+        Long currentUserId = ensureUser("tenant-a", SCOPE_USER, 2L);
+        ensureRole("tenant-a", ADMIN_ROLE);
+        authenticateScopedUser(currentUserId, "user:write");
+
+        assertThatThrownBy(() -> userManagementService.assignRoles(currentUserId, Set.of()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("当前登录用户");
+    }
+
     private Long ensureUser(String tenantId, String username, Long deptId) {
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username = ?", tenantId, username);
         SysUserEntity entity = new SysUserEntity();
@@ -137,6 +205,17 @@ class UserManagementServiceTest {
         entity.setEnabled(1);
         entity.setSessionVersion(1);
         sysUserMapper.insert(entity);
+        return entity.getId();
+    }
+
+    private Long ensureRole(String tenantId, String roleCode) {
+        jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id = ? AND role_code = ?", tenantId, roleCode);
+        SysRoleEntity entity = new SysRoleEntity();
+        entity.setTenantId(tenantId);
+        entity.setRoleCode(roleCode);
+        entity.setRoleName(roleCode);
+        entity.setDataScopeType(DataScopeType.ALL.name());
+        sysRoleMapper.insert(entity);
         return entity.getId();
     }
 

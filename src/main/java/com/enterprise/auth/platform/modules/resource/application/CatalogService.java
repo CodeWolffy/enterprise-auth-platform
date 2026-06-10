@@ -89,6 +89,7 @@ public class CatalogService {
                             tenant.tenantName(),
                             tenant.platformLevel() != null && tenant.platformLevel() == 1,
                             tenant.tenantStatus(),
+                            TimeSupport.toEpochMilli(tenant.authBeginAt()),
                             TimeSupport.toEpochMilli(tenant.expireAt()),
                             profile.packageCode(),
                             profile.packageName(),
@@ -96,6 +97,12 @@ public class CatalogService {
                             profile.storageQuotaGb(),
                             profile.capabilityCodes(),
                             profile.capabilityDescriptions(),
+                            tenant.logoUrl(),
+                            tenant.contactName(),
+                            tenant.contactPhone(),
+                            tenant.contactEmail(),
+                            tenant.website(),
+                            tenant.address(),
                             profile.lifecycleNote()
                     );
                 })
@@ -209,13 +216,20 @@ public class CatalogService {
             @Schema(description = "租户名称") String name,
             @Schema(description = "是否平台级租户") boolean platformLevel,
             @Schema(description = "租户状态") Integer tenantStatus,
-            @Schema(description = "到期时间") Long expireAt,
+            @Schema(description = "授权开始时间") Long authBeginAt,
+            @Schema(description = "授权结束时间") Long expireAt,
             @Schema(description = "套餐编码") String packageCode,
             @Schema(description = "套餐名称") String packageName,
             @Schema(description = "用户配额") Integer userQuota,
             @Schema(description = "存储配额(GB)") Integer storageQuotaGb,
             @Schema(description = "能力编码集合") List<String> capabilityCodes,
             @Schema(description = "能力说明映射") Map<String, String> capabilityDescriptions,
+            @Schema(description = "Logo 地址") String logoUrl,
+            @Schema(description = "联系人姓名") String contactName,
+            @Schema(description = "联系人电话") String contactPhone,
+            @Schema(description = "联系人邮箱") String contactEmail,
+            @Schema(description = "官网地址") String website,
+            @Schema(description = "联系地址") String address,
             @Schema(description = "运营备注") String lifecycleNote
     ) {
     }

@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @TableName("sys_tenant_package")
@@ -18,6 +19,12 @@ public class SysTenantPackageEntity {
     private String tenantId;
     private String packageCode;
     private String packageName;
+    private String subtitle;
+    private BigDecimal salesPrice;
+    private BigDecimal originalPrice;
+    private String descriptionMd;
+    private String appKey;
+    private Integer orderNo;
     private Integer userQuota;
     private Integer storageQuotaGb;
     private String packageDesc;

@@ -1,6 +1,9 @@
 package com.enterprise.auth.platform.modules.tenant.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.enterprise.auth.platform.common.TimeSupport;
+import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantCapabilityEntity;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantCapabilityOverrideEntity;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantEntity;
@@ -57,6 +60,25 @@ public class TenantProfileFacade {
         return Optional.ofNullable(entity);
     }
 
+    public void ensureTenantAccessible(String tenantId) {
+        SysTenantEntity tenant = findByTenantId(tenantId)
+                .orElseThrow(() -> new BusinessException("TENANT_NOT_FOUND", "租户不存在"));
+        ensureTenantAccessible(tenant);
+    }
+
+    public void ensureTenantAccessible(SysTenantEntity tenant) {
+        if (tenant.getTenantStatus() == null || tenant.getTenantStatus() != 1) {
+            throw new BusinessException("TENANT_DISABLED", "租户已停用");
+        }
+        java.time.LocalDateTime now = TimeSupport.utcNowDateTime();
+        if (tenant.getAuthBeginAt() != null && tenant.getAuthBeginAt().isAfter(now)) {
+            throw new BusinessException("TENANT_DISABLED", "租户授权尚未生效");
+        }
+        if (tenant.getExpireAt() != null && !tenant.getExpireAt().isAfter(now)) {
+            throw new BusinessException("TENANT_DISABLED", "租户授权已过期");
+        }
+    }
+
     public Map<String, SysTenantPackageEntity> loadPackages(List<String> packageCodes) {
         if (packageCodes == null || packageCodes.isEmpty()) {
             return Map.of();
@@ -106,13 +128,15 @@ public class TenantProfileFacade {
         if (tenantIds == null || tenantIds.isEmpty()) {
             return Map.of();
         }
-        return sysTenantCapabilityOverrideMapper.selectList(new LambdaQueryWrapper<SysTenantCapabilityOverrideEntity>()
-                        .in(SysTenantCapabilityOverrideEntity::getTenantId, tenantIds))
-                .stream().collect(Collectors.groupingBy(
-                        SysTenantCapabilityOverrideEntity::getTenantId,
-                        LinkedHashMap::new,
-                        Collectors.toList()
-                ));
+        Map<String, List<SysTenantCapabilityOverrideEntity>> result = new LinkedHashMap<>();
+        for (String tenantId : tenantIds.stream().filter(StringUtils::hasText).distinct().toList()) {
+            List<SysTenantCapabilityOverrideEntity> records = TenantContext.runWithTenant(tenantId, () -> sysTenantCapabilityOverrideMapper.selectList(
+                    new LambdaQueryWrapper<SysTenantCapabilityOverrideEntity>()
+                            .eq(SysTenantCapabilityOverrideEntity::getTenantId, tenantId)
+            ));
+            result.put(tenantId, records);
+        }
+        return result;
     }
 
     public String capabilityDescription(SysTenantCapabilityEntity capability) {
@@ -128,7 +152,10 @@ public class TenantProfileFacade {
         return listTenants().stream()
                 .map(t -> new TenantRecord(t.getTenantId(), t.getTenantName(),
                         t.getPlatformLevel(), t.getTenantStatus(),
-                        t.getExpireAt(), t.getLifecycleNote(), t.getPackageCode()))
+                        t.getAuthBeginAt(), t.getExpireAt(),
+                        t.getLogoUrl(), t.getContactName(), t.getContactPhone(), t.getContactEmail(),
+                        t.getWebsite(), t.getAddress(),
+                        t.getLifecycleNote(), t.getPackageCode()))
                 .toList();
     }
 
@@ -177,7 +204,10 @@ public class TenantProfileFacade {
     }
 
     public record TenantRecord(String tenantId, String tenantName, Integer platformLevel, Integer tenantStatus,
-                               java.time.LocalDateTime expireAt, String lifecycleNote, String packageCode) {}
+                               java.time.LocalDateTime authBeginAt, java.time.LocalDateTime expireAt,
+                               String logoUrl, String contactName, String contactPhone, String contactEmail,
+                               String website, String address,
+                               String lifecycleNote, String packageCode) {}
 
     public record PackageRecord(String packageCode, String packageName, Integer userQuota, Integer storageQuotaGb) {}
 

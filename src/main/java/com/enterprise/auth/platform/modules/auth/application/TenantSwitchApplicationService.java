@@ -55,9 +55,7 @@ public class TenantSwitchApplicationService {
         if (tenant == null) {
             throw new BusinessException("TENANT_NOT_FOUND", "租户不存在");
         }
-        if (tenant.getTenantStatus() == null || tenant.getTenantStatus() != 1) {
-            throw new BusinessException("TENANT_DISABLED", "租户已停用");
-        }
+        tenantProfileFacade.ensureTenantAccessible(tenant);
 
         SaSession tokenSession = StpUtil.getTokenSession();
         String fromTenantId = sessionString(tokenSession, "activeTenantId", currentUser.tenantId());

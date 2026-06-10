@@ -42,6 +42,7 @@ public class CodegenApplicationService {
     private final Path outputRoot;
     private final CodegenTemplateService templateService;
     private final CodegenResourceRegistrationService registrationService;
+    private final CodegenMetadataService metadataService;
 
     @Lazy
     @Autowired
@@ -52,13 +53,15 @@ public class CodegenApplicationService {
             AuditEventPublisher auditEventPublisher,
             @Value("${platform.codegen.output-root:target/generated-codegen}") String outputRoot,
             CodegenTemplateService templateService,
-            CodegenResourceRegistrationService registrationService
+            CodegenResourceRegistrationService registrationService,
+            CodegenMetadataService metadataService
     ) {
         this.jdbcTemplate = new JdbcTemplate(dataSource);
         this.auditEventPublisher = auditEventPublisher;
         this.outputRoot = Path.of(outputRoot).toAbsolutePath().normalize();
         this.templateService = templateService;
         this.registrationService = registrationService;
+        this.metadataService = metadataService;
     }
 
     @Transactional(readOnly = true)
@@ -245,12 +248,19 @@ public class CodegenApplicationService {
 
     private List<CodegenColumnView> columns(String tableName) {
         String safeTableName = normalizeTableName(tableName);
-        return jdbcTemplate.query(
+        List<CodegenColumnView> rawColumns = jdbcTemplate.query(
                 "SELECT column_name, data_type, column_type, is_nullable, column_key, extra, column_default, column_comment "
                         + "FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? ORDER BY ordinal_position",
                 (rs, rowNum) -> columnView(rs),
                 safeTableName
         );
+        Map<String, CodegenColumnView> overrides = metadataService.importedColumnOverrides(safeTableName);
+        if (overrides.isEmpty()) {
+            return rawColumns;
+        }
+        return rawColumns.stream()
+                .map(column -> overrides.getOrDefault(column.columnName(), column))
+                .toList();
     }
 
     private void ensureAllowedTable(String tableName) {
