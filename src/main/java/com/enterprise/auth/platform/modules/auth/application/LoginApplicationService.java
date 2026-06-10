@@ -165,7 +165,7 @@ public class LoginApplicationService {
                 return new PasswordChangeState(true, "PASSWORD_EXPIRED");
             }
         }
-        return new PasswordChangeState(false, null);
+        return new PasswordChangeState(false, "");
     }
 
     private record PasswordChangeState(boolean required, String reason) {

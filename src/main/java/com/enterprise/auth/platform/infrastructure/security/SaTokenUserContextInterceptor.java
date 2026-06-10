@@ -69,8 +69,11 @@ public class SaTokenUserContextInterceptor implements HandlerInterceptor {
     private void enforceClientIpBinding(HttpServletRequest request) {
         Object boundClientIpValue = StpUtil.getTokenSession().get("clientIp");
         String boundClientIp = boundClientIpValue == null ? null : String.valueOf(boundClientIpValue);
+        if (!StringUtils.hasText(boundClientIp) || "null".equals(boundClientIp)) {
+            return;
+        }
         String requestClientIp = clientIpResolver.resolve(request);
-        if (StringUtils.hasText(boundClientIp) && StringUtils.hasText(requestClientIp) && !boundClientIp.equals(requestClientIp)) {
+        if (StringUtils.hasText(requestClientIp) && !boundClientIp.equals(requestClientIp)) {
             String token = StpUtil.getTokenValue();
             StpUtil.kickoutByTokenValue(token);
             sessionIndexService.remove(token);
