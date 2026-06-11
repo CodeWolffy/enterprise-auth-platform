@@ -74,12 +74,43 @@ public class ClientIpResolver {
             }
             try {
                 int prefix = Integer.parseInt(parts[1]);
-                if (parts[0].contains(":") || address.contains(":")) {
-                    return "::1".equals(parts[0]) && "::1".equals(address);
+                if (parts[0].contains(":")) {
+                    return ipv6Matches(parts[0], address, prefix);
+                }
+                if (address.contains(":")) {
+                    return false;
                 }
                 int mask = prefix == 0 ? 0 : -1 << (32 - prefix);
                 return (ipv4ToInt(parts[0]) & mask) == (ipv4ToInt(address) & mask);
             } catch (RuntimeException ignored) {
+                return false;
+            }
+        }
+
+        private boolean ipv6Matches(String cidrAddr, String testAddr, int prefix) {
+            try {
+                java.net.InetAddress cidrInet = java.net.InetAddress.getByName(cidrAddr);
+                java.net.InetAddress testInet = java.net.InetAddress.getByName(testAddr);
+                byte[] cidrBytes = cidrInet.getAddress();
+                byte[] testBytes = testInet.getAddress();
+                if (cidrBytes.length != 16 || testBytes.length != 16) {
+                    return false;
+                }
+                int fullBytes = prefix / 8;
+                int remainingBits = prefix % 8;
+                for (int i = 0; i < fullBytes; i++) {
+                    if (cidrBytes[i] != testBytes[i]) {
+                        return false;
+                    }
+                }
+                if (remainingBits > 0) {
+                    int mask = (0xFF << (8 - remainingBits)) & 0xFF;
+                    if ((cidrBytes[fullBytes] & mask) != (testBytes[fullBytes] & mask)) {
+                        return false;
+                    }
+                }
+                return true;
+            } catch (java.net.UnknownHostException e) {
                 return false;
             }
         }

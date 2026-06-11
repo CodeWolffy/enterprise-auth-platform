@@ -70,7 +70,7 @@ spring:
 sa-token:
   token-name: Authorization
   token-prefix: Bearer
-  timeout: 604800
+  timeout: 172800
   active-timeout: ${APP_SECURITY_SESSION_IDLE_SECONDS:7200}
   auto-renew: true
   dynamic-active-timeout: true
@@ -186,7 +186,7 @@ app:
     default-capacity: 20
     default-refill-tokens: 20
     default-refill-duration: 1m
-    failure-mode: open
+    failure-mode: closed
     trusted-proxies:
       - 127.0.0.1/32
       - ::1/128
@@ -204,6 +204,16 @@ app:
       password-reset-request:
         capacity: 5
         refill-tokens: 5
+        refill-duration: 60s
+        failure-mode: closed
+      password-reset-confirm:
+        capacity: 5
+        refill-tokens: 5
+        refill-duration: 60s
+        failure-mode: closed
+      register:
+        capacity: 3
+        refill-tokens: 3
         refill-duration: 60s
         failure-mode: closed
       export:

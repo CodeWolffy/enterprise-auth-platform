@@ -50,6 +50,7 @@ public class PasswordResetApplicationService {
     private final ClientIpResolver clientIpResolver;
     private final SessionIndexService sessionIndexService;
     private final NotificationScenarioPublisher notificationScenarioPublisher;
+    private final CaptchaService captchaService;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public PasswordResetApplicationService(
@@ -62,7 +63,8 @@ public class PasswordResetApplicationService {
             SecurityProperties securityProperties,
             ClientIpResolver clientIpResolver,
             SessionIndexService sessionIndexService,
-            NotificationScenarioPublisher notificationScenarioPublisher
+            NotificationScenarioPublisher notificationScenarioPublisher,
+            CaptchaService captchaService
     ) {
         this.userAuthenticationFacade = userAuthenticationFacade;
         this.tokenMapper = tokenMapper;
@@ -74,10 +76,12 @@ public class PasswordResetApplicationService {
         this.clientIpResolver = clientIpResolver;
         this.sessionIndexService = sessionIndexService;
         this.notificationScenarioPublisher = notificationScenarioPublisher;
+        this.captchaService = captchaService;
     }
 
     @Transactional
     public PasswordResetRequestResponse request(PasswordResetRequest request, HttpServletRequest servletRequest) {
+        captchaService.secondaryVerify(request.captchaId());
         String username = normalize(request.username());
         String email = normalize(request.email());
         String clientIp = clientIpResolver.resolve(servletRequest);
@@ -357,7 +361,8 @@ public class PasswordResetApplicationService {
     public record PasswordResetRequest(
             @NotBlank @Size(min = 5, max = 16) String username,
             @NotBlank @Email @Size(max = 128) String email,
-            String tenantId
+            String tenantId,
+            @NotBlank String captchaId
     ) {}
 
     public record PasswordResetRequestResponse(String message, String result) {

@@ -7,7 +7,7 @@ import com.enterprise.auth.platform.infrastructure.config.RateLimitProperties;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.autoconfigure.data.redis.RedisProperties;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 class RateLimitInterceptorTest {
@@ -18,8 +18,7 @@ class RateLimitInterceptorTest {
         RateLimitInterceptor interceptor = new RateLimitInterceptor(
                 properties,
                 (io.github.bucket4j.redis.lettuce.cas.LettuceBasedProxyManager<String>) null,
-                (io.lettuce.core.RedisClient) null,
-                (io.lettuce.core.resource.ClientResources) null,
+                (io.lettuce.core.api.StatefulRedisConnection<String, byte[]>) null,
                 new ClientIpResolver(properties)
         );
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -35,8 +34,7 @@ class RateLimitInterceptorTest {
         RateLimitInterceptor interceptor = new RateLimitInterceptor(
                 properties,
                 (io.github.bucket4j.redis.lettuce.cas.LettuceBasedProxyManager<String>) null,
-                (io.lettuce.core.RedisClient) null,
-                (io.lettuce.core.resource.ClientResources) null,
+                (io.lettuce.core.api.StatefulRedisConnection<String, byte[]>) null,
                 new ClientIpResolver(properties)
         );
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -48,15 +46,11 @@ class RateLimitInterceptorTest {
     }
 
     @Test
-    void shouldNotFailStartupWhenRedisHostPlaceholderIsUnresolved() {
-        RedisProperties redisProperties = new RedisProperties();
-        redisProperties.setHost("${REDIS_HOST}");
-        redisProperties.setPort(6379);
-
+    void shouldNotFailStartupWhenLettuceFactoryIsUnavailable() {
         RateLimitProperties properties = properties(List.of());
         assertThatCode(() -> new RateLimitInterceptor(
                 properties,
-                redisProperties,
+                (LettuceConnectionFactory) null,
                 new ClientIpResolver(properties)
         )).doesNotThrowAnyException();
     }

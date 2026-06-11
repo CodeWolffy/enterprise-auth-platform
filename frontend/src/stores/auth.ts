@@ -43,7 +43,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function restore() {
-    const raw = sessionStorage.getItem(storageKey) ?? localStorage.getItem(storageKey)
+    const raw = sessionStorage.getItem(storageKey)
     if (!raw) {
       return
     }
@@ -52,7 +52,6 @@ export const useAuthStore = defineStore('auth', () => {
       parsed = JSON.parse(raw) as PersistedSession
     } catch {
       sessionStorage.removeItem(storageKey)
-      localStorage.removeItem(storageKey)
       return
     }
     sessionStore.restoreSession(parsed)
@@ -60,7 +59,6 @@ export const useAuthStore = defineStore('auth', () => {
     permissionStore.setSnapshot(parsed.snapshot)
     tenantStore.syncTenantFromSnapshot(parsed.snapshot)
     sessionStorage.setItem(storageKey, raw)
-    localStorage.removeItem(storageKey)
   }
 
   function persist() {
@@ -156,12 +154,11 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  function clearSession() {
+    function clearSession() {
     sessionStore.clearSessionState()
     tenantStore.clearTenantState()
     permissionStore.clearSnapshot()
     sessionStorage.removeItem(storageKey)
-    localStorage.removeItem(storageKey)
   }
 
   function clearPasswordChangeRequirement() {

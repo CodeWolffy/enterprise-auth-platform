@@ -10,11 +10,15 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 @Service
 public class UserAuthenticationFacade {
+
+    private static final Logger log = LoggerFactory.getLogger(UserAuthenticationFacade.class);
 
     private final UserRepository userRepository;
     private final SysUserMapper sysUserMapper;
@@ -52,7 +56,8 @@ public class UserAuthenticationFacade {
         if (raw instanceof java.util.Map<?, ?> map) {
             try {
                 return Optional.of(objectMapper.convertValue(map, AuthenticationUser.class));
-            } catch (Exception ignored) {
+            } catch (Exception ex) {
+                log.debug("Failed to convert cached user data to AuthenticationUser", ex);
             }
         }
         return Optional.empty();

@@ -8,6 +8,7 @@ import com.enterprise.auth.platform.modules.auth.interfaces.RegisterRequest;
 import com.enterprise.auth.platform.modules.user.interfaces.UserSummary;
 import com.enterprise.auth.platform.modules.auth.application.RegisterAttemptService;
 import com.enterprise.auth.platform.modules.auth.application.RegistrationPolicyService;
+import com.enterprise.auth.platform.modules.security.application.SecurityPolicyApplicationService;
 import com.enterprise.auth.platform.modules.user.application.UserManagementService;
 import com.enterprise.auth.platform.common.web.ClientIpResolver;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,19 +24,22 @@ public class RegistrationApplicationService {
     private final UserManagementService userManagementService;
     private final ClientIpResolver clientIpResolver;
     private final CaptchaService captchaService;
+    private final SecurityPolicyApplicationService securityPolicyApplicationService;
 
     public RegistrationApplicationService(
             RegisterAttemptService registerAttemptService,
             RegistrationPolicyService registrationPolicyService,
             UserManagementService userManagementService,
             ClientIpResolver clientIpResolver,
-            CaptchaService captchaService
+            CaptchaService captchaService,
+            SecurityPolicyApplicationService securityPolicyApplicationService
     ) {
         this.registerAttemptService = registerAttemptService;
         this.registrationPolicyService = registrationPolicyService;
         this.userManagementService = userManagementService;
         this.clientIpResolver = clientIpResolver;
         this.captchaService = captchaService;
+        this.securityPolicyApplicationService = securityPolicyApplicationService;
     }
 
     public UserSummary register(RegisterRequest request, HttpServletRequest servletRequest) {
@@ -48,7 +52,7 @@ public class RegistrationApplicationService {
             TenantContext.setTenantId(defaultTenantId);
             Set<String> defaultRoleCodes = registrationPolicyService.resolveDefaultRoleCodes();
 
-            PasswordValidator.validate(request.password());
+            PasswordValidator.validate(request.password(), securityPolicyApplicationService.effectivePolicy(defaultTenantId));
 
             if (userManagementService.existsByUsername(request.username())) {
                 throw new BusinessException("USERNAME_EXISTS", "用户名已存在");

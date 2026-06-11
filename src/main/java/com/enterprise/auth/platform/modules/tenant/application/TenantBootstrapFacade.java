@@ -17,23 +17,28 @@ import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEn
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserRoleEntity;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserRoleMapper;
+import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 @Service
 public class TenantBootstrapFacade {
 
+    private static final Logger log = LoggerFactory.getLogger(TenantBootstrapFacade.class);
     public static final String TENANT_ADMIN_ROLE_CODE = "TENANT_ADMIN";
     private static final String ROOT_DEPT_CODE = "ROOT";
-    private static final String DEFAULT_INITIAL_PASSWORD = "ChangeMe@123456";
     private static final Pattern USERNAME_ALLOWED_CHARS = Pattern.compile("[^a-zA-Z0-9_.-]");
 
     private final SysDeptMapper sysDeptMapper;
@@ -43,6 +48,7 @@ public class TenantBootstrapFacade {
     private final SysUserRoleMapper sysUserRoleMapper;
     private final PasswordHasher passwordHasher;
     private final MenuService menuService;
+    private final java.security.SecureRandom secureRandom = new java.security.SecureRandom();
 
     public TenantBootstrapFacade(
             SysDeptMapper sysDeptMapper,
@@ -130,7 +136,7 @@ public class TenantBootstrapFacade {
                     .eq(SysRoleMenuEntity::getTenantId, tenantId)
                     .eq(SysRoleMenuEntity::getRoleId, adminRole.getId())
                     .eq(SysRoleMenuEntity::getMenuId, menuId));
-            if (existing != null && existing > 0) {
+            if (Optional.ofNullable(existing).orElse(0L) > 0) {
                 continue;
             }
             SysRoleMenuEntity relation = new SysRoleMenuEntity();
@@ -161,7 +167,7 @@ public class TenantBootstrapFacade {
         entity.setMobile(null);
         entity.setEmail(null);
         entity.setAvatarFileKey(null);
-        entity.setPasswordHash(passwordHasher.hash(DEFAULT_INITIAL_PASSWORD));
+        entity.setPasswordHash(passwordHasher.hash(generateInitialPassword()));
         entity.setEnabled(1);
         entity.setSessionVersion(1);
         entity.setMustChangePassword(1);
@@ -175,7 +181,7 @@ public class TenantBootstrapFacade {
                 .eq(SysUserRoleEntity::getTenantId, tenantId)
                 .eq(SysUserRoleEntity::getUserId, userId)
                 .eq(SysUserRoleEntity::getRoleId, roleId));
-        if (existing != null && existing > 0) {
+        if (Optional.ofNullable(existing).orElse(0L) > 0) {
             return;
         }
         SysUserRoleEntity relation = new SysUserRoleEntity();
@@ -236,6 +242,14 @@ public class TenantBootstrapFacade {
                 TenantContext.clear();
             }
         }
+    }
+
+    private String generateInitialPassword() {
+        byte[] bytes = new byte[16];
+        secureRandom.nextBytes(bytes);
+        String password = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        log.info("Tenant bootstrap generated initial password (length={}) for tenant admin", password.length());
+        return password;
     }
 
     public record BootstrapResult(

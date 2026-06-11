@@ -210,7 +210,12 @@ public class GlobalExceptionHandler {
     private void recordSecurityDenyEvent(Exception exception, HttpServletRequest request) {
         try {
             Principal principal = request.getUserPrincipal();
-            String operator = principal == null ? "anonymous" : principal.getName();
+            String operator;
+            if (principal != null && StringUtils.hasText(principal.getName())) {
+                operator = principal.getName();
+            } else {
+                operator = "anonymous";
+            }
             String tenantId = StringUtils.hasText(TenantContext.getTenantId()) ? TenantContext.getTenantId() : "platform";
             Map<String, Object> payload = Map.of(
                     "method", request.getMethod(),

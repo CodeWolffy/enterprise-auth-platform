@@ -179,6 +179,7 @@ public class AuthController {
     }
 
     @Operation(summary = "用户注册")
+    @RateLimit(key = "register", strategy = RateLimit.Strategy.IP)
     @PostMapping("/register")
     public ApiResponse<UserSummary> register(@Valid @RequestBody RegisterRequest request, HttpServletRequest servletRequest) {
         return ApiResponse.ok(registrationApplicationService.register(request, servletRequest));
