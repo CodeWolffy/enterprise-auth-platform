@@ -30,7 +30,7 @@
           <span class="eyebrow">用户</span>
           <h3>用户管理</h3>
         </div>
-        <el-button v-permission="'user:write'" type="primary" data-testid="users-create" @click="openUser()">新增用户</el-button>
+        <el-button v-permission="'upms:sysuser:add'" type="primary" data-testid="users-create" @click="openUser()">新增用户</el-button>
       </div>
 
       <AdvancedSearch @search="doSearch" @reset="resetSearch">
@@ -151,10 +151,10 @@
         <el-table-column v-if="userTablePrefs.visibleColumnMap.actions" column-key="actions" fixed="right" label="操作" width="320">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
-            <el-button v-permission="'user:write'" link type="primary" data-testid="users-edit" @click="openUser(row)">编辑</el-button>
-            <el-button v-permission="'user:write'" link type="primary" @click="openRoleAssignment(row)">分配角色</el-button>
-            <el-button v-permission="'user:write'" link type="warning" @click="promptResetPassword(row)">重置密码</el-button>
-            <el-button v-permission="'user:write'" link type="danger" data-testid="users-delete" @click="removeUser(row)">删除</el-button>
+            <el-button v-permission="'upms:sysuser:edit'" link type="primary" data-testid="users-edit" @click="openUser(row)">编辑</el-button>
+            <el-button v-permission="'upms:sysuser:edit'" link type="primary" @click="openRoleAssignment(row)">分配角色</el-button>
+            <el-button v-permission="'upms:sysuser:edit'" link type="warning" @click="promptResetPassword(row)">重置密码</el-button>
+            <el-button v-permission="'upms:sysuser:del'" link type="danger" data-testid="users-delete" @click="removeUser(row)">删除</el-button>
           </template>
         </el-table-column>
         <template #empty>
@@ -271,7 +271,7 @@
       </el-form>
       <template #footer>
         <el-button @click="userVisible = false">取消</el-button>
-        <el-button v-permission="'user:write'" type="primary" @click="submitUser">保存</el-button>
+        <el-button v-permission="['upms:sysuser:add', 'upms:sysuser:edit']" type="primary" @click="submitUser">保存</el-button>
       </template>
     </el-dialog>
 
@@ -290,7 +290,7 @@
       </el-form>
       <template #footer>
         <el-button @click="roleVisible = false">取消</el-button>
-        <el-button v-permission="'user:write'" type="primary" @click="submitRoleAssignment">保存</el-button>
+        <el-button v-permission="'upms:sysuser:edit'" type="primary" @click="submitRoleAssignment">保存</el-button>
       </template>
     </el-dialog>
   </div>
@@ -431,7 +431,7 @@ void load()
 async function load() {
   loading.value = true
   try {
-    const shouldLoadRoles = authStore.snapshot?.grants.includes('role:read')
+    const shouldLoadRoles = authStore.snapshot?.grants.includes('upms:sysrole:page')
     const [userPage, roleList, departmentList] = await Promise.all([
       queryUsers(queryParams),
       shouldLoadRoles ? queryRoles() : Promise.resolve([] as RoleView[]),

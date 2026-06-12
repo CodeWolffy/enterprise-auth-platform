@@ -63,7 +63,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'dashboard',
     title: '运行总览',
     icon: 'Monitor',
-    requiredGrant: PERMISSIONS.DASHBOARD_READ,
+    requiredGrant: PERMISSIONS.DASHBOARD_PAGE,
     component: () => import('@/views/dashboard/DashboardView.vue'),
   },
   {
@@ -72,7 +72,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'users',
     title: '用户管理',
     icon: 'Avatar',
-    requiredGrant: PERMISSIONS.USER_READ,
+    requiredGrant: PERMISSIONS.SYSUSER_PAGE,
     component: () => import('@/views/platform/UsersView.vue'),
   },
   {
@@ -81,7 +81,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'roles',
     title: '角色管理',
     icon: 'Connection',
-    requiredGrant: PERMISSIONS.ROLE_READ,
+    requiredGrant: PERMISSIONS.SYSROLE_PAGE,
     component: () => import('@/views/platform/RolesView.vue'),
   },
   {
@@ -90,7 +90,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'depts',
     title: '部门管理',
     icon: 'OfficeBuilding',
-    requiredGrant: PERMISSIONS.DEPT_READ,
+    requiredGrant: PERMISSIONS.SYSDEPT_PAGE,
     component: () => import('@/views/platform/DepartmentsView.vue'),
   },
   {
@@ -99,7 +99,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'online-users',
     title: '在线用户',
     icon: 'Monitor',
-    requiredGrant: PERMISSIONS.SESSION_WRITE,
+    requiredGrant: PERMISSIONS.SESSION_PAGE,
     component: () => import('@/views/audit/OnlineUsersView.vue'),
   },
   {
@@ -117,7 +117,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'audit',
     title: '安全审计',
     icon: 'Histogram',
-    requiredGrant: PERMISSIONS.AUDIT_READ,
+    requiredGrant: PERMISSIONS.AUDIT_PAGE,
     component: () => import('@/views/audit/AuditView.vue'),
   },
   {
@@ -126,7 +126,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'operation-logs',
     title: '操作日志',
     icon: 'Document',
-    requiredGrant: PERMISSIONS.OPERATION_LOG_READ,
+    requiredGrant: PERMISSIONS.OPERATION_LOG_PAGE,
     component: () => import('@/views/audit/OperationLogView.vue'),
   },
   {
@@ -135,7 +135,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'tenants',
     title: '租户管理',
     icon: 'Flag',
-    requiredGrant: PERMISSIONS.TENANT_READ,
+    requiredGrant: PERMISSIONS.SYSTENANT_PAGE,
     component: () => import('@/views/platform/TenantsView.vue'),
   },
   {
@@ -144,7 +144,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'tenant-catalog',
     title: '租户套餐',
     icon: 'Tickets',
-    requiredGrant: PERMISSIONS.TENANT_READ,
+    requiredGrant: PERMISSIONS.TENANT_CATALOG_PAGE,
     component: () => import('@/views/platform/TenantCatalogView.vue'),
   },
   {
@@ -153,7 +153,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'files',
     title: '文件管理',
     icon: 'FolderOpened',
-    requiredGrant: PERMISSIONS.FILE_READ,
+    requiredGrant: PERMISSIONS.FILE_PAGE,
     component: () => import('@/views/platform/FileManagementView.vue'),
   },
   {
@@ -162,7 +162,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'workflow-designer',
     title: '流程设计器',
     icon: 'Connection',
-    requiredGrant: PERMISSIONS.WORKFLOW_WRITE,
+    requiredGrant: PERMISSIONS.WORKFLOW_DESIGNER_PAGE,
     component: () => import('@/views/workflow/WorkflowDesignerView.vue'),
   },
   {
@@ -171,7 +171,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'workflow-definitions',
     title: '流程定义',
     icon: 'Tickets',
-    requiredGrant: PERMISSIONS.WORKFLOW_READ,
+    requiredGrant: PERMISSIONS.WORKFLOW_DEFINITION_PAGE,
     component: () => import('@/views/workflow/WorkflowDefinitionsView.vue'),
   },
   {
@@ -180,6 +180,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'workflow-my-instances',
     title: '我的发起',
     icon: 'Document',
+    requiredGrant: PERMISSIONS.WORKFLOW_INSTANCE_PAGE,
     component: () => import('@/views/workflow/WorkflowMyInstancesView.vue'),
   },
   {
@@ -188,6 +189,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'workflow-todo',
     title: '我的待办',
     icon: 'Tickets',
+    requiredGrant: PERMISSIONS.WORKFLOW_TODO_PAGE,
     component: () => import('@/views/workflow/WorkflowTodoView.vue'),
   },
   {
@@ -196,6 +198,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'workflow-done',
     title: '我的已办',
     icon: 'Document',
+    requiredGrant: PERMISSIONS.WORKFLOW_DONE_PAGE,
     component: () => import('@/views/workflow/WorkflowDoneView.vue'),
   },
   {
@@ -204,7 +207,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'codegen',
     title: '代码生成',
     icon: 'Document',
-    requiredGrant: PERMISSIONS.CODEGEN_READ,
+    requiredGrant: PERMISSIONS.CODEGEN_PAGE,
     component: () => import('@/views/platform/CodegenView.vue'),
   },
   {
@@ -221,7 +224,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'dicts',
     title: '字典管理',
     icon: 'Tickets',
-    requiredGrant: PERMISSIONS.SYSTEM_READ,
+    requiredGrant: PERMISSIONS.SYSDICT_PAGE,
     component: () => import('@/views/system/SystemDictsView.vue'),
   },
   {
@@ -230,7 +233,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'configs',
     title: '参数管理',
     icon: 'Setting',
-    requiredGrant: PERMISSIONS.SYSTEM_READ,
+    requiredGrant: PERMISSIONS.SYSCONFIG_PAGE,
     component: () => import('@/views/system/SystemConfigsView.vue'),
   },
   {
@@ -239,7 +242,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'mail-channel',
     title: '邮件配置',
     icon: 'Message',
-    requiredGrant: PERMISSIONS.SYSTEM_READ,
+    requiredGrant: PERMISSIONS.SYSMAIL_PAGE,
     component: () => import('@/views/system/MailChannelView.vue'),
   },
   {
@@ -248,7 +251,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'notices',
     title: '公告管理',
     icon: 'Tickets',
-    requiredGrant: PERMISSIONS.SYSTEM_READ,
+    requiredGrant: PERMISSIONS.SYSNOTICE_PAGE,
     component: () => import('@/views/system/SystemNoticesView.vue'),
   },
   {
@@ -257,7 +260,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'categories',
     title: '分类配置',
     icon: 'Tickets',
-    requiredGrant: PERMISSIONS.SYSTEM_READ,
+    requiredGrant: PERMISSIONS.SYSCATEGORY_PAGE,
     component: () => import('@/views/system/SystemCategoriesView.vue'),
   },
   {
@@ -266,7 +269,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'settings',
     title: '系统设置',
     icon: 'Setting',
-    requiredGrant: PERMISSIONS.SYSTEM_READ,
+    requiredGrant: PERMISSIONS.SYSTEM_PAGE,
     component: () => import('@/views/system/SystemManagementView.vue'),
   },
   {
@@ -274,7 +277,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'settings-dicts',
     title: '字典管理',
     hidden: true,
-    requiredGrant: PERMISSIONS.SYSTEM_READ,
+    requiredGrant: PERMISSIONS.SYSDICT_PAGE,
     component: () => import('@/views/system/SystemDictsView.vue'),
   },
   {
@@ -282,7 +285,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'settings-configs',
     title: '参数配置',
     hidden: true,
-    requiredGrant: PERMISSIONS.SYSTEM_READ,
+    requiredGrant: PERMISSIONS.SYSCONFIG_PAGE,
     component: () => import('@/views/system/SystemConfigsView.vue'),
   },
   {
@@ -290,7 +293,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'settings-mail-channel',
     title: '邮件配置',
     hidden: true,
-    requiredGrant: PERMISSIONS.SYSTEM_READ,
+    requiredGrant: PERMISSIONS.SYSMAIL_PAGE,
     component: () => import('@/views/system/MailChannelView.vue'),
   },
   {
@@ -298,7 +301,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'settings-notices',
     title: '公告管理',
     hidden: true,
-    requiredGrant: PERMISSIONS.SYSTEM_READ,
+    requiredGrant: PERMISSIONS.SYSNOTICE_PAGE,
     component: () => import('@/views/system/SystemNoticesView.vue'),
   },
   {
@@ -306,7 +309,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'settings-categories',
     title: '分类配置',
     hidden: true,
-    requiredGrant: PERMISSIONS.SYSTEM_READ,
+    requiredGrant: PERMISSIONS.SYSCATEGORY_PAGE,
     component: () => import('@/views/system/SystemCategoriesView.vue'),
   },
   {

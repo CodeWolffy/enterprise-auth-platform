@@ -46,16 +46,16 @@
               </el-select>
               <el-button
                 v-if="selectedDataSource?.external && !selectedDataSource.externalAuthorized"
-                v-permission="'codegen:write'"
+                v-permission="'upms:codegen:edit'"
                 type="warning"
                 :loading="authorizingDataSource"
                 @click="authorizeSelectedDataSource"
               >确认授权</el-button>
               <el-button :disabled="!selectedDataSourceId || selectedDataSourceLocked" :loading="testingDataSource" @click="testSelectedDataSource">测试连接</el-button>
-              <el-button v-permission="'codegen:write'" :disabled="selectedTableNames.length === 0 || !selectedDataSourceId || selectedDataSourceLocked" :loading="importingTables" @click="importSelectedTables">导入配置</el-button>
+              <el-button v-permission="'upms:codegen:add'" :disabled="selectedTableNames.length === 0 || !selectedDataSourceId || selectedDataSourceLocked" :loading="importingTables" @click="importSelectedTables">导入配置</el-button>
               <el-button :loading="importedLoading" @click="loadImportedTables">已导入配置</el-button>
               <el-button :loading="loading" @click="loadTables">刷新表</el-button>
-              <el-button v-permission="'codegen:write'" type="primary" :disabled="!canGenerate" :loading="generating" @click="generateFiles">生成到隔离目录</el-button>
+              <el-button v-permission="'upms:codegen:add'" type="primary" :disabled="!canGenerate" :loading="generating" @click="generateFiles">生成到隔离目录</el-button>
             </div>
           </div>
 
@@ -128,8 +128,8 @@
                 <div class="scope-row">
                   <el-checkbox v-model="form.includeBackend" @change="markPreviewStale">后端</el-checkbox>
                   <el-checkbox v-model="form.includeFrontend" @change="markPreviewStale">前端</el-checkbox>
-                  <el-checkbox v-model="form.overwrite" v-permission="'codegen:write'">允许覆盖</el-checkbox>
-                  <el-checkbox v-model="form.autoRegister" v-permission="'codegen:write'" @change="markPreviewStale">自动注册菜单权限</el-checkbox>
+                  <el-checkbox v-model="form.overwrite" v-permission="'upms:codegen:add'">允许覆盖</el-checkbox>
+                  <el-checkbox v-model="form.autoRegister" v-permission="'upms:codegen:add'" @change="markPreviewStale">自动注册菜单权限</el-checkbox>
                 </div>
                 <el-alert
                   class="safety-alert"
@@ -241,7 +241,7 @@
               <h3>生成模板</h3>
               <p class="muted-line">用 <code>&#123;&#123;className&#125;&#125;</code> 等占位符编写代码生成模板，按路径匹配覆盖默认实现。</p>
             </div>
-            <el-button v-permission="'codegen:write'" type="primary" @click="openTemplateDialog()">新增模板</el-button>
+            <el-button v-permission="'upms:codegen:add'" type="primary" @click="openTemplateDialog()">新增模板</el-button>
           </div>
           <AdvancedSearch @search="applyTemplateSearch" @reset="resetTemplateSearch">
             <el-form-item label="关键字">
@@ -272,7 +272,7 @@
             <el-table-column fixed="right" label="操作" width="200">
               <template #default="{ row }">
                 <el-button link type="primary" @click="openTemplateDialog(row)">编辑</el-button>
-                <el-button v-permission="'codegen:write'" :disabled="row.builtin" link type="danger" @click="removeTemplate(row)">删除</el-button>
+                <el-button v-permission="'upms:codegen:del'" :disabled="row.builtin" link type="danger" @click="removeTemplate(row)">删除</el-button>
               </template>
             </el-table-column>
             <template #empty>

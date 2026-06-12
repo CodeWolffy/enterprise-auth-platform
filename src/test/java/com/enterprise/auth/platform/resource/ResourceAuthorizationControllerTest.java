@@ -85,7 +85,7 @@ class ResourceAuthorizationControllerTest {
     @Test
     void updateSystemMenuShouldRejectIdentityFieldChanges() throws Exception {
         mockMvc.perform(put("/api/menus/{menuId}", 20L)
-                        .with(bearer(principal("platform", Set.of("system:write"))))
+                        .with(bearer(principal("platform", Set.of("upms:sysmenu:edit"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -112,7 +112,7 @@ class ResourceAuthorizationControllerTest {
     @Test
     void createMenuShouldRejectDuplicateRouteKey() throws Exception {
         mockMvc.perform(post("/api/menus")
-                        .with(bearer(principal("platform", Set.of("system:write"))))
+                        .with(bearer(principal("platform", Set.of("upms:sysmenu:edit"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -122,7 +122,7 @@ class ResourceAuthorizationControllerTest {
                                   "resourceKey": "ut.duplicate.route",
                                   "menuName": "UT Duplicate Route",
                                   "routeKey": "users",
-                                  "grantKey": "user:read",
+                                  "grantKey": "upms:sysuser:get",
                                   "path": "/ut/duplicate-route",
                                   "component": "UsersView",
                                   "icon": null,
@@ -139,7 +139,7 @@ class ResourceAuthorizationControllerTest {
     @Test
     void updateMenuShouldRejectDescendantAsParent() throws Exception {
         mockMvc.perform(put("/api/menus/{menuId}", 20L)
-                        .with(bearer(principal("platform", Set.of("system:write"))))
+                        .with(bearer(principal("platform", Set.of("upms:sysmenu:edit"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -166,7 +166,7 @@ class ResourceAuthorizationControllerTest {
     @Test
     void createMenuShouldRequireRouteAndGrantFields() throws Exception {
         mockMvc.perform(post("/api/menus")
-                        .with(bearer(principal("platform", Set.of("system:write"))))
+                        .with(bearer(principal("platform", Set.of("upms:sysmenu:edit"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -193,7 +193,7 @@ class ResourceAuthorizationControllerTest {
     @Test
     void createButtonShouldRequireMenuParentAndGrantKey() throws Exception {
         mockMvc.perform(post("/api/menus")
-                        .with(bearer(principal("platform", Set.of("system:write"))))
+                        .with(bearer(principal("platform", Set.of("upms:sysmenu:edit"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -222,7 +222,7 @@ class ResourceAuthorizationControllerTest {
         AtomicReference<String> tokenRef = new AtomicReference<>();
 
         mockMvc.perform(post("/api/menus")
-                        .with(bearerWithSnapshotCapture(principal("platform", Set.of("system:write", "stale:grant")), tokenRef))
+                        .with(bearerWithSnapshotCapture(principal("platform", Set.of("upms:sysmenu:edit", "stale:grant")), tokenRef))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -232,7 +232,7 @@ class ResourceAuthorizationControllerTest {
                                   "resourceKey": "ut.menu.reuse.button",
                                   "menuName": "UT Reuse Button",
                                   "routeKey": null,
-                                  "grantKey": "user:read",
+                                  "grantKey": "upms:sysuser:get",
                                   "path": null,
                                   "component": null,
                                   "icon": null,
@@ -242,14 +242,14 @@ class ResourceAuthorizationControllerTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.grantKey").value("user:read"));
+                .andExpect(jsonPath("$.data.grantKey").value("upms:sysuser:get"));
 
         Long count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM sys_menu WHERE tenant_id = ? AND resource_key = ? AND grant_key = ?",
                 Long.class,
                 "platform",
                 "ut.menu.reuse.button",
-                "user:read"
+                "upms:sysuser:get"
         );
         assertThat(count).isEqualTo(1L);
         verify(authPrincipalCacheService).evictAll();
@@ -265,7 +265,7 @@ class ResourceAuthorizationControllerTest {
         Long menuId = createTempMenu();
 
         mockMvc.perform(post("/api/menus/{menuId}/actions", menuId)
-                        .with(bearer(principal("platform", Set.of("system:write"))))
+                        .with(bearer(principal("platform", Set.of("upms:sysmenu:edit"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -274,8 +274,8 @@ class ResourceAuthorizationControllerTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[?(@.resourceKey=='ut.menu.batch.actions:read')]").exists())
-                .andExpect(jsonPath("$.data[?(@.grantKey=='utbatch:read')]").exists())
+                .andExpect(jsonPath("$.data[?(@.resourceKey=='upms:ut.menu.batch.actions:read')]").exists())
+                .andExpect(jsonPath("$.data[?(@.grantKey=='upms:utbatch:read')]").exists())
                 .andExpect(jsonPath("$.data[?(@.resourceKey=='ut.menu.batch.actions:create')]").exists())
                 .andExpect(jsonPath("$.data[?(@.grantKey=='utbatch:create')]").exists());
 
@@ -301,7 +301,7 @@ class ResourceAuthorizationControllerTest {
         );
 
         mockMvc.perform(delete("/api/menus/{menuId}", menuId)
-                        .with(bearer(principal("platform", Set.of("system:write"))))
+                        .with(bearer(principal("platform", Set.of("upms:sysmenu:edit"))))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"))
@@ -334,7 +334,7 @@ class ResourceAuthorizationControllerTest {
     @Test
     void tenantCannotMutatePlatformMenuTemplate() throws Exception {
         mockMvc.perform(post("/api/menus")
-                        .with(bearer(principal("tenant-a", Set.of("system:write"))))
+                        .with(bearer(principal("tenant-a", Set.of("upms:sysmenu:edit"))))
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -344,7 +344,7 @@ class ResourceAuthorizationControllerTest {
                                   "resourceKey": "ut.menu.tenant.boundary",
                                   "menuName": "UT Tenant Boundary",
                                   "routeKey": null,
-                                  "grantKey": "user:read",
+                                  "grantKey": "upms:sysuser:get",
                                   "path": null,
                                   "component": null,
                                   "icon": null,
@@ -363,7 +363,7 @@ class ResourceAuthorizationControllerTest {
         Long roleId = createTempRole("tenant-a");
 
         mockMvc.perform(put("/api/roles/{roleId}/menus", roleId)
-                        .with(bearer(principal("tenant-a", Set.of("role:write"))))
+                        .with(bearer(principal("tenant-a", Set.of("upms:sysrole:edit"))))
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -377,7 +377,7 @@ class ResourceAuthorizationControllerTest {
                 .andExpect(jsonPath("$.data[?(@==21)]").exists());
 
         mockMvc.perform(get("/api/roles/{roleId}/menus", roleId)
-                        .with(bearer(principal("tenant-a", Set.of("role:read"))))
+                        .with(bearer(principal("tenant-a", Set.of("upms:sysrole:get"))))
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[?(@==1)]").exists())
@@ -390,7 +390,7 @@ class ResourceAuthorizationControllerTest {
         Long roleId = createTempRole("tenant-a");
 
         mockMvc.perform(put("/api/roles/{roleId}/menus", roleId)
-                        .with(bearer(principal("tenant-a", Set.of("role:write"))))
+                        .with(bearer(principal("tenant-a", Set.of("upms:sysrole:edit"))))
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -418,7 +418,7 @@ class ResourceAuthorizationControllerTest {
         Long roleId = createTempRole("tenant-a");
 
         mockMvc.perform(put("/api/roles/{roleId}/menus", roleId)
-                        .with(bearer(principal("tenant-a", Set.of("role:write"))))
+                        .with(bearer(principal("tenant-a", Set.of("upms:sysrole:edit"))))
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -459,7 +459,7 @@ class ResourceAuthorizationControllerTest {
                 "ut.menu.batch.actions",
                 "UT 批量按钮菜单",
                 "ut-batch-actions",
-                "utbatch:read",
+                "upms:utbatch:read",
                 "/ut/batch-actions",
                 "UtBatchActionsView",
                 null,

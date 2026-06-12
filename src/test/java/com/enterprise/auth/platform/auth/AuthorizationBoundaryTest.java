@@ -45,7 +45,7 @@ class AuthorizationBoundaryTest {
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
         mockMvc.perform(get("/api/users")
-                        .with(bearer(principal(Set.of("user:read"))))
+                        .with(bearer(principal(Set.of("upms:sysuser:get"))))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"));
@@ -65,7 +65,7 @@ class AuthorizationBoundaryTest {
                 """;
 
         mockMvc.perform(post("/api/users")
-                        .with(bearer(principal(Set.of("user:read"))))
+                        .with(bearer(principal(Set.of("upms:sysuser:get"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(invalidPayload))
@@ -73,7 +73,7 @@ class AuthorizationBoundaryTest {
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
         mockMvc.perform(post("/api/users")
-                        .with(bearer(principal(Set.of("user:write"))))
+                        .with(bearer(principal(Set.of("upms:sysuser:edit"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(invalidPayload))
@@ -84,19 +84,19 @@ class AuthorizationBoundaryTest {
     @Test
     void departmentReadAndWriteShouldUseSeparatePermissionKeys() throws Exception {
         mockMvc.perform(get("/api/depts")
-                        .with(bearer(principal(Set.of("dept:write"))))
+                        .with(bearer(principal(Set.of("upms:sysdept:edit"))))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
         mockMvc.perform(get("/api/depts")
-                        .with(bearer(principal(Set.of("dept:read"))))
+                        .with(bearer(principal(Set.of("upms:sysdept:get"))))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"));
 
         mockMvc.perform(post("/api/depts")
-                        .with(bearer(principal(Set.of("dept:read"))))
+                        .with(bearer(principal(Set.of("upms:sysdept:get"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -114,19 +114,19 @@ class AuthorizationBoundaryTest {
     @Test
     void auditWriteEndpointsShouldRequireAuditWritePermission() throws Exception {
         mockMvc.perform(get("/api/audit/events/export")
-                        .with(bearer(principal(Set.of("audit:read"))))
+                        .with(bearer(principal(Set.of("upms:audit:get"))))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
         mockMvc.perform(post("/api/audit/exports")
-                        .with(bearer(principal(Set.of("audit:read"))))
+                        .with(bearer(principal(Set.of("upms:audit:get"))))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
         mockMvc.perform(put("/api/audit/exports/policy")
-                        .with(bearer(principal(Set.of("audit:read"))))
+                        .with(bearer(principal(Set.of("upms:audit:get"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -142,7 +142,7 @@ class AuthorizationBoundaryTest {
     @Test
     void systemAndResourceWriteEndpointsShouldRequireSystemWritePermission() throws Exception {
         mockMvc.perform(post("/api/system/dicts")
-                        .with(bearer(principal(Set.of("system:read"))))
+                        .with(bearer(principal(Set.of("upms:system:get"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -156,7 +156,7 @@ class AuthorizationBoundaryTest {
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
         mockMvc.perform(post("/api/menus")
-                        .with(bearer(principal(Set.of("system:read"))))
+                        .with(bearer(principal(Set.of("upms:system:get"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -166,7 +166,7 @@ class AuthorizationBoundaryTest {
                                   "resourceKey": "auth.boundary",
                                   "menuName": "Auth Boundary",
                                   "routeKey": "auth-boundary",
-                                  "grantKey": "auth:read",
+                                  "grantKey": "upms:session:get",
                                   "path": "/auth-boundary",
                                   "component": "AuthBoundaryView",
                                   "icon": null,
@@ -191,7 +191,7 @@ class AuthorizationBoundaryTest {
                 .andExpect(jsonPath("$.data.tenantId").value("platform"))
                 .andExpect(jsonPath("$.data.operatorTenantId").value("platform"))
                 .andExpect(jsonPath("$.data.roles[?(@ == 'ADMIN')]").exists())
-                .andExpect(jsonPath("$.data.grants[?(@ == 'user:read')]").exists())
+                .andExpect(jsonPath("$.data.grants[?(@ == 'upms:sysuser:get')]").exists())
                 .andExpect(jsonPath("$.data.menus").isArray())
                 .andExpect(jsonPath("$.data.menus..routeKey").exists())
                 .andExpect(jsonPath("$.data.menus..path").exists())
@@ -203,7 +203,7 @@ class AuthorizationBoundaryTest {
   void allScopeSessionsShouldFallBackToOwnSessionsWithoutSessionWritePermission() throws Exception {
     mockMvc.perform(get("/api/auth/sessions")
         .queryParam("scope", "all")
-        .with(bearer(principal(1L, Set.of("auth:read"))))
+        .with(bearer(principal(1L, Set.of("upms:session:get"))))
         .header("X-Tenant-Id", "platform"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.records[?(@.currentSession==true)]").exists());

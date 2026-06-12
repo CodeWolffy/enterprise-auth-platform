@@ -91,7 +91,7 @@ class UserManagementServiceTest {
     void shouldRejectCreatingUserInHiddenDepartment() {
         TenantContext.setTenantId("tenant-a");
         Long scopeUserId = ensureUser("tenant-a", SCOPE_USER, 2L);
-        authenticateScopedUser(scopeUserId, "user:write");
+        authenticateScopedUser(scopeUserId, "upms:sysuser:edit");
 
         assertThatThrownBy(() -> userManagementService.create(new CreateUserRequest(
                 CREATED_USER,
@@ -112,7 +112,7 @@ class UserManagementServiceTest {
         TenantContext.setTenantId("tenant-a");
         Long scopeUserId = ensureUser("tenant-a", SCOPE_USER, 2L);
         Long hiddenUserId = ensureUser("tenant-a", HIDDEN_USER, 3L);
-        authenticateScopedUser(scopeUserId, "user:write");
+        authenticateScopedUser(scopeUserId, "upms:sysuser:edit");
 
         assertThatThrownBy(() -> userManagementService.update(hiddenUserId, new CreateUserRequest(
                 null,
@@ -133,7 +133,7 @@ class UserManagementServiceTest {
         TenantContext.setTenantId("tenant-a");
         ensureUser("platform", CROSS_TENANT_USER, 1L);
         Long scopeUserId = ensureUser("tenant-a", SCOPE_USER, 2L);
-        authenticateScopedUser(scopeUserId, "user:write");
+        authenticateScopedUser(scopeUserId, "upms:sysuser:edit");
 
         assertThatThrownBy(() -> userManagementService.create(new CreateUserRequest(
                 CROSS_TENANT_USER,
@@ -155,7 +155,7 @@ class UserManagementServiceTest {
     void shouldRejectDeletingCurrentUser() {
         TenantContext.setTenantId("tenant-a");
         Long currentUserId = ensureUser("tenant-a", SCOPE_USER, 2L);
-        authenticateScopedUser(currentUserId, "user:write");
+        authenticateScopedUser(currentUserId, "upms:sysuser:edit");
 
         assertThatThrownBy(() -> userManagementService.delete(currentUserId))
                 .isInstanceOf(BusinessException.class)
@@ -166,7 +166,7 @@ class UserManagementServiceTest {
     void shouldRejectDisablingCurrentUser() {
         TenantContext.setTenantId("tenant-a");
         Long currentUserId = ensureUser("tenant-a", SCOPE_USER, 2L);
-        authenticateScopedUser(currentUserId, "user:write");
+        authenticateScopedUser(currentUserId, "upms:sysuser:edit");
 
         assertThatThrownBy(() -> userManagementService.update(currentUserId, new CreateUserRequest(
                 null,
@@ -187,7 +187,7 @@ class UserManagementServiceTest {
         TenantContext.setTenantId("tenant-a");
         Long currentUserId = ensureUser("tenant-a", SCOPE_USER, 2L);
         ensureRole("tenant-a", ADMIN_ROLE);
-        authenticateScopedUser(currentUserId, "user:write");
+        authenticateScopedUser(currentUserId, "upms:sysuser:edit");
 
         assertThatThrownBy(() -> userManagementService.assignRoles(currentUserId, Set.of()))
                 .isInstanceOf(BusinessException.class)

@@ -92,7 +92,7 @@ class FileControllerP1Test {
 
     @Test
     void commonUploadShouldRejectPrivateVisibility() throws Exception {
-        UserAccount principal = principal(Set.of("file:write"));
+        UserAccount principal = principal(Set.of("upms:file:add"));
         MockMultipartFile file = new MockMultipartFile(
                 "file",
                 "avatar.png",
@@ -112,7 +112,7 @@ class FileControllerP1Test {
 
     @Test
     void commonUploadShouldAcceptOwnerVisibility() throws Exception {
-        UserAccount principal = principal(Set.of("file:write"));
+        UserAccount principal = principal(Set.of("upms:file:add"));
         MockMultipartFile file = new MockMultipartFile(
                 "file",
                 "avatar.png",
@@ -227,7 +227,7 @@ class FileControllerP1Test {
                 passwordHasher.hash("FileTest@123"),
                 true,
                 Set.of("ADMIN"),
-                Set.of(PermissionCodes.FILE_READ, PermissionCodes.FILE_WRITE, PermissionCodes.TENANT_READ),
+                Set.of(PermissionCodes.FILE_PAGE, PermissionCodes.FILE_ADD, PermissionCodes.SYSTENANT_GET),
                 Set.of(),
                 DataScopeType.ALL,
                 1

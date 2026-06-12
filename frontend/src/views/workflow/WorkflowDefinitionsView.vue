@@ -26,8 +26,8 @@
           <p class="muted-line">内置轻量状态机先验证顺序审批、候选人/候选组和变量快照，后续再决定是否替换为外部流程引擎。</p>
         </div>
         <div class="panel-actions">
-          <el-button v-permission="'workflow:write'" @click="openCreateDialog">JSON 新增</el-button>
-          <el-button v-permission="'workflow:write'" type="primary" @click="openDesigner">打开设计器</el-button>
+          <el-button v-permission="'upms:workflowdefinition:add'" @click="openCreateDialog">JSON 新增</el-button>
+          <el-button v-permission="'upms:workflowdesigner:page'" type="primary" @click="openDesigner">打开设计器</el-button>
         </div>
       </div>
 
@@ -70,8 +70,8 @@
         <el-table-column fixed="right" label="操作" width="230">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
-            <el-button v-if="row.status === 'DRAFT'" v-permission="'workflow:write'" link type="primary" @click="deployDefinition(row)">部署</el-button>
-            <el-button v-if="row.status === 'DEPLOYED'" v-permission="'workflow:write'" link type="danger" @click="disableDefinition(row)">停用</el-button>
+            <el-button v-if="row.status === 'DRAFT'" v-permission="'upms:workflowdefinition:deploy'" link type="primary" @click="deployDefinition(row)">部署</el-button>
+            <el-button v-if="row.status === 'DEPLOYED'" v-permission="'upms:workflowdefinition:deploy'" link type="danger" @click="disableDefinition(row)">停用</el-button>
           </template>
         </el-table-column>
         <template #empty>
@@ -111,7 +111,7 @@
       </el-form>
       <template #footer>
         <el-button @click="createVisible = false">取消</el-button>
-        <el-button v-permission="'workflow:write'" type="primary" :loading="submitting" @click="submitDefinition">保存草稿</el-button>
+        <el-button v-permission="'upms:workflowdefinition:add'" type="primary" :loading="submitting" @click="submitDefinition">保存草稿</el-button>
       </template>
     </el-dialog>
 

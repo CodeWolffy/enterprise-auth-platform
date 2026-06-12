@@ -19,7 +19,7 @@
           <span class="eyebrow">参数</span>
           <h3>参数管理</h3>
         </div>
-        <el-button v-permission="'system:write'" type="primary" @click="openConfig()">新增参数</el-button>
+        <el-button v-permission="'upms:sysconfig:add'" type="primary" @click="openConfig()">新增参数</el-button>
       </div>
 
       <AdvancedSearch @search="handleSearch" @reset="resetSearch">
@@ -134,8 +134,8 @@
         >
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
-            <el-button v-permission="'system:write'" link type="primary" @click="openConfig(row)">编辑</el-button>
-            <el-button v-permission="'system:write'" link type="danger" @click="removeConfig(row.id)">删除</el-button>
+            <el-button v-permission="'upms:sysconfig:edit'" link type="primary" @click="openConfig(row)">编辑</el-button>
+            <el-button v-permission="'upms:sysconfig:del'" link type="danger" @click="removeConfig(row.id)">删除</el-button>
           </template>
         </el-table-column>
         <template #empty>
@@ -183,7 +183,7 @@
       </el-form>
       <template #footer>
         <el-button @click="visible = false">取消</el-button>
-        <el-button v-permission="'system:write'" type="primary" @click="submit">保存</el-button>
+        <el-button v-permission="['upms:sysconfig:add', 'upms:sysconfig:edit']" type="primary" @click="submit">保存</el-button>
       </template>
     </el-dialog>
   </div>

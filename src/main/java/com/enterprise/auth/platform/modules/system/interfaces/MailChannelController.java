@@ -42,7 +42,7 @@ public class MailChannelController {
 
     @Operation(summary = "查询邮件渠道预设列表")
     @GetMapping("/presets")
-    @SaCheckPermission(PermissionCodes.SYSTEM_READ)
+    @SaCheckPermission(PermissionCodes.SYSMAIL_GET)
     public ApiResponse<List<Map<String, Object>>> presets() {
         List<Map<String, Object>> list = Arrays.stream(MailChannelPreset.values())
                 .map(preset -> {
@@ -61,21 +61,21 @@ public class MailChannelController {
 
     @Operation(summary = "查询当前租户的邮件渠道配置")
     @GetMapping
-    @SaCheckPermission(PermissionCodes.SYSTEM_READ)
+    @SaCheckPermission(PermissionCodes.SYSMAIL_GET)
     public ApiResponse<MailChannelResponse> getChannel() {
         return ApiResponse.ok(mailChannelService.getVisibleChannel(currentTenant()).orElse(null));
     }
 
     @Operation(summary = "保存或更新当前租户的邮件渠道配置")
     @PostMapping
-    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
+    @SaCheckPermission(PermissionCodes.SYSMAIL_EDIT)
     public ApiResponse<MailChannelResponse> saveChannel(@Valid @RequestBody MailChannelRequest request) {
         return ApiResponse.ok(mailChannelService.saveOrUpdate(request));
     }
 
     @Operation(summary = "删除当前租户的邮件渠道配置")
     @DeleteMapping
-    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
+    @SaCheckPermission(PermissionCodes.SYSMAIL_DEL)
     public ApiResponse<Void> deleteChannel() {
         mailChannelService.deleteChannel();
         return ApiResponse.ok();
@@ -84,7 +84,7 @@ public class MailChannelController {
     @Operation(summary = "发送测试邮件")
     @RateLimit(key = "mail-channel-test", strategy = RateLimit.Strategy.USER_AND_IP, capacity = 3, refillTokens = 3, refillDurationSeconds = 60)
     @PostMapping("/test")
-    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
+    @SaCheckPermission(PermissionCodes.SYSMAIL_EDIT)
     public ApiResponse<Map<String, Object>> testSend(
             @Parameter(description = "接收测试邮件的邮箱地址") @RequestParam @NotBlank @Email String toEmail
     ) {

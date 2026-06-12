@@ -10,10 +10,10 @@
       </div>
       <div class="designer-hero__actions">
         <el-button @click="resetDesigner">重置</el-button>
-        <el-button v-permission="'workflow:write'" type="primary" plain :disabled="Boolean(validationIssue)" :loading="submitting" @click="saveDefinition(false)">
+        <el-button v-permission="'upms:workflowdefinition:add'" type="primary" plain :disabled="Boolean(validationIssue)" :loading="submitting" @click="saveDefinition(false)">
           保存草稿
         </el-button>
-        <el-button v-permission="'workflow:write'" type="primary" :disabled="Boolean(validationIssue)" :loading="submitting" @click="saveDefinition(true)">
+        <el-button v-permission="['upms:workflowdefinition:add', 'upms:workflowdefinition:deploy']" type="primary" :disabled="Boolean(validationIssue)" :loading="submitting" @click="saveDefinition(true)">
           保存并部署
         </el-button>
       </div>

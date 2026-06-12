@@ -42,21 +42,21 @@ public class RoleController {
 
     @Operation(summary = "查询角色列表")
     @GetMapping
-    @SaCheckPermission(PermissionCodes.ROLE_READ)
+    @SaCheckPermission(PermissionCodes.SYSROLE_PAGE)
     public ApiResponse<List<CatalogService.RoleView>> list() {
         return ApiResponse.ok(catalogService.roles());
     }
 
     @Operation(summary = "新增角色")
     @PostMapping
-    @SaCheckPermission(PermissionCodes.ROLE_WRITE)
+    @SaCheckPermission(PermissionCodes.SYSROLE_ADD)
     public ApiResponse<CatalogService.RoleView> create(@Valid @RequestBody CreateRoleRequest request) {
         return ApiResponse.ok(roleManagementService.create(request));
     }
 
     @Operation(summary = "修改角色")
     @PutMapping("/{roleId}")
-    @SaCheckPermission(PermissionCodes.ROLE_WRITE)
+    @SaCheckPermission(PermissionCodes.SYSROLE_EDIT)
     public ApiResponse<CatalogService.RoleView> update(
             @Parameter(description = "角色 ID") @PathVariable Long roleId,
             @Valid @RequestBody CreateRoleRequest request
@@ -66,14 +66,14 @@ public class RoleController {
 
     @Operation(summary = "查询角色已分配菜单")
     @GetMapping("/{roleId}/menus")
-    @SaCheckPermission(PermissionCodes.ROLE_READ)
+    @SaCheckPermission(PermissionCodes.SYSROLE_GET)
     public ApiResponse<Set<Long>> assignedMenus(@Parameter(description = "角色 ID") @PathVariable Long roleId) {
         return ApiResponse.ok(roleGrantQueryFacade.listRoleMenuIds(roleId));
     }
 
     @Operation(summary = "分配角色菜单")
     @PutMapping("/{roleId}/menus")
-    @SaCheckPermission(PermissionCodes.ROLE_WRITE)
+    @SaCheckPermission(PermissionCodes.SYSROLE_EDIT)
     public ApiResponse<Set<Long>> assignMenus(
             @Parameter(description = "角色 ID") @PathVariable Long roleId,
             @Valid @RequestBody AssignMenusRequest request
@@ -83,14 +83,14 @@ public class RoleController {
 
     @Operation(summary = "查询角色删除影响")
     @GetMapping("/{roleId}/impact")
-    @SaCheckPermission(PermissionCodes.ROLE_READ)
+    @SaCheckPermission(PermissionCodes.SYSROLE_GET)
     public ApiResponse<RoleManagementService.RoleImpactView> impact(@Parameter(description = "角色 ID") @PathVariable Long roleId) {
         return ApiResponse.ok(roleManagementService.impact(roleId));
     }
 
     @Operation(summary = "删除角色")
     @DeleteMapping("/{roleId}")
-    @SaCheckPermission(PermissionCodes.ROLE_WRITE)
+    @SaCheckPermission(PermissionCodes.SYSROLE_DEL)
     public ApiResponse<Void> delete(@Parameter(description = "角色 ID") @PathVariable Long roleId) {
         roleManagementService.delete(roleId);
         return ApiResponse.ok();

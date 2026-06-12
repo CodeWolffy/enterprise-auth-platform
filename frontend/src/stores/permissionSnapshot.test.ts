@@ -18,8 +18,8 @@ describe('permissionSnapshot store', () => {
     store.setSnapshot(snapshot({ superAdmin: false }))
 
     expect(store.menuItems.map((item) => item.path)).toEqual(['/dashboard', '/system/users'])
-    expect(store.hasGrant('user:read')).toBe(true)
-    expect(store.hasGrant(['role:read', 'user:write'])).toBe(false)
+    expect(store.hasGrant('upms:sysuser:page')).toBe(true)
+    expect(store.hasGrant(['upms:sysrole:page', 'upms:sysuser:add'])).toBe(false)
   })
 
   it('allows all grants for super admin', () => {
@@ -39,7 +39,7 @@ function snapshot(options: { superAdmin: boolean }): PermissionSnapshot {
     operatorTenantId: 'tenant-a',
     superAdmin: options.superAdmin,
     roles: ['USER'],
-    grants: ['user:read'],
+    grants: ['upms:sysuser:page'],
     dataScopeType: 'ALL',
     customDeptIds: [],
     menus: [

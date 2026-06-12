@@ -29,7 +29,7 @@
           <span class="eyebrow">角色</span>
           <h3>角色管理</h3>
         </div>
-        <el-button v-permission="'role:write'" type="primary" @click="openRole()">新增角色</el-button>
+        <el-button v-permission="'upms:sysrole:add'" type="primary" @click="openRole()">新增角色</el-button>
       </div>
 
       <AdvancedSearch @search="handleSearch" @reset="resetSearch">
@@ -124,9 +124,9 @@
         <el-table-column v-if="roleTablePrefs.visibleColumnMap.actions" column-key="actions" fixed="right" label="操作" width="320">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
-            <el-button v-permission="'role:write'" link type="primary" @click="openRole(row)">编辑</el-button>
-            <el-button v-permission="'role:write'" link type="primary" @click="openMenuAssignment(row)">分配权限</el-button>
-            <el-button v-permission="'role:write'" link type="danger" @click="removeRole(row)">删除</el-button>
+            <el-button v-permission="'upms:sysrole:edit'" link type="primary" @click="openRole(row)">编辑</el-button>
+            <el-button v-permission="'upms:sysrole:edit'" link type="primary" @click="openMenuAssignment(row)">分配权限</el-button>
+            <el-button v-permission="'upms:sysrole:del'" link type="danger" @click="removeRole(row)">删除</el-button>
           </template>
         </el-table-column>
         <template #empty>
@@ -233,7 +233,7 @@
       </el-form>
       <template #footer>
         <el-button @click="roleVisible = false">取消</el-button>
-        <el-button v-permission="'role:write'" type="primary" @click="submitRole">保存</el-button>
+        <el-button v-permission="['upms:sysrole:add', 'upms:sysrole:edit']" type="primary" @click="submitRole">保存</el-button>
       </template>
     </el-dialog>
 
@@ -281,7 +281,7 @@
       </el-tree>
       <template #footer>
         <el-button @click="menuVisible = false">取消</el-button>
-        <el-button v-permission="'role:write'" type="primary" @click="submitMenuAssignment">保存</el-button>
+        <el-button v-permission="'upms:sysrole:edit'" type="primary" @click="submitMenuAssignment">保存</el-button>
       </template>
     </el-dialog>
   </div>

@@ -179,7 +179,7 @@ class AuthControllerSessionFlowTest {
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.username").value("admin"))
                 .andExpect(jsonPath("$.data.tenantId").value("platform"))
-                .andExpect(jsonPath("$.data.grants[?(@=='tenant:read')]").exists());
+                .andExpect(jsonPath("$.data.grants[?(@=='upms:systenant:get')]").exists());
 
         SaSession tokenSession = StpUtil.getTokenSessionByToken(token);
         Assertions.assertEquals("platform", tokenSession.get("permissionsTenantId"));
@@ -393,8 +393,8 @@ class AuthControllerSessionFlowTest {
                 .andExpect(jsonPath("$.data.tenantId").value(TENANT_A))
                 .andExpect(jsonPath("$.data.operatorTenantId").value(TENANT_A))
                 .andExpect(jsonPath("$.data.superAdmin").value(false))
-                .andExpect(jsonPath("$.data.grants[?(@=='tenant:read')]").doesNotExist())
-                .andExpect(jsonPath("$.data.grants[?(@=='audit:read')]").exists());
+                .andExpect(jsonPath("$.data.grants[?(@=='upms:systenant:get')]").doesNotExist())
+                .andExpect(jsonPath("$.data.grants[?(@=='upms:audit:get')]").exists());
     }
 
     @Test

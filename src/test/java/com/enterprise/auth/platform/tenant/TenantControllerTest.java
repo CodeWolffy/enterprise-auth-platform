@@ -96,7 +96,7 @@ class TenantControllerTest {
     @Test
     void currentTenantResolvesFromHeader() throws Exception {
         mockMvc.perform(get("/api/tenants/current")
-                        .with(bearer(principal("tenant:read"), TENANT_ID))
+                        .with(bearer(principal("upms:systenant:get"), TENANT_ID))
                         .header("X-Tenant-Id", TENANT_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.tenantId").value(TENANT_ID));
@@ -106,7 +106,7 @@ class TenantControllerTest {
     void tenantHistoryShouldSupportFilters() throws Exception {
         long now = System.currentTimeMillis();
         mockMvc.perform(get("/api/tenants/{tenantId}/history", TENANT_ID)
-                        .with(bearer(principal("tenant:read"), TENANT_ID))
+                        .with(bearer(principal("upms:systenant:get"), TENANT_ID))
                         .header("X-Tenant-Id", TENANT_ID)
                         .param("changeType", "STATUS")
                         .param("operator", "test")
@@ -122,7 +122,7 @@ class TenantControllerTest {
     void tenantHistorySummaryShouldReturnTrajectoryOverview() throws Exception {
         long now = System.currentTimeMillis();
         mockMvc.perform(get("/api/tenants/{tenantId}/history/summary", TENANT_ID)
-                        .with(bearer(principal("tenant:read"), TENANT_ID))
+                        .with(bearer(principal("upms:systenant:get"), TENANT_ID))
                         .header("X-Tenant-Id", TENANT_ID)
                         .param("fromEpochMs", String.valueOf(now - SEVEN_DAYS_MS))
                         .param("toEpochMs", String.valueOf(now)))
@@ -136,7 +136,7 @@ class TenantControllerTest {
     @Test
     void tenantHistoryShouldRejectLocalDateTimeWithoutTimezone() throws Exception {
         mockMvc.perform(get("/api/tenants/{tenantId}/history", TENANT_ID)
-                        .with(bearer(principal("tenant:read"), TENANT_ID))
+                        .with(bearer(principal("upms:systenant:get"), TENANT_ID))
                         .header("X-Tenant-Id", TENANT_ID)
                         .param("fromEpochMs", "2026-03-01T00:00:00")
                         .param("toEpochMs", "2026-03-31T23:59:59"))
@@ -149,7 +149,7 @@ class TenantControllerTest {
         long authBeginAt = (System.currentTimeMillis() / 1000) * 1000;
         long expireAt = authBeginAt + 30L * 24 * 3600 * 1000;
 
-        UserAccount principal = principal("tenant:write");
+        UserAccount principal = principal("upms:systenant:edit");
         mockMvc.perform(post("/api/tenants")
                         .with(bearer(principal, "platform"))
                         .header("X-Tenant-Id", "platform")
@@ -216,7 +216,7 @@ class TenantControllerTest {
                 .andExpect(jsonPath("$.data.address").value("北京市朝阳区"));
 
         mockMvc.perform(get("/api/tenants")
-                        .with(bearer(principal("tenant:read"), "platform"))
+                        .with(bearer(principal("upms:systenant:get"), "platform"))
                         .header("X-Tenant-Id", "platform")
                         .param("keyword", "tenant-package-linkage-ut"))
                 .andExpect(status().isOk())
@@ -231,7 +231,7 @@ class TenantControllerTest {
     void tenantPackageLinkageShouldExposeSummaryAndKeepPackageDefinitionImmutable() throws Exception {
         seedLinkagePackage();
 
-        UserAccount principal = principal("tenant:write");
+        UserAccount principal = principal("upms:systenant:edit");
         mockMvc.perform(post("/api/tenants")
                         .with(bearer(principal, "platform"))
                         .header("X-Tenant-Id", "platform")
@@ -257,7 +257,7 @@ class TenantControllerTest {
                 .andExpect(jsonPath("$.data.capabilityCodes[0]").value(ORIGINAL_CAPABILITY));
 
         mockMvc.perform(get("/api/platform/tenants/{tenantId}/capability-summary", LINKAGE_TENANT_ID)
-                        .with(bearer(principal("tenant:read"), "platform"))
+                        .with(bearer(principal("upms:systenant:get"), "platform"))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.packageCapabilityCount").value(1))
@@ -290,7 +290,7 @@ class TenantControllerTest {
                 .andExpect(jsonPath("$.data.capabilityCodes[1]").value(EXTRA_CAPABILITY));
 
         mockMvc.perform(get("/api/tenants/{tenantId}/capability-summary", LINKAGE_TENANT_ID)
-                        .with(bearer(principal("tenant:read"), "platform"))
+                        .with(bearer(principal("upms:systenant:get"), "platform"))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.packageCapabilityCount").value(1))
@@ -379,7 +379,7 @@ class TenantControllerTest {
     @Test
     void tenantCapabilityOverridesShouldBeQueriedAndUpdated() throws Exception {
         mockMvc.perform(put("/api/tenants/{tenantId}/capability-overrides", TENANT_ID)
-                        .with(bearer(principal("tenant:write"), TENANT_ID))
+                        .with(bearer(principal("upms:systenant:edit"), TENANT_ID))
                         .header("X-Tenant-Id", TENANT_ID)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -402,7 +402,7 @@ class TenantControllerTest {
                 .andExpect(jsonPath("$.data.overrides[?(@.capabilityCode=='audit')].overrideEnabled").value(true));
 
         mockMvc.perform(get("/api/tenants/{tenantId}/capability-overrides", TENANT_ID)
-                        .with(bearer(principal("tenant:read"), TENANT_ID))
+                        .with(bearer(principal("upms:systenant:get"), TENANT_ID))
                         .header("X-Tenant-Id", TENANT_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.tenantId").value(TENANT_ID))
@@ -412,8 +412,8 @@ class TenantControllerTest {
 
     private UserAccount principal(String authority) {
         java.util.LinkedHashSet<String> authorities = new java.util.LinkedHashSet<>();
-        authorities.add("tenant:read");
-        authorities.add("tenant:write");
+        authorities.add("upms:systenant:get");
+        authorities.add("upms:systenant:edit");
         authorities.add(authority);
         return new UserAccount(
                 1L,

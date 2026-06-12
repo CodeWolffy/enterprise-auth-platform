@@ -435,11 +435,12 @@ public class FileApplicationService {
     }
 
     private boolean hasFileRead(UserAccount user) {
-        return user.permissions().contains(PermissionCodes.FILE_READ) || user.permissions().contains(PermissionCodes.FILE_WRITE);
+        return user.permissions().contains(PermissionCodes.FILE_PAGE)
+                || user.permissions().contains(PermissionCodes.FILE_GET);
     }
 
     private boolean hasFileWrite(UserAccount user) {
-        return user.permissions().contains(PermissionCodes.FILE_WRITE);
+        return user.permissions().contains(PermissionCodes.FILE_ADD);
     }
 
     private String trimmedOrNull(String value) {

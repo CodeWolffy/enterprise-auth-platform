@@ -4,6 +4,7 @@ import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
 import com.enterprise.auth.platform.common.audit.AuditEventPublisher;
 import com.enterprise.auth.platform.common.authz.DataScopeService;
+import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.PageResult;
@@ -63,7 +64,7 @@ public class SessionApplicationService {
             Integer size
     ) {
         boolean allTenant = "all".equals(scope)
-                && (currentUser.permissions().contains("session:write") || platformAdminSupport.isPlatformSuperAdmin(currentUser));
+                && (currentUser.permissions().contains(PermissionCodes.SESSION_PAGE) || platformAdminSupport.isPlatformSuperAdmin(currentUser));
         if (allTenant) {
             return allSessions(currentUser, currentToken, page, size);
         }
@@ -76,7 +77,7 @@ public class SessionApplicationService {
         String targetTenantId = sessionAttribute(sessionId, "tenantId", currentUser.tenantId());
         Map<String, Object> payload = sessionAuditPayload(sessionId);
         boolean sameOwner = currentUser.id().equals(targetUserId);
-        boolean canManage = currentUser.permissions().contains("session:write");
+        boolean canManage = currentUser.permissions().contains(PermissionCodes.SESSION_KICK);
         boolean platformAdmin = platformAdminSupport.isPlatformSuperAdmin(currentUser);
         boolean sameTenantOrPlatform = currentUser.tenantId().equals(targetTenantId) || platformAdmin;
         boolean visibleTarget = platformAdmin || dataScopeService.canAccessUser(currentUser.tenantId(), targetUserId);

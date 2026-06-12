@@ -80,7 +80,7 @@ class DatabaseUserRepositoryRolePayloadTest {
                 FROM sys_menu
                 WHERE tenant_id = 'platform'
                   AND deleted = 0
-                  AND grant_key IN ('user:read', 'audit:read')
+                  AND grant_key IN ('upms:sysuser:get', 'upms:audit:get')
                 """,
                 TENANT_ID,
                 roleId,
@@ -150,7 +150,7 @@ class DatabaseUserRepositoryRolePayloadTest {
         assertThat(result).isPresent();
         var user = result.orElseThrow();
         assertThat(user.roles()).contains(roleCode);
-        assertThat(user.permissions()).containsExactlyInAnyOrder("user:read", "audit:read");
+        assertThat(user.permissions()).containsExactlyInAnyOrder("upms:sysuser:get", "upms:audit:get");
         assertThat(user.permissions()).doesNotContain("payload:extra");
         assertThat(user.dataScopeType()).isEqualTo(DataScopeType.CUSTOM);
         assertThat(user.customDeptIds()).containsExactlyInAnyOrder(2L, 3L);

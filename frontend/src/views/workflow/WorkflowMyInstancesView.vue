@@ -25,7 +25,7 @@
           <h3>流程实例</h3>
           <p class="muted-line">发起时保存变量快照，审批过程只读取快照，不反向改写业务变量。</p>
         </div>
-        <el-button type="primary" @click="openStartDialog">发起流程</el-button>
+        <el-button v-permission="'upms:workflowinstance:add'" type="primary" @click="openStartDialog">发起流程</el-button>
       </div>
 
       <AdvancedSearch @search="applySearch" @reset="resetSearch">
@@ -67,10 +67,10 @@
         <el-table-column fixed="right" label="操作" width="240">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
-            <el-button v-if="row.status === 'RUNNING'" :loading="withdrawingId === row.id" link type="danger" @click="withdrawInstance(row)">撤回</el-button>
+            <el-button v-if="row.status === 'RUNNING'" v-permission="'upms:workflowinstance:edit'" :loading="withdrawingId === row.id" link type="danger" @click="withdrawInstance(row)">撤回</el-button>
             <el-button
               v-if="row.status === 'RUNNING'"
-              v-permission="'workflow:write'"
+              v-permission="'upms:workflowinstance:del'"
               :loading="terminatingId === row.id"
               link
               type="danger"

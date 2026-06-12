@@ -27,28 +27,28 @@ public class SecurityPolicyController {
 
     @Operation(summary = "查询当前租户生效安全策略")
     @GetMapping
-    @SaCheckPermission(PermissionCodes.SECURITY_READ)
+    @SaCheckPermission(PermissionCodes.SECURITY_GET)
     public ApiResponse<SecurityPolicyView> currentTenantPolicy() {
         return ApiResponse.ok(securityPolicyApplicationService.currentTenantPolicyView());
     }
 
     @Operation(summary = "更新当前租户安全策略覆盖")
     @PutMapping
-    @SaCheckPermission(PermissionCodes.SECURITY_WRITE)
+    @SaCheckPermission(PermissionCodes.SECURITY_EDIT)
     public ApiResponse<SecurityPolicyView> updateTenantPolicy(@Valid @RequestBody SecurityPolicyRequest request) {
         return ApiResponse.ok(securityPolicyApplicationService.updateTenantPolicy(request));
     }
 
     @Operation(summary = "查询平台默认安全策略")
     @GetMapping("/platform")
-    @SaCheckPermission(PermissionCodes.SECURITY_READ)
+    @SaCheckPermission(PermissionCodes.SECURITY_GET)
     public ApiResponse<SecurityPolicyView> platformPolicy() {
         return ApiResponse.ok(securityPolicyApplicationService.platformPolicyView());
     }
 
     @Operation(summary = "更新平台默认安全策略")
     @PutMapping("/platform")
-    @SaCheckPermission(PermissionCodes.SECURITY_WRITE)
+    @SaCheckPermission(PermissionCodes.SECURITY_EDIT)
     public ApiResponse<SecurityPolicyView> updatePlatformPolicy(@Valid @RequestBody SecurityPolicyRequest request) {
         return ApiResponse.ok(securityPolicyApplicationService.updatePlatformPolicy(request));
     }

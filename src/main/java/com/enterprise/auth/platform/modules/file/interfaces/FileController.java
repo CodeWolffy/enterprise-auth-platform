@@ -41,7 +41,7 @@ public class FileController {
 
     @Operation(summary = "分页查询文件")
     @GetMapping
-    @SaCheckPermission(PermissionCodes.FILE_READ)
+    @SaCheckPermission(PermissionCodes.FILE_PAGE)
     public ApiResponse<PageResult<FileMetadataView>> page(
             @Parameter(description = "文件名关键词") @RequestParam(required = false) String keyword,
             @Parameter(description = "内容类型") @RequestParam(required = false) String contentType,
@@ -55,7 +55,7 @@ public class FileController {
 
     @Operation(summary = "上传文件")
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @SaCheckPermission(PermissionCodes.FILE_WRITE)
+    @SaCheckPermission(PermissionCodes.FILE_ADD)
     public ApiResponse<FileMetadataView> upload(
             @Parameter(description = "文件") @RequestPart("file") MultipartFile file,
             @Parameter(description = "可见性：PUBLIC/TENANT/OWNER/PRIVATE，默认 OWNER") @RequestParam(required = false) FileVisibility visibility
@@ -83,7 +83,7 @@ public class FileController {
 
     @Operation(summary = "删除文件")
     @DeleteMapping("/{fileKey}")
-    @SaCheckPermission(PermissionCodes.FILE_WRITE)
+    @SaCheckPermission(PermissionCodes.FILE_DEL)
     public ApiResponse<Void> delete(@PathVariable String fileKey) {
         fileApplicationService.delete(fileKey);
         return ApiResponse.ok();

@@ -35,21 +35,21 @@ public class DeptController {
 
     @Operation(summary = "查询部门列表")
     @GetMapping
-    @SaCheckPermission(PermissionCodes.DEPT_READ)
+    @SaCheckPermission(PermissionCodes.SYSDEPT_PAGE)
     public ApiResponse<List<CatalogService.DepartmentView>> list() {
         return ApiResponse.ok(catalogService.departments());
     }
 
     @Operation(summary = "新增部门")
     @PostMapping
-    @SaCheckPermission(PermissionCodes.DEPT_WRITE)
+    @SaCheckPermission(PermissionCodes.SYSDEPT_ADD)
     public ApiResponse<CatalogService.DepartmentView> create(@Valid @RequestBody DeptCrudRequest request) {
         return ApiResponse.ok(deptManagementService.create(request));
     }
 
     @Operation(summary = "修改部门")
     @PutMapping("/{deptId}")
-    @SaCheckPermission(PermissionCodes.DEPT_WRITE)
+    @SaCheckPermission(PermissionCodes.SYSDEPT_EDIT)
     public ApiResponse<CatalogService.DepartmentView> update(
             @Parameter(description = "部门 ID") @PathVariable Long deptId,
             @Valid @RequestBody DeptCrudRequest request
@@ -59,7 +59,7 @@ public class DeptController {
 
     @Operation(summary = "删除部门")
     @DeleteMapping("/{deptId}")
-    @SaCheckPermission(PermissionCodes.DEPT_WRITE)
+    @SaCheckPermission(PermissionCodes.SYSDEPT_DEL)
     public ApiResponse<Void> delete(@Parameter(description = "部门 ID") @PathVariable Long deptId) {
         deptManagementService.delete(deptId);
         return ApiResponse.ok();

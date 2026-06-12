@@ -26,8 +26,8 @@
           <p class="panel-subtitle">左侧维护字典类型，右侧维护该类型下的字典值。</p>
         </div>
         <div class="panel-actions">
-          <el-button v-permission="'system:write'" @click="refreshCacheAction">刷新缓存</el-button>
-          <el-button v-permission="'system:write'" type="primary" @click="openDict()">新增字典类型</el-button>
+          <el-button v-permission="'upms:sysdict:edit'" @click="refreshCacheAction">刷新缓存</el-button>
+          <el-button v-permission="'upms:sysdict:add'" type="primary" @click="openDict()">新增字典类型</el-button>
         </div>
       </div>
 
@@ -171,8 +171,8 @@
             >
               <template #default="{ row }">
                 <el-button link type="primary" @click.stop="selectDict(row)">查看值</el-button>
-                <el-button v-permission="'system:write'" link type="primary" @click.stop="openDict(row)">编辑</el-button>
-                <el-button v-permission="'system:write'" link type="danger" @click.stop="removeDict(row.id)">删除</el-button>
+                <el-button v-permission="'upms:sysdict:edit'" link type="primary" @click.stop="openDict(row)">编辑</el-button>
+                <el-button v-permission="'upms:sysdict:del'" link type="danger" @click.stop="removeDict(row.id)">删除</el-button>
               </template>
             </el-table-column>
             <template #empty>
@@ -202,8 +202,8 @@
             </div>
             <div class="panel-actions">
               <el-button :disabled="!selectedDict" @click="reloadSelectedDetail">刷新</el-button>
-              <el-button v-permission="'system:write'" :disabled="!selectedDict" @click="openSelectedDict">编辑类型</el-button>
-              <el-button v-permission="'system:write'" :disabled="!selectedDict" type="primary" @click="openValue()">新增字典值</el-button>
+              <el-button v-permission="'upms:sysdict:edit'" :disabled="!selectedDict" @click="openSelectedDict">编辑类型</el-button>
+              <el-button v-permission="'upms:sysdict:add'" :disabled="!selectedDict" type="primary" @click="openValue()">新增字典值</el-button>
             </div>
           </div>
 
@@ -250,8 +250,8 @@
             </el-table-column>
             <el-table-column fixed="right" label="操作" width="150">
               <template #default="{ row }">
-                <el-button v-permission="'system:write'" link type="primary" @click="openValue(row)">编辑</el-button>
-                <el-button v-permission="'system:write'" link type="danger" @click="removeValue(row.id)">删除</el-button>
+                <el-button v-permission="'upms:sysdict:edit'" link type="primary" @click="openValue(row)">编辑</el-button>
+                <el-button v-permission="'upms:sysdict:del'" link type="danger" @click="removeValue(row.id)">删除</el-button>
               </template>
             </el-table-column>
             <template #empty>
@@ -279,7 +279,7 @@
       </el-form>
       <template #footer>
         <el-button @click="dictDialogVisible = false">取消</el-button>
-        <el-button v-permission="'system:write'" type="primary" @click="submitDict">保存</el-button>
+        <el-button v-permission="['upms:sysdict:add', 'upms:sysdict:edit']" type="primary" @click="submitDict">保存</el-button>
       </template>
     </el-dialog>
 
@@ -314,7 +314,7 @@
       </el-form>
       <template #footer>
         <el-button @click="valueDialogVisible = false">取消</el-button>
-        <el-button v-permission="'system:write'" type="primary" :disabled="!selectedDict" @click="submitValue">保存</el-button>
+        <el-button v-permission="['upms:sysdict:add', 'upms:sysdict:edit']" type="primary" :disabled="!selectedDict" @click="submitValue">保存</el-button>
       </template>
     </el-dialog>
   </div>

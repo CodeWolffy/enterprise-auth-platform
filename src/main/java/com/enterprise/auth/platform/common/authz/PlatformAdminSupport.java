@@ -26,7 +26,7 @@ public class PlatformAdminSupport {
             return true;
         }
         Set<String> permissions = user.permissions();
-        return permissions != null && (permissions.contains("tenant:write") || permissions.contains("tenant:read"));
+        return permissions != null && (permissions.contains(PermissionCodes.SYSTENANT_EDIT) || permissions.contains(PermissionCodes.SYSTENANT_GET));
     }
 
     public boolean canSwitchTenant(UserAccount user, String requestedTenantId) {

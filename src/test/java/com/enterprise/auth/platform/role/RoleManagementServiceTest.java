@@ -50,7 +50,7 @@ class RoleManagementServiceTest {
 
     private void setupContext() {
         TenantContext.setTenantId(TENANT);
-        bind(tenantAdmin(TENANT, Set.of("role:write")));
+        bind(tenantAdmin(TENANT, Set.of("upms:sysrole:edit")));
     }
 
     @Test

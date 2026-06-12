@@ -190,7 +190,7 @@ class UserDirectoryServiceTest {
                 userEntity.getPasswordHash(),
                 true,
                 Set.of(),
-                Set.of("user:read"),
+                Set.of("upms:sysuser:get"),
                 customDeptIds,
                 dataScopeType,
                 userEntity.getSessionVersion() == null ? 1 : userEntity.getSessionVersion()

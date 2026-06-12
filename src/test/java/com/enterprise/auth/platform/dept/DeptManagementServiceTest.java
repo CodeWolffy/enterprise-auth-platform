@@ -98,7 +98,7 @@ class DeptManagementServiceTest {
                 passwordHasher.hash("DeptTest@123"),
                 true,
                 Set.of(),
-                Set.of("dept:read"),
+                Set.of("upms:sysdept:get"),
                 Set.of(),
                 DataScopeType.DEPT_AND_CHILDREN,
                 1
@@ -122,7 +122,7 @@ class DeptManagementServiceTest {
                 passwordHasher.hash("DeptTest@123"),
                 true,
                 Set.of(),
-                Set.of("dept:write"),
+                Set.of("upms:sysdept:edit"),
                 Set.of(),
                 DataScopeType.DEPT,
                 1

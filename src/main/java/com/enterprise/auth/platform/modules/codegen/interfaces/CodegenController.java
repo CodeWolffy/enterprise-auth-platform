@@ -50,28 +50,28 @@ public class CodegenController {
 
     @Operation(summary = "查询代码生成数据源")
     @GetMapping("/datasources")
-    @SaCheckPermission(PermissionCodes.CODEGEN_READ)
+    @SaCheckPermission(PermissionCodes.CODEGEN_PAGE)
     public ApiResponse<java.util.List<CodegenMetadataDtos.DataSourceView>> dataSources() {
         return ApiResponse.ok(metadataService.dataSources());
     }
 
     @Operation(summary = "新增代码生成数据源")
     @PostMapping("/datasources")
-    @SaCheckPermission(PermissionCodes.CODEGEN_WRITE)
+    @SaCheckPermission(PermissionCodes.CODEGEN_ADD)
     public ApiResponse<CodegenMetadataDtos.DataSourceView> createDataSource(@RequestBody CodegenMetadataDtos.DataSourceRequest request) {
         return ApiResponse.ok(metadataService.createDataSource(request));
     }
 
     @Operation(summary = "修改代码生成数据源")
     @PutMapping("/datasources/{id}")
-    @SaCheckPermission(PermissionCodes.CODEGEN_WRITE)
+    @SaCheckPermission(PermissionCodes.CODEGEN_EDIT)
     public ApiResponse<CodegenMetadataDtos.DataSourceView> updateDataSource(@PathVariable Long id, @RequestBody CodegenMetadataDtos.DataSourceRequest request) {
         return ApiResponse.ok(metadataService.updateDataSource(id, request));
     }
 
     @Operation(summary = "删除代码生成数据源")
     @DeleteMapping("/datasources/{id}")
-    @SaCheckPermission(PermissionCodes.CODEGEN_WRITE)
+    @SaCheckPermission(PermissionCodes.CODEGEN_DEL)
     public ApiResponse<Void> deleteDataSource(@PathVariable Long id) {
         metadataService.deleteDataSource(id);
         return ApiResponse.ok();
@@ -79,7 +79,7 @@ public class CodegenController {
 
     @Operation(summary = "确认外部代码生成数据源授权")
     @PostMapping("/datasources/{id}/authorize")
-    @SaCheckPermission(PermissionCodes.CODEGEN_WRITE)
+    @SaCheckPermission(PermissionCodes.CODEGEN_EDIT)
     public ApiResponse<CodegenMetadataDtos.DataSourceView> authorizeDataSource(
             @PathVariable Long id,
             @RequestBody(required = false) CodegenMetadataDtos.DataSourceAuthorizationRequest request
@@ -89,14 +89,14 @@ public class CodegenController {
 
     @Operation(summary = "测试代码生成数据源连接")
     @PostMapping("/datasources/{id}/test")
-    @SaCheckPermission(PermissionCodes.CODEGEN_READ)
+    @SaCheckPermission(PermissionCodes.CODEGEN_GET)
     public ApiResponse<CodegenMetadataDtos.ConnectionTestResult> testDataSource(@PathVariable Long id) {
         return ApiResponse.ok(metadataService.testConnection(id));
     }
 
     @Operation(summary = "查询数据源可导入数据表")
     @GetMapping("/datasources/{id}/tables")
-    @SaCheckPermission(PermissionCodes.CODEGEN_READ)
+    @SaCheckPermission(PermissionCodes.CODEGEN_PAGE)
     public ApiResponse<PageResult<CodegenTableView>> dataSourceTables(
             @PathVariable Long id,
             @RequestParam(required = false) String keyword,
@@ -108,14 +108,14 @@ public class CodegenController {
 
     @Operation(summary = "导入代码生成表配置")
     @PostMapping("/tables/import")
-    @SaCheckPermission(PermissionCodes.CODEGEN_WRITE)
+    @SaCheckPermission(PermissionCodes.CODEGEN_ADD)
     public ApiResponse<java.util.List<CodegenMetadataDtos.ImportedTableView>> importTables(@RequestBody CodegenMetadataDtos.ImportTableRequest request) {
         return ApiResponse.ok(metadataService.importTables(request));
     }
 
     @Operation(summary = "分页查询已导入表配置")
     @GetMapping("/imported-tables")
-    @SaCheckPermission(PermissionCodes.CODEGEN_READ)
+    @SaCheckPermission(PermissionCodes.CODEGEN_PAGE)
     public ApiResponse<PageResult<CodegenMetadataDtos.ImportedTableView>> importedTables(
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "1") int page,
@@ -126,14 +126,14 @@ public class CodegenController {
 
     @Operation(summary = "查询导入表字段配置")
     @GetMapping("/imported-tables/{tableId}")
-    @SaCheckPermission(PermissionCodes.CODEGEN_READ)
+    @SaCheckPermission(PermissionCodes.CODEGEN_GET)
     public ApiResponse<CodegenMetadataDtos.TableConfigDetailView> tableConfig(@PathVariable Long tableId) {
         return ApiResponse.ok(metadataService.tableConfig(tableId));
     }
 
     @Operation(summary = "保存导入表字段配置")
     @PutMapping("/imported-tables/{tableId}/columns")
-    @SaCheckPermission(PermissionCodes.CODEGEN_WRITE)
+    @SaCheckPermission(PermissionCodes.CODEGEN_EDIT)
     public ApiResponse<CodegenMetadataDtos.TableConfigDetailView> updateColumns(
             @PathVariable Long tableId,
             @RequestBody CodegenMetadataDtos.UpdateColumnsRequest request
@@ -143,7 +143,7 @@ public class CodegenController {
 
     @Operation(summary = "分页查询可生成数据表")
     @GetMapping("/tables")
-    @SaCheckPermission(PermissionCodes.CODEGEN_READ)
+    @SaCheckPermission(PermissionCodes.CODEGEN_PAGE)
     public ApiResponse<PageResult<CodegenTableView>> tables(
             @Parameter(description = "关键字，匹配表名或表注释") @RequestParam(required = false) String keyword,
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
@@ -154,21 +154,21 @@ public class CodegenController {
 
     @Operation(summary = "查询数据表字段")
     @GetMapping("/tables/{tableName}")
-    @SaCheckPermission(PermissionCodes.CODEGEN_READ)
+    @SaCheckPermission(PermissionCodes.CODEGEN_GET)
     public ApiResponse<CodegenTableDetailView> table(@Parameter(description = "表名") @PathVariable String tableName) {
         return ApiResponse.ok(codegenApplicationService.table(tableName));
     }
 
     @Operation(summary = "预览生成结果")
     @PostMapping("/preview")
-    @SaCheckPermission(PermissionCodes.CODEGEN_READ)
+    @SaCheckPermission(PermissionCodes.CODEGEN_GET)
     public ApiResponse<CodegenPreviewResult> preview(@Valid @RequestBody CodegenRequest request) {
         return ApiResponse.ok(codegenApplicationService.preview(request.toCommand()));
     }
 
     @Operation(summary = "生成代码到隔离目录")
     @PostMapping("/generate")
-    @SaCheckPermission(PermissionCodes.CODEGEN_WRITE)
+    @SaCheckPermission(PermissionCodes.CODEGEN_ADD)
     public ApiResponse<CodegenGenerateResult> generate(@Valid @RequestBody CodegenRequest request) {
         return ApiResponse.ok(codegenApplicationService.generate(request.toCommand()));
     }
@@ -188,7 +188,7 @@ public class CodegenController {
 
     @Operation(summary = "分页查询自定义模板")
     @GetMapping("/templates")
-    @SaCheckPermission(PermissionCodes.CODEGEN_READ)
+    @SaCheckPermission(PermissionCodes.CODEGEN_PAGE)
     public ApiResponse<PageResult<CodegenTemplateView>> templates(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String templateCategory,
@@ -200,21 +200,21 @@ public class CodegenController {
 
     @Operation(summary = "查询自定义模板详情")
     @GetMapping("/templates/{templateId}")
-    @SaCheckPermission(PermissionCodes.CODEGEN_READ)
+    @SaCheckPermission(PermissionCodes.CODEGEN_GET)
     public ApiResponse<CodegenTemplateView> template(@PathVariable Long templateId) {
         return ApiResponse.ok(templateService.detail(templateId));
     }
 
     @Operation(summary = "新增自定义模板")
     @PostMapping("/templates")
-    @SaCheckPermission(PermissionCodes.CODEGEN_WRITE)
+    @SaCheckPermission(PermissionCodes.CODEGEN_ADD)
     public ApiResponse<CodegenTemplateView> createTemplate(@Valid @RequestBody CodegenTemplateRequest request) {
         return ApiResponse.ok(templateService.create(request.toView()));
     }
 
     @Operation(summary = "修改自定义模板")
     @PutMapping("/templates/{templateId}")
-    @SaCheckPermission(PermissionCodes.CODEGEN_WRITE)
+    @SaCheckPermission(PermissionCodes.CODEGEN_EDIT)
     public ApiResponse<CodegenTemplateView> updateTemplate(
             @PathVariable Long templateId,
             @Valid @RequestBody CodegenTemplateRequest request
@@ -224,7 +224,7 @@ public class CodegenController {
 
     @Operation(summary = "删除自定义模板")
     @DeleteMapping("/templates/{templateId}")
-    @SaCheckPermission(PermissionCodes.CODEGEN_WRITE)
+    @SaCheckPermission(PermissionCodes.CODEGEN_DEL)
     public ApiResponse<Void> deleteTemplate(@PathVariable Long templateId) {
         templateService.delete(templateId);
         return ApiResponse.ok();

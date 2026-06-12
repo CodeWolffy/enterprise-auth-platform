@@ -9,6 +9,7 @@ import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
+import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.modules.notification.application.NotificationScenarioPublisher;
 import com.enterprise.auth.platform.modules.role.application.RoleQueryFacade;
@@ -771,7 +772,7 @@ public class WorkflowApplicationService {
         if (Objects.equals(instance.getStarterUserId(), user.id())) {
             return true;
         }
-        if (user.permissions().contains("workflow:read")) {
+        if (user.permissions().contains(PermissionCodes.WORKFLOW_INSTANCE_GET)) {
             return true;
         }
         if (hasVisibleTask(instance, user)) {

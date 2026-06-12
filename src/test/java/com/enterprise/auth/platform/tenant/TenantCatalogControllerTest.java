@@ -35,7 +35,7 @@ class TenantCatalogControllerTest {
     private static final String PACKAGE_CODE = "tenant_package_ut";
     private static final String REFERENCED_TENANT_ID = "tenant-package-ut-ref";
     private static final String VISIBLE_RESOURCE_KEY = "tenant-package-ut-menu";
-    private static final String GRANT_RESOURCE_KEY = "tenant-package-ut:read";
+    private static final String GRANT_RESOURCE_KEY = "upms:tenant-package-ut:read";
 
     @Autowired
     private MockMvc mockMvc;
@@ -80,7 +80,7 @@ class TenantCatalogControllerTest {
 
     @Test
     void shouldManagePlatformTenantCatalog() throws Exception {
-        UserAccount principal = principal(Set.of("tenant:read", "tenant:write"));
+        UserAccount principal = principal(Set.of("upms:systenant:get", "upms:systenant:edit"));
 
         mockMvc.perform(post("/api/tenant-catalog/capabilities")
                         .with(bearer(principal))

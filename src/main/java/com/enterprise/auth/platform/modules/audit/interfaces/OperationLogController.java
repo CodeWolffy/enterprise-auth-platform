@@ -39,7 +39,7 @@ public class OperationLogController {
 
     @Operation(summary = "分页查询操作日志")
     @GetMapping
-    @SaCheckPermission(PermissionCodes.OPERATION_LOG_READ)
+    @SaCheckPermission(PermissionCodes.OPERATION_LOG_PAGE)
     public ApiResponse<AuditPage> page(
             @Parameter(description = "租户编码") @RequestParam(required = false) String tenantId,
             @Parameter(description = "事件类型") @RequestParam(required = false) String eventType,

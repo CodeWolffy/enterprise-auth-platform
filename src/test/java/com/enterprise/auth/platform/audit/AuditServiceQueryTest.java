@@ -104,7 +104,7 @@ class AuditServiceQueryTest {
                 passwordHasher.hash("AuditTest@123"),
                 true,
                 Set.of(),
-                Set.of("audit:read"),
+                Set.of("upms:audit:get"),
                 Set.of(),
                 DataScopeType.DEPT,
                 1

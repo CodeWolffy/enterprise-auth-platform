@@ -90,7 +90,7 @@
         </el-table-column>
         <el-table-column label="操作" width="120" fixed="right">
           <template #default="{ row }">
-            <el-button v-permission="'session:write'" link type="danger" data-testid="online-users-force-offline" :disabled="!row.active || row.currentSession" @click="kickSession(row.sessionId)">强制下线</el-button>
+            <el-button v-permission="'upms:session:kick'" link type="danger" data-testid="online-users-force-offline" :disabled="!row.active || row.currentSession" @click="kickSession(row.sessionId)">强制下线</el-button>
           </template>
         </el-table-column>
         <template #empty>

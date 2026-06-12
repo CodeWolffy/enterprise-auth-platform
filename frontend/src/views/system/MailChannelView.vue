@@ -38,7 +38,7 @@
         <div class="panel-head-actions">
           <el-button
             v-if="hasOwnChannel"
-            v-permission="'system:write'"
+            v-permission="'upms:sysmail:del'"
             type="danger"
             plain
             @click="handleDelete"
@@ -111,7 +111,7 @@
 
         <el-form-item>
           <el-button
-            v-permission="'system:write'"
+            v-permission="'upms:sysmail:edit'"
             type="primary"
             :loading="saving"
             @click="handleSave"

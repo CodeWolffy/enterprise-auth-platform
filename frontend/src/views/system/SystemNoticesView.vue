@@ -24,7 +24,7 @@
           <span class="eyebrow">公告</span>
           <h3>公告管理</h3>
         </div>
-        <el-button v-permission="'system:write'" type="primary" @click="openNotice()">新增公告</el-button>
+        <el-button v-permission="'upms:sysnotice:add'" type="primary" @click="openNotice()">新增公告</el-button>
       </div>
 
       <AdvancedSearch @search="handleSearch" @reset="resetSearch">
@@ -166,8 +166,8 @@
         >
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
-            <el-button v-permission="'system:write'" link type="primary" @click="openNotice(row)">编辑</el-button>
-            <el-button v-permission="'system:write'" link type="danger" @click="removeNotice(row.id)">删除</el-button>
+            <el-button v-permission="'upms:sysnotice:edit'" link type="primary" @click="openNotice(row)">编辑</el-button>
+            <el-button v-permission="'upms:sysnotice:del'" link type="danger" @click="removeNotice(row.id)">删除</el-button>
           </template>
         </el-table-column>
         <template #empty>
@@ -229,7 +229,7 @@
       </el-form>
       <template #footer>
         <el-button @click="visible = false">取消</el-button>
-        <el-button v-permission="'system:write'" type="primary" @click="submit">保存</el-button>
+        <el-button v-permission="['upms:sysnotice:add', 'upms:sysnotice:edit']" type="primary" @click="submit">保存</el-button>
       </template>
     </el-dialog>
   </div>

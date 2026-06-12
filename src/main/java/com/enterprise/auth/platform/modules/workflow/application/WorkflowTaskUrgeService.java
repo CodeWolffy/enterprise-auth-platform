@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.audit.AuditEventPublisher;
 import com.enterprise.auth.platform.common.audit.PlatformAuditEvent;
+import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.PageResult;
@@ -172,7 +173,7 @@ public class WorkflowTaskUrgeService {
     }
 
     private boolean canUrge(WfTaskEntity task, UserAccount user) {
-        if (user.permissions().contains("workflow:write")) {
+        if (user.permissions().contains(PermissionCodes.WORKFLOW_TODO_EDIT)) {
             return true;
         }
         WfProcessInstanceEntity instance = instanceMapper.selectOne(new LambdaQueryWrapper<WfProcessInstanceEntity>()
@@ -206,7 +207,7 @@ public class WorkflowTaskUrgeService {
     }
 
     private boolean canViewUrges(WfTaskEntity task, UserAccount user) {
-        if (user.permissions().contains("workflow:write") || user.permissions().contains("workflow:read")) {
+        if (user.permissions().contains(PermissionCodes.WORKFLOW_TODO_EDIT) || user.permissions().contains(PermissionCodes.WORKFLOW_TODO_GET)) {
             return true;
         }
         WfProcessInstanceEntity instance = instanceMapper.selectOne(new LambdaQueryWrapper<WfProcessInstanceEntity>()
@@ -236,7 +237,7 @@ public class WorkflowTaskUrgeService {
         if (taskCount == null || taskCount == 0) {
             throw new BusinessException("NOT_FOUND", "流程实例催办记录不存在");
         }
-        if (user.permissions().contains("workflow:write") || user.permissions().contains("workflow:read")) {
+        if (user.permissions().contains(PermissionCodes.WORKFLOW_TODO_EDIT) || user.permissions().contains(PermissionCodes.WORKFLOW_TODO_GET)) {
             return;
         }
         WfProcessInstanceEntity instance = instanceMapper.selectOne(new LambdaQueryWrapper<WfProcessInstanceEntity>()

@@ -44,7 +44,7 @@ public class MenuController {
 
     @Operation(summary = "查询可授权菜单树")
     @GetMapping("/grantable-tree")
-    @SaCheckPermission(PermissionCodes.ROLE_READ)
+    @SaCheckPermission(PermissionCodes.SYSROLE_GET)
     public ApiResponse<List<MenuTreeNode>> grantableTree() {
         return ApiResponse.ok(MenuTreeUtil.buildTree(menuService.grantableTree(TenantContext.getTenantId())));
     }

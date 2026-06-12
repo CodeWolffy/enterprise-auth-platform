@@ -439,7 +439,7 @@ function resolveTagIcon(tag: { path: string; title: string }) {
 // tenant loading
 const tenantOptions = ref<Array<{ tenantId: string; name: string }>>([])
 const canLoadTenants = computed(() => {
-  return authStore.canSwitchTenant && Boolean(authStore.snapshot?.grants.includes('tenant:read'))
+  return authStore.canSwitchTenant && Boolean(authStore.snapshot?.grants.includes('upms:systenant:page'))
 })
 const tenantSelectWidth = computed(() => {
   const longestOptionLength = tenantOptions.value.reduce((longest, tenant) => {

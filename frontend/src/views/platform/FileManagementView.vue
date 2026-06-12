@@ -32,7 +32,7 @@
         </div>
         <div class="panel-actions">
           <el-upload
-            v-permission="'file:write'"
+            v-permission="'upms:file:add'"
             :auto-upload="false"
             :show-file-list="false"
             :on-change="handleUploadSelected"
@@ -70,7 +70,7 @@
             <el-option label="私有" value="PRIVATE" />
           </el-select>
         </el-form-item>
-        <el-form-item v-permission="'file:write'" label="上传可见性">
+        <el-form-item v-permission="'upms:file:add'" label="上传可见性">
           <el-select v-model="uploadVisibility" style="width: 160px">
             <el-option label="归属人" value="OWNER" />
             <el-option label="租户" value="TENANT" />
@@ -128,7 +128,7 @@
           <template #default="{ row }">
             <el-button link type="primary" @click="downloadFile(row)">下载</el-button>
             <el-button v-if="row.url" link type="primary" @click="copyUrl(row.url)">复制链接</el-button>
-            <el-button v-permission="'file:write'" link type="danger" @click="removeFile(row)">删除</el-button>
+            <el-button v-permission="'upms:file:del'" link type="danger" @click="removeFile(row)">删除</el-button>
           </template>
         </el-table-column>
         <template #empty>

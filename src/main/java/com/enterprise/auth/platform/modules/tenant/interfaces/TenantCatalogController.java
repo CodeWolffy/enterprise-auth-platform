@@ -40,14 +40,14 @@ public class TenantCatalogController {
 
     @Operation(summary = "查询套餐列表")
     @GetMapping("/packages")
-    @SaCheckPermission(PermissionCodes.TENANT_READ)
+    @SaCheckPermission(PermissionCodes.TENANT_CATALOG_PAGE)
     public ApiResponse<List<TenantCatalogManagementService.TenantPackageView>> packages() {
         return ApiResponse.ok(tenantCatalogApplicationService.packages());
     }
 
     @Operation(summary = "新增套餐")
     @PostMapping("/packages")
-    @SaCheckPermission(PermissionCodes.TENANT_WRITE)
+    @SaCheckPermission(PermissionCodes.TENANT_CATALOG_ADD)
     public ApiResponse<TenantCatalogManagementService.TenantPackageView> createPackage(
             @Valid @RequestBody TenantPackageCrudRequest request
     ) {
@@ -56,7 +56,7 @@ public class TenantCatalogController {
 
     @Operation(summary = "修改套餐")
     @PutMapping("/packages/{id}")
-    @SaCheckPermission(PermissionCodes.TENANT_WRITE)
+    @SaCheckPermission(PermissionCodes.TENANT_CATALOG_EDIT)
     public ApiResponse<TenantCatalogManagementService.TenantPackageView> updatePackage(
             @Parameter(description = "套餐主键 ID") @PathVariable Long id,
             @Valid @RequestBody TenantPackageCrudRequest request
@@ -66,7 +66,7 @@ public class TenantCatalogController {
 
     @Operation(summary = "套餐变更影响分析")
     @GetMapping("/packages/{id}/impact")
-    @SaCheckPermission(PermissionCodes.TENANT_READ)
+    @SaCheckPermission(PermissionCodes.TENANT_CATALOG_GET)
     public ApiResponse<TenantCatalogManagementService.TenantPackageImpactView> packageImpact(
             @Parameter(description = "套餐主键 ID") @PathVariable Long id
     ) {
@@ -75,7 +75,7 @@ public class TenantCatalogController {
 
     @Operation(summary = "删除套餐")
     @DeleteMapping("/packages/{id}")
-    @SaCheckPermission(PermissionCodes.TENANT_WRITE)
+    @SaCheckPermission(PermissionCodes.TENANT_CATALOG_DEL)
     public ApiResponse<Void> deletePackage(@Parameter(description = "套餐主键 ID") @PathVariable Long id) {
         tenantCatalogApplicationService.deletePackage(id);
         return ApiResponse.ok();
@@ -83,14 +83,14 @@ public class TenantCatalogController {
 
     @Operation(summary = "查询能力列表")
     @GetMapping("/capabilities")
-    @SaCheckPermission(PermissionCodes.TENANT_READ)
+    @SaCheckPermission(PermissionCodes.TENANT_CATALOG_PAGE)
     public ApiResponse<List<TenantCatalogManagementService.TenantCapabilityView>> capabilities() {
         return ApiResponse.ok(tenantCapabilityApplicationService.capabilities());
     }
 
     @Operation(summary = "新增能力")
     @PostMapping("/capabilities")
-    @SaCheckPermission(PermissionCodes.TENANT_WRITE)
+    @SaCheckPermission(PermissionCodes.TENANT_CATALOG_ADD)
     public ApiResponse<TenantCatalogManagementService.TenantCapabilityView> createCapability(
             @Valid @RequestBody TenantCapabilityCrudRequest request
     ) {
@@ -99,7 +99,7 @@ public class TenantCatalogController {
 
     @Operation(summary = "修改能力")
     @PutMapping("/capabilities/{id}")
-    @SaCheckPermission(PermissionCodes.TENANT_WRITE)
+    @SaCheckPermission(PermissionCodes.TENANT_CATALOG_EDIT)
     public ApiResponse<TenantCatalogManagementService.TenantCapabilityView> updateCapability(
             @Parameter(description = "能力主键 ID") @PathVariable Long id,
             @Valid @RequestBody TenantCapabilityCrudRequest request
@@ -109,7 +109,7 @@ public class TenantCatalogController {
 
     @Operation(summary = "能力变更影响分析")
     @GetMapping("/capabilities/{id}/impact")
-    @SaCheckPermission(PermissionCodes.TENANT_READ)
+    @SaCheckPermission(PermissionCodes.TENANT_CATALOG_GET)
     public ApiResponse<TenantCatalogManagementService.TenantCapabilityImpactView> capabilityImpact(
             @Parameter(description = "能力主键 ID") @PathVariable Long id
     ) {
@@ -118,7 +118,7 @@ public class TenantCatalogController {
 
     @Operation(summary = "删除能力")
     @DeleteMapping("/capabilities/{id}")
-    @SaCheckPermission(PermissionCodes.TENANT_WRITE)
+    @SaCheckPermission(PermissionCodes.TENANT_CATALOG_DEL)
     public ApiResponse<Void> deleteCapability(@Parameter(description = "能力主键 ID") @PathVariable Long id) {
         tenantCapabilityApplicationService.deleteCapability(id);
         return ApiResponse.ok();

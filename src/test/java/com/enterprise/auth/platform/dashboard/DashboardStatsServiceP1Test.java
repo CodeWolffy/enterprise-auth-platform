@@ -213,7 +213,7 @@ class DashboardStatsServiceP1Test {
                 "hash",
                 true,
                 Set.of(),
-                Set.of("dashboard:read"),
+                Set.of("upms:dashboard:get"),
                 Set.of(),
                 dataScopeType,
                 1

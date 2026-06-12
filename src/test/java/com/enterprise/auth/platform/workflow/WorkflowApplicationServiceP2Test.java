@@ -86,7 +86,7 @@ class WorkflowApplicationServiceP2Test {
 
     @Test
     void sequentialApprovalShouldAdvanceAndCompleteWithVariableSnapshot() {
-        bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("workflow:write", "workflow:read"));
+        bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("upms:workflowtodo:edit", "upms:workflowtodo:get"));
         Long definitionId = createAndDeployTwoStepDefinition();
         Map<String, Object> variables = new LinkedHashMap<>();
         variables.put("amount", 100);
@@ -133,7 +133,7 @@ class WorkflowApplicationServiceP2Test {
 
     @Test
     void rejectShouldEndInstanceAndRemoveTodo() {
-        bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("workflow:write"));
+        bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("upms:workflowtodo:edit"));
         createAndDeploySingleStepDefinition("p2-wf-reject-ut", Set.of(approverOneId), Set.of());
         var started = workflowApplicationService.startInstance(new WorkflowStartCommand(
                 "p2-wf-reject-ut",
@@ -153,7 +153,7 @@ class WorkflowApplicationServiceP2Test {
 
     @Test
     void rejectToStepShouldReturnPreviousConfiguredNode() {
-        bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("workflow:write"));
+        bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("upms:workflowtodo:edit"));
         var definition = workflowApplicationService.createDefinition(new WorkflowDefinitionCommand(
                 "p2-wf-reject-to-step-ut",
                 "P2 指定节点驳回",
@@ -186,7 +186,7 @@ class WorkflowApplicationServiceP2Test {
 
     @Test
     void rejectToStarterShouldCreateStarterReworkTaskAndRestartAfterSubmit() {
-        bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("workflow:write"));
+        bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("upms:workflowtodo:edit"));
         var definition = workflowApplicationService.createDefinition(new WorkflowDefinitionCommand(
                 "p2-wf-reject-to-starter-ut",
                 "P2 发起人重提",
@@ -222,7 +222,7 @@ class WorkflowApplicationServiceP2Test {
 
     @Test
     void starterShouldWithdrawRunningInstanceAndCancelPendingTask() {
-        bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("workflow:write"));
+        bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("upms:workflowtodo:edit"));
         createAndDeploySingleStepDefinition("p2-wf-withdraw-ut", Set.of(approverOneId), Set.of());
         var started = workflowApplicationService.startInstance(new WorkflowStartCommand(
                 "p2-wf-withdraw-ut",
@@ -252,7 +252,7 @@ class WorkflowApplicationServiceP2Test {
 
     @Test
     void actionableUserCanTransferTaskToAnotherEnabledUser() {
-        bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("workflow:write"));
+        bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("upms:workflowtodo:edit"));
         createAndDeploySingleStepDefinition("p2-wf-transfer-ut", Set.of(approverOneId), Set.of());
         var started = workflowApplicationService.startInstance(new WorkflowStartCommand(
                 "p2-wf-transfer-ut",
@@ -292,7 +292,7 @@ class WorkflowApplicationServiceP2Test {
 
     @Test
     void processedTaskShouldRejectSecondApprovalAttempt() {
-        bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("workflow:write"));
+        bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("upms:workflowtodo:edit"));
         createAndDeploySingleStepDefinition("p2-wf-concurrent-approve-ut", Set.of(approverOneId), Set.of());
         var started = workflowApplicationService.startInstance(new WorkflowStartCommand(
                 "p2-wf-concurrent-approve-ut",
@@ -326,7 +326,7 @@ class WorkflowApplicationServiceP2Test {
 
     @Test
     void repeatedUrgeForSameTaskShouldBeRateLimited() {
-        bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("workflow:write"));
+        bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("upms:workflowtodo:edit"));
         createAndDeploySingleStepDefinition("p2-wf-urge-rate-limit-ut", Set.of(approverOneId), Set.of());
         var started = workflowApplicationService.startInstance(new WorkflowStartCommand(
                 "p2-wf-urge-rate-limit-ut",
@@ -352,7 +352,7 @@ class WorkflowApplicationServiceP2Test {
 
     @Test
     void tenantAndCandidateIsolationShouldBlockCrossScopeAccess() {
-        bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("workflow:write", "workflow:read"));
+        bindPrincipal(TENANT_A, starterId, STARTER, Set.of(), Set.of("upms:workflowtodo:edit", "upms:workflowtodo:get"));
         Long definitionId = createAndDeploySingleStepDefinition("p2-wf-isolation-ut", Set.of(approverOneId), Set.of());
         var started = workflowApplicationService.startInstance(new WorkflowStartCommand(
                 "p2-wf-isolation-ut",
@@ -367,7 +367,7 @@ class WorkflowApplicationServiceP2Test {
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("候选处理人");
 
-        bindPrincipal(TENANT_B, otherTenantUserId, OTHER_TENANT_USER, Set.of(GROUP_APPROVER), Set.of("workflow:read"));
+        bindPrincipal(TENANT_B, otherTenantUserId, OTHER_TENANT_USER, Set.of(GROUP_APPROVER), Set.of("upms:workflowtodo:get"));
         assertThat(workflowApplicationService.definitions(null, 1, 20).records()).isEmpty();
         assertThatThrownBy(() -> workflowApplicationService.definition(definitionId))
                 .isInstanceOf(BusinessException.class)

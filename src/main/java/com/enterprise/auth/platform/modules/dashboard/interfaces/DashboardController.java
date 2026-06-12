@@ -23,7 +23,7 @@ public class DashboardController {
 
     @Operation(summary = "查询仪表盘统计")
     @GetMapping("/stats")
-    @SaCheckPermission(PermissionCodes.DASHBOARD_READ)
+    @SaCheckPermission(PermissionCodes.DASHBOARD_GET)
     public ApiResponse<DashboardStatsResponse> stats() {
         return ApiResponse.ok(dashboardStatsService.stats());
     }
