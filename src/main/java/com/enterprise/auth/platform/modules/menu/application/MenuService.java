@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.modules.menu.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.enterprise.auth.platform.common.cache.CacheNames;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
@@ -12,6 +13,7 @@ import com.enterprise.auth.platform.modules.menu.infrastructure.mapper.SysMenuMa
 import com.enterprise.auth.platform.modules.menu.interfaces.CreateMenuRequest;
 import com.enterprise.auth.platform.modules.role.application.RoleMenuReferenceFacade;
 import com.enterprise.auth.platform.modules.tenant.application.TenantCapabilityResourceScopeFacade;
+import com.enterprise.auth.platform.modules.tenant.application.TenantMenuService;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,6 +27,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,18 +39,18 @@ public class MenuService {
 
     private static final String PLATFORM_TENANT = "platform";
     private static final Map<String, String> ACTION_LABELS = Map.of(
-            "read", "查看",
-            "create", "新增",
-            "update", "修改",
-            "delete", "删除",
-            "export", "导出",
-            "import", "导入"
+            "add", "新增",
+            "edit", "修改",
+            "del", "删除",
+            "page", "列表",
+            "get", "查询"
     );
 
     private final SysMenuMapper sysMenuMapper;
     private final RoleMenuReferenceFacade roleMenuReferenceFacade;
     private final ApplicationEventPublisher eventPublisher;
     private final TenantCapabilityResourceScopeFacade tenantCapabilityResourceScopeFacade;
+    private final TenantMenuService tenantMenuService;
     private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
     private final TenantProperties tenantProperties;
 
@@ -55,6 +59,7 @@ public class MenuService {
             RoleMenuReferenceFacade roleMenuReferenceFacade,
             ApplicationEventPublisher eventPublisher,
             TenantCapabilityResourceScopeFacade tenantCapabilityResourceScopeFacade,
+            TenantMenuService tenantMenuService,
             AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
             TenantProperties tenantProperties
     ) {
@@ -62,13 +67,16 @@ public class MenuService {
         this.roleMenuReferenceFacade = roleMenuReferenceFacade;
         this.eventPublisher = eventPublisher;
         this.tenantCapabilityResourceScopeFacade = tenantCapabilityResourceScopeFacade;
+        this.tenantMenuService = tenantMenuService;
         this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
         this.tenantProperties = tenantProperties;
     }
 
     public List<MenuTreeNode> templateTree() {
         List<SysMenuEntity> menus = listTemplateMenus();
-        return rebuildTree(menus);
+        return menus.stream()
+                .map(m -> toMenuNode(m, List.of()))
+                .toList();
     }
 
     public Set<String> resolveGrantKeys(String activeTenantId, Set<Long> grantedMenuIds, boolean superAdmin) {
@@ -92,6 +100,7 @@ public class MenuService {
                 .map(menuById::get)
                 .filter(Objects::nonNull)
                 .filter(menu -> hierarchyEnabled(menu, menuById))
+                .filter(menu -> parseType(menu.getMenuType()) == MenuType.BUTTON)
                 .map(SysMenuEntity::getGrantKey)
                 .filter(StringUtils::hasText)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
@@ -120,6 +129,14 @@ public class MenuService {
             return List.of();
         }
         expanded.retainAll(visibleIds);
+        // 非平台租户需与租户分配的菜单取交集（对齐 haorong-mall sys_tenant_menu 模型）
+        if (!platformTenantId().equals(activeTenantId)) {
+            Set<Long> tenantMenuIds = tenantMenuService.findTenantMenuIds(activeTenantId);
+            if (tenantMenuIds.isEmpty()) {
+                return List.of();
+            }
+            expanded.retainAll(tenantMenuIds);
+        }
         Map<Long, RuntimeMenuNodeBuilder> nodes = new LinkedHashMap<>();
         for (Long menuId : expanded) {
             SysMenuEntity menu = menuById.get(menuId);
@@ -167,10 +184,10 @@ public class MenuService {
         if (grantableIds.isEmpty()) {
             return List.of();
         }
-        List<SysMenuEntity> filtered = template.stream()
+        return template.stream()
                 .filter(menu -> menu.getId() != null && grantableIds.contains(menu.getId()))
+                .map(m -> toMenuNode(m, List.of()))
                 .toList();
-        return rebuildTree(filtered);
     }
 
     public Set<Long> filterGrantableMenuIds(String activeTenantId, Set<Long> menuIds) {
@@ -213,27 +230,32 @@ public class MenuService {
         return toMenuMap(listTemplateMenus()).containsKey(menuId);
     }
 
+    public MenuTreeNode detail(Long menuId) {
+        return toMenuNode(getMenu(menuId), List.of());
+    }
+
     @Transactional
+    @CacheEvict(value = CacheNames.MENU_TEMPLATE, allEntries = true)
     public MenuTreeNode create(CreateMenuRequest request) {
         requirePlatformTenant();
         SysMenuEntity parent = request.parentId() == null ? null : getMenu(request.parentId());
-        validateMenuShape(request.menuType(), parent, request.routeKey(), request.path(), request.component(), request.grantKey());
-        validateGrantKey(request.grantKey());
+        validateMenuShape(request.menuType(), parent, request.grantKey());
+        validateGrantKey(request.menuType(), request.grantKey());
         validateUniqueKeys(null, request.resourceKey(), request.routeKey(), request.path());
 
         SysMenuEntity entity = new SysMenuEntity();
         entity.setTenantId(platformTenantId());
         entity.setParentId(request.parentId());
         entity.setAncestors(resolveAncestors(parent));
-        entity.setMenuType(request.menuType().name());
+        entity.setMenuType(request.menuType().value());
         entity.setResourceKey(request.resourceKey().trim());
         entity.setMenuName(request.menuName().trim());
-        entity.setRouteKey(blankToNull(request.routeKey()));
-        entity.setGrantKey(blankToNull(request.grantKey()));
-        entity.setPath(blankToNull(request.path()));
-        entity.setComponent(blankToNull(request.component()));
-        entity.setRedirect(blankToNull(request.redirect()));
-        entity.setIcon(blankToNull(request.icon()));
+        entity.setRouteKey(request.menuType() == MenuType.MENU ? blankToNull(request.routeKey()) : null);
+        entity.setGrantKey(request.menuType() == MenuType.BUTTON ? blankToNull(request.grantKey()) : null);
+        entity.setPath(request.menuType() == MenuType.MENU ? blankToNull(request.path()) : null);
+        entity.setComponent(request.menuType() == MenuType.MENU ? blankToNull(request.component()) : null);
+        entity.setRedirect(request.menuType() == MenuType.MENU ? blankToNull(request.redirect()) : null);
+        entity.setIcon(request.menuType() == MenuType.MENU ? blankToNull(request.icon()) : null);
         entity.setOrderNo(request.orderNo() == null ? 0 : request.orderNo());
         entity.setVisible(Boolean.FALSE.equals(request.visible()) ? 0 : 1);
         entity.setEnabled(Boolean.FALSE.equals(request.enabled()) ? 0 : 1);
@@ -254,11 +276,13 @@ public class MenuService {
     }
 
     @Transactional
+    @CacheEvict(value = CacheNames.MENU_TEMPLATE, allEntries = true)
     public MenuTreeNode update(Long menuId, CreateMenuRequest request) {
         return update(menuId, request, true);
     }
 
     @Transactional
+    @CacheEvict(value = CacheNames.MENU_TEMPLATE, allEntries = true)
     public MenuTreeNode update(Long menuId, CreateMenuRequest request, boolean parentIdPresent) {
         requirePlatformTenant();
         SysMenuEntity entity = getMenu(menuId);
@@ -289,21 +313,21 @@ public class MenuService {
         if (parent != null && containsDescendant(parent.getAncestors(), menuId)) {
             throw new BusinessException("父节点不能是当前节点的子孙节点");
         }
-        validateMenuShape(normalizedRequest.menuType(), parent, normalizedRequest.routeKey(), normalizedRequest.path(), normalizedRequest.component(), normalizedRequest.grantKey());
-        validateGrantKey(normalizedRequest.grantKey());
+        validateMenuShape(normalizedRequest.menuType(), parent, normalizedRequest.grantKey());
+        validateGrantKey(normalizedRequest.menuType(), normalizedRequest.grantKey());
         validateUniqueKeys(menuId, normalizedRequest.resourceKey(), normalizedRequest.routeKey(), normalizedRequest.path());
 
         entity.setParentId(normalizedRequest.parentId());
         entity.setAncestors(resolveAncestors(parent));
-        entity.setMenuType(normalizedRequest.menuType().name());
+        entity.setMenuType(normalizedRequest.menuType().value());
         entity.setResourceKey(normalizedRequest.resourceKey().trim());
         entity.setMenuName(normalizedRequest.menuName().trim());
-        entity.setRouteKey(blankToNull(normalizedRequest.routeKey()));
-        entity.setGrantKey(blankToNull(normalizedRequest.grantKey()));
-        entity.setPath(blankToNull(normalizedRequest.path()));
-        entity.setComponent(blankToNull(normalizedRequest.component()));
-        entity.setRedirect(blankToNull(normalizedRequest.redirect()));
-        entity.setIcon(blankToNull(normalizedRequest.icon()));
+        entity.setRouteKey(normalizedRequest.menuType() == MenuType.MENU ? blankToNull(normalizedRequest.routeKey()) : null);
+        entity.setGrantKey(normalizedRequest.menuType() == MenuType.BUTTON ? blankToNull(normalizedRequest.grantKey()) : null);
+        entity.setPath(normalizedRequest.menuType() == MenuType.MENU ? blankToNull(normalizedRequest.path()) : null);
+        entity.setComponent(normalizedRequest.menuType() == MenuType.MENU ? blankToNull(normalizedRequest.component()) : null);
+        entity.setRedirect(normalizedRequest.menuType() == MenuType.MENU ? blankToNull(normalizedRequest.redirect()) : null);
+        entity.setIcon(normalizedRequest.menuType() == MenuType.MENU ? blankToNull(normalizedRequest.icon()) : null);
         entity.setOrderNo(normalizedRequest.orderNo() == null ? 0 : normalizedRequest.orderNo());
         entity.setVisible(Boolean.FALSE.equals(normalizedRequest.visible()) ? 0 : 1);
         entity.setEnabled(Boolean.FALSE.equals(normalizedRequest.enabled()) ? 0 : 1);
@@ -325,6 +349,7 @@ public class MenuService {
     }
 
     @Transactional
+    @CacheEvict(value = CacheNames.MENU_TEMPLATE, allEntries = true)
     public List<MenuTreeNode> batchCreateActions(Long menuId, List<String> actions) {
         requirePlatformTenant();
         SysMenuEntity parent = getMenu(menuId);
@@ -338,14 +363,15 @@ public class MenuService {
         List<MenuTreeNode> created = new ArrayList<>();
         int orderNo = nextChildOrderNo(menuId);
         for (String action : normalizedActions) {
-            String resourceKey = parent.getResourceKey() + ":" + action;
             String grantKey = resolveActionGrantKey(parent, action);
+            validateGrantKey(MenuType.BUTTON, grantKey);
+            String resourceKey = resolveActionResourceKey(grantKey, action);
             ensureActionNotExists(resourceKey, grantKey);
             SysMenuEntity entity = new SysMenuEntity();
             entity.setTenantId(platformTenantId());
             entity.setParentId(parent.getId());
             entity.setAncestors(resolveAncestors(parent));
-            entity.setMenuType(MenuType.BUTTON.name());
+            entity.setMenuType(MenuType.BUTTON.value());
             entity.setResourceKey(resourceKey);
             entity.setMenuName(parent.getMenuName() + ACTION_LABELS.getOrDefault(action, action));
             entity.setRouteKey(null);
@@ -371,6 +397,7 @@ public class MenuService {
     }
 
     @Transactional
+    @CacheEvict(value = CacheNames.MENU_TEMPLATE, allEntries = true)
     public void delete(Long menuId) {
         requirePlatformTenant();
         SysMenuEntity entity = getMenu(menuId);
@@ -401,6 +428,7 @@ public class MenuService {
     }
 
     @Transactional
+    @CacheEvict(value = CacheNames.MENU_TEMPLATE, allEntries = true)
     public MenuTreeNode updateSort(Long menuId, Integer orderNo) {
         requirePlatformTenant();
         validateOrderNo(orderNo);
@@ -414,6 +442,7 @@ public class MenuService {
         return toMenuNode(entity, List.of());
     }
 
+    @Cacheable(value = CacheNames.MENU_TEMPLATE, unless = "#result.isEmpty()")
     private List<SysMenuEntity> listTemplateMenus() {
         return runWithPlatformTenant(() ->
                 sysMenuMapper.selectList(new LambdaQueryWrapper<SysMenuEntity>()
@@ -436,40 +465,12 @@ public class MenuService {
         return entity;
     }
 
-    private List<MenuTreeNode> rebuildTree(List<SysMenuEntity> menus) {
-        Map<Long, List<SysMenuEntity>> childrenMap = new LinkedHashMap<>();
-        List<SysMenuEntity> roots = new ArrayList<>();
-
-        for (SysMenuEntity menu : menus) {
-            if (menu.getParentId() == null) {
-                roots.add(menu);
-            } else {
-                childrenMap.computeIfAbsent(menu.getParentId(), k -> new ArrayList<>()).add(menu);
-            }
-        }
-
-        Comparator<SysMenuEntity> comp = Comparator
-                .comparingInt((SysMenuEntity m) -> m.getOrderNo() == null ? Integer.MAX_VALUE : m.getOrderNo())
-                .thenComparingLong((SysMenuEntity m) -> m.getId() == null ? Long.MAX_VALUE : m.getId());
-
-        roots.sort(comp);
-        return roots.stream().map(root -> buildSubTree(root, childrenMap, comp)).toList();
-    }
-
-    private MenuTreeNode buildSubTree(SysMenuEntity menu, Map<Long, List<SysMenuEntity>> childrenMap, Comparator<SysMenuEntity> comp) {
-        List<SysMenuEntity> childMenus = new ArrayList<>(childrenMap.getOrDefault(menu.getId(), List.of()));
-        childMenus.sort(comp);
-        List<MenuTreeNode> childNodes = childMenus.stream()
-                .map(child -> buildSubTree(child, childrenMap, comp))
-                .toList();
-        return toMenuNode(menu, childNodes);
-    }
-
     private MenuTreeNode toMenuNode(SysMenuEntity entity, List<MenuTreeNode> children) {
         return new MenuTreeNode(
-                entity.getId(), entity.getMenuType(), entity.getResourceKey(), entity.getMenuName(),
+                entity.getId(), parseType(entity.getMenuType()).value(), entity.getResourceKey(), entity.getMenuName(),
                 entity.getParentId(), entity.getAncestors(),
-                entity.getRouteKey(), entity.getGrantKey(), entity.getPath(), entity.getComponent(),
+                entity.getRouteKey(), entity.getGrantKey(), entity.getGrantKey(),
+                entity.getPath(), entity.getComponent(),
                 entity.getRedirect(), entity.getIcon(), entity.getOrderNo(),
                 entity.getVisible() == null || entity.getVisible() == 1,
                 entity.getEnabled() == null || entity.getEnabled() == 1,
@@ -514,12 +515,62 @@ public class MenuService {
     }
 
     private String resolveActionGrantKey(SysMenuEntity parent, String action) {
-        String grantKey = blankToNull(parent.getGrantKey());
-        if (grantKey == null || !grantKey.contains(":")) {
-            throw new BusinessException("父级菜单授权键不合法，无法生成按钮权限");
+        String existingPrefix = findExistingActionPermissionPrefix(parent.getId());
+        if (existingPrefix != null) {
+            return existingPrefix + ":" + action;
         }
-        String module = grantKey.substring(0, grantKey.indexOf(':'));
-        return module + ":" + action;
+        String resourceKey = blankToNull(parent.getResourceKey());
+        String prefix = permissionPrefixFromResourceKey(resourceKey);
+        if (prefix == null) {
+            throw new BusinessException("资源标识不合法，无法生成按钮权限");
+        }
+        return prefix + ":" + action;
+    }
+
+    private String resolveActionResourceKey(String grantKey, String action) {
+        String normalizedGrantKey = blankToNull(grantKey);
+        if (normalizedGrantKey == null) {
+            throw new BusinessException("授权键不合法，无法生成资源标识");
+        }
+        String[] segments = normalizedGrantKey.split(":");
+        if (segments.length < 3) {
+            throw new BusinessException("授权键不合法，无法生成资源标识");
+        }
+        return segments[segments.length - 2] + "." + action;
+    }
+
+    private String permissionPrefixFromResourceKey(String resourceKey) {
+        if (!StringUtils.hasText(resourceKey)) {
+            return null;
+        }
+        String normalized = resourceKey.trim();
+        int actionSeparator = normalized.lastIndexOf('.');
+        if (actionSeparator > 0) {
+            normalized = normalized.substring(0, actionSeparator);
+        }
+        if (normalized.contains("-")) {
+            return null;
+        }
+        if (!normalized.matches("^[a-zA-Z0-9_]+(?::[a-zA-Z0-9_]+)?$")) {
+            return null;
+        }
+        return normalized.contains(":") ? normalized : "upms:" + normalized;
+    }
+
+    private String findExistingActionPermissionPrefix(Long parentId) {
+        return listTemplateMenus().stream()
+                .filter(menu -> Objects.equals(parentId, menu.getParentId()))
+                .filter(menu -> Objects.equals(MenuType.BUTTON.value(), menu.getMenuType()))
+                .map(SysMenuEntity::getGrantKey)
+                .map(MenuService::blankToNull)
+                .filter(Objects::nonNull)
+                .map(grantKey -> {
+                    int lastSeparator = grantKey.lastIndexOf(':');
+                    return lastSeparator > 0 ? grantKey.substring(0, lastSeparator) : null;
+                })
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
     }
 
     private void ensureActionNotExists(String resourceKey, String grantKey) {
@@ -527,7 +578,7 @@ public class MenuService {
         String normalizedGrantKey = blankToNull(grantKey);
         boolean exists = listTemplateMenus().stream().anyMatch(menu ->
                 Objects.equals(normalizedResourceKey, blankToNull(menu.getResourceKey()))
-                        || (Objects.equals(MenuType.BUTTON.name(), menu.getMenuType())
+                        || (Objects.equals(MenuType.BUTTON.value(), menu.getMenuType())
                         && Objects.equals(normalizedGrantKey, blankToNull(menu.getGrantKey())))
         );
         if (exists) {
@@ -535,45 +586,32 @@ public class MenuService {
         }
     }
 
-    private void validateMenuShape(MenuType childType, SysMenuEntity parent, String routeKey, String path, String component, String grantKey) {
-        validateParentType(childType, parent);
-        if (childType == MenuType.MENU) {
-            if (!StringUtils.hasText(routeKey) || !StringUtils.hasText(path) || !StringUtils.hasText(component)) {
-                throw new BusinessException("菜单节点必须配置路由标识、路径和组件");
+    private void validateMenuShape(MenuType childType, SysMenuEntity parent, String grantKey) {
+        if (childType == MenuType.BUTTON) {
+            if (parent == null || parseType(parent.getMenuType()) != MenuType.MENU) {
+                throw new BusinessException("按钮权限必须挂在菜单节点下");
             }
             if (!StringUtils.hasText(grantKey)) {
-                throw new BusinessException("菜单节点必须配置授权键");
-            }
-        }
-        if ((childType == MenuType.BUTTON || childType == MenuType.API) && !StringUtils.hasText(grantKey)) {
-            throw new BusinessException("按钮/API 权限必须配置授权键");
-        }
-    }
-
-    private void validateParentType(MenuType childType, SysMenuEntity parent) {
-        if (parent == null) {
-            if (childType == MenuType.BUTTON) {
-                throw new BusinessException("按钮权限必须挂在菜单节点下");
+                throw new BusinessException("按钮权限必须配置授权键");
             }
             return;
         }
-        MenuType parentType = parseType(parent.getMenuType());
-        if (parentType == MenuType.BUTTON || parentType == MenuType.API) {
-            throw new BusinessException("按钮/API 权限不能作为父节点");
+        if (StringUtils.hasText(grantKey)) {
+            throw new BusinessException("菜单节点不承载按钮权限");
         }
-        if (parentType == MenuType.MENU && childType != MenuType.BUTTON && childType != MenuType.API) {
-            throw new BusinessException("菜单节点下只允许挂按钮或 API 权限");
-        }
-        if (childType == MenuType.BUTTON && parentType != MenuType.MENU) {
-            throw new BusinessException("按钮权限必须挂在菜单节点下");
+        if (parent != null && parseType(parent.getMenuType()) == MenuType.BUTTON) {
+            throw new BusinessException("按钮权限不能作为父节点");
         }
     }
 
-    private void validateGrantKey(String grantKey) {
+    private void validateGrantKey(MenuType menuType, String grantKey) {
         if (!StringUtils.hasText(grantKey)) {
             return;
         }
-        if (!grantKey.matches("^[a-zA-Z0-9]+:[a-zA-Z0-9]+(?:[:][a-zA-Z0-9_-]+)?$")) {
+        if (menuType != MenuType.BUTTON) {
+            throw new BusinessException("只有按钮节点可以配置授权键");
+        }
+        if (!grantKey.matches("^[a-zA-Z0-9]+:[a-zA-Z0-9]+:[a-zA-Z0-9_-]+$")) {
             throw new BusinessException("授权键格式不合法");
         }
     }
@@ -605,7 +643,7 @@ public class MenuService {
         if (entity.getIsSystem() == null || entity.getIsSystem() != 1) {
             return;
         }
-        if (!Objects.equals(entity.getMenuType(), request.menuType().name())) {
+        if (!Objects.equals(parseType(entity.getMenuType()), request.menuType())) {
             throw new BusinessException("系统节点不允许修改类型");
         }
         if (!Objects.equals(entity.getParentId(), request.parentId())) {
@@ -657,8 +695,7 @@ public class MenuService {
     }
 
     private boolean isRouteNode(SysMenuEntity menu) {
-        MenuType type = parseType(menu.getMenuType());
-        return type == MenuType.DIR || type == MenuType.MENU;
+        return parseType(menu.getMenuType()) == MenuType.MENU;
     }
 
     private boolean hierarchyEnabled(SysMenuEntity menu, Map<Long, SysMenuEntity> menuById) {
@@ -776,11 +813,7 @@ public class MenuService {
     }
 
     private MenuType parseType(String value) {
-        try {
-            return MenuType.valueOf(value);
-        } catch (Exception ignored) {
-            return MenuType.BUTTON;
-        }
+        return MenuType.fromValue(value);
     }
 
     private <T> T runWithPlatformTenant(Supplier<T> supplier) {

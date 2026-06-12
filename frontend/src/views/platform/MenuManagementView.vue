@@ -11,14 +11,14 @@
             v-model="keyword"
             class="resource-toolbar__search"
             clearable
-            placeholder="搜索名称、资源、路由、授权键或应用标识"
+            placeholder="搜索菜单名称、菜单权限、菜单编码或菜单路径"
           >
             <template #prefix>
               <el-icon><Search /></el-icon>
             </template>
           </el-input>
           <el-button :icon="Refresh" @click="load">刷新</el-button>
-          <el-button v-permission="'system:write'" type="primary" :icon="Plus" @click="openCreate(null)">
+          <el-button v-permission="'upms:sysmenu:add'" type="primary" :icon="Plus" @click="openCreate(null)">
             新增顶层
           </el-button>
         </div>
@@ -29,20 +29,21 @@
         row-key="id"
         default-expand-all
         :tree-props="{ children: 'children' }"
+        :indent="0"
         class="menu-permission-table"
         size="default"
       >
         <el-table-column label="菜单名称" min-width="260">
           <template #default="{ row }">
             <div class="node-title" :style="nodeTitleStyle(row)">
-              <el-icon v-if="row.menuType === 'DIR'" class="node-icon node-icon--dir">
+              <el-icon v-if="row.menuType === '0' && row.children?.length" class="node-icon node-icon--dir">
                 <FolderOpened />
               </el-icon>
-              <el-icon v-else-if="row.menuType === 'MENU'" class="node-icon node-icon--menu">
+              <el-icon v-else-if="row.menuType === '0'" class="node-icon node-icon--menu">
                 <Menu />
               </el-icon>
               <el-icon v-else class="node-icon node-icon--permission">
-                <Tickets />
+                <Lock />
               </el-icon>
               <span class="node-label">{{ row.menuName }}</span>
               <el-tag size="small" effect="plain">{{ typeLabel(row.menuType) }}</el-tag>
@@ -51,79 +52,31 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="资源标识" width="180">
+        <el-table-column label="菜单权限" width="190">
           <template #default="{ row }">
-            <code class="route-key">{{ row.resourceKey }}</code>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="授权键" width="180">
-          <template #default="{ row }">
-            <code v-if="row.grantKey">{{ row.grantKey }}</code>
+            <code v-if="row.permission">{{ row.permission }}</code>
             <span v-else class="text-muted">—</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="路由标识" width="160">
+        <el-table-column label="菜单编码" width="180">
           <template #default="{ row }">
-            <code v-if="row.routeKey" class="route-key">{{ row.routeKey }}</code>
+            <code v-if="row.component" class="route-key">{{ row.component }}</code>
             <span v-else class="text-muted">—</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="路由路径" width="160">
+        <el-table-column label="菜单路径" width="180">
           <template #default="{ row }">
             <code v-if="row.path">{{ row.path }}</code>
             <span v-else class="text-muted">—</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="组件" width="180">
-          <template #default="{ row }">
-            <span v-if="row.component">{{ row.component }}</span>
-            <span v-else class="text-muted">—</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="应用标识" width="140">
-          <template #default="{ row }">
-            <code v-if="row.applicationKey" class="route-key">{{ row.applicationKey }}</code>
-            <span v-else class="text-muted">—</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="外链" width="80" align="center">
-          <template #default="{ row }">
-            <el-tag v-if="row.outerStatus" size="small" type="warning" effect="plain">外链</el-tag>
-            <span v-else class="text-muted">—</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="图标" width="80" align="center">
-          <template #default="{ row }">
-            <el-icon v-if="row.icon" :size="18"><component :is="row.icon" /></el-icon>
-            <span v-else class="text-muted">—</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="状态" width="100" align="center">
-          <template #default="{ row }">
-            <el-tag v-if="!row.visible" size="small" type="info">隐藏</el-tag>
-            <el-tag v-else-if="!row.enabled" size="small" type="danger">禁用</el-tag>
-            <el-tag v-else size="small" type="success">正常</el-tag>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="排序" width="90" align="center">
-          <template #default="{ row }">
-            <span class="sort-value">{{ row.orderNo }}</span>
-          </template>
-        </el-table-column>
-
         <el-table-column label="操作" width="240" fixed="right">
           <template #default="{ row }">
             <el-button
-              v-if="row.grantKey"
+              v-if="row.permission"
               link
               type="primary"
               size="small"
@@ -132,8 +85,8 @@
               复制权限
             </el-button>
             <el-button
-              v-if="row.menuType === 'MENU'"
-              v-permission="'system:write'"
+              v-if="row.menuType === '0'"
+              v-permission="'upms:sysmenu:add'"
               link
               type="primary"
               size="small"
@@ -142,7 +95,7 @@
               批量按钮
             </el-button>
             <el-button
-              v-permission="'system:write'"
+              v-permission="'upms:sysmenu:add'"
               link
               type="primary"
               size="small"
@@ -152,7 +105,7 @@
               新增子级
             </el-button>
             <el-button
-              v-permission="'system:write'"
+              v-permission="'upms:sysmenu:edit'"
               link
               type="primary"
               size="small"
@@ -162,7 +115,7 @@
               编辑
             </el-button>
             <el-button
-              v-permission="'system:write'"
+              v-permission="'upms:sysmenu:del'"
               link
               type="danger"
               size="small"
@@ -208,34 +161,34 @@
         </el-form-item>
 
         <el-form-item label="资源标识" prop="resourceKey">
-          <el-input v-model="form.resourceKey" placeholder="唯一标识，如 system:user:create" />
+          <el-input v-model="form.resourceKey" placeholder="唯一标识，如 sysmenu 或 sysmenu.add" />
         </el-form-item>
 
         <el-form-item label="菜单名称" prop="menuName">
           <el-input v-model="form.menuName" placeholder="输入菜单名称" maxlength="60" />
         </el-form-item>
 
-        <el-form-item v-if="form.menuType !== 'BUTTON' && form.menuType !== 'API'" label="路由标识" prop="routeKey">
+        <el-form-item v-if="form.menuType === '0'" label="路由标识" prop="routeKey">
           <el-input v-model="form.routeKey" placeholder="前端路由标识，如 users" />
         </el-form-item>
 
-        <el-form-item v-if="form.menuType === 'MENU' || form.menuType === 'BUTTON' || form.menuType === 'API'" label="授权键" prop="grantKey">
-          <el-input v-model="form.grantKey" placeholder="授权键，如 user:read 或 user:write:create" />
+        <el-form-item v-if="form.menuType === '1'" label="菜单权限" prop="grantKey">
+          <el-input v-model="form.grantKey" placeholder="如 upms:sysmenu:add" />
         </el-form-item>
 
-        <el-form-item v-if="form.menuType === 'MENU'" label="路由路径" prop="path">
-          <el-input v-model="form.path" placeholder="/system/users" />
+        <el-form-item v-if="form.menuType === '0'" label="菜单路径" prop="path">
+          <el-input v-model="form.path" placeholder="/platform/menu" />
         </el-form-item>
 
-        <el-form-item v-if="form.menuType === 'MENU'" label="组件名称" prop="component">
-          <el-input v-model="form.component" placeholder="UsersView" />
+        <el-form-item v-if="form.menuType === '0'" label="菜单编码" prop="component">
+          <el-input v-model="form.component" placeholder="upms/menu/index 或 MenuManagementView" />
         </el-form-item>
 
-        <el-form-item label="重定向" v-if="form.menuType === 'MENU'">
+        <el-form-item label="重定向" v-if="form.menuType === '0'">
           <el-input v-model="form.redirect" placeholder="重定向路径（可选）" />
         </el-form-item>
 
-        <el-form-item label="图标" v-if="form.menuType === 'DIR' || form.menuType === 'MENU'">
+        <el-form-item label="图标" v-if="form.menuType === '0'">
           <el-input v-model="form.icon" placeholder="Element Plus 图标名">
             <template #prefix>
               <el-icon v-if="form.icon"><component :is="form.icon" /></el-icon>
@@ -247,7 +200,7 @@
           <el-input v-model="form.applicationKey" placeholder="用于套餐/能力映射，如 app_base" clearable />
         </el-form-item>
 
-        <el-form-item v-if="form.menuType === 'MENU'" label="外链">
+        <el-form-item v-if="form.menuType === '0'" label="外链">
           <el-switch v-model="form.outerStatus" active-text="外链" inactive-text="内链" />
         </el-form-item>
 
@@ -305,7 +258,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import {
-  Plus, Edit, Delete, Refresh, Search, FolderOpened, Menu, Tickets,
+  Plus, Edit, Delete, Refresh, Search, FolderOpened, Menu, Lock,
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import {
@@ -328,7 +281,7 @@ const formRef = ref<FormInstance>()
 
 const form = reactive<MenuMutationPayload & { parentId?: number | null }>({
   parentId: null,
-  menuType: 'MENU',
+  menuType: '0',
   resourceKey: '',
   menuName: '',
   routeKey: null,
@@ -345,19 +298,16 @@ const form = reactive<MenuMutationPayload & { parentId?: number | null }>({
 })
 
 const actionOptions = [
-  { label: '查看', value: 'read' },
-  { label: '新增', value: 'create' },
-  { label: '修改', value: 'update' },
-  { label: '删除', value: 'delete' },
-  { label: '导出', value: 'export' },
-  { label: '导入', value: 'import' },
+  { label: '新增', value: 'add' },
+  { label: '修改', value: 'edit' },
+  { label: '删除', value: 'del' },
+  { label: '列表', value: 'page' },
+  { label: '查询', value: 'get' },
 ]
 
 const menuTypeOptions = [
-  { label: '目录', value: 'DIR' },
-  { label: '菜单', value: 'MENU' },
-  { label: '按钮', value: 'BUTTON' },
-  { label: 'API', value: 'API' },
+  { label: '菜单', value: '0' },
+  { label: '按钮', value: '1' },
 ]
 
 const formRules: FormRules = {
@@ -382,9 +332,10 @@ const filteredTableData = computed(() => {
         const children = filterTree(n.children || [])
         const match =
           n.menuName.toLowerCase().includes(kw) ||
-          n.resourceKey.toLowerCase().includes(kw) ||
+          (n.permission && n.permission.toLowerCase().includes(kw)) ||
+          (n.component && n.component.toLowerCase().includes(kw)) ||
+          (n.path && n.path.toLowerCase().includes(kw)) ||
           (n.routeKey && n.routeKey.toLowerCase().includes(kw)) ||
-          (n.grantKey && n.grantKey.toLowerCase().includes(kw)) ||
           (n.applicationKey && n.applicationKey.toLowerCase().includes(kw))
         if (match || children.length > 0) {
           return { ...n, children }
@@ -395,12 +346,18 @@ const filteredTableData = computed(() => {
   return filterTree(tableData.value)
 })
 
-const nodeTitleStyle = () => ({ paddingLeft: '0px' })
+const nodeTitleStyle = (row: MenuTreeNode) => {
+  const depth = (row as any)._depth ?? 0
+  const baseIndent = 16
+  return { paddingLeft: `${depth * baseIndent}px` }
+}
 
 async function load() {
   loading.value = true
   try {
-    tableData.value = await queryMenuTree()
+    const data = await queryMenuTree()
+    computeDepth(data)
+    tableData.value = data
   } catch (e: any) {
     ElMessage.error(e?.message || '加载菜单失败')
   } finally {
@@ -408,9 +365,18 @@ async function load() {
   }
 }
 
+function computeDepth(nodes: MenuTreeNode[], depth = 0) {
+  for (const node of nodes) {
+    (node as any)._depth = depth
+    if (node.children?.length) {
+      computeDepth(node.children, depth + 1)
+    }
+  }
+}
+
 function resetForm() {
   form.parentId = null
-  form.menuType = 'MENU'
+  form.menuType = '0'
   form.resourceKey = ''
   form.menuName = ''
   form.routeKey = null
@@ -433,7 +399,7 @@ function openCreate(parentId: number | null) {
   resetForm()
   form.parentId = parentId
   if (parentId == null) {
-    form.menuType = 'DIR'
+    form.menuType = '0'
   }
   dialogVisible.value = true
 }
@@ -470,12 +436,12 @@ async function handleSave() {
       menuType: form.menuType,
       resourceKey: form.resourceKey,
       menuName: form.menuName,
-      routeKey: form.routeKey || null,
-      grantKey: form.grantKey || null,
-      path: form.path || null,
-      component: form.component || null,
-      redirect: form.redirect || null,
-      icon: form.icon || null,
+      routeKey: form.menuType === '0' ? form.routeKey || null : null,
+      grantKey: form.menuType === '1' ? form.grantKey || null : null,
+      path: form.menuType === '0' ? form.path || null : null,
+      component: form.menuType === '0' ? form.component || null : null,
+      redirect: form.menuType === '0' ? form.redirect || null : null,
+      icon: form.menuType === '0' ? form.icon || null : null,
       orderNo: form.orderNo,
       visible: form.visible,
       enabled: form.enabled,
@@ -517,16 +483,16 @@ async function handleDelete(row: MenuTreeNode) {
 }
 
 async function copyGrantKey(row: MenuTreeNode) {
-  if (!row.grantKey) {
+  if (!row.permission) {
     return
   }
-  await navigator.clipboard?.writeText(row.grantKey)
+  await navigator.clipboard?.writeText(row.permission)
   ElMessage.success('权限标识已复制')
 }
 
 function openBatchActions(row: MenuTreeNode) {
   actionParent.value = row
-  selectedActions.value = ['read', 'create', 'update', 'delete']
+  selectedActions.value = ['add', 'edit', 'del', 'page', 'get']
   actionDialogVisible.value = true
 }
 
@@ -550,12 +516,10 @@ async function handleBatchActions() {
 
 function typeLabel(type: MenuTreeNode['menuType']) {
   const labels: Record<MenuTreeNode['menuType'], string> = {
-    DIR: '目录',
-    MENU: '菜单',
-    BUTTON: '按钮',
-    API: 'API',
+    '0': '菜单',
+    '1': '按钮',
   }
-  return labels[type]
+  return labels[type] ?? type
 }
 
 onMounted(load)

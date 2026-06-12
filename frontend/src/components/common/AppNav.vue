@@ -19,7 +19,7 @@
 import type { Component } from 'vue'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { resolveAppIcon, resolveMenuPresentation } from '@/app/registry/module-manifest'
+import { resolveAppIcon, resolveMenuPresentation, resolveRouteManifest } from '@/app/registry/module-manifest'
 import { resolveRoutePath } from '@/router/route-access'
 import AppNavItem from './AppNavItem.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -65,7 +65,8 @@ function buildLinks(nodes: MenuItem[]): NavLink[] {
 
   for (const node of nodes) {
     const accessKey = node.routeKey?.trim() || node.code?.trim() || ''
-    const path = node.path?.trim() || resolveRoutePath(accessKey)
+    const rawPath = node.path?.trim() || resolveRoutePath(accessKey)
+    const path = canAccessRoute(accessKey) ? rawPath : ''
     const children = buildLinks(node.children ?? [])
     const fallbackPath = children[0]?.to ?? ''
     if (!path && !fallbackPath) {
@@ -93,6 +94,11 @@ function buildLinks(nodes: MenuItem[]): NavLink[] {
     })
   }
   return links
+}
+
+function canAccessRoute(accessKey: string) {
+  const requiredGrant = resolveRouteManifest(accessKey)?.requiredGrant
+  return !requiredGrant || authStore.hasGrant(requiredGrant)
 }
 </script>
 

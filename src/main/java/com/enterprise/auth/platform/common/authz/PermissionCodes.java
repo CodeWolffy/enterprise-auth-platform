@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.common.authz;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
@@ -32,6 +33,11 @@ public final class PermissionCodes {
     public static final String CODEGEN_READ = "codegen:read";
     public static final String CODEGEN_WRITE = "codegen:write";
     public static final String CODEGEN_DOWNLOAD = "codegen:download";
+    public static final String SYSMENU_PAGE = "upms:sysmenu:page";
+    public static final String SYSMENU_GET = "upms:sysmenu:get";
+    public static final String SYSMENU_ADD = "upms:sysmenu:add";
+    public static final String SYSMENU_EDIT = "upms:sysmenu:edit";
+    public static final String SYSMENU_DEL = "upms:sysmenu:del";
     public static final String SESSION_WRITE = "session:write";
 
     public static final Set<String> ALL = Set.of(
@@ -59,10 +65,15 @@ public final class PermissionCodes {
             CODEGEN_READ,
             CODEGEN_WRITE,
             CODEGEN_DOWNLOAD,
+            SYSMENU_PAGE,
+            SYSMENU_GET,
+            SYSMENU_ADD,
+            SYSMENU_EDIT,
+            SYSMENU_DEL,
             SESSION_WRITE
     );
 
-    public static final List<PermissionDescriptor> CATALOG = List.of(
+    public static final List<PermissionDescriptor> CATALOG = Arrays.asList(
             new PermissionDescriptor(USER_READ, "用户查看", "user"),
             new PermissionDescriptor(USER_WRITE, "用户管理", "user"),
             new PermissionDescriptor(ROLE_READ, "角色查看", "role"),
@@ -87,6 +98,11 @@ public final class PermissionCodes {
             new PermissionDescriptor(CODEGEN_READ, "代码生成查看", "codegen"),
             new PermissionDescriptor(CODEGEN_WRITE, "代码生成管理", "codegen"),
             new PermissionDescriptor(CODEGEN_DOWNLOAD, "代码生成下载", "codegen"),
+            new PermissionDescriptor(SYSMENU_PAGE, "菜单管理列表", "sysmenu"),
+            new PermissionDescriptor(SYSMENU_GET, "菜单管理查询", "sysmenu"),
+            new PermissionDescriptor(SYSMENU_ADD, "菜单管理新增", "sysmenu"),
+            new PermissionDescriptor(SYSMENU_EDIT, "菜单管理修改", "sysmenu"),
+            new PermissionDescriptor(SYSMENU_DEL, "菜单管理删除", "sysmenu"),
             new PermissionDescriptor(SESSION_WRITE, "会话管理", "session")
     );
 

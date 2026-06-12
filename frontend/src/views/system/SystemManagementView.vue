@@ -83,7 +83,7 @@
             <h4>菜单管理</h4>
             <p>维护目录、菜单、按钮和 API 权限节点，支持授权键、路由键、可见性与排序配置。</p>
           </div>
-          <el-button v-permission="'system:write'" type="primary" data-testid="settings-menus-entry" @click="goTo('settings-menus')">进入菜单管理</el-button>
+          <el-button v-permission="'upms:sysmenu:page'" type="primary" data-testid="settings-menus-entry" @click="goTo('settings-menus')">进入菜单管理</el-button>
         </article>
       </div>
     </section>

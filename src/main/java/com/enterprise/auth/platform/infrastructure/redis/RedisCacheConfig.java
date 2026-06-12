@@ -62,7 +62,8 @@ public class RedisCacheConfig implements CachingConfigurer {
                 .withCacheConfiguration(CacheNames.SYSTEM_CONFIGS, defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedSystemConfigsTtl()))
                 .withCacheConfiguration(CacheNames.SYSTEM_NOTICES, defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedSystemNoticesTtl()))
                 .withCacheConfiguration(CacheNames.SYSTEM_CATEGORIES_ALL, defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedSystemCategoriesAllTtl()))
-                .withCacheConfiguration(CacheNames.SYSTEM_CATEGORIES_TARGET, defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedSystemCategoriesTargetTtl()));
+                .withCacheConfiguration(CacheNames.SYSTEM_CATEGORIES_TARGET, defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedSystemCategoriesTargetTtl()))
+                .withCacheConfiguration(CacheNames.MENU_TEMPLATE, defaultRedisCacheConfiguration.entryTtl(cacheProperties.resolvedMenuTemplateTtl()));
     }
 
     @Bean

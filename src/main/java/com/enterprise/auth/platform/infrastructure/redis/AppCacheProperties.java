@@ -14,7 +14,8 @@ public record AppCacheProperties(
         Duration systemConfigsTtl,
         Duration systemNoticesTtl,
         Duration systemCategoriesAllTtl,
-        Duration systemCategoriesTargetTtl
+        Duration systemCategoriesTargetTtl,
+        Duration menuTemplateTtl
 ) {
 
     public String resolvedKeyPrefix() {
@@ -67,6 +68,10 @@ public record AppCacheProperties(
 
     public Duration resolvedSystemCategoriesTargetTtl() {
         return resolvePositiveTtl(systemCategoriesTargetTtl, Duration.ofMinutes(60));
+    }
+
+    public Duration resolvedMenuTemplateTtl() {
+        return resolvePositiveTtl(menuTemplateTtl, Duration.ofMinutes(10));
     }
 
     private Duration resolvePositiveTtl(Duration source, Duration fallback) {

@@ -13,6 +13,7 @@ public record MenuTreeNode(
         @Schema(description = "祖先链") String ancestors,
         @Schema(description = "路由标识") String routeKey,
         @Schema(description = "授权键") String grantKey,
+        @Schema(description = "权限标识（对齐 haorong-mall 的 permission）") String permission,
         @Schema(description = "路由路径") String path,
         @Schema(description = "组件名") String component,
         @Schema(description = "重定向路径") String redirect,

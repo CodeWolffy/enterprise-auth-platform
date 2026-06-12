@@ -4,6 +4,7 @@ import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.modules.menu.application.MenuService;
+import com.enterprise.auth.platform.modules.menu.application.MenuTreeUtil;
 import com.enterprise.auth.platform.modules.menu.domain.MenuTreeNode;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,35 +37,42 @@ public class MenuController {
 
     @Operation(summary = "查询菜单树")
     @GetMapping("/tree")
-    @SaCheckPermission(PermissionCodes.SYSTEM_READ)
+    @SaCheckPermission(PermissionCodes.SYSMENU_PAGE)
     public ApiResponse<List<MenuTreeNode>> tree() {
-        return ApiResponse.ok(menuService.templateTree());
+        return ApiResponse.ok(MenuTreeUtil.buildTree(menuService.templateTree()));
     }
 
     @Operation(summary = "查询可授权菜单树")
     @GetMapping("/grantable-tree")
     @SaCheckPermission(PermissionCodes.ROLE_READ)
     public ApiResponse<List<MenuTreeNode>> grantableTree() {
-        return ApiResponse.ok(menuService.grantableTree(TenantContext.getTenantId()));
+        return ApiResponse.ok(MenuTreeUtil.buildTree(menuService.grantableTree(TenantContext.getTenantId())));
     }
 
     @Operation(summary = "查询平台菜单模板树")
     @GetMapping("/template-tree")
-    @SaCheckPermission(PermissionCodes.SYSTEM_READ)
+    @SaCheckPermission(PermissionCodes.SYSMENU_PAGE)
     public ApiResponse<List<MenuTreeNode>> templateTree() {
-        return ApiResponse.ok(menuService.templateTree());
+        return ApiResponse.ok(MenuTreeUtil.buildTree(menuService.templateTree()));
+    }
+
+    @Operation(summary = "查询菜单详情")
+    @GetMapping("/{menuId}")
+    @SaCheckPermission(PermissionCodes.SYSMENU_GET)
+    public ApiResponse<MenuTreeNode> detail(@Parameter(description = "菜单 ID") @PathVariable Long menuId) {
+        return ApiResponse.ok(menuService.detail(menuId));
     }
 
     @Operation(summary = "新增菜单")
     @PostMapping
-    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
+    @SaCheckPermission(PermissionCodes.SYSMENU_ADD)
     public ApiResponse<MenuTreeNode> create(@Valid @RequestBody CreateMenuRequest request) {
         return ApiResponse.ok(menuService.create(request));
     }
 
     @Operation(summary = "修改菜单")
     @PutMapping("/{menuId}")
-    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
+    @SaCheckPermission(PermissionCodes.SYSMENU_EDIT)
     public ApiResponse<MenuTreeNode> update(
             @Parameter(description = "菜单 ID") @PathVariable Long menuId,
             @RequestBody JsonNode body
@@ -83,7 +91,7 @@ public class MenuController {
 
     @Operation(summary = "删除菜单")
     @DeleteMapping("/{menuId}")
-    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
+    @SaCheckPermission(PermissionCodes.SYSMENU_DEL)
     public ApiResponse<Void> delete(@Parameter(description = "菜单 ID") @PathVariable Long menuId) {
         menuService.delete(menuId);
         return ApiResponse.ok();
@@ -91,7 +99,7 @@ public class MenuController {
 
     @Operation(summary = "批量生成按钮权限")
     @PostMapping("/{menuId}/actions")
-    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
+    @SaCheckPermission(PermissionCodes.SYSMENU_ADD)
     public ApiResponse<List<MenuTreeNode>> batchActions(
             @Parameter(description = "菜单 ID") @PathVariable Long menuId,
             @Valid @RequestBody BatchMenuActionRequest request
@@ -101,7 +109,7 @@ public class MenuController {
 
     @Operation(summary = "修改菜单排序")
     @PutMapping("/{menuId}/sort")
-    @SaCheckPermission(PermissionCodes.SYSTEM_WRITE)
+    @SaCheckPermission(PermissionCodes.SYSMENU_EDIT)
     public ApiResponse<MenuTreeNode> sort(
             @Parameter(description = "菜单 ID") @PathVariable Long menuId,
             @Valid @RequestBody SortMenuRequest request

@@ -154,13 +154,18 @@ function canRegisterRoute(
   allowedRouteKeys: Set<string>,
 ) {
   if (manifest.routeKey) {
-    return allowedRouteKeys.has(manifest.routeKey)
+    return allowedRouteKeys.has(manifest.routeKey) && hasRequiredGrant(snapshot, manifest.requiredGrant)
   }
   if (manifest.generatedRoute) {
     return [...allowedRouteKeys].some((routeKey) => routeKey.startsWith('generated.'))
   }
   const requiredGrant = manifest.requiredGrant?.trim()
   return !requiredGrant || snapshot.superAdmin || (snapshot.grants ?? []).includes(requiredGrant)
+}
+
+function hasRequiredGrant(snapshot: PermissionSnapshot, requiredGrant?: string | null) {
+  const normalizedGrant = requiredGrant?.trim()
+  return !normalizedGrant || snapshot.superAdmin || (snapshot.grants ?? []).includes(normalizedGrant)
 }
 
 function collectMenuByRouteKey(menus: MenuItem[]) {

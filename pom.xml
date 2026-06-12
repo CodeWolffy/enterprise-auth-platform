@@ -25,6 +25,7 @@
         <redisson.version>3.52.0</redisson.version>
         <knife4j.version>4.4.0</knife4j.version>
         <fastjson2.version>2.0.52</fastjson2.version>
+        <hutool.version>5.8.25</hutool.version>
         <spring-boot-admin.version>3.2.3</spring-boot-admin.version>
         <rocketmq.version>2.3.1</rocketmq.version>
         <seata.version>1.7.1</seata.version>
@@ -159,6 +160,11 @@
             <groupId>com.alibaba.fastjson2</groupId>
             <artifactId>fastjson2</artifactId>
             <version>${fastjson2.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+            <version>${hutool.version}</version>
         </dependency>
         <dependency>
             <groupId>com.alibaba</groupId>

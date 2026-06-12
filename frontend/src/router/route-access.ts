@@ -1,5 +1,5 @@
 import type { RouteLocationNormalized } from 'vue-router'
-import { ROUTE_KEY_PATH_MAP } from '@/app/registry/module-manifest'
+import { ROUTE_KEY_PATH_MAP, resolveRouteManifest } from '@/app/registry/module-manifest'
 import type { MenuItem, PermissionSnapshot } from '@/types/auth-models'
 
 interface RouteAccessTarget {
@@ -64,7 +64,7 @@ export function isAllowedRoute(snapshot: PermissionSnapshot | null, to: RouteAcc
   }
 
   const routeKeys = collectAllowedRouteKeys(snapshot.menus ?? [])
-  return routeKeys.has(routeKey)
+  return routeKeys.has(routeKey) && hasRequiredGrant(snapshot, requiredGrant)
 }
 
 function isAllowedGeneratedRoute(snapshot: PermissionSnapshot, path: string) {
@@ -103,12 +103,21 @@ export function resolveFirstAllowedPath(snapshot: PermissionSnapshot | null) {
     if (!routeKey || !routeKeys.has(routeKey)) {
       continue
     }
+    const requiredGrant = resolveRouteManifest(routeKey)?.requiredGrant?.trim() ?? ''
+    if (!hasRequiredGrant(snapshot, requiredGrant)) {
+      continue
+    }
     const path = menu.path?.trim() || resolveRoutePath(routeKey)
     if (path) {
       return path
     }
   }
   return routeKeys.has('dashboard') ? '/dashboard' : null
+}
+
+function hasRequiredGrant(snapshot: PermissionSnapshot, requiredGrant?: string | null) {
+  const normalizedGrant = requiredGrant?.trim()
+  return !normalizedGrant || snapshot.superAdmin || (snapshot.grants ?? []).includes(normalizedGrant)
 }
 
 function flattenMenuTree(menus: MenuItem[]) {

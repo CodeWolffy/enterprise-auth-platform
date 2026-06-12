@@ -6,6 +6,6 @@ import java.util.List;
 
 @Schema(description = "批量生成按钮权限请求")
 public record BatchMenuActionRequest(
-        @Schema(description = "动作集合：read/create/update/delete/export/import") @NotEmpty List<String> actions
+        @Schema(description = "动作集合：add/edit/del/page/get") @NotEmpty List<String> actions
 ) {
 }

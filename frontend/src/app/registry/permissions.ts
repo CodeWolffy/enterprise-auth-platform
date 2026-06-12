@@ -20,7 +20,11 @@ export const PERMISSIONS = {
   WORKFLOW_WRITE: 'workflow:write',
   CODEGEN_READ: 'codegen:read',
   CODEGEN_WRITE: 'codegen:write',
-  CODEGEN_DOWNLOAD: 'codegen:download',
+  SYSMENU_PAGE: 'upms:sysmenu:page',
+  SYSMENU_GET: 'upms:sysmenu:get',
+  SYSMENU_ADD: 'upms:sysmenu:add',
+  SYSMENU_EDIT: 'upms:sysmenu:edit',
+  SYSMENU_DEL: 'upms:sysmenu:del',
   SESSION_WRITE: 'session:write',
 } as const
 
@@ -53,6 +57,11 @@ export const PERMISSION_CATALOG: Array<{
   { code: PERMISSIONS.CODEGEN_READ, label: '代码生成查看', module: 'codegen' },
   { code: PERMISSIONS.CODEGEN_WRITE, label: '代码生成管理', module: 'codegen' },
   { code: PERMISSIONS.CODEGEN_DOWNLOAD, label: '代码生成下载', module: 'codegen' },
+  { code: PERMISSIONS.SYSMENU_PAGE, label: '菜单管理列表', module: 'sysmenu' },
+  { code: PERMISSIONS.SYSMENU_GET, label: '菜单管理查询', module: 'sysmenu' },
+  { code: PERMISSIONS.SYSMENU_ADD, label: '菜单管理新增', module: 'sysmenu' },
+  { code: PERMISSIONS.SYSMENU_EDIT, label: '菜单管理修改', module: 'sysmenu' },
+  { code: PERMISSIONS.SYSMENU_DEL, label: '菜单管理删除', module: 'sysmenu' },
   { code: PERMISSIONS.SESSION_WRITE, label: '会话管理', module: 'session' },
 ]
 

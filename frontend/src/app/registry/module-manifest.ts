@@ -108,7 +108,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'menus',
     title: '菜单管理',
     icon: 'Tickets',
-    requiredGrant: PERMISSIONS.SYSTEM_READ,
+    requiredGrant: PERMISSIONS.SYSMENU_PAGE,
     component: () => import('@/views/platform/MenuManagementView.vue'),
   },
   {
@@ -314,7 +314,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'settings-menus',
     title: '菜单管理',
     hidden: true,
-    requiredGrant: PERMISSIONS.SYSTEM_WRITE,
+    requiredGrant: PERMISSIONS.SYSMENU_PAGE,
     component: () => import('@/views/platform/MenuManagementView.vue'),
   },
 ] satisfies AppRouteManifest[]

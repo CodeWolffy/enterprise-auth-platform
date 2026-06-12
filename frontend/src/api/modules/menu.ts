@@ -3,7 +3,7 @@
 import { http } from '../http'
 import type { ApiResponse } from '@/types/api'
 
-export type MenuType = 'DIR' | 'MENU' | 'BUTTON' | 'API'
+export type MenuType = '0' | '1'
 
 export interface MenuTreeNode {
   id: number
