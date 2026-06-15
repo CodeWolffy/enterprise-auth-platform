@@ -9,8 +9,10 @@ import com.enterprise.auth.platform.modules.menu.application.MenuTemplateMutatio
 import com.enterprise.auth.platform.modules.role.application.RoleMenuMutationFacade;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,8 +21,8 @@ import org.springframework.util.StringUtils;
 @Service
 public class CodegenResourceRegistrationService {
 
-    private static final String GENERATED_MENU_PARENT_KEY = "generated";
-    private static final String GENERATED_API_PARENT_KEY = "api.generated";
+    private static final String GENERATED_MENU_PARENT_PATH = "/platform/generated";
+    private static final String GENERATED_API_PARENT_PERMISSION = "upms:generated";
 
     private final MenuTemplateMutationFacade menuTemplateMutationFacade;
     private final RoleMenuMutationFacade roleMenuMutationFacade;
@@ -48,14 +50,13 @@ public class CodegenResourceRegistrationService {
         String templateTenantId = platformTenantId();
         String grantTenantId = activeTenantId();
         Long menuId = ensureMenuWithParents(templateTenantId, safeModule, title);
-        Long readApiId = ensureApi(templateTenantId, "api.generated." + safeModule + ".read", safeModule + " 读", safeModule + ":read", 900);
-        Long writeApiId = ensureApi(templateTenantId, "api.generated." + safeModule + ".write", safeModule + " 写", safeModule + ":write", 910);
+        Long readApiId = ensureApi(templateTenantId, safeModule + ":read", safeModule + " 读", 900);
+        Long writeApiId = ensureApi(templateTenantId, safeModule + ":write", safeModule + " 写", 910);
 
         List<String> grantKeys = new ArrayList<>();
         grantKeys.add(safeModule + ":read");
         grantKeys.add(safeModule + ":write");
-        List<Long> assignedMenuIds = List.of(menuId, readApiId, writeApiId);
-        assignToAdminRole(grantTenantId, assignedMenuIds);
+        assignToAdminRole(grantTenantId, List.of(menuId, readApiId, writeApiId));
         permissionSnapshotInvalidationService.invalidateAll();
         return grantKeys;
     }
@@ -70,137 +71,106 @@ public class CodegenResourceRegistrationService {
     }
 
     private Long ensureMenuWithParents(String tenantId, String moduleName, String title) {
-        ensureParentMenu(tenantId, GENERATED_MENU_PARENT_KEY, "已生成模块");
+        ensureParentMenu(tenantId);
         ensureParentApi(tenantId);
         return ensureMenu(tenantId, moduleName, title);
     }
 
-    private void ensureParentMenu(String tenantId, String resourceKey, String resourceName) {
-        if (menuTemplateMutationFacade.findByKeyAndType(tenantId, resourceKey, "DIR").isPresent()) {
+    private void ensureParentMenu(String tenantId) {
+        if (menuTemplateMutationFacade.findByKeyAndType(tenantId, GENERATED_MENU_PARENT_PATH, "0").isPresent()) {
             return;
         }
-        MenuTemplateNode platformManagement = menuTemplateMutationFacade.findByKey(tenantId, "platform-management").orElse(null);
+        MenuTemplateNode platformManagement = menuTemplateMutationFacade.findByKey(tenantId, "/platform").orElse(null);
         menuTemplateMutationFacade.create(new MenuTemplateMutation(
                 tenantId,
                 platformManagement == null ? null : platformManagement.id(),
-                platformManagement == null ? "" : joinAncestor(platformManagement.ancestors(), platformManagement.id()),
-                "DIR",
-                resourceKey,
-                resourceName,
+                "0",
+                "已生成模块",
                 null,
-                null,
-                null,
-                null,
+                GENERATED_MENU_PARENT_PATH,
+                "Layout",
                 "Files",
-                75,
-                1,
-                1,
-                1
+                75
         ));
     }
 
     private void ensureParentApi(String tenantId) {
-        if (menuTemplateMutationFacade.findByKeyAndType(tenantId, GENERATED_API_PARENT_KEY, "DIR").isPresent()) {
-            return;
-        }
-        MenuTemplateNode apiParent = menuTemplateMutationFacade.findByKey(tenantId, "api").orElse(null);
-        if (apiParent == null) {
+        if (menuTemplateMutationFacade.findByKeyAndType(tenantId, GENERATED_API_PARENT_PERMISSION, "1").isPresent()) {
             return;
         }
         menuTemplateMutationFacade.create(new MenuTemplateMutation(
                 tenantId,
-                apiParent.id(),
-                joinAncestor(apiParent.ancestors(), apiParent.id()),
-                "DIR",
-                GENERATED_API_PARENT_KEY,
+                null,
+                "1",
                 "生成模块 API",
+                GENERATED_API_PARENT_PERMISSION,
                 null,
                 null,
                 null,
-                null,
-                null,
-                990,
-                0,
-                1,
-                1
+                990
         ));
     }
 
     private Long ensureMenu(String tenantId, String moduleName, String title) {
-        String menuKey = "generated." + moduleName;
-        MenuTemplateNode existing = menuTemplateMutationFacade.findByKey(tenantId, menuKey).orElse(null);
+        String path = GENERATED_MENU_PARENT_PATH + "/" + moduleName;
+        MenuTemplateNode existing = menuTemplateMutationFacade.findByKey(tenantId, path).orElse(null);
         if (existing != null) {
             return existing.id();
         }
-        MenuTemplateNode parent = menuTemplateMutationFacade.findByKey(tenantId, GENERATED_MENU_PARENT_KEY)
+        MenuTemplateNode parent = menuTemplateMutationFacade.findByKey(tenantId, GENERATED_MENU_PARENT_PATH)
                 .orElseThrow(() -> new BusinessException("PARENT_MENU_MISSING", "已生成模块父菜单未就绪"));
         return menuTemplateMutationFacade.create(new MenuTemplateMutation(
                 tenantId,
                 parent.id(),
-                joinAncestor(parent.ancestors(), parent.id()),
-                "MENU",
-                menuKey,
+                "0",
                 (StringUtils.hasText(title) ? title : moduleName) + "（生成产物）",
-                menuKey,
-                moduleName + ":read",
-                "/platform/generated/" + moduleName,
+                null,
+                path,
                 "CodegenView",
                 "Files",
-                100,
-                1,
-                1,
-                0
+                100
         ));
     }
 
-    private Long ensureApi(String tenantId, String resourceKey, String resourceName, String grantKey, int orderNo) {
-        MenuTemplateNode existing = menuTemplateMutationFacade.findByKey(tenantId, resourceKey).orElse(null);
+    private Long ensureApi(String tenantId, String permission, String name, int sort) {
+        MenuTemplateNode existing = menuTemplateMutationFacade.findByKey(tenantId, permission).orElse(null);
         if (existing != null) {
             return existing.id();
         }
-        MenuTemplateNode parent = menuTemplateMutationFacade.findByKey(tenantId, GENERATED_API_PARENT_KEY).orElse(null);
+        MenuTemplateNode parent = menuTemplateMutationFacade.findByKey(tenantId, GENERATED_API_PARENT_PERMISSION).orElse(null);
         return menuTemplateMutationFacade.create(new MenuTemplateMutation(
                 tenantId,
                 parent == null ? null : parent.id(),
-                parent == null ? "" : joinAncestor(parent.ancestors(), parent.id()),
-                "API",
-                resourceKey,
-                resourceName,
-                null,
-                grantKey,
+                "1",
+                name,
+                permission,
                 null,
                 null,
                 null,
-                orderNo,
-                0,
-                1,
-                0
+                sort
         ));
     }
 
     private void assignToAdminRole(String tenantId, List<Long> menuIds) {
-        Set<Long> expandedMenuIds = new LinkedHashSet<>();
+        Map<Long, MenuTemplateNode> knownNodes = new LinkedHashMap<>();
         for (Long menuId : menuIds) {
-            menuTemplateMutationFacade.findById(platformTenantId(), menuId).ifPresent(menu -> {
-                if (StringUtils.hasText(menu.ancestors())) {
-                    for (String ancestor : menu.ancestors().split(",")) {
-                        if (!StringUtils.hasText(ancestor)) {
-                            continue;
-                        }
-                        try {
-                            expandedMenuIds.add(Long.parseLong(ancestor.trim()));
-                        } catch (NumberFormatException ignored) {
-                        }
-                    }
+            menuTemplateMutationFacade.findById(platformTenantId(), menuId).ifPresent(node -> knownNodes.put(node.id(), node));
+        }
+        Set<Long> expandedMenuIds = new LinkedHashSet<>();
+        for (MenuTemplateNode node : knownNodes.values()) {
+            Long parentId = node.parentId();
+            while (parentId != null) {
+                Long currentParentId = parentId;
+                MenuTemplateNode parent = knownNodes.computeIfAbsent(currentParentId,
+                        id -> menuTemplateMutationFacade.findById(platformTenantId(), id).orElse(null));
+                if (parent == null) {
+                    break;
                 }
-                expandedMenuIds.add(menu.id());
-            });
+                expandedMenuIds.add(parent.id());
+                parentId = parent.parentId();
+            }
+            expandedMenuIds.add(node.id());
         }
         roleMenuMutationFacade.assignMenuIdsToRoleCode(tenantId, "ADMIN", expandedMenuIds);
-    }
-
-    private String joinAncestor(String ancestors, Long id) {
-        String prefix = StringUtils.hasText(ancestors) ? ancestors : "";
-        return StringUtils.hasText(prefix) ? prefix + "," + id : String.valueOf(id);
     }
 }

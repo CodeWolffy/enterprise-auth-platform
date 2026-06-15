@@ -19,9 +19,9 @@ public class SysTenantMenuEntity {
 
     private Long menuId;
 
-    @TableField(fill = FieldFill.INSERT)
-    private String createdBy;
+    @TableField(value = "create_by", fill = FieldFill.INSERT)
+    private String createBy;
 
-    @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createdAt;
+    @TableField(value = "create_time", fill = FieldFill.INSERT)
+    private LocalDateTime createTime;
 }

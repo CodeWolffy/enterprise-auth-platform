@@ -19,12 +19,12 @@ export interface MenuItem {
   id: number
   code: string
   title: string
+  name?: string | null
   path?: string | null
   component?: string | null
-  routeKey?: string | null
+  permission?: string | null
   icon?: string | null
-  orderNo?: number | null
-  visible?: boolean | null
+  sort?: number | null
   children?: MenuItem[]
 }
 

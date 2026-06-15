@@ -37,7 +37,7 @@ public final class MenuTreeUtil {
             return List.of();
         }
         List<TreeNode<Long>> treeNodes = flatNodes.stream()
-                .sorted(Comparator.comparingInt(node -> node.orderNo() == null ? Integer.MAX_VALUE : node.orderNo()))
+                .sorted(Comparator.comparingInt(node -> node.sort() == null ? Integer.MAX_VALUE : node.sort()))
                 .map(MenuTreeUtil::toTreeNode)
                 .toList();
         List<Tree<Long>> tree = TreeUtil.build(treeNodes, ROOT_PARENT_ID, TREE_NODE_CONFIG, (tn, treeObj) -> {
@@ -58,25 +58,18 @@ public final class MenuTreeUtil {
         TreeNode<Long> tn = new TreeNode<>();
         tn.setId(node.id());
         tn.setParentId(node.parentId() != null ? node.parentId() : ROOT_PARENT_ID);
-        tn.setName(node.menuName());
-        tn.setWeight(node.orderNo() == null ? 0 : node.orderNo());
+        tn.setName(node.name());
+        tn.setWeight(node.sort() == null ? 0 : node.sort());
         Map<String, Object> extra = new HashMap<>();
-        extra.put("menuType", node.menuType());
-        extra.put("resourceKey", node.resourceKey());
+        extra.put("type", node.type());
         extra.put("permission", node.permission());
-        extra.put("routeKey", node.routeKey());
-        extra.put("grantKey", node.grantKey());
         extra.put("path", node.path());
         extra.put("component", node.component());
         extra.put("redirect", node.redirect());
         extra.put("icon", node.icon());
-        extra.put("orderNo", node.orderNo());
-        extra.put("visible", node.visible());
-        extra.put("enabled", node.enabled());
-        extra.put("system", node.system());
+        extra.put("sort", node.sort());
         extra.put("outerStatus", node.outerStatus());
         extra.put("applicationKey", node.applicationKey());
-        extra.put("ancestors", node.ancestors());
         tn.setExtra(extra);
         return tn;
     }
@@ -93,22 +86,15 @@ public final class MenuTreeUtil {
         }
         return new MenuTreeNode(
                 tree.getId(),
-                str(tree, "menuType"),
-                str(tree, "resourceKey"),
+                str(tree, "type"),
                 tree.getName().toString(),
                 ROOT_PARENT_ID.equals(tree.getParentId()) ? null : tree.getParentId(),
-                str(tree, "ancestors"),
-                str(tree, "routeKey"),
-                str(tree, "grantKey"),
                 str(tree, "permission"),
                 str(tree, "path"),
                 str(tree, "component"),
                 str(tree, "redirect"),
                 str(tree, "icon"),
-                getInt(tree, "orderNo"),
-                getBoolean(tree, "visible"),
-                getBoolean(tree, "enabled"),
-                getBoolean(tree, "system"),
+                getInt(tree, "sort"),
                 getBoolean(tree, "outerStatus"),
                 str(tree, "applicationKey"),
                 children

@@ -107,7 +107,6 @@ public class RoleManagementService {
             relation.setTenantId(tenantId);
             relation.setRoleId(roleId);
             relation.setMenuId(menuId);
-            relation.setCreatedBy(operator);
             sysRoleMenuMapper.insert(relation);
         }
         evictPrincipalsByRole(tenantId, roleId);

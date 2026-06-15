@@ -11,11 +11,102 @@
  Target Server Version : 80043 (8.0.43)
  File Encoding         : 65001
 
- Date: 08/06/2026 16:32:36
+ Date: 13/06/2026 22:09:23
 */
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
+
+-- ----------------------------
+-- Table structure for codegen_data_source
+-- ----------------------------
+DROP TABLE IF EXISTS `codegen_data_source`;
+CREATE TABLE `codegen_data_source`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `tenant_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '所属租户',
+  `name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '数据源名称',
+  `jdbc_url` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'JDBC 地址',
+  `username` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '用户名',
+  `password_cipher` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '密码密文',
+  `db_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '数据库名',
+  `host` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '主机',
+  `port` int NULL DEFAULT NULL COMMENT '端口',
+  `enabled` tinyint NOT NULL DEFAULT 1 COMMENT '是否启用',
+  `external_authorized` tinyint NOT NULL DEFAULT 0 COMMENT '外部数据源是否已显式授权',
+  `authorized_at` timestamp NULL DEFAULT NULL COMMENT '外部数据源授权时间',
+  `authorization_note` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '外部数据源授权说明',
+  `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '创建人',
+  `updated_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '更新人',
+  `deleted` tinyint NOT NULL DEFAULT 0 COMMENT '逻辑删除标记',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_codegen_data_source_tenant_name`(`tenant_id` ASC, `name` ASC, `deleted` ASC) USING BTREE,
+  INDEX `idx_codegen_data_source_tenant_enabled`(`tenant_id` ASC, `enabled` ASC, `deleted` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 2 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '代码生成数据源' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Table structure for codegen_table
+-- ----------------------------
+DROP TABLE IF EXISTS `codegen_table`;
+CREATE TABLE `codegen_table`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `tenant_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '所属租户',
+  `data_source_id` bigint NOT NULL COMMENT '数据源 ID',
+  `table_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '表名',
+  `table_comment` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '表注释',
+  `class_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '类名',
+  `tpl_category` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT 'crud' COMMENT '模板分类',
+  `package_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '包名',
+  `module_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '模块名',
+  `business_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '业务名',
+  `function_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '功能名',
+  `function_author` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '作者',
+  `gen_type` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT 'preview' COMMENT '生成方式',
+  `gen_path` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '生成路径',
+  `options` json NULL COMMENT '扩展选项',
+  `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '创建人',
+  `updated_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '更新人',
+  `deleted` tinyint NOT NULL DEFAULT 0 COMMENT '逻辑删除标记',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_codegen_table_tenant_ds_table`(`tenant_id` ASC, `data_source_id` ASC, `table_name` ASC, `deleted` ASC) USING BTREE,
+  INDEX `idx_codegen_table_tenant_table`(`tenant_id` ASC, `table_name` ASC, `deleted` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 4 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '代码生成表配置' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Table structure for codegen_table_column
+-- ----------------------------
+DROP TABLE IF EXISTS `codegen_table_column`;
+CREATE TABLE `codegen_table_column`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `tenant_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '所属租户',
+  `table_id` bigint NOT NULL COMMENT '表配置 ID',
+  `column_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '字段名',
+  `column_comment` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '字段注释',
+  `column_type` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '字段类型',
+  `data_type` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '数据类型',
+  `java_type` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT 'Java 类型',
+  `java_field` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT 'Java 字段',
+  `is_pk` tinyint NOT NULL DEFAULT 0 COMMENT '是否主键',
+  `is_required` tinyint NOT NULL DEFAULT 0 COMMENT '是否必填',
+  `is_insert` tinyint NOT NULL DEFAULT 1 COMMENT '是否插入',
+  `is_edit` tinyint NOT NULL DEFAULT 1 COMMENT '是否编辑',
+  `is_list` tinyint NOT NULL DEFAULT 1 COMMENT '是否列表',
+  `is_query` tinyint NOT NULL DEFAULT 0 COMMENT '是否查询',
+  `query_type` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT 'EQ' COMMENT '查询方式',
+  `html_type` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT 'input' COMMENT '表单控件',
+  `dict_type` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '字典类型',
+  `sort` int NOT NULL DEFAULT 0 COMMENT '排序',
+  `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '创建人',
+  `updated_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '更新人',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_codegen_column_table_column`(`tenant_id` ASC, `table_id` ASC, `column_name` ASC) USING BTREE,
+  INDEX `idx_codegen_column_table_sort`(`tenant_id` ASC, `table_id` ASC, `sort` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 19 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '代码生成字段配置' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for codegen_template
@@ -26,6 +117,7 @@ CREATE TABLE `codegen_template`  (
   `tenant_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '所属租户',
   `name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '模板名称',
   `language` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '语言：java/typescript/vue',
+  `template_category` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'backend' COMMENT '模板分类：backend/frontend/api/type/view',
   `path_pattern` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '匹配生成路径的正则或关键字',
   `content` mediumtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '模板内容（{{className}} 等占位）',
   `description` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '描述',
@@ -37,7 +129,8 @@ CREATE TABLE `codegen_template`  (
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_codegen_template_tenant_name`(`tenant_id` ASC, `name` ASC) USING BTREE,
-  INDEX `idx_codegen_template_tenant_lang_pattern`(`tenant_id` ASC, `language` ASC, `path_pattern` ASC) USING BTREE
+  INDEX `idx_codegen_template_tenant_lang_pattern`(`tenant_id` ASC, `language` ASC, `path_pattern` ASC) USING BTREE,
+  INDEX `idx_codegen_template_tenant_category`(`tenant_id` ASC, `template_category` ASC, `deleted` ASC) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 2 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '代码生成自定义模板' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
@@ -96,7 +189,7 @@ CREATE TABLE `sys_audit_export_task`  (
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_sys_audit_export_task_tenant_time`(`tenant_id` ASC, `requested_at` DESC) USING BTREE,
   INDEX `idx_sys_audit_export_task_operator_status`(`operator` ASC, `status` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 803 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '审计导出任务表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 823 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '审计导出任务表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_audit_log
@@ -116,7 +209,7 @@ CREATE TABLE `sys_audit_log`  (
   INDEX `idx_sys_audit_log_event`(`event_type` ASC) USING BTREE,
   INDEX `idx_sys_audit_log_tenant_event_time`(`tenant_id` ASC, `event_type` ASC, `occurred_at` ASC, `id` ASC) USING BTREE,
   INDEX `idx_sys_audit_log_tenant_operator_time`(`tenant_id` ASC, `operator` ASC, `occurred_at` ASC, `id` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 9588 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '安全审计日志表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 10198 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '安全审计日志表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_category_rule
@@ -136,7 +229,7 @@ CREATE TABLE `sys_category_rule`  (
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_sys_category_rule_tenant_target_code`(`tenant_id` ASC, `target_type` ASC, `category_code` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 81 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '系统分类规则表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 85 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '系统分类规则表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_codegen_allowlist
@@ -156,7 +249,7 @@ CREATE TABLE `sys_codegen_allowlist`  (
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_codegen_allowlist_tenant_table`(`tenant_id` ASC, `table_name` ASC) USING BTREE,
   INDEX `idx_codegen_allowlist_tenant_enabled`(`tenant_id` ASC, `enabled` ASC, `deleted` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 75 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '代码生成表白名单' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 102 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '代码生成表白名单' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_config
@@ -179,7 +272,7 @@ CREATE TABLE `sys_config`  (
   INDEX `idx_sys_config_deleted`(`tenant_id` ASC, `deleted` ASC) USING BTREE,
   INDEX `idx_sys_config_tenant_deleted_created_at`(`tenant_id` ASC, `deleted` ASC, `created_at` ASC) USING BTREE,
   INDEX `idx_sys_config_tenant_deleted_created_by`(`tenant_id` ASC, `deleted` ASC, `created_by` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 1978 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户配置表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 2074 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户配置表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_dept
@@ -193,6 +286,10 @@ CREATE TABLE `sys_dept`  (
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `dept_code` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '部门编码',
   `leader_user_id` bigint NULL DEFAULT NULL COMMENT '部门负责人用户 ID',
+  `leader_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '负责人姓名',
+  `leader_phone` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '负责人电话',
+  `order_no` int NOT NULL DEFAULT 0 COMMENT '排序序号',
+  `enabled` tinyint NOT NULL DEFAULT 1 COMMENT '启用状态：0 停用，1 启用',
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '创建人',
   `updated_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '更新人',
@@ -200,8 +297,9 @@ CREATE TABLE `sys_dept`  (
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_sys_dept_tenant_parent`(`tenant_id` ASC, `parent_id` ASC) USING BTREE,
   INDEX `idx_sys_dept_tenant_code`(`tenant_id` ASC, `dept_code` ASC) USING BTREE,
-  INDEX `idx_sys_dept_deleted`(`tenant_id` ASC, `deleted` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 2386 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '部门树表' ROW_FORMAT = DYNAMIC;
+  INDEX `idx_sys_dept_deleted`(`tenant_id` ASC, `deleted` ASC) USING BTREE,
+  INDEX `idx_sys_dept_tenant_status_order`(`tenant_id` ASC, `deleted` ASC, `enabled` ASC, `order_no` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 2539 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '部门树表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_dict
@@ -213,18 +311,22 @@ CREATE TABLE `sys_dict`  (
   `dict_type` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '字典类型编码',
   `dict_code` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '字典项编码',
   `dict_value` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '字典项值',
+  `description` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '字典类型说明',
+  `enabled` tinyint NOT NULL DEFAULT 1 COMMENT '启用状态：0 停用，1 启用',
+  `remarks` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '备注',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '创建人',
   `updated_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '更新人',
   `deleted` tinyint NOT NULL DEFAULT 0 COMMENT '逻辑删除标记：0 未删除，1 已删除',
   PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE INDEX `uk_sys_dict_tenant_type_code`(`tenant_id` ASC, `dict_type` ASC, `dict_code` ASC) USING BTREE,
+  UNIQUE INDEX `uk_sys_dict_tenant_type`(`tenant_id` ASC, `dict_type` ASC) USING BTREE,
   INDEX `idx_sys_dict_tenant_type`(`tenant_id` ASC, `dict_type` ASC) USING BTREE,
   INDEX `idx_sys_dict_deleted`(`tenant_id` ASC, `deleted` ASC) USING BTREE,
   INDEX `idx_sys_dict_tenant_deleted_created_at`(`tenant_id` ASC, `deleted` ASC, `created_at` ASC) USING BTREE,
-  INDEX `idx_sys_dict_tenant_deleted_created_by`(`tenant_id` ASC, `deleted` ASC, `created_by` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 2152 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '字典表' ROW_FORMAT = DYNAMIC;
+  INDEX `idx_sys_dict_tenant_deleted_created_by`(`tenant_id` ASC, `deleted` ASC, `created_by` ASC) USING BTREE,
+  INDEX `idx_sys_dict_tenant_enabled_updated`(`tenant_id` ASC, `deleted` ASC, `enabled` ASC, `updated_at` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 2305 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '字典表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_dict_value
@@ -247,10 +349,11 @@ CREATE TABLE `sys_dict_value`  (
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_sys_dict_value_tenant_dict_value`(`tenant_id` ASC, `dict_id` ASC, `dict_value` ASC) USING BTREE,
   INDEX `idx_sys_dict_value_tenant_type`(`tenant_id` ASC, `dict_type` ASC) USING BTREE,
   INDEX `idx_sys_dict_value_tenant_dict`(`tenant_id` ASC, `dict_id` ASC) USING BTREE,
   INDEX `idx_sys_dict_value_tenant_deleted`(`tenant_id` ASC, `deleted` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 502 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '字典值表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 538 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '字典值表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_mail_channel
@@ -316,7 +419,7 @@ CREATE TABLE `sys_menu`  (
   INDEX `idx_sys_menu_tenant_type`(`tenant_id` ASC, `menu_type` ASC) USING BTREE,
   INDEX `idx_sys_menu_tenant_grant`(`tenant_id` ASC, `grant_key` ASC) USING BTREE,
   INDEX `idx_sys_menu_tenant_deleted`(`tenant_id` ASC, `deleted` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 1008 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '菜单权限统一表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 1183 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '菜单权限统一表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_notice
@@ -366,7 +469,7 @@ CREATE TABLE `sys_password_reset_token`  (
   INDEX `idx_sys_password_reset_token_user`(`tenant_id` ASC, `user_id` ASC, `created_at` DESC) USING BTREE,
   INDEX `idx_sys_password_reset_token_username`(`tenant_id` ASC, `username` ASC, `created_at` DESC) USING BTREE,
   INDEX `idx_sys_password_reset_token_ip`(`request_ip` ASC, `created_at` DESC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 47 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '密码重置令牌表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 53 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '密码重置令牌表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_permission
@@ -444,7 +547,7 @@ CREATE TABLE `sys_role`  (
   UNIQUE INDEX `uk_sys_role_tenant_code`(`tenant_id` ASC, `role_code` ASC) USING BTREE,
   INDEX `idx_sys_role_tenant_scope`(`tenant_id` ASC, `data_scope_type` ASC) USING BTREE,
   INDEX `idx_sys_role_deleted`(`tenant_id` ASC, `deleted` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 2051 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '角色定义表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 2246 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '角色定义表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_role_menu
@@ -461,7 +564,7 @@ CREATE TABLE `sys_role_menu`  (
   UNIQUE INDEX `uk_sys_role_menu_tenant_role_menu`(`tenant_id` ASC, `role_id` ASC, `menu_id` ASC) USING BTREE,
   INDEX `idx_sys_role_menu_tenant_role`(`tenant_id` ASC, `role_id` ASC) USING BTREE,
   INDEX `idx_sys_role_menu_tenant_menu`(`tenant_id` ASC, `menu_id` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 5366 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '角色菜单权限关联表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 5611 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '角色菜单权限关联表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_role_permission
@@ -507,7 +610,7 @@ CREATE TABLE `sys_storage_file`  (
   INDEX `idx_sys_storage_file_tenant_visibility`(`tenant_id` ASC, `visibility` ASC, `deleted` ASC) USING BTREE,
   INDEX `idx_sys_storage_file_tenant_owner`(`tenant_id` ASC, `owner_user_id` ASC, `deleted` ASC) USING BTREE,
   INDEX `idx_sys_storage_file_created_at`(`created_at` DESC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 171 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '文件存储记录表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 189 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '文件存储记录表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_tenant
@@ -520,8 +623,15 @@ CREATE TABLE `sys_tenant`  (
   `platform_level` tinyint NOT NULL DEFAULT 0 COMMENT '是否平台级租户：1 是，0 否',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `tenant_status` tinyint NOT NULL DEFAULT 1 COMMENT '租户状态：1 启用，0 禁用',
+  `auth_begin_at` datetime NULL DEFAULT NULL COMMENT '授权开始时间',
   `expire_at` datetime NULL DEFAULT NULL COMMENT '租户到期时间',
   `package_code` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '套餐编码',
+  `logo_url` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '租户 Logo 地址',
+  `contact_name` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '联系人姓名',
+  `contact_phone` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '联系人电话',
+  `contact_email` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '联系人邮箱',
+  `website` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '官网地址',
+  `address` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '联系地址',
   `lifecycle_note` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '运营备注',
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '创建人',
@@ -530,8 +640,9 @@ CREATE TABLE `sys_tenant`  (
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `tenant_id`(`tenant_id` ASC) USING BTREE,
   INDEX `idx_sys_tenant_status`(`tenant_status` ASC) USING BTREE,
-  INDEX `idx_sys_tenant_deleted`(`tenant_id` ASC, `deleted` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户主表' ROW_FORMAT = DYNAMIC;
+  INDEX `idx_sys_tenant_deleted`(`tenant_id` ASC, `deleted` ASC) USING BTREE,
+  INDEX `idx_sys_tenant_auth_window`(`tenant_id` ASC, `deleted` ASC, `tenant_status` ASC, `auth_begin_at` ASC, `expire_at` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 31 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户主表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_tenant_capability
@@ -552,7 +663,7 @@ CREATE TABLE `sys_tenant_capability`  (
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_sys_tenant_capability_tenant_code`(`tenant_id` ASC, `capability_code` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 88 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户能力定义表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 95 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户能力定义表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_tenant_capability_override
@@ -570,7 +681,7 @@ CREATE TABLE `sys_tenant_capability_override`  (
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_sys_tenant_capability_override`(`tenant_id` ASC, `capability_code` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 155 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户能力覆盖表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 191 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户能力覆盖表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_tenant_capability_resource_scope
@@ -590,7 +701,7 @@ CREATE TABLE `sys_tenant_capability_resource_scope`  (
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_tenant_capability_resource_scope`(`tenant_id` ASC, `capability_code` ASC, `resource_key` ASC, `scope_type` ASC) USING BTREE,
   INDEX `idx_capability_resource_scope_resource`(`tenant_id` ASC, `resource_key` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 65 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户能力资源范围表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 337 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户能力资源范围表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_tenant_change_log
@@ -608,7 +719,23 @@ CREATE TABLE `sys_tenant_change_log`  (
   `occurred_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '变更时间',
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_sys_tenant_change_log_tenant_time`(`tenant_id` ASC, `occurred_at` DESC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 916 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户变更记录表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 1349 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户变更记录表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Table structure for sys_tenant_menu
+-- ----------------------------
+DROP TABLE IF EXISTS `sys_tenant_menu`;
+CREATE TABLE `sys_tenant_menu`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `tenant_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '租户ID',
+  `menu_id` bigint NOT NULL COMMENT '菜单ID',
+  `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '创建人',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_sys_tenant_menu_tenant_menu`(`tenant_id` ASC, `menu_id` ASC) USING BTREE,
+  INDEX `idx_tenant_menu_tenant`(`tenant_id` ASC) USING BTREE,
+  INDEX `idx_tenant_menu_menu`(`menu_id` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 14 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户分配菜单表' ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Table structure for sys_tenant_package
@@ -619,6 +746,12 @@ CREATE TABLE `sys_tenant_package`  (
   `tenant_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '所属租户，当前固定为 platform',
   `package_code` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '套餐编码',
   `package_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '套餐名称',
+  `subtitle` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '运营副标题',
+  `sales_price` decimal(12, 2) NULL DEFAULT NULL COMMENT '销售价',
+  `original_price` decimal(12, 2) NULL DEFAULT NULL COMMENT '原价',
+  `description_md` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '富文本或 Markdown 描述',
+  `app_key` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '应用标识',
+  `order_no` int NOT NULL DEFAULT 0 COMMENT '展示排序',
   `user_quota` int NULL DEFAULT NULL COMMENT '用户配额',
   `storage_quota_gb` int NULL DEFAULT NULL COMMENT '存储配额GB',
   `package_desc` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '套餐说明',
@@ -629,8 +762,9 @@ CREATE TABLE `sys_tenant_package`  (
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE INDEX `uk_sys_tenant_package_tenant_code`(`tenant_id` ASC, `package_code` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 79 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户套餐定义表' ROW_FORMAT = DYNAMIC;
+  UNIQUE INDEX `uk_sys_tenant_package_tenant_code`(`tenant_id` ASC, `package_code` ASC) USING BTREE,
+  INDEX `idx_sys_tenant_package_tenant_enabled_order`(`tenant_id` ASC, `deleted` ASC, `enabled` ASC, `order_no` ASC) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 107 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户套餐定义表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_tenant_package_capability
@@ -647,7 +781,7 @@ CREATE TABLE `sys_tenant_package_capability`  (
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_sys_tenant_package_capability`(`tenant_id` ASC, `package_code` ASC, `capability_code` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 160 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户套餐能力关联表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 194 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户套餐能力关联表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_tenant_security_policy
@@ -674,7 +808,7 @@ CREATE TABLE `sys_tenant_security_policy`  (
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_sys_tenant_security_policy_tenant`(`tenant_id` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户安全策略覆盖表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 25 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '租户安全策略覆盖表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_user
@@ -707,7 +841,7 @@ CREATE TABLE `sys_user`  (
   INDEX `idx_sys_user_tenant_mobile`(`tenant_id` ASC, `mobile` ASC) USING BTREE,
   INDEX `idx_sys_user_tenant_email`(`tenant_id` ASC, `email` ASC) USING BTREE,
   INDEX `idx_sys_user_deleted`(`tenant_id` ASC, `deleted` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 8555 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '用户账号表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 9131 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '用户账号表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_user_notification
@@ -742,7 +876,7 @@ CREATE TABLE `sys_user_notification`  (
   INDEX `idx_sys_user_notification_user_read`(`tenant_id` ASC, `recipient_user_id` ASC, `read_at` ASC, `created_at` DESC) USING BTREE,
   INDEX `idx_sys_user_notification_source`(`tenant_id` ASC, `source_type` ASC, `source_id` ASC) USING BTREE,
   INDEX `idx_sys_user_notification_biz`(`tenant_id` ASC, `biz_type` ASC, `biz_id` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 643 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '用户站内通知表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 826 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '用户站内通知表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_user_role
@@ -761,7 +895,7 @@ CREATE TABLE `sys_user_role`  (
   UNIQUE INDEX `uk_sys_user_role_tenant_user_role`(`tenant_id` ASC, `user_id` ASC, `role_id` ASC) USING BTREE,
   INDEX `idx_sys_user_role_tenant_user`(`tenant_id` ASC, `user_id` ASC) USING BTREE,
   INDEX `idx_sys_user_role_tenant_role`(`tenant_id` ASC, `role_id` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 1398 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '用户角色关联表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 1524 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '用户角色关联表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for wf_process_definition
@@ -784,7 +918,7 @@ CREATE TABLE `wf_process_definition`  (
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_wf_process_definition_tenant_key_version`(`tenant_id` ASC, `definition_key` ASC, `version` ASC) USING BTREE,
   INDEX `idx_wf_process_definition_tenant_status`(`tenant_id` ASC, `status` ASC, `deleted` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 152 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '工作流流程定义表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 179 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '工作流流程定义表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for wf_process_instance
@@ -814,7 +948,7 @@ CREATE TABLE `wf_process_instance`  (
   UNIQUE INDEX `uk_wf_process_instance_tenant_business`(`tenant_id` ASC, `business_key` ASC) USING BTREE,
   INDEX `idx_wf_process_instance_tenant_starter`(`tenant_id` ASC, `starter_user_id` ASC, `status` ASC) USING BTREE,
   INDEX `idx_wf_process_instance_tenant_definition`(`tenant_id` ASC, `definition_key` ASC, `definition_version` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 152 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '工作流流程实例表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 179 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '工作流流程实例表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for wf_task
@@ -843,7 +977,7 @@ CREATE TABLE `wf_task`  (
   INDEX `idx_wf_task_tenant_instance`(`tenant_id` ASC, `instance_id` ASC, `step_index` ASC) USING BTREE,
   INDEX `idx_wf_task_tenant_status_assignee`(`tenant_id` ASC, `status` ASC, `assignee_user_id` ASC) USING BTREE,
   INDEX `idx_wf_task_tenant_status_created`(`tenant_id` ASC, `status` ASC, `created_at` DESC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 244 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '工作流任务表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 289 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '工作流任务表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for wf_task_urge
@@ -866,6 +1000,6 @@ CREATE TABLE `wf_task_urge`  (
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_wf_task_urge_tenant_task`(`tenant_id` ASC, `task_id` ASC, `urged_at` DESC) USING BTREE,
   INDEX `idx_wf_task_urge_tenant_instance`(`tenant_id` ASC, `instance_id` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 13 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '工作流任务催办记录表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 16 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '工作流任务催办记录表' ROW_FORMAT = DYNAMIC;
 
 SET FOREIGN_KEY_CHECKS = 1;

@@ -349,6 +349,11 @@ const APP_ICON_COMPONENTS: Record<string, Component> = {
   Tickets,
 }
 
+export const APP_ICON_OPTIONS = Object.keys(APP_ICON_COMPONENTS).map((name) => ({
+  label: name,
+  value: name,
+}))
+
 export const APP_ROUTE_DEFINITIONS: Record<string, RouteRecordRaw> = Object.fromEntries(
   APP_ROUTE_MANIFESTS.map((manifest) => [
     manifest.name,

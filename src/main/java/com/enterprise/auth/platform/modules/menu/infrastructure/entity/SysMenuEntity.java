@@ -6,8 +6,8 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
-import lombok.Data;
 import java.time.LocalDateTime;
+import lombok.Data;
 
 @TableName("sys_menu")
 @Data
@@ -15,32 +15,41 @@ public class SysMenuEntity {
 
     @TableId(type = IdType.AUTO)
     private Long id;
-    private String tenantId;
-    private Long parentId;
-    private String ancestors;
-    private String menuType;
-    private String resourceKey;
-    private String menuName;
-    private String routeKey;
-    private String grantKey;
+
+    private String name;
+
+    private String permission;
+
     private String path;
-    private String component;
+
     private String redirect;
+
+    private Long parentId;
+
     private String icon;
-    private Integer orderNo;
-    private Integer visible;
-    private Integer enabled;
-    private Integer isSystem;
+
+    private String component;
+
+    private Integer sort;
+
+    private String type;
+
     private Integer outerStatus;
+
+    @TableLogic(value = "0", delval = "1")
+    private String delFlag;
+
     private String applicationKey;
-    @TableField(fill = FieldFill.INSERT)
-    private String createdBy;
-    @TableField(fill = FieldFill.INSERT_UPDATE)
-    private String updatedBy;
-    @TableLogic
-    private Integer deleted;
-    @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createdAt;
-    @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updatedAt;
+
+    @TableField(value = "create_by", fill = FieldFill.INSERT)
+    private String createBy;
+
+    @TableField(value = "update_by", fill = FieldFill.INSERT_UPDATE)
+    private String updateBy;
+
+    @TableField(value = "create_time", fill = FieldFill.INSERT)
+    private LocalDateTime createTime;
+
+    @TableField(value = "update_time", fill = FieldFill.INSERT_UPDATE)
+    private LocalDateTime updateTime;
 }

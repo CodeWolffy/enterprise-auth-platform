@@ -45,10 +45,9 @@ export interface TenantCapabilityOverrideView {
 export interface TenantResourceScopeMenuView {
   id: number
   parentId?: number | null
-  menuName: string
-  menuType?: string | null
-  resourceKey?: string | null
-  grantKey?: string | null
+  name: string
+  type?: string | null
+  permission?: string | null
   path?: string | null
 }
 

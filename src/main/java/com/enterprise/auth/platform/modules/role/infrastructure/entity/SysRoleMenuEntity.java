@@ -17,8 +17,6 @@ public class SysRoleMenuEntity {
     private String tenantId;
     private Long roleId;
     private Long menuId;
-    @TableField(fill = FieldFill.INSERT)
-    private String createdBy;
-    @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createdAt;
+    @TableField(value = "create_time", fill = FieldFill.INSERT)
+    private LocalDateTime createTime;
 }

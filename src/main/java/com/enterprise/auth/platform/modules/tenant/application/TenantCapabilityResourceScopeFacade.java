@@ -71,7 +71,7 @@ public class TenantCapabilityResourceScopeFacade {
             if (!isAllowedVisible(menu, allowedKeys)) {
                 continue;
             }
-            allowedIds.addAll(parseAncestors(menu.getAncestors(), menuById));
+            allowedIds.addAll(parentIds(menu, menuById));
             if (menu.getId() != null) {
                 allowedIds.add(menu.getId());
             }
@@ -94,7 +94,7 @@ public class TenantCapabilityResourceScopeFacade {
             if (!isAllowedGrant(menu, allowedKeys)) {
                 continue;
             }
-            allowedIds.addAll(parseAncestors(menu.getAncestors(), menuById));
+            allowedIds.addAll(parentIds(menu, menuById));
             if (menu.getId() != null) {
                 allowedIds.add(menu.getId());
             }
@@ -114,7 +114,7 @@ public class TenantCapabilityResourceScopeFacade {
         Set<String> requested = normalizeTextSet(grantKeys);
         return menus.stream()
                 .filter(menu -> menu.getId() != null && grantableIds.contains(menu.getId()))
-                .map(SysMenuEntity::getGrantKey)
+                .map(this::readPermission)
                 .filter(StringUtils::hasText)
                 .map(String::trim)
                 .filter(requested::contains)
@@ -197,18 +197,18 @@ public class TenantCapabilityResourceScopeFacade {
     }
 
     private boolean isAllowedVisible(SysMenuEntity menu, AllowedResourceKeys allowedKeys) {
-        if (allowedKeys.visible().contains(normalizeText(menu.getResourceKey()))) {
+        if (allowedKeys.visible().contains(normalizeText(menu.getPath()))) {
             return true;
         }
-        String grantKey = normalizeText(menu.getGrantKey());
-        return StringUtils.hasText(grantKey) && allowedKeys.grant().contains(grantKey);
+        String permission = normalizeText(readPermission(menu));
+        return StringUtils.hasText(permission) && allowedKeys.grant().contains(permission);
     }
 
     private boolean isAllowedGrant(SysMenuEntity menu, AllowedResourceKeys allowedKeys) {
-        if (allowedKeys.grant().contains(normalizeText(menu.getGrantKey()))) {
+        if (allowedKeys.grant().contains(normalizeText(readPermission(menu)))) {
             return true;
         }
-        return allowedKeys.visible().contains(normalizeText(menu.getResourceKey()));
+        return allowedKeys.visible().contains(normalizeText(menu.getPath()));
     }
 
     private void addEnabledCapability(Set<String> result, Set<String> enabledCapabilityCodes, String code) {
@@ -238,23 +238,16 @@ public class TenantCapabilityResourceScopeFacade {
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
     }
 
-    private Set<Long> parseAncestors(String ancestors, Map<Long, SysMenuEntity> menuById) {
-        if (!StringUtils.hasText(ancestors)) {
-            return Set.of();
-        }
+    private Set<Long> parentIds(SysMenuEntity menu, Map<Long, SysMenuEntity> menuById) {
         Set<Long> ids = new LinkedHashSet<>();
-        for (String part : ancestors.split(",")) {
-            if (!StringUtils.hasText(part)) {
-                continue;
+        Long parentId = menu.getParentId();
+        while (parentId != null) {
+            SysMenuEntity parent = menuById.get(parentId);
+            if (parent == null) {
+                break;
             }
-            try {
-                Long id = Long.parseLong(part.trim());
-                if (menuById.containsKey(id)) {
-                    ids.add(id);
-                }
-            } catch (NumberFormatException ignored) {
-                // ignore invalid ancestor marker
-            }
+            ids.add(parentId);
+            parentId = parent.getParentId();
         }
         return ids;
     }
@@ -271,6 +264,10 @@ public class TenantCapabilityResourceScopeFacade {
 
     private String normalizeText(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private String readPermission(SysMenuEntity menu) {
+        return menu.getPermission();
     }
 
     private String normalizeTenantId(String tenantId) {

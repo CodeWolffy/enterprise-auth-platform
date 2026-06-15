@@ -16,6 +16,11 @@
         <strong>{{ mailChannel?.passwordConfigured ? '已保存' : '未保存' }}</strong>
         <span>{{ mailChannel?.passwordConfigured ? '授权码/密码不会在页面回显' : '首次保存必须填写授权码/密码' }}</span>
       </article>
+      <article class="stat-card">
+        <span class="eyebrow">安全模式</span>
+        <strong>{{ securityModeLabel }}</strong>
+        <span>{{ securityModeHint }}</span>
+      </article>
     </section>
 
     <section v-if="formError" class="dashboard-panel error-panel">
@@ -74,6 +79,11 @@
 
         <el-form-item label="端口" prop="mailPort">
           <el-input-number v-model="form.mailPort" :min="1" :max="65535" />
+          <div class="port-quick-tags">
+            <el-check-tag :checked="form.mailPort === 25" @change="applyPort(25)">25（明文）</el-check-tag>
+            <el-check-tag :checked="form.mailPort === 465" @change="applyPort(465)">465（SSL）</el-check-tag>
+            <el-check-tag :checked="form.mailPort === 587" @change="applyPort(587)">587（STARTTLS）</el-check-tag>
+          </div>
         </el-form-item>
 
         <el-form-item label="邮箱账号" prop="mailUsername">
@@ -193,8 +203,19 @@ const channelTitle = computed(() => {
 })
 const channelSubtitle = computed(() => {
   if (!mailChannel.value) return '尚未配置邮件发送渠道'
-  const source = mailChannel.value.inherited ? ` · 来源 ${mailChannel.value.sourceTenantId}` : ''
-  return `${mailChannel.value.provider} · ${mailChannel.value.mailHost}${source}`
+  return `${presetLabel(mailChannel.value.provider)} · ${mailChannel.value.mailHost}${mailChannel.value.mailPort ? ':' + mailChannel.value.mailPort : ''}`
+})
+const securityModeLabel = computed(() => {
+  if (!mailChannel.value) return '-'
+  if (mailChannel.value.useSsl) return 'SSL'
+  if (mailChannel.value.useStartTls) return 'STARTTLS'
+  return '明文（不建议）'
+})
+const securityModeHint = computed(() => {
+  if (!mailChannel.value) return '配置后将显示安全连接方式'
+  if (mailChannel.value.useSsl) return 'SMTP over SSL（端口推荐 465）'
+  if (mailChannel.value.useStartTls) return 'SMTP with STARTTLS（端口推荐 587）'
+  return '当前未启用加密，请谨慎使用'
 })
 const passwordPlaceholder = computed(() => needsPassword.value ? '首次保存必须填写授权码/密码' : '留空则不修改现有密码')
 const passwordHint = computed(() => needsPassword.value ? '当前没有本租户可复用的已保存凭据。' : '为安全起见，已保存凭据不会回显。')
@@ -203,7 +224,10 @@ const saveButtonText = computed(() => hasOwnChannel.value ? '保存配置' : '�
 const formRules: FormRules = {
   mailHost: [{ required: true, message: '请输入 SMTP 服务器地址', trigger: 'blur' }],
   mailPort: [{ required: true, message: '请输入端口', trigger: 'blur' }],
-  mailUsername: [{ required: true, message: '请输入邮箱账号', trigger: 'blur' }],
+  mailUsername: [
+    { required: true, message: '请输入邮箱账号', trigger: 'blur' },
+    { type: 'email', message: '请输入正确的邮箱地址', trigger: ['blur', 'change'] },
+  ],
   mailFrom: [
     { required: true, message: '请输入发件人地址', trigger: 'blur' },
     { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' },
@@ -241,6 +265,20 @@ function onSslChange(value: boolean) {
 function onStartTlsChange(value: boolean) {
   if (value) {
     form.useSsl = false
+  }
+}
+
+function applyPort(port: number) {
+  form.mailPort = port
+  if (port === 465) {
+    form.useSsl = true
+    form.useStartTls = false
+  } else if (port === 587) {
+    form.useSsl = false
+    form.useStartTls = true
+  } else if (port === 25) {
+    form.useSsl = false
+    form.useStartTls = false
   }
 }
 
@@ -400,6 +438,12 @@ onMounted(async () => {
 
 .field-hint {
   width: 100%;
+}
+
+.port-quick-tags {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .test-result {

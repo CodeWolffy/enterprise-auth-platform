@@ -184,7 +184,7 @@
             <template #default="{ data }">
               <div class="menu-node">
                 <span>{{ data.label }}</span>
-                <el-tag size="small" effect="plain">{{ typeLabel(data.menuType) }}</el-tag>
+                <el-tag size="small" effect="plain">{{ typeLabel(data.type) }}</el-tag>
               </div>
             </template>
           </el-tree>
@@ -272,8 +272,8 @@
           <div class="menu-node">
             <span>{{ data.label }}</span>
             <div class="menu-node__meta">
-              <el-tag size="small" effect="plain">{{ typeLabel(data.menuType) }}</el-tag>
-              <el-tag v-if="data.grantKey" size="small" type="success" effect="plain">{{ data.grantKey }}</el-tag>
+              <el-tag size="small" effect="plain">{{ typeLabel(data.type) }}</el-tag>
+              <el-tag v-if="data.permission" size="small" type="success" effect="plain">{{ data.permission }}</el-tag>
               <el-tag v-if="data.path" size="small" type="info" effect="plain">{{ data.path }}</el-tag>
             </div>
           </div>
@@ -311,9 +311,9 @@ import type { RoleView } from '@/types/role'
 type MenuDisplayNode = {
   id: number
   label: string
-  menuKey: string
-  menuType: MenuType
-  grantKey?: string
+  key: string
+  type: MenuType
+  permission?: string
   path?: string
   children?: MenuDisplayNode[]
 }
@@ -552,7 +552,7 @@ function selectByTypes(types: MenuType[]) {
   const targetTypes = new Set<MenuType>(types)
   const checked = new Set<number>(selectedMenuIds.value)
   for (const node of flattenTree(menuTreeData.value)) {
-    if (targetTypes.has(node.menuType)) {
+    if (targetTypes.has(node.type)) {
       checked.add(node.id)
     }
   }
@@ -596,10 +596,10 @@ function setTreeExpanded(expanded: boolean) {
 function toMenuDisplayTree(source: MenuTreeNode[]): MenuDisplayNode[] {
   return source.map((item) => ({
     id: item.id,
-    label: `${item.menuName} (${item.resourceKey})`,
-    menuKey: item.resourceKey,
-    menuType: item.menuType,
-    grantKey: item.grantKey || undefined,
+    label: `${item.name} (${item.permission || item.path || item.component || item.type})`,
+    key: item.permission || item.path || item.component || String(item.id),
+    type: item.type,
+    permission: item.permission || undefined,
     path: item.path || undefined,
     children: item.children?.length ? toMenuDisplayTree(item.children) : undefined,
   }))
@@ -648,9 +648,9 @@ function filterTreeByKeyword(nodes: MenuDisplayNode[], keywordValue: string): Me
     const children = node.children ? filterTreeByKeyword(node.children, keywordValue) : []
     const matched =
       node.label.toLowerCase().includes(keywordValue) ||
-      node.menuType.toLowerCase().includes(keywordValue) ||
+      node.type.toLowerCase().includes(keywordValue) ||
       (node.path || '').toLowerCase().includes(keywordValue) ||
-      (node.grantKey || '').toLowerCase().includes(keywordValue)
+      (node.permission || '').toLowerCase().includes(keywordValue)
     if (matched || children.length > 0) {
       filtered.push({
         ...node,
@@ -682,17 +682,15 @@ function summarizeByType(selectedIds: Set<number>, tree: MenuDisplayNode[]) {
     if (!selectedIds.has(node.id)) {
       continue
     }
-    counter.set(node.menuType, (counter.get(node.menuType) || 0) + 1)
+    counter.set(node.type, (counter.get(node.type) || 0) + 1)
   }
   return Array.from(counter.entries()).map(([type, count]) => ({ type, count }))
 }
 
 function typeLabel(type: MenuType) {
   const labels: Record<MenuType, string> = {
-    DIR: '目录',
-    MENU: '菜单',
-    BUTTON: '按钮',
-    API: 'API',
+    '0': '菜单',
+    '1': '按钮',
   }
   return labels[type]
 }

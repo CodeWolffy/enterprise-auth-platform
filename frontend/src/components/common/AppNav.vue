@@ -20,7 +20,6 @@ import type { Component } from 'vue'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { resolveAppIcon, resolveMenuPresentation, resolveRouteManifest } from '@/app/registry/module-manifest'
-import { resolveRoutePath } from '@/router/route-access'
 import AppNavItem from './AppNavItem.vue'
 import { useAuthStore } from '@/stores/auth'
 import type { MenuItem } from '@/types/auth-models'
@@ -64,9 +63,9 @@ function buildLinks(nodes: MenuItem[]): NavLink[] {
   const usedPaths = new Set<string>()
 
   for (const node of nodes) {
-    const accessKey = node.routeKey?.trim() || node.code?.trim() || ''
-    const rawPath = node.path?.trim() || resolveRoutePath(accessKey)
-    const path = canAccessRoute(accessKey) ? rawPath : ''
+    const accessKey = node.component?.trim() || node.code?.trim() || ''
+    const rawPath = node.path?.trim() || ''
+    const path = rawPath && canAccessRoute(accessKey) ? rawPath : ''
     const children = buildLinks(node.children ?? [])
     const fallbackPath = children[0]?.to ?? ''
     if (!path && !fallbackPath) {
@@ -81,8 +80,8 @@ function buildLinks(nodes: MenuItem[]): NavLink[] {
     }
     const presentation = resolveMenuPresentation({
       code: node.code,
-      routeKey: accessKey,
-      title: node.title,
+      routeKey: node.component ?? node.permission ?? accessKey,
+      title: node.name ?? node.title,
       icon: node.icon,
     })
     links.push({

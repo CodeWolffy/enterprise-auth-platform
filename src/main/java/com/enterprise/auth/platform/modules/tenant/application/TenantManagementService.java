@@ -743,10 +743,8 @@ public class TenantManagementService {
 
     private ResourceScopeSummary buildResourceScopeSummary(String tenantId) {
         List<SysMenuEntity> menus = withPlatformTenant(() -> sysMenuMapper.selectList(new LambdaQueryWrapper<SysMenuEntity>()
-                .eq(SysMenuEntity::getTenantId, "platform")
-                .eq(SysMenuEntity::getDeleted, 0)
-                .eq(SysMenuEntity::getEnabled, 1)
-                .orderByAsc(SysMenuEntity::getOrderNo)
+                .eq(SysMenuEntity::getDelFlag, "0")
+                .orderByAsc(SysMenuEntity::getSort)
                 .orderByAsc(SysMenuEntity::getId)));
         java.util.Set<Long> visibleIds = tenantCapabilityResourceScopeFacade.visibleMenuIds(tenantId, menus);
         java.util.Set<Long> grantableIds = tenantCapabilityResourceScopeFacade.grantableMenuIds(tenantId, menus);
@@ -813,20 +811,20 @@ public class TenantManagementService {
     public record ResourceScopeMenuView(
             @Schema(description = "菜单 ID") Long id,
             @Schema(description = "父级菜单 ID") Long parentId,
-            @Schema(description = "菜单名称") String menuName,
-            @Schema(description = "菜单类型") String menuType,
-            @Schema(description = "资源键") String resourceKey,
-            @Schema(description = "授权键") String grantKey,
-            @Schema(description = "路由路径") String path
+            @Schema(description = "菜单名称") String name,
+            @Schema(description = "菜单类型") String type,
+            @Schema(description = "菜单路径") String path,
+            @Schema(description = "权限标识") String permission,
+            @Schema(description = "路由路径") String routePath
     ) {
         static ResourceScopeMenuView from(SysMenuEntity menu) {
             return new ResourceScopeMenuView(
                     menu.getId(),
                     menu.getParentId(),
-                    menu.getMenuName(),
-                    menu.getMenuType(),
-                    menu.getResourceKey(),
-                    menu.getGrantKey(),
+                    menu.getName(),
+                    menu.getType(),
+                    menu.getPath(),
+                    menu.getPermission(),
                     menu.getPath()
             );
         }

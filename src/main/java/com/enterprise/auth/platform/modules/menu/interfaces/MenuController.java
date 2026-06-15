@@ -114,6 +114,6 @@ public class MenuController {
             @Parameter(description = "菜单 ID") @PathVariable Long menuId,
             @Valid @RequestBody SortMenuRequest request
     ) {
-        return ApiResponse.ok(menuService.updateSort(menuId, request.orderNo()));
+        return ApiResponse.ok(menuService.updateSort(menuId, request.sort()));
     }
 }

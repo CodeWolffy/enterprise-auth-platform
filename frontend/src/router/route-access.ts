@@ -1,5 +1,5 @@
 import type { RouteLocationNormalized } from 'vue-router'
-import { ROUTE_KEY_PATH_MAP, resolveRouteManifest } from '@/app/registry/module-manifest'
+import { resolveRouteManifest } from '@/app/registry/module-manifest'
 import type { MenuItem, PermissionSnapshot } from '@/types/auth-models'
 
 interface RouteAccessTarget {
@@ -8,32 +8,13 @@ interface RouteAccessTarget {
   path: string
 }
 
-const ROUTE_KEYS = new Set(Object.keys(ROUTE_KEY_PATH_MAP))
-const GENERATED_ROUTE_KEY_PREFIX = 'generated.'
-
-export function resolveRoutePath(routeKey?: string | null) {
-  if (!routeKey) {
-    return ''
-  }
-  const normalizedRouteKey = routeKey.trim()
-  if (normalizedRouteKey.startsWith(GENERATED_ROUTE_KEY_PREFIX)) {
-    const moduleName = normalizedRouteKey.slice(GENERATED_ROUTE_KEY_PREFIX.length).trim()
-    return moduleName ? `/platform/generated/${encodeURIComponent(moduleName)}` : ''
-  }
-  return ROUTE_KEY_PATH_MAP[normalizedRouteKey] ?? ''
-}
-
-export function collectAllowedRouteKeys(menus: MenuItem[]) {
-  const routeKeys = new Set<string>()
+export function collectAllowedRoutePaths(menus: MenuItem[]) {
+  const paths = new Set<string>()
   const walk = (items: MenuItem[]) => {
     for (const item of items) {
-      const routeKey = item.routeKey?.trim()
-      if (routeKey) {
-        if (ROUTE_KEYS.has(routeKey) || routeKey.startsWith(GENERATED_ROUTE_KEY_PREFIX)) {
-          routeKeys.add(routeKey)
-        } else {
-          console.warn('[auth] 后端菜单快照中存在未知的路由键:', routeKey)
-        }
+      const path = normalizeRoutePath(item.path)
+      if (path) {
+        paths.add(path)
       }
       if (item.children?.length) {
         walk(item.children)
@@ -41,7 +22,7 @@ export function collectAllowedRouteKeys(menus: MenuItem[]) {
     }
   }
   walk(menus)
-  return routeKeys
+  return paths
 }
 
 export function isAllowedRoute(snapshot: PermissionSnapshot | null, to: RouteAccessTarget) {
@@ -58,37 +39,21 @@ export function isAllowedRoute(snapshot: PermissionSnapshot | null, to: RouteAcc
     return isAllowedGeneratedRoute(snapshot, to.path)
   }
 
-  const routeKey = String(to.meta.routeKey ?? '').trim()
-  if (!routeKey) {
+  const routePath = normalizeRoutePath(to.path)
+  if (!routePath) {
     return true
   }
 
-  const routeKeys = collectAllowedRouteKeys(snapshot.menus ?? [])
-  return routeKeys.has(routeKey) && hasRequiredGrant(snapshot, requiredGrant)
+  const allowedPaths = collectAllowedRoutePaths(snapshot.menus ?? [])
+  return allowedPaths.has(routePath) && hasRequiredGrant(snapshot, requiredGrant)
 }
 
 function isAllowedGeneratedRoute(snapshot: PermissionSnapshot, path: string) {
-  const moduleName = resolveGeneratedModuleName(path)
-  if (!moduleName) {
+  const routePath = normalizeRoutePath(path)
+  if (!routePath) {
     return false
   }
-  return collectAllowedRouteKeys(snapshot.menus ?? []).has(`${GENERATED_ROUTE_KEY_PREFIX}${moduleName}`)
-}
-
-function resolveGeneratedModuleName(path: string) {
-  const prefix = '/platform/generated/'
-  if (!path.startsWith(prefix)) {
-    return ''
-  }
-  const segment = path.slice(prefix.length).split('/')[0]?.trim()
-  if (!segment) {
-    return ''
-  }
-  try {
-    return decodeURIComponent(segment)
-  } catch {
-    return segment
-  }
+  return collectAllowedRoutePaths(snapshot.menus ?? []).has(routePath)
 }
 
 export function resolveFirstAllowedPath(snapshot: PermissionSnapshot | null) {
@@ -96,23 +61,19 @@ export function resolveFirstAllowedPath(snapshot: PermissionSnapshot | null) {
     return null
   }
 
-  const routeKeys = collectAllowedRouteKeys(snapshot.menus ?? [])
   const menuList = flattenMenuTree(snapshot.menus ?? [])
   for (const menu of menuList) {
-    const routeKey = menu.routeKey?.trim()
-    if (!routeKey || !routeKeys.has(routeKey)) {
+    const path = normalizeRoutePath(menu.path)
+    if (!path) {
       continue
     }
-    const requiredGrant = resolveRouteManifest(routeKey)?.requiredGrant?.trim() ?? ''
+    const requiredGrant = resolveRouteManifest(menu.component?.trim() || menu.permission?.trim() || menu.code?.trim() || '')?.requiredGrant?.trim() ?? ''
     if (!hasRequiredGrant(snapshot, requiredGrant)) {
       continue
     }
-    const path = menu.path?.trim() || resolveRoutePath(routeKey)
-    if (path) {
-      return path
-    }
+    return path
   }
-  return routeKeys.has('dashboard') ? '/dashboard' : null
+  return null
 }
 
 function hasRequiredGrant(snapshot: PermissionSnapshot, requiredGrant?: string | null) {
@@ -132,4 +93,12 @@ function flattenMenuTree(menus: MenuItem[]) {
   }
   walk(menus)
   return result
+}
+
+function normalizeRoutePath(path?: string | null) {
+  const normalized = path?.trim()
+  if (!normalized) {
+    return ''
+  }
+  return normalized.startsWith('/') ? normalized : `/${normalized}`
 }

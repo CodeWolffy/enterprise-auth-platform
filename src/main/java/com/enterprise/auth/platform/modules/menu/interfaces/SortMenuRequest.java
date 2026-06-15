@@ -5,6 +5,6 @@ import jakarta.validation.constraints.NotNull;
 
 @Schema(description = "排序请求")
 public record SortMenuRequest(
-        @Schema(description = "排序值", requiredMode = Schema.RequiredMode.REQUIRED) @NotNull Integer orderNo
+        @Schema(description = "排序值", requiredMode = Schema.RequiredMode.REQUIRED) @NotNull Integer sort
 ) {
 }

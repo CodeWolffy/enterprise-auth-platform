@@ -7,21 +7,15 @@ export type MenuType = '0' | '1'
 
 export interface MenuTreeNode {
   id: number
-  menuType: MenuType
-  resourceKey: string
-  menuName: string
+  type: MenuType
+  name: string
   parentId: number | null
-  ancestors: string
-  routeKey: string | null
-  grantKey: string | null
+  permission: string | null
   path: string | null
   component: string | null
   redirect: string | null
   icon: string | null
-  orderNo: number
-  visible: boolean
-  enabled: boolean
-  system: boolean
+  sort: number
   outerStatus: boolean
   applicationKey: string | null
   children: MenuTreeNode[]
@@ -29,18 +23,14 @@ export interface MenuTreeNode {
 
 export interface MenuMutationPayload {
   parentId?: number | null
-  menuType: MenuType
-  resourceKey: string
-  menuName: string
-  routeKey?: string | null
-  grantKey?: string | null
+  type: MenuType
+  name: string
+  permission?: string | null
   path?: string | null
   component?: string | null
   redirect?: string | null
   icon?: string | null
-  orderNo?: number | null
-  visible?: boolean | null
-  enabled?: boolean | null
+  sort?: number | null
   outerStatus?: boolean | null
   applicationKey?: string | null
 }
@@ -83,7 +73,7 @@ export async function batchCreateMenuActions(menuId: number, payload: BatchMenuA
   return data.data
 }
 
-export async function sortMenu(menuId: number, orderNo: number) {
-  const { data } = await http.put<ApiResponse<MenuTreeNode>>(`/api/menus/${menuId}/sort`, { orderNo })
+export async function sortMenu(menuId: number, sort: number) {
+  const { data } = await http.put<ApiResponse<MenuTreeNode>>(`/api/menus/${menuId}/sort`, { sort })
   return data.data
 }

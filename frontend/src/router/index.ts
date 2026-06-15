@@ -4,7 +4,7 @@ import { ElMessage } from 'element-plus'
 import type { MenuItem, PermissionSnapshot } from '@/types/auth-models'
 import { useAuthStore } from '@/stores/auth'
 import { APP_ROUTE_MANIFESTS, type AppRouteManifest } from '@/app/registry/module-manifest'
-import { collectAllowedRouteKeys, isAllowedRoute, resolveFirstAllowedPath } from './route-access'
+import { isAllowedRoute, resolveFirstAllowedPath } from './route-access'
 
 const CONSOLE_SHELL_ROUTE_NAME = 'console-shell'
 
@@ -128,13 +128,14 @@ function registerDynamicRoutes(snapshot?: PermissionSnapshot | null) {
     return
   }
 
-  const allowedRouteKeys = collectAllowedRouteKeys(snapshot.menus ?? [])
-  const menuByRouteKey = collectMenuByRouteKey(snapshot.menus ?? [])
+  const menuByPath = collectMenuByPath(snapshot.menus ?? [])
+  const allowedRoutePaths = new Set(menuByPath.keys())
   for (const manifest of APP_ROUTE_MANIFESTS) {
-    if (!canRegisterRoute(manifest, snapshot, allowedRouteKeys)) {
+    const menu = resolveMenuForManifest(manifest, menuByPath)
+    if (!canRegisterRoute(manifest, snapshot, allowedRoutePaths, Boolean(menu))) {
       continue
     }
-    router.addRoute(CONSOLE_SHELL_ROUTE_NAME, toRouteRecord(manifest, manifest.routeKey ? menuByRouteKey.get(manifest.routeKey) : undefined))
+    router.addRoute(CONSOLE_SHELL_ROUTE_NAME, toRouteRecord(manifest, menu))
     dynamicRouteNames.add(manifest.name)
   }
 }
@@ -151,13 +152,18 @@ function clearDynamicRoutes() {
 function canRegisterRoute(
   manifest: AppRouteManifest,
   snapshot: PermissionSnapshot,
-  allowedRouteKeys: Set<string>,
+  allowedRoutePaths: Set<string>,
+  hasRuntimeMenu: boolean,
 ) {
-  if (manifest.routeKey) {
-    return allowedRouteKeys.has(manifest.routeKey) && hasRequiredGrant(snapshot, manifest.requiredGrant)
-  }
   if (manifest.generatedRoute) {
-    return [...allowedRouteKeys].some((routeKey) => routeKey.startsWith('generated.'))
+    return [...allowedRoutePaths].some((path) => path.startsWith('/platform/generated/'))
+  }
+  const manifestPath = normalizeAbsoluteRoutePath(manifest.path)
+  if (manifestPath && allowedRoutePaths.has(manifestPath)) {
+    return hasRequiredGrant(snapshot, manifest.requiredGrant)
+  }
+  if (hasRuntimeMenu) {
+    return hasRequiredGrant(snapshot, manifest.requiredGrant)
   }
   const requiredGrant = manifest.requiredGrant?.trim()
   return !requiredGrant || snapshot.superAdmin || (snapshot.grants ?? []).includes(requiredGrant)
@@ -168,13 +174,13 @@ function hasRequiredGrant(snapshot: PermissionSnapshot, requiredGrant?: string |
   return !normalizedGrant || snapshot.superAdmin || (snapshot.grants ?? []).includes(normalizedGrant)
 }
 
-function collectMenuByRouteKey(menus: MenuItem[]) {
+function collectMenuByPath(menus: MenuItem[]) {
   const result = new Map<string, MenuItem>()
   const walk = (items: MenuItem[]) => {
     for (const item of items) {
-      const routeKey = item.routeKey?.trim()
-      if (routeKey && !result.has(routeKey)) {
-        result.set(routeKey, item)
+      const path = normalizeAbsoluteRoutePath(item.path)
+      if (path && !result.has(path)) {
+        result.set(path, item)
       }
       if (item.children?.length) {
         walk(item.children)
@@ -183,6 +189,25 @@ function collectMenuByRouteKey(menus: MenuItem[]) {
   }
   walk(menus)
   return result
+}
+
+function resolveMenuForManifest(
+  manifest: AppRouteManifest,
+  menuByPath: Map<string, MenuItem>,
+) {
+  const manifestPath = normalizeAbsoluteRoutePath(manifest.path)
+  if (manifestPath) {
+    return menuByPath.get(manifestPath)
+  }
+  return undefined
+}
+
+function normalizeAbsoluteRoutePath(path?: string | null) {
+  const normalized = path?.trim()
+  if (!normalized) {
+    return undefined
+  }
+  return normalized.startsWith('/') ? normalized : `/${normalized}`
 }
 
 function normalizeChildRoutePath(path?: string | null) {
@@ -199,7 +224,7 @@ function toRouteRecord(manifest: AppRouteManifest, menu?: MenuItem): RouteRecord
     name: manifest.name,
     component: manifest.component,
     meta: {
-      title: menu?.title?.trim() || manifest.title,
+      title: menu?.name?.trim() || menu?.title?.trim() || manifest.title,
       routeKey: manifest.routeKey,
       requiresGrant: manifest.requiredGrant,
       hidden: manifest.hidden,

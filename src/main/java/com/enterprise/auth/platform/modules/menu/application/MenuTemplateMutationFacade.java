@@ -18,27 +18,28 @@ public class MenuTemplateMutationFacade {
         this.sysMenuMapper = sysMenuMapper;
     }
 
-    public Optional<MenuTemplateNode> findByKey(String tenantId, String resourceKey) {
-        if (!StringUtils.hasText(tenantId) || !StringUtils.hasText(resourceKey)) {
+    public Optional<MenuTemplateNode> findByKey(String tenantId, String key) {
+        if (!StringUtils.hasText(tenantId) || !StringUtils.hasText(key)) {
             return Optional.empty();
         }
+        String normalizedKey = key.trim();
         return withTenant(tenantId, () -> Optional.ofNullable(sysMenuMapper.selectOne(new LambdaQueryWrapper<SysMenuEntity>()
-                .eq(SysMenuEntity::getTenantId, tenantId)
-                .eq(SysMenuEntity::getResourceKey, resourceKey)
-                .eq(SysMenuEntity::getDeleted, 0)
+                .eq(SysMenuEntity::getDelFlag, "0")
+                .and(wrapper -> wrapper.eq(SysMenuEntity::getPath, normalizedKey).or().eq(SysMenuEntity::getPermission, normalizedKey))
                 .last("limit 1")))
                 .map(MenuTemplateNode::from));
     }
 
-    public Optional<MenuTemplateNode> findByKeyAndType(String tenantId, String resourceKey, String menuType) {
-        if (!StringUtils.hasText(tenantId) || !StringUtils.hasText(resourceKey) || !StringUtils.hasText(menuType)) {
+    public Optional<MenuTemplateNode> findByKeyAndType(String tenantId, String key, String type) {
+        if (!StringUtils.hasText(tenantId) || !StringUtils.hasText(key) || !StringUtils.hasText(type)) {
             return Optional.empty();
         }
+        String normalizedType = normalizeType(type);
+        String normalizedKey = key.trim();
         return withTenant(tenantId, () -> Optional.ofNullable(sysMenuMapper.selectOne(new LambdaQueryWrapper<SysMenuEntity>()
-                .eq(SysMenuEntity::getTenantId, tenantId)
-                .eq(SysMenuEntity::getResourceKey, resourceKey)
-                .eq(SysMenuEntity::getMenuType, menuType)
-                .eq(SysMenuEntity::getDeleted, 0)
+                .eq(SysMenuEntity::getDelFlag, "0")
+                .eq(SysMenuEntity::getType, normalizedType)
+                .and(wrapper -> wrapper.eq(SysMenuEntity::getPath, normalizedKey).or().eq(SysMenuEntity::getPermission, normalizedKey))
                 .last("limit 1")))
                 .map(MenuTemplateNode::from));
     }
@@ -48,32 +49,34 @@ public class MenuTemplateMutationFacade {
             return Optional.empty();
         }
         return withTenant(tenantId, () -> Optional.ofNullable(sysMenuMapper.selectById(menuId))
-                .filter(entity -> entity.getDeleted() == null || entity.getDeleted() == 0)
+                .filter(entity -> entity.getDelFlag() == null || "0".equals(entity.getDelFlag()))
                 .map(MenuTemplateNode::from));
     }
 
     public Long create(MenuTemplateMutation mutation) {
         SysMenuEntity entity = new SysMenuEntity();
-        entity.setTenantId(mutation.tenantId());
         entity.setParentId(mutation.parentId());
-        entity.setAncestors(mutation.ancestors());
-        entity.setMenuType(mutation.menuType());
-        entity.setResourceKey(mutation.resourceKey());
-        entity.setMenuName(mutation.menuName());
-        entity.setRouteKey(mutation.routeKey());
-        entity.setGrantKey(mutation.grantKey());
+        entity.setType(normalizeType(mutation.type()));
+        entity.setName(mutation.name());
+        entity.setPermission(mutation.permission());
         entity.setPath(mutation.path());
         entity.setComponent(mutation.component());
         entity.setIcon(mutation.icon());
-        entity.setOrderNo(mutation.orderNo());
-        entity.setVisible(mutation.visible());
-        entity.setEnabled(mutation.enabled());
-        entity.setIsSystem(mutation.system());
+        entity.setSort(mutation.sort() == null ? 0 : mutation.sort());
+        entity.setOuterStatus(0);
+        entity.setDelFlag("0");
         withTenant(mutation.tenantId(), () -> {
             sysMenuMapper.insert(entity);
             return null;
         });
         return entity.getId();
+    }
+
+    private static String normalizeType(String type) {
+        if ("1".equals(type) || "BUTTON".equalsIgnoreCase(type) || "API".equalsIgnoreCase(type)) {
+            return "1";
+        }
+        return "0";
     }
 
     private <T> T withTenant(String tenantId, Supplier<T> supplier) {
@@ -93,17 +96,17 @@ public class MenuTemplateMutationFacade {
     public record MenuTemplateNode(
             Long id,
             Long parentId,
-            String ancestors,
-            String menuType,
-            String resourceKey
+            String path,
+            String type,
+            String permission
     ) {
         private static MenuTemplateNode from(SysMenuEntity entity) {
             return new MenuTemplateNode(
                     entity.getId(),
                     entity.getParentId(),
-                    entity.getAncestors(),
-                    entity.getMenuType(),
-                    entity.getResourceKey()
+                    entity.getPath(),
+                    entity.getType(),
+                    entity.getPermission()
             );
         }
     }
@@ -111,19 +114,13 @@ public class MenuTemplateMutationFacade {
     public record MenuTemplateMutation(
             String tenantId,
             Long parentId,
-            String ancestors,
-            String menuType,
-            String resourceKey,
-            String menuName,
-            String routeKey,
-            String grantKey,
+            String type,
+            String name,
+            String permission,
             String path,
             String component,
             String icon,
-            Integer orderNo,
-            Integer visible,
-            Integer enabled,
-            Integer system
+            Integer sort
     ) {
     }
 }

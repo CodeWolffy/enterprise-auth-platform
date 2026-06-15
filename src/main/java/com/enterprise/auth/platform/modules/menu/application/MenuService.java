@@ -16,7 +16,6 @@ import com.enterprise.auth.platform.modules.tenant.application.TenantCapabilityR
 import com.enterprise.auth.platform.modules.tenant.application.TenantMenuService;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -100,8 +99,8 @@ public class MenuService {
                 .map(menuById::get)
                 .filter(Objects::nonNull)
                 .filter(menu -> hierarchyEnabled(menu, menuById))
-                .filter(menu -> parseType(menu.getMenuType()) == MenuType.BUTTON)
-                .map(SysMenuEntity::getGrantKey)
+                .filter(menu -> readMenuType(menu) == MenuType.BUTTON)
+                .map(this::readPermission)
                 .filter(StringUtils::hasText)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
     }
@@ -124,11 +123,11 @@ public class MenuService {
         }
 
         Set<Long> expanded = expandWithAncestors(grantedIds, menuById);
-        Set<Long> visibleIds = tenantCapabilityResourceScopeFacade.visibleMenuIds(activeTenantId, template);
-        if (visibleIds.isEmpty()) {
+        Set<Long> activeIds = tenantCapabilityResourceScopeFacade.visibleMenuIds(activeTenantId, template);
+        if (activeIds.isEmpty()) {
             return List.of();
         }
-        expanded.retainAll(visibleIds);
+        expanded.retainAll(activeIds);
         // 非平台租户需与租户分配的菜单取交集（对齐 haorong-mall sys_tenant_menu 模型）
         if (!platformTenantId().equals(activeTenantId)) {
             Set<Long> tenantMenuIds = tenantMenuService.findTenantMenuIds(activeTenantId);
@@ -146,7 +145,7 @@ public class MenuService {
             if (!hierarchyEnabled(menu, menuById) || !hierarchyVisible(menu, menuById)) {
                 continue;
             }
-            nodes.put(menu.getId(), RuntimeMenuNodeBuilder.from(menu));
+            nodes.put(menu.getId(), toRuntimeMenuNode(menu));
         }
         if (nodes.isEmpty()) {
             return List.of();
@@ -162,7 +161,7 @@ public class MenuService {
         }
 
         Comparator<RuntimeMenuNodeBuilder> comparator = Comparator
-                .comparingInt((RuntimeMenuNodeBuilder node) -> node.orderNo == null ? Integer.MAX_VALUE : node.orderNo)
+                .comparingInt((RuntimeMenuNodeBuilder node) -> node.sort == null ? Integer.MAX_VALUE : node.sort)
                 .thenComparingLong(node -> node.id == null ? Long.MAX_VALUE : node.id);
         roots.sort(comparator);
         roots.forEach(root -> sortRuntimeChildrenRecursively(root, comparator));
@@ -239,29 +238,16 @@ public class MenuService {
     public MenuTreeNode create(CreateMenuRequest request) {
         requirePlatformTenant();
         SysMenuEntity parent = request.parentId() == null ? null : getMenu(request.parentId());
-        validateMenuShape(request.menuType(), parent, request.grantKey());
-        validateGrantKey(request.menuType(), request.grantKey());
-        validateUniqueKeys(null, request.resourceKey(), request.routeKey(), request.path());
+        validateMenuShape(request.type(), parent, request.permission());
+        validatePermission(request.type(), request.permission());
+        validateUniqueKeys(null, request.permission(), request.path());
 
         SysMenuEntity entity = new SysMenuEntity();
-        entity.setTenantId(platformTenantId());
         entity.setParentId(request.parentId());
-        entity.setAncestors(resolveAncestors(parent));
-        entity.setMenuType(request.menuType().value());
-        entity.setResourceKey(request.resourceKey().trim());
-        entity.setMenuName(request.menuName().trim());
-        entity.setRouteKey(request.menuType() == MenuType.MENU ? blankToNull(request.routeKey()) : null);
-        entity.setGrantKey(request.menuType() == MenuType.BUTTON ? blankToNull(request.grantKey()) : null);
-        entity.setPath(request.menuType() == MenuType.MENU ? blankToNull(request.path()) : null);
-        entity.setComponent(request.menuType() == MenuType.MENU ? blankToNull(request.component()) : null);
-        entity.setRedirect(request.menuType() == MenuType.MENU ? blankToNull(request.redirect()) : null);
-        entity.setIcon(request.menuType() == MenuType.MENU ? blankToNull(request.icon()) : null);
-        entity.setOrderNo(request.orderNo() == null ? 0 : request.orderNo());
-        entity.setVisible(Boolean.FALSE.equals(request.visible()) ? 0 : 1);
-        entity.setEnabled(Boolean.FALSE.equals(request.enabled()) ? 0 : 1);
-        entity.setIsSystem(0);
-        entity.setOuterStatus(Boolean.TRUE.equals(request.outerStatus()) ? 1 : 0);
-        entity.setApplicationKey(request.applicationKey());
+        applyMenuPayload(entity, request.type(), request.name(), request.permission(), request.path(),
+                request.component(), request.redirect(), request.icon(), request.sort(),
+                request.outerStatus(), request.applicationKey());
+        entity.setDelFlag("0");
 
         try {
             runWithPlatformTenant(() -> {
@@ -289,18 +275,14 @@ public class MenuService {
         Long nextParentId = parentIdPresent ? request.parentId() : entity.getParentId();
         CreateMenuRequest normalizedRequest = new CreateMenuRequest(
                 nextParentId,
-                request.menuType(),
-                request.resourceKey(),
-                request.menuName(),
-                request.routeKey(),
-                request.grantKey(),
+                request.type(),
+                request.name(),
+                request.permission(),
                 request.path(),
                 request.component(),
                 request.redirect(),
                 request.icon(),
-                request.orderNo(),
-                request.visible(),
-                request.enabled(),
+                request.sort(),
                 request.outerStatus(),
                 request.applicationKey()
         );
@@ -310,29 +292,17 @@ public class MenuService {
         if (parent != null && parent.getId().equals(menuId)) {
             throw new BusinessException("父节点不能是自身");
         }
-        if (parent != null && containsDescendant(parent.getAncestors(), menuId)) {
+        if (parent != null && isDescendant(menuId, parent.getId())) {
             throw new BusinessException("父节点不能是当前节点的子孙节点");
         }
-        validateMenuShape(normalizedRequest.menuType(), parent, normalizedRequest.grantKey());
-        validateGrantKey(normalizedRequest.menuType(), normalizedRequest.grantKey());
-        validateUniqueKeys(menuId, normalizedRequest.resourceKey(), normalizedRequest.routeKey(), normalizedRequest.path());
+        validateMenuShape(normalizedRequest.type(), parent, normalizedRequest.permission());
+        validatePermission(normalizedRequest.type(), normalizedRequest.permission());
+        validateUniqueKeys(menuId, normalizedRequest.permission(), normalizedRequest.path());
 
         entity.setParentId(normalizedRequest.parentId());
-        entity.setAncestors(resolveAncestors(parent));
-        entity.setMenuType(normalizedRequest.menuType().value());
-        entity.setResourceKey(normalizedRequest.resourceKey().trim());
-        entity.setMenuName(normalizedRequest.menuName().trim());
-        entity.setRouteKey(normalizedRequest.menuType() == MenuType.MENU ? blankToNull(normalizedRequest.routeKey()) : null);
-        entity.setGrantKey(normalizedRequest.menuType() == MenuType.BUTTON ? blankToNull(normalizedRequest.grantKey()) : null);
-        entity.setPath(normalizedRequest.menuType() == MenuType.MENU ? blankToNull(normalizedRequest.path()) : null);
-        entity.setComponent(normalizedRequest.menuType() == MenuType.MENU ? blankToNull(normalizedRequest.component()) : null);
-        entity.setRedirect(normalizedRequest.menuType() == MenuType.MENU ? blankToNull(normalizedRequest.redirect()) : null);
-        entity.setIcon(normalizedRequest.menuType() == MenuType.MENU ? blankToNull(normalizedRequest.icon()) : null);
-        entity.setOrderNo(normalizedRequest.orderNo() == null ? 0 : normalizedRequest.orderNo());
-        entity.setVisible(Boolean.FALSE.equals(normalizedRequest.visible()) ? 0 : 1);
-        entity.setEnabled(Boolean.FALSE.equals(normalizedRequest.enabled()) ? 0 : 1);
-        entity.setOuterStatus(Boolean.TRUE.equals(normalizedRequest.outerStatus()) ? 1 : 0);
-        entity.setApplicationKey(normalizedRequest.applicationKey());
+        applyMenuPayload(entity, normalizedRequest.type(), normalizedRequest.name(), normalizedRequest.permission(), normalizedRequest.path(),
+                normalizedRequest.component(), normalizedRequest.redirect(), normalizedRequest.icon(), normalizedRequest.sort(),
+                normalizedRequest.outerStatus(), normalizedRequest.applicationKey());
 
         try {
             runWithPlatformTenant(() -> {
@@ -343,7 +313,6 @@ public class MenuService {
             throw new BusinessException("菜单权限键已存在或数据不合法");
         }
 
-        refreshDescendantAncestors(menuId);
         evictPrincipalSnapshots();
         return toMenuNode(entity, List.of());
     }
@@ -353,7 +322,7 @@ public class MenuService {
     public List<MenuTreeNode> batchCreateActions(Long menuId, List<String> actions) {
         requirePlatformTenant();
         SysMenuEntity parent = getMenu(menuId);
-        if (parseType(parent.getMenuType()) != MenuType.MENU) {
+        if (readMenuType(parent) != MenuType.MENU) {
             throw new BusinessException("只有菜单节点可以批量生成按钮权限");
         }
         List<String> normalizedActions = normalizeActions(actions);
@@ -361,31 +330,25 @@ public class MenuService {
             throw new BusinessException("请选择要生成的按钮权限");
         }
         List<MenuTreeNode> created = new ArrayList<>();
-        int orderNo = nextChildOrderNo(menuId);
+        int sort = nextChildSort(menuId);
         for (String action : normalizedActions) {
-            String grantKey = resolveActionGrantKey(parent, action);
-            validateGrantKey(MenuType.BUTTON, grantKey);
-            String resourceKey = resolveActionResourceKey(grantKey, action);
-            ensureActionNotExists(resourceKey, grantKey);
+            String permission = resolveActionPermission(parent, action);
+            validatePermission(MenuType.BUTTON, permission);
+            ensureActionNotExists(permission);
             SysMenuEntity entity = new SysMenuEntity();
-            entity.setTenantId(platformTenantId());
             entity.setParentId(parent.getId());
-            entity.setAncestors(resolveAncestors(parent));
-            entity.setMenuType(MenuType.BUTTON.value());
-            entity.setResourceKey(resourceKey);
-            entity.setMenuName(parent.getMenuName() + ACTION_LABELS.getOrDefault(action, action));
-            entity.setRouteKey(null);
-            entity.setGrantKey(grantKey);
+            entity.setType(MenuType.BUTTON.value());
+            entity.setName(readMenuName(parent) + ACTION_LABELS.getOrDefault(action, action));
+            entity.setPermission(permission);
             entity.setPath(null);
             entity.setComponent(null);
             entity.setRedirect(null);
             entity.setIcon(null);
-            entity.setOrderNo(orderNo++);
-            entity.setVisible(1);
-            entity.setEnabled(1);
-            entity.setIsSystem(0);
+            entity.setSort(sort);
+            sort++;
             entity.setOuterStatus(0);
             entity.setApplicationKey(parent.getApplicationKey());
+            entity.setDelFlag("0");
             runWithPlatformTenant(() -> {
                 sysMenuMapper.insert(entity);
                 return null;
@@ -400,15 +363,11 @@ public class MenuService {
     @CacheEvict(value = CacheNames.MENU_TEMPLATE, allEntries = true)
     public void delete(Long menuId) {
         requirePlatformTenant();
-        SysMenuEntity entity = getMenu(menuId);
-        if (entity.getIsSystem() != null && entity.getIsSystem() == 1) {
-            throw new BusinessException("系统菜单权限不允许删除");
-        }
+        getMenu(menuId);
 
         long children = runWithPlatformTenant(() ->
                 sysMenuMapper.selectCount(new LambdaQueryWrapper<SysMenuEntity>()
-                        .eq(SysMenuEntity::getTenantId, platformTenantId())
-                        .eq(SysMenuEntity::getDeleted, 0)
+                        .eq(SysMenuEntity::getDelFlag, "0")
                         .eq(SysMenuEntity::getParentId, menuId)));
 
         if (children > 0) {
@@ -429,11 +388,11 @@ public class MenuService {
 
     @Transactional
     @CacheEvict(value = CacheNames.MENU_TEMPLATE, allEntries = true)
-    public MenuTreeNode updateSort(Long menuId, Integer orderNo) {
+    public MenuTreeNode updateSort(Long menuId, Integer sort) {
         requirePlatformTenant();
-        validateOrderNo(orderNo);
+        validateSort(sort);
         SysMenuEntity entity = getMenu(menuId);
-        entity.setOrderNo(orderNo == null ? 0 : orderNo);
+        entity.setSort(sort == null ? 0 : sort);
         runWithPlatformTenant(() -> {
             sysMenuMapper.updateById(entity);
             return null;
@@ -446,18 +405,16 @@ public class MenuService {
     private List<SysMenuEntity> listTemplateMenus() {
         return runWithPlatformTenant(() ->
                 sysMenuMapper.selectList(new LambdaQueryWrapper<SysMenuEntity>()
-                        .eq(SysMenuEntity::getTenantId, platformTenantId())
-                        .eq(SysMenuEntity::getDeleted, 0)
-                        .orderByAsc(SysMenuEntity::getOrderNo)
+                        .eq(SysMenuEntity::getDelFlag, "0")
+                        .orderByAsc(SysMenuEntity::getSort)
                         .orderByAsc(SysMenuEntity::getId)));
     }
 
     private SysMenuEntity getMenu(Long menuId) {
         SysMenuEntity entity = runWithPlatformTenant(() ->
                 sysMenuMapper.selectOne(new LambdaQueryWrapper<SysMenuEntity>()
-                        .eq(SysMenuEntity::getTenantId, platformTenantId())
                         .eq(SysMenuEntity::getId, menuId)
-                        .eq(SysMenuEntity::getDeleted, 0)
+                        .eq(SysMenuEntity::getDelFlag, "0")
                         .last("limit 1")));
         if (entity == null) {
             throw new BusinessException("菜单权限节点不存在");
@@ -467,15 +424,11 @@ public class MenuService {
 
     private MenuTreeNode toMenuNode(SysMenuEntity entity, List<MenuTreeNode> children) {
         return new MenuTreeNode(
-                entity.getId(), parseType(entity.getMenuType()).value(), entity.getResourceKey(), entity.getMenuName(),
-                entity.getParentId(), entity.getAncestors(),
-                entity.getRouteKey(), entity.getGrantKey(), entity.getGrantKey(),
+                entity.getId(), readMenuType(entity).value(), readMenuName(entity),
+                entity.getParentId(), readPermission(entity),
                 entity.getPath(), entity.getComponent(),
-                entity.getRedirect(), entity.getIcon(), entity.getOrderNo(),
-                entity.getVisible() == null || entity.getVisible() == 1,
-                entity.getEnabled() == null || entity.getEnabled() == 1,
-                entity.getIsSystem() != null && entity.getIsSystem() == 1,
-                entity.getOuterStatus() != null && entity.getOuterStatus() == 1,
+                entity.getRedirect(), entity.getIcon(), readSort(entity),
+                readOuterStatus(entity),
                 entity.getApplicationKey(), children
         );
     }
@@ -501,137 +454,104 @@ public class MenuService {
         return result;
     }
 
-    private int nextChildOrderNo(Long menuId) {
+    private int nextChildSort(Long menuId) {
         return runWithPlatformTenant(() -> sysMenuMapper.selectList(new LambdaQueryWrapper<SysMenuEntity>()
-                        .eq(SysMenuEntity::getTenantId, platformTenantId())
-                        .eq(SysMenuEntity::getDeleted, 0)
+                        .eq(SysMenuEntity::getDelFlag, "0")
                         .eq(SysMenuEntity::getParentId, menuId))
                 .stream()
-                .map(SysMenuEntity::getOrderNo)
+                .map(SysMenuEntity::getSort)
                 .filter(Objects::nonNull)
                 .max(Integer::compareTo)
                 .map(value -> value + 1)
                 .orElse(1));
     }
 
-    private String resolveActionGrantKey(SysMenuEntity parent, String action) {
+    private String resolveActionPermission(SysMenuEntity parent, String action) {
         String existingPrefix = findExistingActionPermissionPrefix(parent.getId());
         if (existingPrefix != null) {
             return existingPrefix + ":" + action;
         }
-        String resourceKey = blankToNull(parent.getResourceKey());
-        String prefix = permissionPrefixFromResourceKey(resourceKey);
-        if (prefix == null) {
-            throw new BusinessException("资源标识不合法，无法生成按钮权限");
+        String parentPermission = blankToNull(parent.getPermission());
+        if (parentPermission != null) {
+            return parentPermission + ":" + action;
         }
-        return prefix + ":" + action;
-    }
-
-    private String resolveActionResourceKey(String grantKey, String action) {
-        String normalizedGrantKey = blankToNull(grantKey);
-        if (normalizedGrantKey == null) {
-            throw new BusinessException("授权键不合法，无法生成资源标识");
+        String path = blankToNull(parent.getPath());
+        if (path == null) {
+            throw new BusinessException("菜单路径不合法，无法生成按钮权限");
         }
-        String[] segments = normalizedGrantKey.split(":");
-        if (segments.length < 3) {
-            throw new BusinessException("授权键不合法，无法生成资源标识");
+        String normalized = path.replaceAll("^/+", "").replace('/', ':').replace('-', '_');
+        if (!normalized.matches("^[a-zA-Z0-9_:]+$")) {
+            throw new BusinessException("菜单路径不合法，无法生成按钮权限");
         }
-        return segments[segments.length - 2] + "." + action;
-    }
-
-    private String permissionPrefixFromResourceKey(String resourceKey) {
-        if (!StringUtils.hasText(resourceKey)) {
-            return null;
-        }
-        String normalized = resourceKey.trim();
-        int actionSeparator = normalized.lastIndexOf('.');
-        if (actionSeparator > 0) {
-            normalized = normalized.substring(0, actionSeparator);
-        }
-        if (normalized.contains("-")) {
-            return null;
-        }
-        if (!normalized.matches("^[a-zA-Z0-9_]+(?::[a-zA-Z0-9_]+)?$")) {
-            return null;
-        }
-        return normalized.contains(":") ? normalized : "upms:" + normalized;
+        return normalized.contains(":") ? normalized + ":" + action : "upms:" + normalized + ":" + action;
     }
 
     private String findExistingActionPermissionPrefix(Long parentId) {
         return listTemplateMenus().stream()
                 .filter(menu -> Objects.equals(parentId, menu.getParentId()))
-                .filter(menu -> Objects.equals(MenuType.BUTTON.value(), menu.getMenuType()))
-                .map(SysMenuEntity::getGrantKey)
+                .filter(menu -> Objects.equals(MenuType.BUTTON.value(), readMenuType(menu).value()))
+                .map(SysMenuEntity::getPermission)
                 .map(MenuService::blankToNull)
                 .filter(Objects::nonNull)
-                .map(grantKey -> {
-                    int lastSeparator = grantKey.lastIndexOf(':');
-                    return lastSeparator > 0 ? grantKey.substring(0, lastSeparator) : null;
+                .map(permission -> {
+                    int lastSeparator = permission.lastIndexOf(':');
+                    return lastSeparator > 0 ? permission.substring(0, lastSeparator) : null;
                 })
                 .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(null);
     }
 
-    private void ensureActionNotExists(String resourceKey, String grantKey) {
-        String normalizedResourceKey = blankToNull(resourceKey);
-        String normalizedGrantKey = blankToNull(grantKey);
+    private void ensureActionNotExists(String permission) {
+        String normalizedPermission = blankToNull(permission);
         boolean exists = listTemplateMenus().stream().anyMatch(menu ->
-                Objects.equals(normalizedResourceKey, blankToNull(menu.getResourceKey()))
-                        || (Objects.equals(MenuType.BUTTON.value(), menu.getMenuType())
-                        && Objects.equals(normalizedGrantKey, blankToNull(menu.getGrantKey())))
+                Objects.equals(MenuType.BUTTON.value(), readMenuType(menu).value())
+                        && Objects.equals(normalizedPermission, blankToNull(readPermission(menu)))
         );
         if (exists) {
             throw new BusinessException("按钮权限已存在，请勿重复生成");
         }
     }
 
-    private void validateMenuShape(MenuType childType, SysMenuEntity parent, String grantKey) {
+    private void validateMenuShape(MenuType childType, SysMenuEntity parent, String permission) {
         if (childType == MenuType.BUTTON) {
-            if (parent == null || parseType(parent.getMenuType()) != MenuType.MENU) {
+            if (parent == null || readMenuType(parent) != MenuType.MENU) {
                 throw new BusinessException("按钮权限必须挂在菜单节点下");
             }
-            if (!StringUtils.hasText(grantKey)) {
-                throw new BusinessException("按钮权限必须配置授权键");
+            if (!StringUtils.hasText(permission)) {
+                throw new BusinessException("按钮权限必须配置权限标识");
             }
             return;
         }
-        if (StringUtils.hasText(grantKey)) {
+        if (StringUtils.hasText(permission)) {
             throw new BusinessException("菜单节点不承载按钮权限");
         }
-        if (parent != null && parseType(parent.getMenuType()) == MenuType.BUTTON) {
+        if (parent != null && readMenuType(parent) == MenuType.BUTTON) {
             throw new BusinessException("按钮权限不能作为父节点");
         }
     }
 
-    private void validateGrantKey(MenuType menuType, String grantKey) {
-        if (!StringUtils.hasText(grantKey)) {
+    private void validatePermission(MenuType menuType, String permission) {
+        if (!StringUtils.hasText(permission)) {
             return;
         }
         if (menuType != MenuType.BUTTON) {
-            throw new BusinessException("只有按钮节点可以配置授权键");
+            throw new BusinessException("只有按钮节点可以配置权限标识");
         }
-        if (!grantKey.matches("^[a-zA-Z0-9]+:[a-zA-Z0-9]+:[a-zA-Z0-9_-]+$")) {
-            throw new BusinessException("授权键格式不合法");
+        if (!permission.matches("^[a-zA-Z0-9]+:[a-zA-Z0-9]+:[a-zA-Z0-9_-]+$")) {
+            throw new BusinessException("权限标识格式不合法");
         }
     }
 
-    private void validateUniqueKeys(Long currentMenuId, String resourceKey, String routeKey, String path) {
-        if (!StringUtils.hasText(resourceKey)) {
-            throw new BusinessException("资源唯一标识不能为空");
-        }
-        String normalizedResourceKey = resourceKey.trim();
-        String normalizedRouteKey = blankToNull(routeKey);
+    private void validateUniqueKeys(Long currentMenuId, String permission, String path) {
+        String normalizedPermission = blankToNull(permission);
         String normalizedPath = blankToNull(path);
         for (SysMenuEntity menu : listTemplateMenus()) {
             if (currentMenuId != null && Objects.equals(menu.getId(), currentMenuId)) {
                 continue;
             }
-            if (normalizedResourceKey.equals(blankToNull(menu.getResourceKey()))) {
-                throw new BusinessException("资源唯一标识已存在");
-            }
-            if (normalizedRouteKey != null && normalizedRouteKey.equals(blankToNull(menu.getRouteKey()))) {
-                throw new BusinessException("路由标识已存在");
+            if (normalizedPermission != null && normalizedPermission.equals(blankToNull(menu.getPermission()))) {
+                throw new BusinessException("权限标识已存在");
             }
             if (normalizedPath != null && normalizedPath.equals(blankToNull(menu.getPath()))) {
                 throw new BusinessException("访问路径已存在");
@@ -640,23 +560,14 @@ public class MenuService {
     }
 
     private void validateSystemMenuMutation(SysMenuEntity entity, CreateMenuRequest request) {
-        if (entity.getIsSystem() == null || entity.getIsSystem() != 1) {
-            return;
-        }
-        if (!Objects.equals(parseType(entity.getMenuType()), request.menuType())) {
+        if (!Objects.equals(readMenuType(entity), request.type())) {
             throw new BusinessException("系统节点不允许修改类型");
         }
         if (!Objects.equals(entity.getParentId(), request.parentId())) {
             throw new BusinessException("系统节点不允许修改父节点");
         }
-        if (!Objects.equals(blankToNull(entity.getResourceKey()), blankToNull(request.resourceKey()))) {
-            throw new BusinessException("系统节点不允许修改资源唯一标识");
-        }
-        if (!Objects.equals(blankToNull(entity.getRouteKey()), blankToNull(request.routeKey()))) {
-            throw new BusinessException("系统节点不允许修改路由标识");
-        }
-        if (!Objects.equals(blankToNull(entity.getGrantKey()), blankToNull(request.grantKey()))) {
-            throw new BusinessException("系统节点不允许修改授权键");
+        if (!Objects.equals(blankToNull(readPermission(entity)), blankToNull(request.permission()))) {
+            throw new BusinessException("系统节点不允许修改权限标识");
         }
         if (!Objects.equals(blankToNull(entity.getPath()), blankToNull(request.path()))) {
             throw new BusinessException("系统节点不允许修改访问路径");
@@ -666,11 +577,24 @@ public class MenuService {
         }
     }
 
-    private void validateOrderNo(Integer orderNo) {
-        if (orderNo == null) {
+    private boolean isDescendant(Long ancestorId, Long candidateId) {
+        Map<Long, SysMenuEntity> menuById = toMenuMap(listTemplateMenus());
+        Long parentId = candidateId;
+        while (parentId != null) {
+            if (Objects.equals(parentId, ancestorId)) {
+                return true;
+            }
+            SysMenuEntity current = menuById.get(parentId);
+            parentId = current == null ? null : current.getParentId();
+        }
+        return false;
+    }
+
+    private void validateSort(Integer sort) {
+        if (sort == null) {
             return;
         }
-        if (orderNo < 0 || orderNo > 9999) {
+        if (sort < 0 || sort > 9999) {
             throw new BusinessException("排序值必须在 0 到 9999 之间");
         }
     }
@@ -695,33 +619,26 @@ public class MenuService {
     }
 
     private boolean isRouteNode(SysMenuEntity menu) {
-        return parseType(menu.getMenuType()) == MenuType.MENU;
+        return readMenuType(menu) == MenuType.MENU;
     }
 
     private boolean hierarchyEnabled(SysMenuEntity menu, Map<Long, SysMenuEntity> menuById) {
-        if (menu.getEnabled() == null || menu.getEnabled() != 1) {
+        if (!isActive(menu)) {
             return false;
         }
-        for (Long ancestorId : parseAncestors(menu.getAncestors())) {
-            SysMenuEntity ancestor = menuById.get(ancestorId);
-            if (ancestor == null || ancestor.getEnabled() == null || ancestor.getEnabled() != 1) {
+        Long parentId = menu.getParentId();
+        while (parentId != null) {
+            SysMenuEntity ancestor = menuById.get(parentId);
+            if (ancestor == null || !isActive(ancestor)) {
                 return false;
             }
+            parentId = ancestor.getParentId();
         }
         return true;
     }
 
     private boolean hierarchyVisible(SysMenuEntity menu, Map<Long, SysMenuEntity> menuById) {
-        if (menu.getVisible() == null || menu.getVisible() != 1) {
-            return false;
-        }
-        for (Long ancestorId : parseAncestors(menu.getAncestors())) {
-            SysMenuEntity ancestor = menuById.get(ancestorId);
-            if (ancestor == null || ancestor.getVisible() == null || ancestor.getVisible() != 1) {
-                return false;
-            }
-        }
-        return true;
+        return hierarchyEnabled(menu, menuById);
     }
 
     private Set<Long> normalizeMenuIds(Set<Long> menuIds) {
@@ -740,7 +657,17 @@ public class MenuService {
             if (menu == null) {
                 continue;
             }
-            expanded.addAll(parseAncestors(menu.getAncestors()));
+            LinkedHashSet<Long> parentChain = new LinkedHashSet<>();
+            Long parentId = menu.getParentId();
+            while (parentId != null) {
+                SysMenuEntity ancestor = menuById.get(parentId);
+                if (ancestor == null) {
+                    break;
+                }
+                parentChain.add(parentId);
+                parentId = ancestor.getParentId();
+            }
+            expanded.addAll(parentChain);
             expanded.add(menuId);
         }
         return expanded;
@@ -755,61 +682,62 @@ public class MenuService {
         ));
     }
 
-    private String resolveAncestors(SysMenuEntity parent) {
-        if (parent == null) {
-            return "";
-        }
-        String p = parent.getAncestors() == null ? "" : parent.getAncestors();
-        if (p.isEmpty()) {
-            return String.valueOf(parent.getId());
-        }
-        return p + "," + parent.getId();
+    private void applyMenuPayload(
+            SysMenuEntity entity,
+            MenuType menuType,
+            String name,
+            String permission,
+            String path,
+            String component,
+            String redirect,
+            String icon,
+            Integer sort,
+            Boolean outerStatus,
+            String applicationKey
+    ) {
+        String normalizedName = name == null ? null : name.trim();
+        String normalizedPermission = menuType == MenuType.BUTTON ? blankToNull(permission) : null;
+        String normalizedPath = menuType == MenuType.MENU ? blankToNull(path) : null;
+        String normalizedComponent = menuType == MenuType.MENU ? blankToNull(component) : null;
+        String normalizedRedirect = menuType == MenuType.MENU ? blankToNull(redirect) : null;
+        String normalizedIcon = menuType == MenuType.MENU ? blankToNull(icon) : null;
+        Integer normalizedSort = sort == null ? 0 : sort;
+
+        entity.setType(menuType.value());
+        entity.setName(normalizedName);
+        entity.setPermission(normalizedPermission);
+        entity.setPath(normalizedPath);
+        entity.setComponent(normalizedComponent);
+        entity.setRedirect(normalizedRedirect);
+        entity.setIcon(normalizedIcon);
+        entity.setSort(normalizedSort);
+        entity.setOuterStatus(Boolean.TRUE.equals(outerStatus) ? 1 : 0);
+        entity.setApplicationKey(applicationKey);
+        entity.setDelFlag("0");
     }
 
-    private void refreshDescendantAncestors(Long menuId) {
-        List<SysMenuEntity> children = runWithPlatformTenant(() ->
-                sysMenuMapper.selectList(new LambdaQueryWrapper<SysMenuEntity>()
-                        .eq(SysMenuEntity::getTenantId, platformTenantId())
-                        .eq(SysMenuEntity::getParentId, menuId)
-                        .eq(SysMenuEntity::getDeleted, 0)));
-        if (children.isEmpty()) {
-            return;
-        }
-        SysMenuEntity parent = getMenu(menuId);
-        String ancestors = resolveAncestors(parent);
-        for (SysMenuEntity child : children) {
-            child.setAncestors(ancestors);
-            runWithPlatformTenant(() -> {
-                sysMenuMapper.updateById(child);
-                return null;
-            });
-            refreshDescendantAncestors(child.getId());
-        }
+    private MenuType readMenuType(SysMenuEntity entity) {
+        return parseType(entity.getType());
     }
 
-    private boolean containsDescendant(String ancestors, Long menuId) {
-        if (ancestors == null || ancestors.isEmpty()) {
-            return false;
-        }
-        return Arrays.stream(ancestors.split(",")).anyMatch(id -> id.equals(String.valueOf(menuId)));
+    private String readMenuName(SysMenuEntity entity) {
+        return entity.getName();
     }
 
-    private Set<Long> parseAncestors(String ancestors) {
-        if (!StringUtils.hasText(ancestors)) {
-            return Set.of();
-        }
-        return Arrays.stream(ancestors.split(","))
-                .map(String::trim)
-                .filter(StringUtils::hasText)
-                .map(value -> {
-                    try {
-                        return Long.parseLong(value);
-                    } catch (NumberFormatException ignored) {
-                        return null;
-                    }
-                })
-                .filter(Objects::nonNull)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+    private String readPermission(SysMenuEntity entity) {
+        return entity.getPermission();
+    }
+
+    private Integer readSort(SysMenuEntity entity) {
+        return entity.getSort();
+    }
+
+    private boolean isActive(SysMenuEntity entity) {
+        return entity.getDelFlag() == null || "0".equals(entity.getDelFlag());
+    }
+
+    private boolean readOuterStatus(SysMenuEntity entity) {
+        return entity.getOuterStatus() != null && entity.getOuterStatus() == 1;
     }
 
     private MenuType parseType(String value) {
@@ -841,6 +769,21 @@ public class MenuService {
         }
     }
 
+    private RuntimeMenuNodeBuilder toRuntimeMenuNode(SysMenuEntity menu) {
+        return new RuntimeMenuNodeBuilder(
+                menu.getId(),
+                menu.getParentId(),
+                menu.getType(),
+                readMenuName(menu),
+                menu.getPath(),
+                menu.getComponent(),
+                readPermission(menu),
+                menu.getIcon(),
+                readSort(menu),
+                readOuterStatus(menu)
+        );
+    }
+
     private static String blankToNull(String value) {
         if (value == null) {
             return null;
@@ -849,17 +792,17 @@ public class MenuService {
         return t.isEmpty() ? null : t;
     }
 
-    private static final class RuntimeMenuNodeBuilder {
+    private final class RuntimeMenuNodeBuilder {
         private final Long id;
         private final Long parentId;
         private final String code;
         private final String title;
         private final String path;
         private final String component;
-        private final String routeKey;
+        private final String permission;
         private final String icon;
-        private final Integer orderNo;
-        private final boolean visible;
+        private final Integer sort;
+        private final boolean outerStatus;
         private final List<RuntimeMenuNodeBuilder> children = new ArrayList<>();
 
         private RuntimeMenuNodeBuilder(
@@ -869,10 +812,10 @@ public class MenuService {
                 String title,
                 String path,
                 String component,
-                String routeKey,
+                String permission,
                 String icon,
-                Integer orderNo,
-                boolean visible
+                Integer sort,
+                boolean outerStatus
         ) {
             this.id = id;
             this.parentId = parentId;
@@ -880,29 +823,14 @@ public class MenuService {
             this.title = title;
             this.path = path;
             this.component = component;
-            this.routeKey = routeKey;
+            this.permission = permission;
             this.icon = icon;
-            this.orderNo = orderNo;
-            this.visible = visible;
-        }
-
-        private static RuntimeMenuNodeBuilder from(SysMenuEntity menu) {
-            return new RuntimeMenuNodeBuilder(
-                    menu.getId(),
-                    menu.getParentId(),
-                    menu.getResourceKey(),
-                    menu.getMenuName(),
-                    menu.getPath(),
-                    menu.getComponent(),
-                    menu.getRouteKey(),
-                    menu.getIcon(),
-                    menu.getOrderNo(),
-                    menu.getVisible() == null || menu.getVisible() == 1
-            );
+            this.sort = sort;
+            this.outerStatus = outerStatus;
         }
 
         private MenuNode toMenuNode() {
-            return new MenuNode(id, code, title, path, component, routeKey, icon, orderNo, visible, children.stream().map(RuntimeMenuNodeBuilder::toMenuNode).toList());
+            return new MenuNode(id, code, title, title, path, component, permission, icon, sort, outerStatus, children.stream().map(RuntimeMenuNodeBuilder::toMenuNode).toList());
         }
     }
 }

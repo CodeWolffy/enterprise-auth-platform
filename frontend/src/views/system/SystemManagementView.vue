@@ -43,6 +43,15 @@
 
         <article class="setting-card">
           <div>
+            <span class="eyebrow">邮件</span>
+            <h4>邮件渠道</h4>
+            <p>配置 SMTP 服务器、授权管理和测试邮件发送。</p>
+          </div>
+          <el-button v-permission="'upms:sysmail:page'" type="primary" data-testid="settings-mail-channel-entry" @click="goTo('settings-mail-channel')">进入邮件配置</el-button>
+        </article>
+
+        <article class="setting-card">
+          <div>
             <span class="eyebrow">参数</span>
             <h4>参数管理</h4>
             <p>维护平台运行参数、业务配置项和策略型参数。</p>
@@ -153,7 +162,7 @@ async function load() {
 }
 
 function goTo(
-  name: 'settings-dicts' | 'settings-configs' | 'settings-notices' | 'settings-categories' | 'tenant-catalog' | 'settings-menus',
+  name: 'settings-dicts' | 'settings-configs' | 'settings-mail-channel' | 'settings-notices' | 'settings-categories' | 'tenant-catalog' | 'settings-menus',
 ) {
   void router.push({ name })
 }
