@@ -14,10 +14,11 @@
 
       <div class="menu-sheet">
         <el-table
+          ref="tableRef"
           :data="filteredTableData"
           height="100%"
           row-key="id"
-          default-expand-all
+          @expand-change="handleExpandChange"
           :tree-props="{ children: 'children' }"
           :indent="28"
           class="menu-permission-table"
@@ -195,7 +196,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import {
   Plus, Lock,
 } from '@element-plus/icons-vue'
@@ -213,6 +214,7 @@ import {
 const loading = ref(false)
 const saving = ref(false)
 const tableData = ref<MenuTreeNode[]>([])
+const tableRef = ref()
 const dialogVisible = ref(false)
 const isEditing = ref(false)
 const editingId = ref<number | null>(null)
@@ -263,6 +265,20 @@ function nodeIconClass(row: MenuTreeNode) {
     return 'node-icon-wrap--folder'
   }
   return 'node-icon-wrap--menu'
+}
+
+function handleExpandChange(row: MenuTreeNode, expanded: boolean | MenuTreeNode[]) {
+  const isExpanded = Array.isArray(expanded)
+    ? expanded.some((item) => item.id === row.id)
+    : expanded
+
+  if (!isExpanded || !row.children?.length) return
+
+  for (const child of row.children) {
+    const hasMenuChildren = child.children?.some((item) => item.type === '0')
+    if (child.type !== '0' || !hasMenuChildren) continue
+    nextTick(() => tableRef.value?.toggleRowExpansion(child, true))
+  }
 }
 
 async function load() {
