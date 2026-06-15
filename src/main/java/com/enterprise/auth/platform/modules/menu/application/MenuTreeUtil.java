@@ -47,7 +47,18 @@ public final class MenuTreeUtil {
             treeObj.setWeight(tn.getWeight());
             treeObj.putAll(tn.getExtra());
         });
-        return tree.stream().map(MenuTreeUtil::fromTree).toList();
+        return unwrapVirtualRoot(tree.stream().map(MenuTreeUtil::fromTree).toList());
+    }
+
+    private static List<MenuTreeNode> unwrapVirtualRoot(List<MenuTreeNode> tree) {
+        if (tree.size() != 1) {
+            return tree;
+        }
+        MenuTreeNode root = tree.get(0);
+        if (!"root".equals(root.permission()) && !"root".equals(root.component()) && !"根节点".equals(root.name())) {
+            return tree;
+        }
+        return root.children() == null ? List.of() : root.children();
     }
 
     /**

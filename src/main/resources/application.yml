@@ -170,6 +170,7 @@ app:
     platform-tenant-id: platform
     mybatis-tenant-enabled: true
     mybatis-ignore-tables:
+      - sys_menu
       - sys_tenant
       - sys_platform_security_policy
 

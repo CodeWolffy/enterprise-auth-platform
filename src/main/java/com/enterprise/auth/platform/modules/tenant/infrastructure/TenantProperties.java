@@ -14,6 +14,7 @@ public record TenantProperties(
 
     public List<String> resolvedIgnoreTables() {
                 LinkedHashSet<String> defaults = new LinkedHashSet<>();
+                defaults.add("sys_menu");
                 if (mybatisIgnoreTables != null) {
                         defaults.addAll(mybatisIgnoreTables);
                 }

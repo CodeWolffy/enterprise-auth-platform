@@ -2,8 +2,6 @@ package com.enterprise.auth.platform.modules.tenant.application;
 
 import com.enterprise.auth.platform.modules.tenant.interfaces.TenantCapabilityCrudRequest;
 import com.enterprise.auth.platform.modules.tenant.interfaces.UpdateTenantCapabilityOverridesRequest;
-import com.enterprise.auth.platform.modules.tenant.application.TenantCatalogManagementService;
-import com.enterprise.auth.platform.modules.tenant.application.TenantManagementService;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -100,21 +98,21 @@ public class TenantCapabilityApplicationService {
     public record ResourceScopeMenuView(
             @Schema(description = "菜单 ID") Long id,
             @Schema(description = "父级菜单 ID") Long parentId,
-            @Schema(description = "菜单名称") String menuName,
-            @Schema(description = "菜单类型") String menuType,
-            @Schema(description = "资源键") String resourceKey,
-            @Schema(description = "授权键") String grantKey,
-            @Schema(description = "路由路径") String path
+            @Schema(description = "菜单名称") String name,
+            @Schema(description = "菜单类型") String type,
+            @Schema(description = "菜单路径") String path,
+            @Schema(description = "权限标识") String permission,
+            @Schema(description = "路由路径") String routePath
     ) {
         static ResourceScopeMenuView from(TenantManagementService.ResourceScopeMenuView source) {
             return new ResourceScopeMenuView(
                     source.id(),
                     source.parentId(),
-                    source.menuName(),
-                    source.menuType(),
-                    source.resourceKey(),
-                    source.grantKey(),
-                    source.path()
+                    source.name(),
+                    source.type(),
+                    source.path(),
+                    source.permission(),
+                    source.routePath()
             );
         }
     }
