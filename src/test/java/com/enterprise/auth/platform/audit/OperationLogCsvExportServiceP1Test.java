@@ -1,19 +1,18 @@
 package com.enterprise.auth.platform.audit;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
 import com.enterprise.auth.platform.common.audit.AuditEvent;
 import com.enterprise.auth.platform.modules.audit.application.AuditPayloadRedactor;
 import com.enterprise.auth.platform.modules.audit.application.AuditService;
 import com.enterprise.auth.platform.modules.audit.application.OperationLogCsvExportService;
 import com.enterprise.auth.platform.modules.audit.interfaces.AuditQuery;
+import org.junit.jupiter.api.Test;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class OperationLogCsvExportServiceP1Test {
 

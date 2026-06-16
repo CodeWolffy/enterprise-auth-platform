@@ -1,14 +1,14 @@
 package com.enterprise.auth.platform.infrastructure.config;
 
 import com.enterprise.auth.platform.common.web.RateLimitInterceptor;
-import com.enterprise.auth.platform.infrastructure.config.CorsProperties;
 import com.enterprise.auth.platform.infrastructure.security.SaTokenUserContextInterceptor;
-import java.util.List;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+import java.util.List;
 
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {

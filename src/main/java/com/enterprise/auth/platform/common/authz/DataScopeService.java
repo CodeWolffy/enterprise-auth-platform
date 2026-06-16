@@ -1,7 +1,6 @@
 package com.enterprise.auth.platform.common.authz;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.modules.dept.infrastructure.entity.SysDeptEntity;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
 import com.enterprise.auth.platform.modules.dept.infrastructure.mapper.SysDeptMapper;

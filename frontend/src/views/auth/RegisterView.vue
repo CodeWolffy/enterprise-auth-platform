@@ -120,6 +120,14 @@
         </label>
         <p v-if="fieldErrors.terms" class="auth-error">{{ fieldErrors.terms }}</p>
 
+        <div class="auth-captcha-row" :class="{ 'is-verified': captchaVerified }">
+          <span>{{ captchaVerified ? '验证通过' : '需完成滑块验证' }}</span>
+          <button class="auth-link" type="button" @click="openCaptchaDialog({ refresh: true })">
+            {{ captchaVerified ? '重新验证' : '去验证' }}
+          </button>
+        </div>
+        <p v-if="fieldErrors.captcha" class="auth-error">{{ fieldErrors.captcha }}</p>
+
         <div v-if="statusMessage" class="auth-status" :class="sceneStatus">
           {{ statusMessage }}
         </div>
@@ -133,14 +141,44 @@
         已有账号？<button class="auth-link" type="button" @click="router.push('/login')">去登录</button>
       </p>
     </div>
+
+    <el-dialog
+      v-model="captchaDialogVisible"
+      class="captcha-verify-dialog"
+      title="安全验证"
+      width="360px"
+      :close-on-click-modal="false"
+      :destroy-on-close="false"
+      :show-close="true"
+      @closed="handleCaptchaDialogClosed"
+    >
+      <SliderCaptcha
+        v-if="!captchaLoading && captchaBackground && captchaSlider"
+        :background-image="captchaBackground"
+        :slider-image="captchaSlider"
+        :background-width="captchaBackgroundWidth"
+        :background-height="captchaBackgroundHeight"
+        :slider-width="captchaSliderWidth"
+        :slider-height="captchaSliderHeight"
+        :verifying="captchaVerifying"
+        @verify="handleSliderVerify"
+        @refresh="reloadCaptcha"
+      />
+      <div v-else class="captcha-dialog__loading">
+        <div class="captcha-dialog__spinner"></div>
+        <span>验证码加载中</span>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { fetchRegisterOptions } from '@/api/modules'
+import SliderCaptcha from '@/components/auth/SliderCaptcha.vue'
+import { fetchCaptcha, fetchRegisterOptions, verifyCaptcha } from '@/api/modules'
 import { http } from '@/api/http'
+import type { CaptchaTrackPayload } from '@/types/auth-models'
 
 type SceneStatus = 'idle' | 'error' | 'success'
 type RegisterField = 'username' | 'displayName' | 'password' | 'confirmPassword' | 'mobile' | 'email' | 'terms'
@@ -174,6 +212,20 @@ const sceneStatus = ref<SceneStatus>('idle')
 const statusMessage = ref('')
 const defaultTenantId = ref('tenant-a')
 const defaultRoleCodes = ref<string[]>([])
+
+// 滑块验证码状态
+const captchaCode = ref('')
+const captchaId = ref('')
+const captchaBackground = ref('')
+const captchaSlider = ref('')
+const captchaBackgroundWidth = ref(0)
+const captchaBackgroundHeight = ref(0)
+const captchaSliderWidth = ref(0)
+const captchaSliderHeight = ref(0)
+const captchaVerified = ref(false)
+const captchaDialogVisible = ref(false)
+const captchaLoading = ref(false)
+const captchaVerifying = ref(false)
 
 function clearAllErrors() {
   fieldErrors.username = ''
@@ -261,12 +313,73 @@ function resolveErrorMessage(error: unknown, fallback: string) {
   return maybe?.response?.data?.message || fallback
 }
 
+function toImageDataUrl(image: string, defaultMime: string) {
+  if (!image) {
+    return ''
+  }
+  return image.startsWith('data:') ? image : `data:${defaultMime};base64,${image}`
+}
+
+async function reloadCaptcha() {
+  captchaLoading.value = true
+  try {
+    const captcha = await fetchCaptcha()
+    captchaId.value = captcha.captchaId
+    captchaBackground.value = toImageDataUrl(captcha.backgroundImage, 'image/jpeg')
+    captchaSlider.value = toImageDataUrl(captcha.sliderImage, 'image/png')
+    captchaBackgroundWidth.value = captcha.backgroundImageWidth || 0
+    captchaBackgroundHeight.value = captcha.backgroundImageHeight || 0
+    captchaSliderWidth.value = captcha.sliderImageWidth || 0
+    captchaSliderHeight.value = captcha.sliderImageHeight || 0
+    captchaVerified.value = false
+    captchaCode.value = ''
+  } finally {
+    captchaLoading.value = false
+  }
+}
+
+async function openCaptchaDialog(options: { refresh?: boolean } = {}) {
+  if (options.refresh || !captchaBackground.value || !captchaSlider.value || !captchaId.value) {
+    await reloadCaptcha()
+  }
+  captchaDialogVisible.value = true
+}
+
+function handleCaptchaDialogClosed() {
+  // 关闭弹窗不做额外操作
+}
+
+async function handleSliderVerify(track: CaptchaTrackPayload) {
+  const code = JSON.stringify(track)
+  captchaVerifying.value = true
+  try {
+    await verifyCaptcha(captchaId.value, code)
+    captchaCode.value = code
+    captchaVerified.value = true
+    captchaDialogVisible.value = false
+  } catch {
+    captchaVerified.value = false
+    captchaCode.value = ''
+    await reloadCaptcha()
+  } finally {
+    captchaVerifying.value = false
+  }
+}
+
 async function handleRegister() {
   if (loading.value) {
     return
   }
 
   if (!validateForm()) {
+    return
+  }
+
+  if (!captchaVerified.value) {
+    fieldErrors['terms'] = '' // 清除条款错误干扰
+    sceneStatus.value = 'error'
+    statusMessage.value = '请先完成滑块验证'
+    await openCaptchaDialog({ refresh: true })
     return
   }
 
@@ -281,6 +394,7 @@ async function handleRegister() {
       password: form.password,
       mobile: form.mobile.trim(),
       email: form.email.trim(),
+      captchaId: captchaId.value,
     })
     sceneStatus.value = 'success'
     statusMessage.value = '账号创建成功，正在跳转登录页...'
