@@ -73,6 +73,13 @@
             show-icon
             :closable="false"
           />
+          <el-steps class="codegen-steps" :active="activeGenerateStep" finish-status="success" simple>
+            <el-step title="选数据源" />
+            <el-step title="导入表" />
+            <el-step title="配字段" />
+            <el-step title="预览" />
+            <el-step title="生成/下载" />
+          </el-steps>
 
           <AdvancedSearch @search="applySearch" @reset="resetSearch">
             <el-form-item label="关键字">
@@ -87,13 +94,28 @@
                 <el-table-column prop="tableName" label="表名" min-width="190" show-overflow-tooltip>
                   <template #default="{ row }">
                     <div class="table-name-cell">
-                      <strong>{{ row.tableName }}</strong>
+                      <div class="table-title-row">
+                        <strong>{{ row.tableName }}</strong>
+                        <el-tag size="small" :type="importedTableMap.has(row.tableName) ? 'success' : 'info'" effect="plain">
+                          {{ importedTableMap.has(row.tableName) ? '已导入' : '未导入' }}
+                        </el-tag>
+                      </div>
                       <small>{{ row.tableComment || '无表注释' }}</small>
                     </div>
                   </template>
                 </el-table-column>
                 <el-table-column prop="engine" label="引擎" width="90" />
                 <el-table-column prop="tableRows" label="估算行数" width="110" />
+                <el-table-column fixed="right" label="操作" width="150">
+                  <template #default="{ row }">
+                    <el-button v-if="importedTableMap.has(row.tableName)" link type="primary" @click.stop="openImportedTable(importedTableMap.get(row.tableName)!)">
+                      配字段
+                    </el-button>
+                    <el-button v-else v-permission="'upms:codegen:add'" link type="primary" :disabled="!selectedDataSourceId || selectedDataSourceLocked" @click.stop="importSingleTable(row.tableName)">
+                      导入
+                    </el-button>
+                  </template>
+                </el-table-column>
                 <template #empty>
                   <el-empty description="暂无可生成数据表" />
                 </template>
@@ -116,6 +138,17 @@
                 <el-form-item label="目标表">
                   <el-input v-model="form.tableName" readonly placeholder="从左侧选择数据表" />
                 </el-form-item>
+                <div v-if="form.tableName" class="current-table-toolbar">
+                  <el-tag :type="selectedImportedTable ? 'success' : 'warning'" effect="plain">
+                    {{ selectedImportedTable ? '当前表已导入配置' : '当前表尚未导入配置' }}
+                  </el-tag>
+                  <el-button v-if="!selectedImportedTable" v-permission="'upms:codegen:add'" size="small" type="primary" :loading="importingTables" :disabled="!selectedDataSourceId || selectedDataSourceLocked" @click="importCurrentTable">
+                    导入当前表
+                  </el-button>
+                  <el-button v-else size="small" type="primary" plain :loading="columnConfigLoading" @click="openColumnConfig()">
+                    配置字段
+                  </el-button>
+                </div>
                 <el-form-item label="模块名">
                   <el-input v-model="form.moduleName" placeholder="例如 userProfile" @input="markPreviewStale" />
                 </el-form-item>
@@ -192,7 +225,7 @@
                 {{ previewStale ? '配置已变更，请重新预览' : '预览可生成' }}
               </el-tag>
               <el-button size="small" :disabled="!activePreviewPath" @click="copyText(activePreviewPath, '预览路径已复制')">复制当前路径</el-button>
-              <el-button v-permission="'codegen:download'" size="small" type="primary" :disabled="!canDownload" :loading="downloading" @click="downloadZip">下载产物</el-button>
+              <el-button v-permission="'upms:codegen:download'" size="small" type="primary" :disabled="!canDownload" :loading="downloading" @click="downloadZip">下载产物</el-button>
             </div>
           </div>
 
@@ -492,7 +525,26 @@ const selectedValidFilePaths = computed(() => {
 })
 const canGenerate = computed(() => Boolean(previewResult.value) && !previewStale.value && selectedValidFilePaths.value.length > 0 && !generating.value)
 const canDownload = computed(() => Boolean(previewResult.value) && selectedValidFilePaths.value.length > 0 && !downloading.value)
-const selectedImportedTable = computed(() => importedTablePage.value.records.find((item) => item.tableName === form.tableName) ?? null)
+const importedTableMap = computed(() => new Map(importedTablePage.value.records.map((item) => [item.tableName, item] as const)))
+const selectedImportedTable = computed(() => importedTableMap.value.get(form.tableName) ?? null)
+const activeGenerateStep = computed(() => {
+  if (generatedFiles.value.length > 0) {
+    return 5
+  }
+  if (previewResult.value && !previewStale.value) {
+    return 4
+  }
+  if (selectedImportedTable.value) {
+    return 3
+  }
+  if (form.tableName) {
+    return 2
+  }
+  if (selectedDataSourceId.value) {
+    return 1
+  }
+  return 0
+})
 const selectedDataSource = computed(() => dataSources.value.find((item) => item.id === selectedDataSourceId.value) ?? null)
 const selectedDataSourceLocked = computed(() => Boolean(selectedDataSource.value?.external && !selectedDataSource.value.externalAuthorized))
 const dataSourceAuthAlert = computed(() => {
@@ -645,19 +697,38 @@ async function authorizeSelectedDataSource() {
 }
 
 async function importSelectedTables() {
-  if (!selectedDataSourceId.value || selectedTableNames.value.length === 0) {
+  await importTablesByNames(selectedTableNames.value)
+}
+
+async function importCurrentTable() {
+  if (!form.tableName) {
+    ElMessage.warning('请先选择数据表')
+    return
+  }
+  await importTablesByNames([form.tableName], true)
+}
+
+async function importSingleTable(tableName: string) {
+  await importTablesByNames([tableName], true)
+}
+
+async function importTablesByNames(tableNames: string[], openFirstConfig = false) {
+  if (!selectedDataSourceId.value || tableNames.length === 0) {
     return
   }
   importingTables.value = true
   try {
     const imported = await importCodegenTables({
       dataSourceId: selectedDataSourceId.value,
-      tableNames: selectedTableNames.value,
+      tableNames,
       packageName: form.packageName,
       author: 'system',
     })
     ElMessage.success(`已导入 ${imported.length} 张表配置`)
     await loadImportedTables()
+    if (openFirstConfig && imported[0]) {
+      await openImportedTable(imported[0])
+    }
   } finally {
     importingTables.value = false
   }
@@ -912,9 +983,11 @@ async function saveTemplate() {
   const payload: CodegenTemplateView = {
     name: editingTemplate.value.name.trim(),
     language: editingTemplate.value.language,
+    templateCategory: editingTemplate.value.templateCategory,
     pathPattern: editingTemplate.value.pathPattern.trim(),
     content: editingTemplate.value.content,
     description: editingTemplate.value.description?.trim() || undefined,
+    builtin: false,
   }
   if (!payload.name || !payload.pathPattern || !payload.content) {
     ElMessage.warning('名称、路径匹配、模板内容均为必填')
@@ -969,6 +1042,11 @@ async function removeTemplate(template: CodegenTemplateView) {
 
 .datasource-auth-alert {
   margin: 0 0 16px;
+}
+
+.codegen-steps {
+  margin: 0 0 16px;
+  border: 1px solid var(--line);
 }
 
 .column-panel-head {
@@ -1076,6 +1154,24 @@ async function removeTemplate(template: CodegenTemplateView) {
     color: var(--text-soft);
     font-size: 12px;
   }
+}
+
+.table-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.current-table-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -6px 0 14px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  background: var(--bg-card-muted);
 }
 
 .compact-footer {

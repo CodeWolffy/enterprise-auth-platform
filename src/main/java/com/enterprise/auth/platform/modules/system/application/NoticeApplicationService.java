@@ -115,6 +115,19 @@ public class NoticeApplicationService {
         auditService.record("NOTICE_DELETED", SecuritySupport.currentOperator(), tenantId, Map.of("noticeId", id));
     }
 
+    public SystemViewModels.NoticeView publishedNotice(Long id) {
+        String tenantId = currentTenantId();
+        SysNoticeEntity entity = sysNoticeMapper.selectOne(new LambdaQueryWrapper<SysNoticeEntity>()
+                .eq(SysNoticeEntity::getId, id)
+                .eq(SysNoticeEntity::getTenantId, tenantId)
+                .eq(SysNoticeEntity::getDeleted, 0)
+                .last("limit 1"));
+        if (entity == null || !activePublished(entity)) {
+            throw new BusinessException("公告不存在或尚未发布");
+        }
+        return toNoticeView(entity);
+    }
+
     public String currentTenantId() {
         String tenantId = TenantContext.getTenantId();
         return StringUtils.hasText(tenantId) ? tenantId : "platform";

@@ -7,8 +7,8 @@ import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.modules.audit.application.AuditService;
 import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
 import com.enterprise.auth.platform.modules.dept.application.DeptTenantDataFacade;
+import com.enterprise.auth.platform.modules.menu.application.MenuService;
 import com.enterprise.auth.platform.modules.menu.infrastructure.entity.SysMenuEntity;
-import com.enterprise.auth.platform.modules.menu.infrastructure.mapper.SysMenuMapper;
 import com.enterprise.auth.platform.modules.resource.application.CatalogService;
 import com.enterprise.auth.platform.modules.role.application.RoleTenantDataFacade;
 import com.enterprise.auth.platform.modules.security.application.SecurityPolicyApplicationService;
@@ -46,7 +46,7 @@ public class TenantManagementService {
     private final SysTenantCapabilityMapper sysTenantCapabilityMapper;
     private final SysTenantPackageCapabilityMapper sysTenantPackageCapabilityMapper;
     private final SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper;
-    private final SysMenuMapper sysMenuMapper;
+    private final MenuService menuService;
     private final CatalogService catalogService;
     private final AuditService auditService;
     private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
@@ -65,7 +65,7 @@ public class TenantManagementService {
             SysTenantCapabilityMapper sysTenantCapabilityMapper,
             SysTenantPackageCapabilityMapper sysTenantPackageCapabilityMapper,
             SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper,
-            SysMenuMapper sysMenuMapper,
+            MenuService menuService,
             CatalogService catalogService,
             AuditService auditService,
             AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
@@ -83,7 +83,7 @@ public class TenantManagementService {
         this.sysTenantCapabilityMapper = sysTenantCapabilityMapper;
         this.sysTenantPackageCapabilityMapper = sysTenantPackageCapabilityMapper;
         this.sysTenantCapabilityOverrideMapper = sysTenantCapabilityOverrideMapper;
-        this.sysMenuMapper = sysMenuMapper;
+        this.menuService = menuService;
         this.catalogService = catalogService;
         this.auditService = auditService;
         this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
@@ -742,10 +742,7 @@ public class TenantManagementService {
     }
 
     private ResourceScopeSummary buildResourceScopeSummary(String tenantId) {
-        List<SysMenuEntity> menus = withPlatformTenant(() -> sysMenuMapper.selectList(new LambdaQueryWrapper<SysMenuEntity>()
-                .eq(SysMenuEntity::getDelFlag, "0")
-                .orderByAsc(SysMenuEntity::getSort)
-                .orderByAsc(SysMenuEntity::getId)));
+        List<SysMenuEntity> menus = menuService.listTemplateMenus();
         java.util.Set<Long> visibleIds = tenantCapabilityResourceScopeFacade.visibleMenuIds(tenantId, menus);
         java.util.Set<Long> grantableIds = tenantCapabilityResourceScopeFacade.grantableMenuIds(tenantId, menus);
         List<ResourceScopeMenuView> visibleMenus = menus.stream()

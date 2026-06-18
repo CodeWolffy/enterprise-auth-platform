@@ -304,7 +304,7 @@ class AuditControllerTest {
                 passwordHasher.hash("AuditController@123"),
                 true,
                 Set.of(),
-                Set.of("upms:audit:get"),
+                Set.of("upms:audit:page"),
                 Set.of(),
                 DataScopeType.ALL,
                 1
@@ -319,7 +319,7 @@ class AuditControllerTest {
                 passwordHasher.hash("AuditController@123"),
                 true,
                 Set.of(),
-                Set.of("upms:audit:get", "upms:audit:edit"),
+                Set.of("upms:audit:page", "upms:audit:get", "upms:audit:export", "upms:audit:edit", "upms:audit:del", "upms:audit:download"),
                 Set.of(),
                 DataScopeType.ALL,
                 1

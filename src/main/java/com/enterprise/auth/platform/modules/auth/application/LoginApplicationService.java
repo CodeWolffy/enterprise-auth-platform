@@ -8,6 +8,7 @@ import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.auth.infrastructure.SecurityProperties;
 import com.enterprise.auth.platform.modules.security.application.SecurityPolicyApplicationService;
+import com.enterprise.auth.platform.modules.tenant.application.TenantProfileFacade;
 import com.enterprise.auth.platform.modules.user.application.AuthenticationUser;
 import com.enterprise.auth.platform.modules.user.application.UserAuthenticationFacade;
 import com.enterprise.auth.platform.modules.auth.interfaces.LoginRequest;
@@ -37,6 +38,7 @@ public class LoginApplicationService {
     private final SessionIndexService sessionIndexService;
     private final ClientIpResolver clientIpResolver;
     private final SecurityPolicyApplicationService securityPolicyApplicationService;
+    private final TenantProfileFacade tenantProfileFacade;
 
     public LoginApplicationService(
             CaptchaService captchaService,
@@ -48,7 +50,8 @@ public class LoginApplicationService {
             SecurityProperties securityProperties,
             SessionIndexService sessionIndexService,
             ClientIpResolver clientIpResolver,
-            SecurityPolicyApplicationService securityPolicyApplicationService
+            SecurityPolicyApplicationService securityPolicyApplicationService,
+            TenantProfileFacade tenantProfileFacade
     ) {
         this.captchaService = captchaService;
         this.passwordHasher = passwordHasher;
@@ -58,13 +61,15 @@ public class LoginApplicationService {
         this.registrationPolicyService = registrationPolicyService;
         this.securityProperties = securityProperties;
         this.sessionIndexService = sessionIndexService;
-        this.clientIpResolver = clientIpResolver;
-        this.securityPolicyApplicationService = securityPolicyApplicationService;
+            this.clientIpResolver = clientIpResolver;
+            this.securityPolicyApplicationService = securityPolicyApplicationService;
+            this.tenantProfileFacade = tenantProfileFacade;
     }
 
     public TokenSessionResponse login(LoginRequest request, HttpServletRequest servletRequest) {
         captchaService.secondaryVerify(request.captchaId());
         String tenantId = resolveLoginTenantId(request);
+        tenantProfileFacade.ensureTenantAccessible(tenantId);
         String clientIp = clientIpResolver.resolve(servletRequest);
         String previousTenantId = TenantContext.getTenantId();
         try {

@@ -22,7 +22,13 @@ import org.springframework.util.StringUtils;
 public class CodegenResourceRegistrationService {
 
     private static final String GENERATED_MENU_PARENT_PATH = "/platform/generated";
-    private static final String GENERATED_API_PARENT_PERMISSION = "upms:generated";
+    private static final List<GeneratedAction> GENERATED_ACTIONS = List.of(
+            new GeneratedAction("page", "列表", 100),
+            new GeneratedAction("get", "查询", 110),
+            new GeneratedAction("add", "新增", 120),
+            new GeneratedAction("edit", "修改", 130),
+            new GeneratedAction("del", "删除", 140)
+    );
 
     private final MenuTemplateMutationFacade menuTemplateMutationFacade;
     private final RoleMenuMutationFacade roleMenuMutationFacade;
@@ -50,13 +56,15 @@ public class CodegenResourceRegistrationService {
         String templateTenantId = platformTenantId();
         String grantTenantId = activeTenantId();
         Long menuId = ensureMenuWithParents(templateTenantId, safeModule, title);
-        Long readApiId = ensureApi(templateTenantId, safeModule + ":read", safeModule + " 读", 900);
-        Long writeApiId = ensureApi(templateTenantId, safeModule + ":write", safeModule + " 写", 910);
+        List<Long> actionIds = ensureActions(templateTenantId, menuId, safeModule, title);
 
-        List<String> grantKeys = new ArrayList<>();
-        grantKeys.add(safeModule + ":read");
-        grantKeys.add(safeModule + ":write");
-        assignToAdminRole(grantTenantId, List.of(menuId, readApiId, writeApiId));
+        List<String> grantKeys = GENERATED_ACTIONS.stream()
+                .map(action -> safeModule + ":" + action.code())
+                .toList();
+        List<Long> assignedMenuIds = new ArrayList<>();
+        assignedMenuIds.add(menuId);
+        assignedMenuIds.addAll(actionIds);
+        assignToAdminRole(grantTenantId, assignedMenuIds);
         permissionSnapshotInvalidationService.invalidateAll();
         return grantKeys;
     }
@@ -72,7 +80,6 @@ public class CodegenResourceRegistrationService {
 
     private Long ensureMenuWithParents(String tenantId, String moduleName, String title) {
         ensureParentMenu(tenantId);
-        ensureParentApi(tenantId);
         return ensureMenu(tenantId, moduleName, title);
     }
 
@@ -94,20 +101,30 @@ public class CodegenResourceRegistrationService {
         ));
     }
 
-    private void ensureParentApi(String tenantId) {
-        if (menuTemplateMutationFacade.findByKeyAndType(tenantId, GENERATED_API_PARENT_PERMISSION, "1").isPresent()) {
-            return;
+    private List<Long> ensureActions(String tenantId, Long parentId, String moduleName, String title) {
+        List<Long> ids = new ArrayList<>();
+        String labelPrefix = StringUtils.hasText(title) ? title : moduleName;
+        for (GeneratedAction action : GENERATED_ACTIONS) {
+            ids.add(ensureAction(tenantId, parentId, moduleName + ":" + action.code(), labelPrefix + action.label(), action.sort()));
         }
-        menuTemplateMutationFacade.create(new MenuTemplateMutation(
+        return ids;
+    }
+
+    private Long ensureAction(String tenantId, Long parentId, String permission, String name, int sort) {
+        MenuTemplateNode existing = menuTemplateMutationFacade.findByKeyAndType(tenantId, permission, "1").orElse(null);
+        if (existing != null) {
+            return existing.id();
+        }
+        return menuTemplateMutationFacade.create(new MenuTemplateMutation(
                 tenantId,
-                null,
+                parentId,
                 "1",
-                "生成模块 API",
-                GENERATED_API_PARENT_PERMISSION,
+                name,
+                permission,
                 null,
                 null,
                 null,
-                990
+                sort
         ));
     }
 
@@ -132,23 +149,7 @@ public class CodegenResourceRegistrationService {
         ));
     }
 
-    private Long ensureApi(String tenantId, String permission, String name, int sort) {
-        MenuTemplateNode existing = menuTemplateMutationFacade.findByKey(tenantId, permission).orElse(null);
-        if (existing != null) {
-            return existing.id();
-        }
-        MenuTemplateNode parent = menuTemplateMutationFacade.findByKey(tenantId, GENERATED_API_PARENT_PERMISSION).orElse(null);
-        return menuTemplateMutationFacade.create(new MenuTemplateMutation(
-                tenantId,
-                parent == null ? null : parent.id(),
-                "1",
-                name,
-                permission,
-                null,
-                null,
-                null,
-                sort
-        ));
+    private record GeneratedAction(String code, String label, int sort) {
     }
 
     private void assignToAdminRole(String tenantId, List<Long> menuIds) {
@@ -157,7 +158,7 @@ public class CodegenResourceRegistrationService {
             menuTemplateMutationFacade.findById(platformTenantId(), menuId).ifPresent(node -> knownNodes.put(node.id(), node));
         }
         Set<Long> expandedMenuIds = new LinkedHashSet<>();
-        for (MenuTemplateNode node : knownNodes.values()) {
+        for (MenuTemplateNode node : List.copyOf(knownNodes.values())) {
             Long parentId = node.parentId();
             while (parentId != null) {
                 Long currentParentId = parentId;

@@ -283,6 +283,12 @@ public class SystemController {
         return ApiResponse.ok(noticeApplicationService.notices(published, workflowStatus, keyword, page, size, sortBy, sortDirection));
     }
 
+    @Operation(summary = "查询已发布公告详情")
+    @GetMapping("/notices/{id}/published")
+    public ApiResponse<SystemViewModels.NoticeView> publishedNotice(@Parameter(description = "公告 ID") @PathVariable Long id) {
+        return ApiResponse.ok(noticeApplicationService.publishedNotice(id));
+    }
+
     @Operation(summary = "新增公告")
     @PostMapping("/notices")
     @SaCheckPermission(PermissionCodes.SYSNOTICE_ADD)

@@ -18,6 +18,7 @@ import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.auth.infrastructure.AuthPrincipalCacheService;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
@@ -26,9 +27,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
@@ -70,16 +71,9 @@ class ResourceAuthorizationControllerTest {
             jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id = ? AND id IN (" + inClause + ")", "tenant-a");
         }
         jdbcTemplate.update("DELETE FROM sys_user WHERE username IN (?, ?)", PLATFORM_USER, TENANT_USER);
-        jdbcTemplate.update(
-                "DELETE FROM sys_menu WHERE tenant_id = ? AND resource_key LIKE ?",
-                "platform",
-                "ut.menu.%"
-        );
-        jdbcTemplate.update(
-                "DELETE FROM sys_menu WHERE tenant_id = ? AND resource_key LIKE ?",
-                "platform",
-                "ut.batch.%"
-        );
+        jdbcTemplate.update("DELETE FROM sys_menu WHERE permission LIKE ?", "upms:utbatch:%");
+        jdbcTemplate.update("DELETE FROM sys_menu WHERE permission LIKE ?", "ut:batch:%");
+        jdbcTemplate.update("DELETE FROM sys_menu WHERE permission = ?", "upms:resourceauth:reuse");
     }
 
     @Test
@@ -91,49 +85,47 @@ class ResourceAuthorizationControllerTest {
                         .content("""
                                 {
                                   "parentId": 1,
-                                  "menuType": "DIR",
-                                  "resourceKey": "system-renamed",
-                                  "menuName": "系统模块",
-                                  "routeKey": null,
-                                  "grantKey": null,
+                                  "type": "0",
+                                  "name": "系统模块",
+                                  "permission": null,
                                   "path": null,
                                   "component": null,
+                                  "redirect": null,
                                   "icon": "Setting",
-                                  "orderNo": 20,
-                                  "visible": true,
-                                  "enabled": true
+                                  "sort": 20,
+                                  "outerStatus": false,
+                                  "applicationKey": null
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"))
-                .andExpect(jsonPath("$.message").value("系统节点不允许修改资源唯一标识"));
+                .andExpect(jsonPath("$.message").value("系统节点不允许修改父节点"));
     }
 
     @Test
-    void createMenuShouldRejectDuplicateRouteKey() throws Exception {
+    void createMenuShouldRejectDuplicatePath() throws Exception {
         mockMvc.perform(post("/api/menus")
-                        .with(bearer(principal("platform", Set.of("upms:sysmenu:edit"))))
+                        .with(bearer(principal("platform", Set.of("upms:sysmenu:add"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "parentId": 20,
-                                  "menuType": "MENU",
-                                  "resourceKey": "ut.duplicate.route",
-                                  "menuName": "UT Duplicate Route",
-                                  "routeKey": "users",
-                                  "grantKey": "upms:sysuser:get",
-                                  "path": "/ut/duplicate-route",
+                                  "type": "0",
+                                  "name": "UT Duplicate Route",
+                                  "permission": null,
+                                  "path": "/system/users",
                                   "component": "UsersView",
+                                  "redirect": null,
                                   "icon": null,
-                                  "orderNo": 999,
-                                  "visible": true,
-                                  "enabled": true
+                                  "sort": 999,
+                                  "outerStatus": false,
+                                  "applicationKey": null
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"))
-                .andExpect(jsonPath("$.message").value("路由标识已存在"));
+                .andExpect(jsonPath("$.message").value("访问路径已存在"));
     }
 
     @Test
@@ -145,17 +137,16 @@ class ResourceAuthorizationControllerTest {
                         .content("""
                                 {
                                   "parentId": 21,
-                                  "menuType": "DIR",
-                                  "resourceKey": "system",
-                                  "menuName": "系统模块",
-                                  "routeKey": null,
-                                  "grantKey": null,
+                                  "type": "0",
+                                  "name": "系统模块",
+                                  "permission": null,
                                   "path": null,
                                   "component": null,
+                                  "redirect": null,
                                   "icon": "Setting",
-                                  "orderNo": 20,
-                                  "visible": true,
-                                  "enabled": true
+                                  "sort": 20,
+                                  "outerStatus": false,
+                                  "applicationKey": null
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
@@ -164,25 +155,24 @@ class ResourceAuthorizationControllerTest {
     }
 
     @Test
-    void createMenuShouldRequireRouteAndGrantFields() throws Exception {
+    void createButtonShouldRejectPermissionOnMenuNode() throws Exception {
         mockMvc.perform(post("/api/menus")
-                        .with(bearer(principal("platform", Set.of("upms:sysmenu:edit"))))
+                        .with(bearer(principal("platform", Set.of("upms:sysmenu:add"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "parentId": 20,
-                                  "menuType": "MENU",
-                                  "resourceKey": "ut.missing.route",
-                                  "menuName": "UT Missing Route",
-                                  "routeKey": null,
-                                  "grantKey": null,
-                                  "path": null,
-                                  "component": null,
+                                  "type": "0",
+                                  "name": "UT Menu With Permission",
+                                  "permission": "upms:sysuser:get",
+                                  "path": "/ut/menu-with-permission",
+                                  "component": "UsersView",
+                                  "redirect": null,
                                   "icon": null,
-                                  "orderNo": 999,
-                                  "visible": true,
-                                  "enabled": true
+                                  "sort": 999,
+                                  "outerStatus": false,
+                                  "applicationKey": null
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
@@ -191,65 +181,35 @@ class ResourceAuthorizationControllerTest {
     }
 
     @Test
-    void createButtonShouldRequireMenuParentAndGrantKey() throws Exception {
-        mockMvc.perform(post("/api/menus")
-                        .with(bearer(principal("platform", Set.of("upms:sysmenu:edit"))))
-                        .header("X-Tenant-Id", "platform")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "parentId": 20,
-                                  "menuType": "BUTTON",
-                                  "resourceKey": "ut.button.invalid.parent",
-                                  "menuName": "UT Invalid Button",
-                                  "routeKey": null,
-                                  "grantKey": null,
-                                  "path": null,
-                                  "component": null,
-                                  "icon": null,
-                                  "orderNo": 999,
-                                  "visible": true,
-                                  "enabled": true
-                                }
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"))
-                .andExpect(jsonPath("$.message").exists());
-    }
-
-    @Test
-    void createMenuShouldAllowGrantKeyReuseAndEvictPermissionSnapshots() throws Exception {
+    void createButtonShouldEvictPermissionSnapshots() throws Exception {
         AtomicReference<String> tokenRef = new AtomicReference<>();
 
         mockMvc.perform(post("/api/menus")
-                        .with(bearerWithSnapshotCapture(principal("platform", Set.of("upms:sysmenu:edit", "stale:grant")), tokenRef))
+                        .with(bearerWithSnapshotCapture(principal("platform", Set.of("upms:sysmenu:add")), tokenRef))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "parentId": 21,
-                                  "menuType": "BUTTON",
-                                  "resourceKey": "ut.menu.reuse.button",
-                                  "menuName": "UT Reuse Button",
-                                  "routeKey": null,
-                                  "grantKey": "upms:sysuser:get",
+                                  "type": "1",
+                                  "name": "UT Reuse Button",
+                                  "permission": "upms:resourceauth:reuse",
                                   "path": null,
                                   "component": null,
+                                  "redirect": null,
                                   "icon": null,
-                                  "orderNo": 999,
-                                  "visible": false,
-                                  "enabled": true
+                                  "sort": 999,
+                                  "outerStatus": false,
+                                  "applicationKey": null
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.grantKey").value("upms:sysuser:get"));
+                .andExpect(jsonPath("$.data.permission").value("upms:resourceauth:reuse"));
 
         Long count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM sys_menu WHERE tenant_id = ? AND resource_key = ? AND grant_key = ?",
+                "SELECT COUNT(*) FROM sys_menu WHERE type = '1' AND permission = ?",
                 Long.class,
-                "platform",
-                "ut.menu.reuse.button",
-                "upms:sysuser:get"
+                "upms:resourceauth:reuse"
         );
         assertThat(count).isEqualTo(1L);
         verify(authPrincipalCacheService).evictAll();
@@ -265,26 +225,25 @@ class ResourceAuthorizationControllerTest {
         Long menuId = createTempMenu();
 
         mockMvc.perform(post("/api/menus/{menuId}/actions", menuId)
-                        .with(bearer(principal("platform", Set.of("upms:sysmenu:edit"))))
+                        .with(bearer(principal("platform", Set.of("upms:sysmenu:add"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "actions": ["read", "create"]
+                                  "actions": ["page", "add"]
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[?(@.resourceKey=='upms:ut.menu.batch.actions:read')]").exists())
-                .andExpect(jsonPath("$.data[?(@.grantKey=='upms:utbatch:read')]").exists())
-                .andExpect(jsonPath("$.data[?(@.resourceKey=='ut.menu.batch.actions:create')]").exists())
-                .andExpect(jsonPath("$.data[?(@.grantKey=='utbatch:create')]").exists());
+                .andExpect(jsonPath("$.data[?(@.name=='UT 批量按钮菜单列表')]").exists())
+                .andExpect(jsonPath("$.data[?(@.permission=='upms:utbatch:read:page')]").exists())
+                .andExpect(jsonPath("$.data[?(@.name=='UT 批量按钮菜单新增')]").exists())
+                .andExpect(jsonPath("$.data[?(@.permission=='upms:utbatch:read:add')]").exists());
 
         Long count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM sys_menu WHERE tenant_id = ? AND parent_id = ? AND resource_key LIKE ?",
+                "SELECT COUNT(*) FROM sys_menu WHERE parent_id = ? AND type = '1' AND permission LIKE ?",
                 Long.class,
-                "platform",
                 menuId,
-                "ut.menu.batch.actions:%"
+                "upms:utbatch:read:%"
         );
         assertThat(count).isEqualTo(2L);
     }
@@ -294,14 +253,14 @@ class ResourceAuthorizationControllerTest {
         Long menuId = createTempMenu();
         Long roleId = createTempRole("tenant-a");
         jdbcTemplate.update(
-                "INSERT INTO sys_role_menu(tenant_id, role_id, menu_id, created_at) VALUES(?, ?, ?, NOW())",
+                "INSERT INTO sys_role_menu(tenant_id, role_id, menu_id, create_time) VALUES(?, ?, ?, NOW())",
                 "tenant-a",
                 roleId,
                 menuId
         );
 
         mockMvc.perform(delete("/api/menus/{menuId}", menuId)
-                        .with(bearer(principal("platform", Set.of("upms:sysmenu:edit"))))
+                        .with(bearer(principal("platform", Set.of("upms:sysmenu:del"))))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"))
@@ -334,23 +293,22 @@ class ResourceAuthorizationControllerTest {
     @Test
     void tenantCannotMutatePlatformMenuTemplate() throws Exception {
         mockMvc.perform(post("/api/menus")
-                        .with(bearer(principal("tenant-a", Set.of("upms:sysmenu:edit"))))
+                        .with(bearer(principal("tenant-a", Set.of("upms:sysmenu:add"))))
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "parentId": 21,
-                                  "menuType": "BUTTON",
-                                  "resourceKey": "ut.menu.tenant.boundary",
-                                  "menuName": "UT Tenant Boundary",
-                                  "routeKey": null,
-                                  "grantKey": "upms:sysuser:get",
+                                  "type": "1",
+                                  "name": "UT Tenant Boundary",
+                                  "permission": "upms:sysuser:get",
                                   "path": null,
                                   "component": null,
+                                  "redirect": null,
                                   "icon": null,
-                                  "orderNo": 999,
-                                  "visible": false,
-                                  "enabled": true
+                                  "sort": 999,
+                                  "outerStatus": false,
+                                  "applicationKey": null
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
@@ -372,7 +330,6 @@ class ResourceAuthorizationControllerTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[?(@==1)]").exists())
                 .andExpect(jsonPath("$.data[?(@==20)]").exists())
                 .andExpect(jsonPath("$.data[?(@==21)]").exists());
 
@@ -380,7 +337,6 @@ class ResourceAuthorizationControllerTest {
                         .with(bearer(principal("tenant-a", Set.of("upms:sysrole:get"))))
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[?(@==1)]").exists())
                 .andExpect(jsonPath("$.data[?(@==20)]").exists())
                 .andExpect(jsonPath("$.data[?(@==21)]").exists());
     }
@@ -388,6 +344,7 @@ class ResourceAuthorizationControllerTest {
     @Test
     void assignMenuShouldNotGrantChildButtonsUnlessSelected() throws Exception {
         Long roleId = createTempRole("tenant-a");
+        List<Long> childButtonIds = childButtonIdsUnder(21L);
 
         mockMvc.perform(put("/api/roles/{roleId}/menus", roleId)
                         .with(bearer(principal("tenant-a", Set.of("upms:sysrole:edit"))))
@@ -399,7 +356,6 @@ class ResourceAuthorizationControllerTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[?(@==1)]").exists())
                 .andExpect(jsonPath("$.data[?(@==20)]").exists())
                 .andExpect(jsonPath("$.data[?(@==21)]").exists());
 
@@ -409,13 +365,17 @@ class ResourceAuthorizationControllerTest {
                 "tenant-a",
                 roleId
         );
-        assertThat(assignedIds).contains(1L, 20L, 21L);
-        assertThat(assignedIds).doesNotContain(210L, 211L, 212L);
+        assertThat(assignedIds).contains(20L, 21L);
+        assertThat(assignedIds).doesNotContain(childButtonIds.toArray(new Long[0]));
     }
 
     @Test
     void assignButtonShouldAutoFillAncestorMenuOnly() throws Exception {
         Long roleId = createTempRole("tenant-a");
+        Long buttonId = firstChildButtonIdUnder(21L);
+        List<Long> siblingButtonIds = childButtonIdsUnder(21L).stream()
+                .filter(id -> !id.equals(buttonId))
+                .toList();
 
         mockMvc.perform(put("/api/roles/{roleId}/menus", roleId)
                         .with(bearer(principal("tenant-a", Set.of("upms:sysrole:edit"))))
@@ -423,14 +383,13 @@ class ResourceAuthorizationControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "menuIds": [210]
+                                  "menuIds": [%d]
                                 }
-                                """))
+                                """.formatted(buttonId)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[?(@==1)]").exists())
                 .andExpect(jsonPath("$.data[?(@==20)]").exists())
                 .andExpect(jsonPath("$.data[?(@==21)]").exists())
-                .andExpect(jsonPath("$.data[?(@==210)]").exists());
+                .andExpect(jsonPath("$.data[?(@==%d)]".formatted(buttonId)).exists());
 
         List<Long> assignedIds = jdbcTemplate.queryForList(
                 "SELECT menu_id FROM sys_role_menu WHERE tenant_id = ? AND role_id = ?",
@@ -438,27 +397,38 @@ class ResourceAuthorizationControllerTest {
                 "tenant-a",
                 roleId
         );
-        assertThat(assignedIds).contains(1L, 20L, 21L, 210L);
-        assertThat(assignedIds).doesNotContain(211L, 212L);
+        assertThat(assignedIds).contains(20L, 21L, buttonId);
+        assertThat(assignedIds).doesNotContain(siblingButtonIds.toArray(new Long[0]));
+    }
+
+    private List<Long> childButtonIdsUnder(Long parentId) {
+        return jdbcTemplate.queryForList(
+                "SELECT id FROM sys_menu WHERE parent_id = ? AND type = '1' AND del_flag = '0' ORDER BY id",
+                Long.class,
+                parentId
+        );
+    }
+
+    private Long firstChildButtonIdUnder(Long parentId) {
+        List<Long> ids = childButtonIdsUnder(parentId);
+        if (ids.isEmpty()) {
+            throw new IllegalStateException("No button found under menu " + parentId);
+        }
+        return ids.get(0);
     }
 
     private Long createTempMenu() {
-        jdbcTemplate.update("DELETE FROM sys_menu WHERE tenant_id = ? AND resource_key LIKE ?", "platform", "ut.menu.batch.actions%");
+        jdbcTemplate.update("DELETE FROM sys_menu WHERE permission LIKE ?", "upms:utbatch:%");
+        jdbcTemplate.update("DELETE FROM sys_menu WHERE permission LIKE ?", "ut:batch:%");
         jdbcTemplate.update(
                 """
                 INSERT INTO sys_menu (
-                    tenant_id, parent_id, ancestors, menu_type, resource_key, menu_name, route_key,
-                    grant_key, path, component, icon, order_no, visible, enabled, is_system,
-                    outer_status, application_key, deleted
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 0, 0, ?, 0)
+                    parent_id, name, permission, path, component, icon, sort, type,
+                    outer_status, application_key, del_flag
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, '0', 0, ?, '0')
                 """,
-                "platform",
                 20L,
-                "1,20",
-                "MENU",
-                "ut.menu.batch.actions",
                 "UT 批量按钮菜单",
-                "ut-batch-actions",
                 "upms:utbatch:read",
                 "/ut/batch-actions",
                 "UtBatchActionsView",
@@ -467,10 +437,9 @@ class ResourceAuthorizationControllerTest {
                 "app_ut"
         );
         return jdbcTemplate.queryForObject(
-                "SELECT id FROM sys_menu WHERE tenant_id = ? AND resource_key = ?",
+                "SELECT id FROM sys_menu WHERE name = ?",
                 Long.class,
-                "platform",
-                "ut.menu.batch.actions"
+                "UT 批量按钮菜单"
         );
     }
 

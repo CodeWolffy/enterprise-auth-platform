@@ -71,6 +71,7 @@ class RedisCacheConfigTest {
                 null,
                 null,
                 null,
+                null,
                 null
         );
     }

@@ -38,6 +38,10 @@ export const useAuthStore = defineStore('auth', () => {
   const menuItems = computed(() => permissionStore.menuItems)
   const canSwitchTenant = computed(() => permissionStore.canSwitchTenant)
 
+  function hasPermission(required: string | string[] | undefined) {
+    return permissionStore.hasPermission(required)
+  }
+
   function hasGrant(required: string | string[]) {
     return permissionStore.hasGrant(required)
   }
@@ -191,6 +195,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAuthenticated,
     menuItems,
     canSwitchTenant,
+    hasPermission,
     hasGrant,
     restore,
     bootstrapSnapshot,

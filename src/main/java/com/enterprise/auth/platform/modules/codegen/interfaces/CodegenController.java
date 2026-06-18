@@ -18,6 +18,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.nio.charset.StandardCharsets;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -181,7 +183,9 @@ public class CodegenController {
         MediaType mediaType = MediaType.parseMediaType(artifact.contentType());
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(mediaType);
-        headers.setContentDispositionFormData("attachment", artifact.fileName());
+        headers.setContentDisposition(ContentDisposition.attachment()
+                .filename(artifact.fileName(), StandardCharsets.UTF_8)
+                .build());
         headers.setContentLength(artifact.payload().length);
         return new ResponseEntity<>(artifact.payload(), headers, org.springframework.http.HttpStatus.OK);
     }

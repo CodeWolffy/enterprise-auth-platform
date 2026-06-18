@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.enterprise.auth.platform.modules.auth.application.CaptchaService;
 import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -43,8 +44,12 @@ class AuthPasswordResetTest {
     @Autowired
     private PasswordHasher passwordHasher;
 
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private CaptchaService captchaService;
+
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.doAnswer(invocation -> null).when(captchaService).secondaryVerify(org.mockito.ArgumentMatchers.anyString());
         cleanup();
         insertResetUser();
     }
@@ -244,7 +249,8 @@ class AuthPasswordResetTest {
                 {
                   "username": "%s",
                   "email": "%s",
-                  "tenantId": "%s"
+                  "tenantId": "%s",
+                  "captchaId": "captcha-pwd-reset-ut"
                 }
                 """.formatted(username, email, tenantId);
     }

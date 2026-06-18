@@ -45,7 +45,7 @@ class AuthorizationBoundaryTest {
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
         mockMvc.perform(get("/api/users")
-                        .with(bearer(principal(Set.of("upms:sysuser:get"))))
+                        .with(bearer(principal(Set.of("upms:sysuser:page"))))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"));
@@ -73,7 +73,7 @@ class AuthorizationBoundaryTest {
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
         mockMvc.perform(post("/api/users")
-                        .with(bearer(principal(Set.of("upms:sysuser:edit"))))
+                        .with(bearer(principal(Set.of("upms:sysuser:add"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(invalidPayload))
@@ -84,19 +84,19 @@ class AuthorizationBoundaryTest {
     @Test
     void departmentReadAndWriteShouldUseSeparatePermissionKeys() throws Exception {
         mockMvc.perform(get("/api/depts")
-                        .with(bearer(principal(Set.of("upms:sysdept:edit"))))
+                        .with(bearer(principal(Set.of("upms:sysdept:add"))))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
         mockMvc.perform(get("/api/depts")
-                        .with(bearer(principal(Set.of("upms:sysdept:get"))))
+                        .with(bearer(principal(Set.of("upms:sysdept:page"))))
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"));
 
         mockMvc.perform(post("/api/depts")
-                        .with(bearer(principal(Set.of("upms:sysdept:get"))))
+                        .with(bearer(principal(Set.of("upms:sysdept:page"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -191,9 +191,8 @@ class AuthorizationBoundaryTest {
                 .andExpect(jsonPath("$.data.tenantId").value("platform"))
                 .andExpect(jsonPath("$.data.operatorTenantId").value("platform"))
                 .andExpect(jsonPath("$.data.roles[?(@ == 'ADMIN')]").exists())
-                .andExpect(jsonPath("$.data.grants[?(@ == 'upms:sysuser:get')]").exists())
+                .andExpect(jsonPath("$.data.grants[?(@ == 'upms:sysuser:page')]").exists())
                 .andExpect(jsonPath("$.data.menus").isArray())
-                .andExpect(jsonPath("$.data.menus..routeKey").exists())
                 .andExpect(jsonPath("$.data.menus..path").exists())
                 .andExpect(jsonPath("$.data.menus..component").exists())
                 .andExpect(jsonPath("$.data.superAdmin").value(true));

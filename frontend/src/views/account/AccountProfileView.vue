@@ -652,8 +652,10 @@ function formatDevice(raw?: string | null) {
 
 watch(cropScale, drawAvatarPreview)
 onMounted(() => {
-  void loadProfile()
-  void loadSessions()
+  if (!isForcedPasswordChange.value) {
+    void loadProfile()
+    void loadSessions()
+  }
 })
 </script>
 

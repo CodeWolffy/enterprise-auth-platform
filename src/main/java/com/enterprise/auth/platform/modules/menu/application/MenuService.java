@@ -402,7 +402,7 @@ public class MenuService {
     }
 
     @Cacheable(value = CacheNames.MENU_TEMPLATE, unless = "#result.isEmpty()")
-    private List<SysMenuEntity> listTemplateMenus() {
+    public List<SysMenuEntity> listTemplateMenus() {
         return runWithPlatformTenant(() ->
                 sysMenuMapper.selectList(new LambdaQueryWrapper<SysMenuEntity>()
                         .eq(SysMenuEntity::getDelFlag, "0")
@@ -538,7 +538,7 @@ public class MenuService {
         if (menuType != MenuType.BUTTON) {
             throw new BusinessException("只有按钮节点可以配置权限标识");
         }
-        if (!permission.matches("^[a-zA-Z0-9]+:[a-zA-Z0-9]+:[a-zA-Z0-9_-]+$")) {
+        if (!permission.matches("^[a-zA-Z0-9]+(:[a-zA-Z0-9_-]+)+$")) {
             throw new BusinessException("权限标识格式不合法");
         }
     }

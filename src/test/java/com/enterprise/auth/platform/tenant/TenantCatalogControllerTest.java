@@ -80,7 +80,7 @@ class TenantCatalogControllerTest {
 
     @Test
     void shouldManagePlatformTenantCatalog() throws Exception {
-        UserAccount principal = principal(Set.of("upms:systenant:get", "upms:systenant:edit"));
+        UserAccount principal = principal(Set.of("upms:tenantcatalog:page", "upms:tenantcatalog:get", "upms:tenantcatalog:add", "upms:tenantcatalog:edit", "upms:tenantcatalog:del"));
 
         mockMvc.perform(post("/api/tenant-catalog/capabilities")
                         .with(bearer(principal))

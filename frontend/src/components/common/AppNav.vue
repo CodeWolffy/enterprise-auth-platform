@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <el-menu
     :default-active="activePath"
     class="sidebar-menu"
@@ -19,9 +19,10 @@
 import type { Component } from 'vue'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { resolveAppIcon, resolveMenuPresentation, resolveRouteManifest } from '@/app/registry/module-manifest'
+import { resolveAppIcon, resolveMenuPresentation } from '@/app/registry/module-manifest'
 import AppNavItem from './AppNavItem.vue'
 import { useAuthStore } from '@/stores/auth'
+import { isAllowedMenuPath } from '@/router/route-access'
 import type { MenuItem } from '@/types/auth-models'
 
 defineProps<{
@@ -61,11 +62,11 @@ const defaultOpeneds = computed(() => {
 function buildLinks(nodes: MenuItem[]): NavLink[] {
   const links: NavLink[] = []
   const usedPaths = new Set<string>()
+  const snapshot = authStore.snapshot
 
   for (const node of nodes) {
-    const accessKey = node.component?.trim() || node.code?.trim() || ''
-    const rawPath = node.path?.trim() || ''
-    const path = rawPath && canAccessRoute(accessKey) ? rawPath : ''
+    const rawPath = normalizeRoutePath(node.path)
+    const path = rawPath && isAllowedMenuPath(snapshot, node) ? rawPath : ''
     const children = buildLinks(node.children ?? [])
     const fallbackPath = children[0]?.to ?? ''
     if (!path && !fallbackPath) {
@@ -80,7 +81,7 @@ function buildLinks(nodes: MenuItem[]): NavLink[] {
     }
     const presentation = resolveMenuPresentation({
       code: node.code,
-      routeKey: node.component ?? node.permission ?? accessKey,
+      routeKey: node.component ?? node.permission ?? node.code,
       title: node.name ?? node.title,
       icon: node.icon,
     })
@@ -95,9 +96,12 @@ function buildLinks(nodes: MenuItem[]): NavLink[] {
   return links
 }
 
-function canAccessRoute(accessKey: string) {
-  const requiredGrant = resolveRouteManifest(accessKey)?.requiredGrant
-  return !requiredGrant || authStore.hasGrant(requiredGrant)
+function normalizeRoutePath(path?: string | null) {
+  const normalized = path?.trim()
+  if (!normalized) {
+    return ''
+  }
+  return normalized.startsWith('/') ? normalized : `/${normalized}`
 }
 </script>
 

@@ -18,6 +18,19 @@ export const usePermissionSnapshotStore = defineStore('permissionSnapshot', () =
     clearDynamicRoutes()
   }
 
+  function hasPermission(required: string | string[] | undefined) {
+    if (!required || (Array.isArray(required) && required.length === 0)) {
+      return true
+    }
+    if (snapshot.value?.superAdmin) {
+      return true
+    }
+    const permissionSet = new Set(snapshot.value?.grants ?? [])
+    return Array.isArray(required)
+      ? required.some((permission) => permissionSet.has(permission))
+      : permissionSet.has(required)
+  }
+
   function hasGrant(required: string | string[]) {
     if (!required || (Array.isArray(required) && required.length === 0)) {
       return true
@@ -40,6 +53,7 @@ export const usePermissionSnapshotStore = defineStore('permissionSnapshot', () =
     menuItems,
     canSwitchTenant,
     setSnapshot,
+    hasPermission,
     hasGrant,
     clearSnapshot,
   }

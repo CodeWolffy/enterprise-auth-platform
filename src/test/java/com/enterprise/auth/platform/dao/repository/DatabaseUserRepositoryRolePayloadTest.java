@@ -7,6 +7,7 @@ import com.enterprise.auth.platform.modules.role.application.RolePayloadCodec;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.modules.user.application.AuthenticationUser;
 import com.enterprise.auth.platform.modules.user.infrastructure.repository.DatabaseUserRepository;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -71,21 +72,26 @@ class DatabaseUserRepositoryRolePayloadTest {
                 TENANT_ID,
                 roleCode
         );
-        jdbcTemplate.update(
+        List<Long> menuIds = jdbcTemplate.queryForList(
                 """
-                INSERT IGNORE INTO sys_role_menu (
-                    tenant_id, role_id, menu_id, created_by, created_at
-                )
-                SELECT ?, ?, id, ?, NOW()
-                FROM sys_menu
-                WHERE tenant_id = 'platform'
-                  AND deleted = 0
-                  AND grant_key IN ('upms:sysuser:get', 'upms:audit:get')
+                SELECT id FROM sys_menu
+                WHERE del_flag = '0'
+                  AND type = '1'
+                  AND permission IN ('upms:sysuser:get', 'upms:audit:get')
                 """,
-                TENANT_ID,
-                roleId,
-                "test"
+                Long.class
         );
+        for (Long menuId : menuIds) {
+            jdbcTemplate.update(
+                    """
+                    INSERT IGNORE INTO sys_role_menu (tenant_id, role_id, menu_id, create_time)
+                    VALUES (?, ?, ?, NOW())
+                    """,
+                    TENANT_ID,
+                    roleId,
+                    menuId
+            );
+        }
         jdbcTemplate.update(
                 """
                 INSERT INTO sys_user (

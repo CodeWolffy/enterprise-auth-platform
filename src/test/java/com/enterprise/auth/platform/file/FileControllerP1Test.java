@@ -227,7 +227,7 @@ class FileControllerP1Test {
                 passwordHasher.hash("FileTest@123"),
                 true,
                 Set.of("ADMIN"),
-                Set.of(PermissionCodes.FILE_PAGE, PermissionCodes.FILE_ADD, PermissionCodes.SYSTENANT_GET),
+                Set.of(PermissionCodes.FILE_PAGE, PermissionCodes.FILE_ADD, PermissionCodes.FILE_DEL, PermissionCodes.SYSTENANT_GET),
                 Set.of(),
                 DataScopeType.ALL,
                 1

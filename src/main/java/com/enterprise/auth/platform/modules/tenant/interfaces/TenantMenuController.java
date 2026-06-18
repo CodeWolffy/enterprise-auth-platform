@@ -1,14 +1,13 @@
 package com.enterprise.auth.platform.modules.tenant.interfaces;
 
-import com.enterprise.auth.platform.common.context.TenantContext;
+import cn.dev33.satoken.annotation.SaCheckPermission;
+import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.modules.tenant.application.TenantMenuService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import java.util.Set;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,6 +29,7 @@ public class TenantMenuController {
 
     @Operation(summary = "查询租户分配的菜单ID集合")
     @GetMapping("/{tenantId}")
+    @SaCheckPermission(PermissionCodes.SYSTENANT_GET)
     public ApiResponse<Set<Long>> getTenantMenus(
             @Parameter(description = "租户ID") @PathVariable String tenantId) {
         return ApiResponse.ok(tenantMenuService.findTenantMenuIds(tenantId));
@@ -37,6 +37,7 @@ public class TenantMenuController {
 
     @Operation(summary = "保存租户菜单分配（全量替换）")
     @PostMapping("/{tenantId}")
+    @SaCheckPermission(PermissionCodes.SYSTENANT_EDIT)
     public ApiResponse<Void> saveTenantMenus(
             @Parameter(description = "租户ID") @PathVariable String tenantId,
             @Valid @RequestBody AssignTenantMenusRequest request) {

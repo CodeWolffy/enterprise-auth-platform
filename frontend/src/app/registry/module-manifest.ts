@@ -330,6 +330,10 @@ const ROUTE_KEY_MANIFEST_MAP: Record<string, AppRouteManifest & { routeKey: stri
   APP_ROUTE_KEY_MANIFESTS.map((manifest) => [manifest.routeKey, manifest]),
 )
 
+const ROUTE_PATH_MANIFEST_MAP: Record<string, AppRouteManifest> = Object.fromEntries(
+  APP_ROUTE_MANIFESTS.filter((manifest) => !manifest.generatedRoute).map((manifest) => [normalizeRoutePath(manifest.path), manifest]),
+)
+
 const NAV_CODE_MANIFEST_MAP: Record<string, AppNavManifest> = Object.fromEntries(
   APP_NAV_MANIFESTS.map((manifest) => [manifest.code, manifest]),
 )
@@ -382,6 +386,11 @@ export function resolveRouteManifest(routeKey?: string | null) {
   return normalizedRouteKey ? ROUTE_KEY_MANIFEST_MAP[normalizedRouteKey] : undefined
 }
 
+export function resolveRouteManifestByPath(path?: string | null) {
+  const normalizedPath = normalizeRoutePath(path)
+  return normalizedPath ? ROUTE_PATH_MANIFEST_MAP[normalizedPath] : undefined
+}
+
 export function resolveMenuPresentation(menu: MenuPresentationInput) {
   const routeManifest = resolveRouteManifest(menu.routeKey)
   const normalizedCode = normalizeValue(menu.code)
@@ -401,4 +410,12 @@ export function resolveAppIcon(icon?: string | null) {
 function normalizeValue(value?: string | null) {
   const normalized = value?.trim()
   return normalized ? normalized : undefined
+}
+
+function normalizeRoutePath(path?: string | null) {
+  const normalized = normalizeValue(path)
+  if (!normalized) {
+    return ''
+  }
+  return normalized.startsWith('/') ? normalized : `/${normalized}`
 }

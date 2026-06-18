@@ -154,7 +154,7 @@ class SystemControllerTest {
     @Test
     void dictListShouldApplyDataScope() throws Exception {
         mockMvc.perform(get("/api/system/dicts")
-                        .with(bearer(principal(Set.of("upms:system:get"))))
+                        .with(bearer(principal(Set.of("upms:sysdict:page"))))
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.records[?(@.dictCode=='" + VISIBLE_DICT_CODE + "')]").exists())
@@ -164,7 +164,7 @@ class SystemControllerTest {
     @Test
     void dictListShouldSupportSortByDictCode() throws Exception {
         mockMvc.perform(get("/api/system/dicts")
-                        .with(bearer(principal(Set.of("upms:system:get"))))
+                        .with(bearer(principal(Set.of("upms:sysdict:page"))))
                         .header("X-Tenant-Id", "tenant-a")
                         .param("sortBy", "dictCode")
                         .param("sortDirection", "asc")
@@ -177,7 +177,7 @@ class SystemControllerTest {
     @Test
     void dictListShouldSupportCategoryFilter() throws Exception {
         mockMvc.perform(get("/api/system/dicts")
-                        .with(bearer(principal(Set.of("upms:system:get"))))
+                        .with(bearer(principal(Set.of("upms:sysdict:page"))))
                         .header("X-Tenant-Id", "tenant-a")
                         .param("category", "system"))
                 .andExpect(status().isOk())
@@ -188,7 +188,7 @@ class SystemControllerTest {
     @Test
     void updateHiddenDictShouldBeRejected() throws Exception {
         mockMvc.perform(put("/api/system/dicts/{id}", hiddenDictId)
-                        .with(bearer(principal(Set.of("upms:sysmenu:edit"))))
+                        .with(bearer(principal(Set.of("upms:sysdict:edit"))))
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -208,7 +208,7 @@ class SystemControllerTest {
         Long visibleDictId = visibleDictId();
 
         mockMvc.perform(get("/api/system/dicts/{id}", visibleDictId)
-                        .with(bearer(principal(Set.of("upms:system:get"))))
+                        .with(bearer(principal(Set.of("upms:sysdict:get"))))
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.dict.dictCode").value(VISIBLE_DICT_CODE))
@@ -223,7 +223,7 @@ class SystemControllerTest {
         Long visibleDictId = visibleDictId();
 
         mockMvc.perform(post("/api/system/dicts/{id}/values", visibleDictId)
-                        .with(bearer(principal(Set.of("upms:sysmenu:edit"))))
+                        .with(bearer(principal(Set.of("upms:sysdict:add"))))
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -250,7 +250,7 @@ class SystemControllerTest {
         );
 
         mockMvc.perform(put("/api/system/dict-values/{valueId}", valueId)
-                        .with(bearer(principal(Set.of("upms:sysmenu:edit"))))
+                        .with(bearer(principal(Set.of("upms:sysdict:edit"))))
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -269,12 +269,12 @@ class SystemControllerTest {
                 .andExpect(jsonPath("$.data.enabled").value(false));
 
         mockMvc.perform(delete("/api/system/dict-values/{valueId}", valueId)
-                        .with(bearer(principal(Set.of("upms:sysmenu:edit"))))
+                        .with(bearer(principal(Set.of("upms:sysdict:del"))))
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/system/dicts/{id}", visibleDictId)
-                        .with(bearer(principal(Set.of("upms:system:get"))))
+                        .with(bearer(principal(Set.of("upms:sysdict:get"))))
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.values[?(@.dictValue=='" + UPDATED_DICT_VALUE + "')]").doesNotExist());
@@ -283,7 +283,7 @@ class SystemControllerTest {
     @Test
     void shouldCreateCategoryOption() throws Exception {
         mockMvc.perform(post("/api/system/categories/dict")
-                        .with(bearer(principal(Set.of("upms:sysmenu:edit"))))
+                        .with(bearer(principal(Set.of("upms:syscategory:add"))))
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -298,13 +298,13 @@ class SystemControllerTest {
                 .andExpect(jsonPath("$.data.matchers[0]").value("system_scope*"));
 
         mockMvc.perform(get("/api/system/categories/dict")
-                        .with(bearer(principal(Set.of("upms:system:get"))))
+                        .with(bearer(principal(Set.of("upms:syscategory:get"))))
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[?(@.code=='" + CATEGORY_CODE + "')]").exists());
 
         mockMvc.perform(get("/api/system/categories/dict/{code}/analysis", CATEGORY_CODE)
-                        .with(bearer(principal(Set.of("upms:system:get"))))
+                        .with(bearer(principal(Set.of("upms:syscategory:get"))))
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.code").value(CATEGORY_CODE))

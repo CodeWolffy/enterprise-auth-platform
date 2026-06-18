@@ -184,6 +184,9 @@ public class CodegenApplicationService {
                 .filter(allowedPaths::contains)
                 .distinct()
                 .toList();
+        if (resolved.size() != selectedFiles.stream().distinct().count()) {
+            throw new BusinessException("VALIDATION_ERROR", "选择的生成文件不存在或不属于本次生成结果");
+        }
         if (resolved.isEmpty()) {
             throw new BusinessException("VALIDATION_ERROR", emptyMessage);
         }
@@ -206,10 +209,24 @@ public class CodegenApplicationService {
         List<CodegenColumnView> editableColumns = columns.stream()
                 .filter(column -> !column.columnName().equals(primaryKey.columnName()))
                 .filter(column -> !SYSTEM_COLUMNS.contains(column.columnName().toLowerCase(Locale.ROOT)))
+                .filter(column -> column.insert() || column.edit())
                 .toList();
         if (editableColumns.isEmpty()) {
             throw new BusinessException("VALIDATION_ERROR", "数据表没有可写业务字段，无法生成完整 CRUD");
         }
+        List<CodegenColumnView> insertColumns = editableColumns.stream()
+                .filter(CodegenColumnView::insert)
+                .toList();
+        List<CodegenColumnView> editColumns = editableColumns.stream()
+                .filter(CodegenColumnView::edit)
+                .toList();
+        List<CodegenColumnView> listColumns = columns.stream()
+                .filter(CodegenColumnView::list)
+                .limit(8)
+                .toList();
+        List<CodegenColumnView> queryColumns = columns.stream()
+                .filter(CodegenColumnView::query)
+                .toList();
         boolean includeBackend = command.includeBackend();
         boolean includeFrontend = command.includeFrontend();
         if (!includeBackend && !includeFrontend) {
@@ -227,7 +244,11 @@ public class CodegenApplicationService {
                 primaryKey.javaField(),
                 primaryKey.javaType(),
                 columns,
-                editableColumns
+                editableColumns,
+                insertColumns,
+                editColumns,
+                listColumns,
+                queryColumns
         );
     }
 
@@ -259,8 +280,35 @@ public class CodegenApplicationService {
             return rawColumns;
         }
         return rawColumns.stream()
-                .map(column -> overrides.getOrDefault(column.columnName(), column))
+                .map(column -> mergeColumnOverride(column, overrides.get(column.columnName())))
                 .toList();
+    }
+
+    private CodegenColumnView mergeColumnOverride(CodegenColumnView rawColumn, CodegenColumnView override) {
+        if (override == null) {
+            return rawColumn;
+        }
+        return new CodegenColumnView(
+                rawColumn.columnName(),
+                rawColumn.dataType(),
+                rawColumn.columnType(),
+                rawColumn.nullable(),
+                rawColumn.primaryKey(),
+                rawColumn.autoIncrement(),
+                override.required(),
+                rawColumn.columnDefault(),
+                override.columnComment(),
+                override.javaType(),
+                override.javaField(),
+                tsTypeFromJava(override.javaType(), rawColumn.dataType()),
+                override.insert(),
+                override.edit(),
+                override.list(),
+                override.query(),
+                override.queryType(),
+                override.htmlType(),
+                override.dictType()
+        );
     }
 
     private void ensureAllowedTable(String tableName) {
@@ -285,7 +333,9 @@ public class CodegenApplicationService {
         if (includeBackend) {
             files.add(new CodegenFilePreview(backendPath(model, "infrastructure/entity", model.className() + "Entity.java"), "java", renderWithTemplate("java", backendPath(model, "infrastructure/entity", model.className() + "Entity.java"), renderEntity(model), templateVariables(model))));
             files.add(new CodegenFilePreview(backendPath(model, "infrastructure/mapper", model.className() + "Mapper.java"), "java", renderWithTemplate("java", backendPath(model, "infrastructure/mapper", model.className() + "Mapper.java"), renderMapper(model), templateVariables(model))));
-            files.add(new CodegenFilePreview(backendPath(model, "interfaces", model.className() + "CrudRequest.java"), "java", renderWithTemplate("java", backendPath(model, "interfaces", model.className() + "CrudRequest.java"), renderCrudRequest(model), templateVariables(model))));
+            files.add(new CodegenFilePreview(backendPath(model, "interfaces", model.className() + "CreateRequest.java"), "java", renderWithTemplate("java", backendPath(model, "interfaces", model.className() + "CreateRequest.java"), renderCreateRequest(model), templateVariables(model))));
+            files.add(new CodegenFilePreview(backendPath(model, "interfaces", model.className() + "UpdateRequest.java"), "java", renderWithTemplate("java", backendPath(model, "interfaces", model.className() + "UpdateRequest.java"), renderUpdateRequest(model), templateVariables(model))));
+            files.add(new CodegenFilePreview(backendPath(model, "interfaces", model.className() + "QueryRequest.java"), "java", renderWithTemplate("java", backendPath(model, "interfaces", model.className() + "QueryRequest.java"), renderQueryRequest(model), templateVariables(model))));
             files.add(new CodegenFilePreview(backendPath(model, "application", model.className() + "ApplicationService.java"), "java", renderWithTemplate("java", backendPath(model, "application", model.className() + "ApplicationService.java"), renderService(model), templateVariables(model))));
             files.add(new CodegenFilePreview(backendPath(model, "interfaces", model.className() + "Controller.java"), "java", renderWithTemplate("java", backendPath(model, "interfaces", model.className() + "Controller.java"), renderController(model), templateVariables(model))));
         }
@@ -363,41 +413,84 @@ public class CodegenApplicationService {
                 + "}\n";
     }
 
-    private String renderCrudRequest(CodegenModel model) {
+    private String renderCreateRequest(CodegenModel model) {
+        return renderRequestRecord(model, model.className() + "CreateRequest", model.title() + "新增请求", mutationRequestFields(model.insertColumns()));
+    }
+
+    private String renderUpdateRequest(CodegenModel model) {
+        return renderRequestRecord(model, model.className() + "UpdateRequest", model.title() + "修改请求", mutationRequestFields(model.editColumns()));
+    }
+
+    private String renderQueryRequest(CodegenModel model) {
+        return renderRequestRecord(model, model.className() + "QueryRequest", model.title() + "查询请求", queryRequestFields(model.queryColumns()));
+    }
+
+    private String renderRequestRecord(CodegenModel model, String recordName, String description, List<String> fields) {
         StringBuilder builder = new StringBuilder();
         builder.append("package ").append(model.packageName()).append(".modules.").append(model.moduleName()).append(".interfaces;\n\n");
         builder.append("import io.swagger.v3.oas.annotations.media.Schema;\n");
         builder.append("import jakarta.validation.constraints.NotBlank;\n");
-        builder.append("import jakarta.validation.constraints.NotNull;\n");
-        builder.append("import java.time.LocalDateTime;\n\n");
-        builder.append("@Schema(description = \"").append(escapeJava(model.title())).append("新增或修改请求\")\n");
-        builder.append("public record ").append(model.className()).append("CrudRequest(");
-        if (model.editableColumns().isEmpty()) {
-            builder.append(") {\n}\n");
+        builder.append("import jakarta.validation.constraints.NotNull;\n\n");
+        builder.append("@Schema(description = \"").append(escapeJava(description)).append("\")\n");
+        builder.append("public record ").append(recordName).append('(');
+        if (fields.isEmpty()) {
+            builder.append(") {\n");
+            builder.append("}\n");
             return builder.toString();
         }
         builder.append("\n");
-        for (int i = 0; i < model.editableColumns().size(); i++) {
-            CodegenColumnView column = model.editableColumns().get(i);
-            boolean required = requestRequired(column);
-            builder.append("        @Schema(description = \"").append(escapeJava(columnLabel(column))).append("\"");
-            if (required) {
-                builder.append(", requiredMode = Schema.RequiredMode.REQUIRED");
-            }
-            builder.append(") ");
-            if (required) {
-                builder.append("String".equals(column.javaType()) ? "@NotBlank " : "@NotNull ");
-            }
-            builder.append(column.javaType()).append(' ').append(column.javaField());
-            builder.append(i + 1 == model.editableColumns().size() ? "\n" : ",\n");
+        for (int i = 0; i < fields.size(); i++) {
+            builder.append(fields.get(i));
+            builder.append(i + 1 == fields.size() ? "\n" : ",\n");
         }
-        builder.append(") {\n}\n");
+        builder.append(") {\n");
+        builder.append("}\n");
+        return builder.toString();
+    }
+
+    private List<String> mutationRequestFields(List<CodegenColumnView> columns) {
+        List<String> fields = new ArrayList<>();
+        for (CodegenColumnView column : columns) {
+            fields.add(requestField(column, column.javaField(), columnLabel(column), true));
+        }
+        return fields;
+    }
+
+    private List<String> queryRequestFields(List<CodegenColumnView> columns) {
+        List<String> fields = new ArrayList<>();
+        fields.add("            @Schema(description = \"页码\") Integer page");
+        fields.add("            @Schema(description = \"每页数量\") Integer size");
+        for (CodegenColumnView column : columns) {
+            if (isBetweenQuery(column)) {
+                fields.add(requestField(column, queryRangeField(column, "Start"), columnLabel(column) + "起始", false));
+                fields.add(requestField(column, queryRangeField(column, "End"), columnLabel(column) + "结束", false));
+            } else {
+                fields.add(requestField(column, column.javaField(), columnLabel(column), false));
+            }
+        }
+        return fields;
+    }
+
+    private String requestField(CodegenColumnView column, String fieldName, String label, boolean validate) {
+        StringBuilder builder = new StringBuilder();
+        boolean required = validate && requestRequired(column);
+        builder.append("            @Schema(description = \"").append(escapeJava(label)).append("\"");
+        if (required) {
+            builder.append(", requiredMode = Schema.RequiredMode.REQUIRED");
+        }
+        builder.append(") ");
+        if (required) {
+            builder.append("String".equals(column.javaType()) ? "@NotBlank " : "@NotNull ");
+        }
+        builder.append(column.javaType()).append(' ').append(fieldName);
         return builder.toString();
     }
 
     private String renderService(CodegenModel model) {
         String entity = model.className() + "Entity";
-        String request = model.className() + "CrudRequest";
+        String createRequest = model.className() + "CreateRequest";
+        String updateRequest = model.className() + "UpdateRequest";
+        String queryRequest = model.className() + "QueryRequest";
         String mapper = model.className() + "Mapper";
         return "package " + model.packageName() + ".modules." + model.moduleName() + ".application;\n\n"
                 + "import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;\n"
@@ -406,8 +499,9 @@ public class CodegenApplicationService {
                 + "import com.enterprise.auth.platform.common.web.PageResult;\n"
                 + "import " + model.packageName() + ".modules." + model.moduleName() + ".infrastructure.entity." + entity + ";\n"
                 + "import " + model.packageName() + ".modules." + model.moduleName() + ".infrastructure.mapper." + mapper + ";\n"
-                + "import " + model.packageName() + ".modules." + model.moduleName() + ".interfaces." + request + ";\n"
-                + "import java.util.List;\n"
+                + "import " + model.packageName() + ".modules." + model.moduleName() + ".interfaces." + createRequest + ";\n"
+                + "import " + model.packageName() + ".modules." + model.moduleName() + ".interfaces." + updateRequest + ";\n"
+                + "import " + model.packageName() + ".modules." + model.moduleName() + ".interfaces." + queryRequest + ";\n"
                 + "import org.springframework.stereotype.Service;\n"
                 + "import org.springframework.transaction.annotation.Transactional;\n"
                 + "import org.springframework.util.StringUtils;\n\n"
@@ -418,15 +512,15 @@ public class CodegenApplicationService {
                 + "        this.mapper = mapper;\n"
                 + "    }\n\n"
                 + "    @Transactional(readOnly = true)\n"
-                + "    public PageResult<" + entity + "> page(String keyword, int page, int size) {\n"
-                + "        int safePage = Math.max(page, 1);\n"
-                + "        int safeSize = Math.min(Math.max(size, 1), 100);\n"
-                + "        LambdaQueryWrapper<" + entity + "> countQuery = baseQuery(keyword);\n"
+                + "    public PageResult<" + entity + "> page(" + queryRequest + " request) {\n"
+                + "        int safePage = Math.max(request == null || request.page() == null ? 1 : request.page(), 1);\n"
+                + "        int safeSize = Math.min(Math.max(request == null || request.size() == null ? 20 : request.size(), 1), 100);\n"
+                + "        LambdaQueryWrapper<" + entity + "> countQuery = baseQuery(request);\n"
                 + "        Long total = mapper.selectCount(countQuery);\n"
                 + "        if (total == null || total == 0) {\n"
                 + "            return PageResult.empty(safePage, safeSize);\n"
                 + "        }\n"
-                + "        LambdaQueryWrapper<" + entity + "> listQuery = baseQuery(keyword);\n"
+                + "        LambdaQueryWrapper<" + entity + "> listQuery = baseQuery(request);\n"
                 + "        applyDefaultOrder(listQuery);\n"
                 + "        listQuery.last(\"limit \" + ((safePage - 1) * safeSize) + \",\" + safeSize);\n"
                 + "        return PageResult.of(total, safePage, safeSize, mapper.selectList(listQuery));\n"
@@ -436,17 +530,17 @@ public class CodegenApplicationService {
                 + "        return getExisting(id);\n"
                 + "    }\n\n"
                 + "    @Transactional\n"
-                + "    public " + entity + " create(" + request + " request) {\n"
+                + "    public " + entity + " create(" + createRequest + " request) {\n"
                 + "        " + entity + " entity = new " + entity + "();\n"
                 + renderTenantAssignment(model)
-                + renderApplyRequest(model)
+                + renderApplyRequest(model.insertColumns())
                 + "        mapper.insert(entity);\n"
                 + "        return entity;\n"
                 + "    }\n\n"
                 + "    @Transactional\n"
-                + "    public " + entity + " update(" + model.primaryKeyJavaType() + " id, " + request + " request) {\n"
+                + "    public " + entity + " update(" + model.primaryKeyJavaType() + " id, " + updateRequest + " request) {\n"
                 + "        " + entity + " entity = getExisting(id);\n"
-                + renderApplyRequest(model)
+                + renderApplyRequest(model.editColumns())
                 + "        mapper.updateById(entity);\n"
                 + "        return entity;\n"
                 + "    }\n\n"
@@ -464,11 +558,11 @@ public class CodegenApplicationService {
                 + "        }\n"
                 + "        return entity;\n"
                 + "    }\n\n"
-                + "    private LambdaQueryWrapper<" + entity + "> baseQuery(String keyword) {\n"
+                + "    private LambdaQueryWrapper<" + entity + "> baseQuery(" + queryRequest + " request) {\n"
                 + "        LambdaQueryWrapper<" + entity + "> query = new LambdaQueryWrapper<>();\n"
                 + renderTenantFilter(model)
                 + renderDeletedFilter(model)
-                + renderKeywordFilter(model)
+                + renderQueryFilters(model)
                 + "        return query;\n"
                 + "    }\n\n"
                 + "    private void applyDefaultOrder(LambdaQueryWrapper<" + entity + "> query) {\n"
@@ -483,7 +577,9 @@ public class CodegenApplicationService {
 
     private String renderController(CodegenModel model) {
         String entity = model.className() + "Entity";
-        String request = model.className() + "CrudRequest";
+        String createRequest = model.className() + "CreateRequest";
+        String updateRequest = model.className() + "UpdateRequest";
+        String queryRequest = model.className() + "QueryRequest";
         return "package " + model.packageName() + ".modules." + model.moduleName() + ".interfaces;\n\n"
                 + "import cn.dev33.satoken.annotation.SaCheckPermission;\n"
                 + "import com.enterprise.auth.platform.common.web.ApiResponse;\n"
@@ -496,12 +592,12 @@ public class CodegenApplicationService {
                 + "import jakarta.validation.Valid;\n"
                 + "import org.springframework.web.bind.annotation.DeleteMapping;\n"
                 + "import org.springframework.web.bind.annotation.GetMapping;\n"
+                + "import org.springframework.web.bind.annotation.ModelAttribute;\n"
                 + "import org.springframework.web.bind.annotation.PathVariable;\n"
                 + "import org.springframework.web.bind.annotation.PostMapping;\n"
                 + "import org.springframework.web.bind.annotation.PutMapping;\n"
                 + "import org.springframework.web.bind.annotation.RequestBody;\n"
                 + "import org.springframework.web.bind.annotation.RequestMapping;\n"
-                + "import org.springframework.web.bind.annotation.RequestParam;\n"
                 + "import org.springframework.web.bind.annotation.RestController;\n\n"
                 + "@Tag(name = \"" + escapeJava(model.title()) + "\")\n"
                 + "@RestController\n"
@@ -514,12 +610,8 @@ public class CodegenApplicationService {
                 + "    @Operation(summary = \"分页查询" + escapeJava(model.title()) + "\")\n"
                 + "    @GetMapping\n"
                 + "    @SaCheckPermission(\"" + model.moduleName() + ":page\")\n"
-                + "    public ApiResponse<PageResult<" + entity + ">> page(\n"
-                + "            @Parameter(description = \"关键字\") @RequestParam(required = false) String keyword,\n"
-                + "            @Parameter(description = \"页码\") @RequestParam(defaultValue = \"1\") int page,\n"
-                + "            @Parameter(description = \"每页数量\") @RequestParam(defaultValue = \"20\") int size\n"
-                + "    ) {\n"
-                + "        return ApiResponse.ok(service.page(keyword, page, size));\n"
+                + "    public ApiResponse<PageResult<" + entity + ">> page(@ModelAttribute " + queryRequest + " request) {\n"
+                + "        return ApiResponse.ok(service.page(request));\n"
                 + "    }\n\n"
                 + "    @Operation(summary = \"查询" + escapeJava(model.title()) + "详情\")\n"
                 + "    @GetMapping(\"/{id}\")\n"
@@ -530,7 +622,7 @@ public class CodegenApplicationService {
                 + "    @Operation(summary = \"新增" + escapeJava(model.title()) + "\")\n"
                 + "    @PostMapping\n"
                 + "    @SaCheckPermission(\"" + model.moduleName() + ":add\")\n"
-                + "    public ApiResponse<" + entity + "> create(@Valid @RequestBody " + request + " request) {\n"
+                + "    public ApiResponse<" + entity + "> create(@Valid @RequestBody " + createRequest + " request) {\n"
                 + "        return ApiResponse.ok(service.create(request));\n"
                 + "    }\n\n"
                 + "    @Operation(summary = \"修改" + escapeJava(model.title()) + "\")\n"
@@ -538,7 +630,7 @@ public class CodegenApplicationService {
                 + "    @SaCheckPermission(\"" + model.moduleName() + ":edit\")\n"
                 + "    public ApiResponse<" + entity + "> update(\n"
                 + "            @Parameter(description = \"主键\") @PathVariable " + model.primaryKeyJavaType() + " id,\n"
-                + "            @Valid @RequestBody " + request + " request\n"
+                + "            @Valid @RequestBody " + updateRequest + " request\n"
                 + "    ) {\n"
                 + "        return ApiResponse.ok(service.update(id, request));\n"
                 + "    }\n\n"
@@ -560,9 +652,25 @@ public class CodegenApplicationService {
             builder.append("  ").append(column.javaField()).append(optional ? "?: " : ": ").append(column.tsType()).append(optional ? " | null" : "").append("\n");
         }
         builder.append("}\n\n");
-        builder.append("export interface ").append(model.className()).append("CrudRequest {\n");
-        for (CodegenColumnView column : model.editableColumns()) {
-            builder.append("  ").append(column.javaField()).append("?: ").append(column.tsType()).append(" | null\n");
+        builder.append("export interface ").append(model.className()).append("CreateRequest {\n");
+        for (CodegenColumnView column : model.insertColumns()) {
+            appendTsRequestField(builder, column);
+        }
+        builder.append("}\n\n");
+        builder.append("export interface ").append(model.className()).append("UpdateRequest {\n");
+        for (CodegenColumnView column : model.editColumns()) {
+            appendTsRequestField(builder, column);
+        }
+        builder.append("}\n\n");
+        builder.append("export interface ").append(model.className()).append("QueryParams {\n");
+        builder.append("  page?: number\n  size?: number\n");
+        for (CodegenColumnView column : model.queryColumns()) {
+            if (isBetweenQuery(column)) {
+                appendTsQueryField(builder, queryRangeField(column, "Start"), column);
+                appendTsQueryField(builder, queryRangeField(column, "End"), column);
+            } else {
+                appendTsQueryField(builder, column.javaField(), column);
+            }
         }
         builder.append("}\n\n");
         builder.append("export interface ").append(model.className()).append("Page {\n");
@@ -570,14 +678,19 @@ public class CodegenApplicationService {
         return builder.toString();
     }
 
+    private void appendTsRequestField(StringBuilder builder, CodegenColumnView column) {
+        builder.append("  ").append(column.javaField()).append(requestRequired(column) ? ": " : "?: ")
+                .append(column.tsType()).append(requestRequired(column) ? "\n" : " | null\n");
+    }
+
+    private void appendTsQueryField(StringBuilder builder, String fieldName, CodegenColumnView column) {
+        builder.append("  ").append(fieldName).append("?: ").append(column.tsType()).append(" | null\n");
+    }
+
     private String renderApi(CodegenModel model) {
         return "import { http } from '../http'\n"
                 + "import type { ApiResponse } from '@/types/api'\n"
-                + "import type { " + model.className() + "CrudRequest, " + model.className() + "Page, " + model.className() + "View } from '@/types/" + model.moduleName() + "'\n\n"
-                + "export interface " + model.className() + "QueryParams {\n"
-                + "  keyword?: string\n"
-                + "  page?: number\n"
-                + "  size?: number\n}\n\n"
+                + "import type { " + model.className() + "CreateRequest, " + model.className() + "Page, " + model.className() + "QueryParams, " + model.className() + "UpdateRequest, " + model.className() + "View } from '@/types/" + model.moduleName() + "'\n\n"
                 + "export async function query" + model.className() + "Page(params?: " + model.className() + "QueryParams) {\n"
                 + "  const { data } = await http.get<ApiResponse<" + model.className() + "Page>>('/api/generated/" + model.kebabName() + "', { params })\n"
                 + "  return data.data\n"
@@ -586,11 +699,11 @@ public class CodegenApplicationService {
                 + "  const { data } = await http.get<ApiResponse<" + model.className() + "View>>(`/api/generated/" + model.kebabName() + "/${id}`)\n"
                 + "  return data.data\n"
                 + "}\n\n"
-                + "export async function create" + model.className() + "(payload: " + model.className() + "CrudRequest) {\n"
+                + "export async function create" + model.className() + "(payload: " + model.className() + "CreateRequest) {\n"
                 + "  const { data } = await http.post<ApiResponse<" + model.className() + "View>>('/api/generated/" + model.kebabName() + "', payload)\n"
                 + "  return data.data\n"
                 + "}\n\n"
-                + "export async function update" + model.className() + "(id: " + tsScalarType(model.primaryKeyJavaType()) + ", payload: " + model.className() + "CrudRequest) {\n"
+                + "export async function update" + model.className() + "(id: " + tsScalarType(model.primaryKeyJavaType()) + ", payload: " + model.className() + "UpdateRequest) {\n"
                 + "  const { data } = await http.put<ApiResponse<" + model.className() + "View>>(`/api/generated/" + model.kebabName() + "/${id}`, payload)\n"
                 + "  return data.data\n"
                 + "}\n\n"
@@ -609,20 +722,18 @@ public class CodegenApplicationService {
                 + "          <h3>" + escapeVue(model.title()) + "</h3>\n"
                 + "        </div>\n"
                 + "        <div class=\"panel-actions\">\n"
-                + "          <el-button :loading=\"loading\" @click=\"load\">刷新</el-button>\n"
+                + "          <el-button v-permission=\"'" + model.moduleName() + ":page'\" :loading=\"loading\" @click=\"load\">刷新</el-button>\n"
                 + "          <el-button v-permission=\"'" + model.moduleName() + ":add'\" type=\"primary\" @click=\"openForm()\">新增</el-button>\n"
                 + "        </div>\n"
                 + "      </div>\n\n"
                 + "      <AdvancedSearch @search=\"handleSearch\" @reset=\"resetSearch\">\n"
-                + "        <el-form-item label=\"关键字\">\n"
-                + "          <el-input v-model=\"keyword\" placeholder=\"搜索关键字段\" clearable />\n"
-                + "        </el-form-item>\n"
+                + renderVueSearchItems(model)
                 + "      </AdvancedSearch>\n\n"
                 + "      <el-table v-loading=\"loading\" :data=\"records\" stripe>\n"
                 + renderVueColumns(model)
                 + "        <el-table-column fixed=\"right\" label=\"操作\" width=\"180\">\n"
                 + "          <template #default=\"{ row }\">\n"
-                + "            <el-button link type=\"primary\" @click=\"openDetail(row)\">详情</el-button>\n"
+                + "            <el-button v-permission=\"'" + model.moduleName() + ":get'\" link type=\"primary\" @click=\"openDetail(row)\">详情</el-button>\n"
                 + "            <el-button v-permission=\"'" + model.moduleName() + ":edit'\" link type=\"primary\" @click=\"openForm(row)\">编辑</el-button>\n"
                 + "            <el-button v-permission=\"'" + model.moduleName() + ":del'\" link type=\"danger\" @click=\"remove(row)\">删除</el-button>\n"
                 + "          </template>\n"
@@ -647,12 +758,13 @@ public class CodegenApplicationService {
                 + "      </el-descriptions>\n"
                 + "    </el-drawer>\n\n"
                 + "    <el-dialog v-model=\"formVisible\" :title=\"editingId === null ? '新增' : '编辑'\" width=\"560px\">\n"
-                + "      <el-form ref=\"formRef\" label-position=\"top\" :model=\"form\" :rules=\"rules\">\n"
+                + "      <el-form ref=\"formRef\" label-position=\"top\" :model=\"form\" :rules=\"editingId === null ? createRules : updateRules\">\n"
                 + renderVueFormItems(model)
                 + "      </el-form>\n"
                 + "      <template #footer>\n"
                 + "        <el-button @click=\"formVisible = false\">取消</el-button>\n"
-                + "        <el-button v-permission=\"'" + model.moduleName() + ":edit'\" type=\"primary\" @click=\"submit\">保存</el-button>\n"
+                + "        <el-button v-if=\"editingId === null\" v-permission=\"'" + model.moduleName() + ":add'\" type=\"primary\" @click=\"submit\">保存</el-button>\n"
+                + "        <el-button v-else v-permission=\"'" + model.moduleName() + ":edit'\" type=\"primary\" @click=\"submit\">保存</el-button>\n"
                 + "      </template>\n"
                 + "    </el-dialog>\n"
                 + "  </div>\n"
@@ -663,26 +775,27 @@ public class CodegenApplicationService {
                 + "import type { FormInstance, FormRules } from 'element-plus'\n"
                 + "import AdvancedSearch from '@/components/common/AdvancedSearch.vue'\n"
                 + "import { create" + model.className() + ", delete" + model.className() + ", query" + model.className() + "Page, update" + model.className() + " } from '@/api/modules/" + model.moduleName() + "'\n"
-                + "import type { " + model.className() + "CrudRequest, " + model.className() + "View } from '@/types/" + model.moduleName() + "'\n\n"
+                + "import type { " + model.className() + "CreateRequest, " + model.className() + "QueryParams, " + model.className() + "UpdateRequest, " + model.className() + "View } from '@/types/" + model.moduleName() + "'\n\n"
                 + "const loading = ref(false)\n"
                 + "const formVisible = ref(false)\n"
                 + "const detailVisible = ref(false)\n"
                 + "const records = ref<" + model.className() + "View[]>([])\n"
                 + "const detailItem = ref<" + model.className() + "View | null>(null)\n"
                 + "const editingId = ref<" + tsScalarType(model.primaryKeyJavaType()) + " | null>(null)\n"
-                + "const keyword = ref('')\n"
+                + "const query = reactive<" + model.className() + "QueryParams>(" + renderTsInitialQuery(model) + ")\n"
                 + "const page = ref(1)\n"
                 + "const size = ref(20)\n"
                 + "const total = ref(0)\n"
                 + "const formRef = ref<FormInstance>()\n\n"
-                + "const form = reactive<" + model.className() + "CrudRequest>(" + renderTsInitialForm(model) + ")\n\n"
-                + "const rules = reactive<FormRules>(" + renderTsRules(model) + ")\n\n"
+                + "const form = reactive<" + model.className() + "CreateRequest & " + model.className() + "UpdateRequest>(" + renderTsInitialForm(model) + ")\n\n"
+                + "const createRules = reactive<FormRules>(" + renderTsRules(model.insertColumns()) + ")\n"
+                + "const updateRules = reactive<FormRules>(" + renderTsRules(model.editColumns()) + ")\n\n"
                 + "void load()\n\n"
                 + "async function load() {\n"
                 + "  loading.value = true\n"
                 + "  try {\n"
                 + "    const result = await query" + model.className() + "Page({\n"
-                + "      keyword: keyword.value || undefined,\n"
+                + "      ...query,\n"
                 + "      page: page.value,\n"
                 + "      size: size.value,\n"
                 + "    })\n"
@@ -697,7 +810,7 @@ public class CodegenApplicationService {
                 + "  void load()\n"
                 + "}\n\n"
                 + "function resetSearch() {\n"
-                + "  keyword.value = ''\n"
+                + "  Object.assign(query, " + renderTsInitialQuery(model) + ")\n"
                 + "  page.value = 1\n"
                 + "  void load()\n"
                 + "}\n\n"
@@ -725,10 +838,10 @@ public class CodegenApplicationService {
                 + "  }\n"
                 + "  await formRef.value.validate()\n"
                 + "  if (editingId.value === null) {\n"
-                + "    await create" + model.className() + "(form)\n"
+                + "    await create" + model.className() + "(toCreatePayload())\n"
                 + "    ElMessage.success('已创建')\n"
                 + "  } else {\n"
-                + "    await update" + model.className() + "(editingId.value, form)\n"
+                + "    await update" + model.className() + "(editingId.value, toUpdatePayload())\n"
                 + "    ElMessage.success('已更新')\n"
                 + "  }\n"
                 + "  formVisible.value = false\n"
@@ -740,15 +853,21 @@ public class CodegenApplicationService {
                 + "  ElMessage.success('已删除')\n"
                 + "  await load()\n"
                 + "}\n\n"
-                + "function toForm(row?: " + model.className() + "View): " + model.className() + "CrudRequest {\n"
+                + "function toForm(row?: " + model.className() + "View): " + model.className() + "CreateRequest & " + model.className() + "UpdateRequest {\n"
                 + renderTsToForm(model)
+                + "}\n\n"
+                + "function toCreatePayload(): " + model.className() + "CreateRequest {\n"
+                + renderTsPayload(model.insertColumns())
+                + "}\n\n"
+                + "function toUpdatePayload(): " + model.className() + "UpdateRequest {\n"
+                + renderTsPayload(model.editColumns())
                 + "}\n"
                 + "</script>\n";
     }
 
     private String renderVueColumns(CodegenModel model) {
         StringBuilder builder = new StringBuilder();
-        for (CodegenColumnView column : model.columns().stream().limit(8).toList()) {
+        for (CodegenColumnView column : model.listColumns()) {
             builder.append("        <el-table-column prop=\"")
                     .append(column.javaField())
                     .append("\" label=\"")
@@ -773,31 +892,102 @@ public class CodegenApplicationService {
     private String renderVueFormItems(CodegenModel model) {
         StringBuilder builder = new StringBuilder();
         for (CodegenColumnView column : model.editableColumns()) {
-            builder.append("        <el-form-item label=\"")
+            builder.append("        <el-form-item")
+                    .append(vueFormItemVisibility(column))
+                    .append(" label=\"")
                     .append(escapeVue(columnLabel(column)))
                     .append("\" prop=\"")
                     .append(column.javaField())
                     .append("\">\n")
-                    .append(vueInput(column))
+                    .append(vueInput("form", column))
                     .append("        </el-form-item>\n");
         }
         return builder.toString();
     }
 
-    private String vueInput(CodegenColumnView column) {
+    private String vueFormItemVisibility(CodegenColumnView column) {
+        if (column.insert() && column.edit()) {
+            return "";
+        }
+        if (column.insert()) {
+            return " v-if=\"editingId === null\"";
+        }
+        return " v-if=\"editingId !== null\"";
+    }
+
+    private String renderVueSearchItems(CodegenModel model) {
+        if (model.queryColumns().isEmpty()) {
+            return "        <el-empty description=\"暂无查询字段\" />\n";
+        }
+        StringBuilder builder = new StringBuilder();
+        for (CodegenColumnView column : model.queryColumns()) {
+            if (isBetweenQuery(column)) {
+                builder.append("        <el-form-item label=\"").append(escapeVue(columnLabel(column))).append("\">\n");
+                builder.append("          <div style=\"display: flex; gap: 8px\">\n");
+                builder.append(queryInput(queryRangeField(column, "Start"), column, "开始"));
+                builder.append(queryInput(queryRangeField(column, "End"), column, "结束"));
+                builder.append("          </div>\n");
+                builder.append("        </el-form-item>\n");
+            } else {
+                builder.append("        <el-form-item label=\"").append(escapeVue(columnLabel(column))).append("\">\n");
+                builder.append(queryInput(column.javaField(), column, "请输入" + columnLabel(column)));
+                builder.append("        </el-form-item>\n");
+            }
+        }
+        return builder.toString();
+    }
+
+    private String queryInput(String fieldName, CodegenColumnView column, String placeholder) {
+        return vueInput("query", fieldName, column, placeholder);
+    }
+
+    private String vueInput(String modelName, CodegenColumnView column) {
+        return vueInput(modelName, column.javaField(), column, "请输入" + columnLabel(column));
+    }
+
+    private String vueInput(String modelName, String fieldName, CodegenColumnView column, String placeholder) {
+        String modelPath = modelName + "." + fieldName;
+        String htmlType = column.htmlType();
+        if ("select".equals(htmlType)) {
+            return "          <el-select v-model=\"" + modelPath + "\" placeholder=\"" + escapeVue(placeholder) + "\" clearable style=\"width: 100%\">\n"
+                    + selectOptions(column)
+                    + "          </el-select>\n";
+        }
+        if ("textarea".equals(htmlType)) {
+            return "          <el-input v-model=\"" + modelPath + "\" type=\"textarea\" :rows=\"4\" placeholder=\"" + escapeVue(placeholder) + "\" clearable />\n";
+        }
+        if ("number".equals(htmlType)) {
+            return "          <el-input-number v-model=\"" + modelPath + "\" :min=\"0\" controls-position=\"right\" style=\"width: 100%\" />\n";
+        }
+        if ("datetime".equals(htmlType)) {
+            return "          <el-date-picker v-model=\"" + modelPath + "\" type=\"datetime\" value-format=\"YYYY-MM-DDTHH:mm:ss\" placeholder=\"" + escapeVue(placeholder) + "\" style=\"width: 100%\" />\n";
+        }
         if ("boolean".equals(column.tsType())) {
-            return "          <el-switch v-model=\"form." + column.javaField() + "\" />\n";
+            return "          <el-switch v-model=\"" + modelPath + "\" />\n";
         }
         if ("number".equals(column.tsType())) {
-            return "          <el-input-number v-model=\"form." + column.javaField() + "\" :min=\"0\" controls-position=\"right\" style=\"width: 100%\" />\n";
+            return "          <el-input-number v-model=\"" + modelPath + "\" :min=\"0\" controls-position=\"right\" style=\"width: 100%\" />\n";
         }
         if (isTemporal(column)) {
-            return "          <el-date-picker v-model=\"form." + column.javaField() + "\" type=\"datetime\" value-format=\"YYYY-MM-DDTHH:mm:ss\" style=\"width: 100%\" />\n";
+            return "          <el-date-picker v-model=\"" + modelPath + "\" type=\"datetime\" value-format=\"YYYY-MM-DDTHH:mm:ss\" placeholder=\"" + escapeVue(placeholder) + "\" style=\"width: 100%\" />\n";
         }
         if (column.columnType() != null && column.columnType().toLowerCase(Locale.ROOT).contains("text")) {
-            return "          <el-input v-model=\"form." + column.javaField() + "\" type=\"textarea\" :rows=\"4\" />\n";
+            return "          <el-input v-model=\"" + modelPath + "\" type=\"textarea\" :rows=\"4\" placeholder=\"" + escapeVue(placeholder) + "\" clearable />\n";
         }
-        return "          <el-input v-model=\"form." + column.javaField() + "\" />\n";
+        return "          <el-input v-model=\"" + modelPath + "\" placeholder=\"" + escapeVue(placeholder) + "\" clearable />\n";
+    }
+
+    private String selectOptions(CodegenColumnView column) {
+        if ("boolean".equals(column.tsType())) {
+            return "            <el-option label=\"是\" :value=\"true\" />\n"
+                    + "            <el-option label=\"否\" :value=\"false\" />\n";
+        }
+        if ("number".equals(column.tsType())) {
+            return "            <el-option label=\"选项一\" :value=\"1\" />\n"
+                    + "            <el-option label=\"选项二\" :value=\"2\" />\n";
+        }
+        return "            <el-option label=\"选项一\" value=\"option1\" />\n"
+                + "            <el-option label=\"选项二\" value=\"option2\" />\n";
     }
 
     private String renderTsInitialForm(CodegenModel model) {
@@ -812,9 +1002,36 @@ public class CodegenApplicationService {
         return builder.toString();
     }
 
-    private String renderTsRules(CodegenModel model) {
+    private String renderTsInitialQuery(CodegenModel model) {
+        if (model.queryColumns().isEmpty()) {
+            return "{}";
+        }
         StringBuilder builder = new StringBuilder("{\n");
-        for (CodegenColumnView column : model.editableColumns()) {
+        for (CodegenColumnView column : model.queryColumns()) {
+            if (isBetweenQuery(column)) {
+                builder.append("  ").append(queryRangeField(column, "Start")).append(": undefined,\n");
+                builder.append("  ").append(queryRangeField(column, "End")).append(": undefined,\n");
+            } else {
+                builder.append("  ").append(column.javaField()).append(": undefined,\n");
+            }
+        }
+        builder.append("}");
+        return builder.toString();
+    }
+
+    private String renderTsPayload(List<CodegenColumnView> columns) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("  return {\n");
+        for (CodegenColumnView column : columns) {
+            builder.append("    ").append(column.javaField()).append(": form.").append(column.javaField()).append(",\n");
+        }
+        builder.append("  }\n");
+        return builder.toString();
+    }
+
+    private String renderTsRules(List<CodegenColumnView> columns) {
+        StringBuilder builder = new StringBuilder("{\n");
+        for (CodegenColumnView column : columns) {
             if (requestRequired(column)) {
                 builder.append("  ").append(column.javaField()).append(": [{ required: true, message: '请输入")
                         .append(escapeTs(columnLabel(column)))
@@ -841,9 +1058,9 @@ public class CodegenApplicationService {
                 : "";
     }
 
-    private String renderApplyRequest(CodegenModel model) {
+    private String renderApplyRequest(List<CodegenColumnView> columns) {
         StringBuilder builder = new StringBuilder();
-        for (CodegenColumnView column : model.editableColumns()) {
+        for (CodegenColumnView column : columns) {
             builder.append("        entity.set").append(upperFirst(column.javaField())).append("(request.").append(column.javaField()).append("());\n");
         }
         return builder.toString();
@@ -863,26 +1080,41 @@ public class CodegenApplicationService {
                 : "";
     }
 
-    private String renderKeywordFilter(CodegenModel model) {
-        List<CodegenColumnView> keywordColumns = model.editableColumns().stream()
-                .filter(column -> "String".equals(column.javaType()))
-                .limit(3)
-                .toList();
-        if (keywordColumns.isEmpty()) {
+    private String renderQueryFilters(CodegenModel model) {
+        if (model.queryColumns().isEmpty()) {
             return "";
         }
         String entity = model.className() + "Entity";
         StringBuilder builder = new StringBuilder();
-        builder.append("        if (StringUtils.hasText(keyword)) {\n");
-        builder.append("            query.and(wrapper -> wrapper\n");
-        for (int i = 0; i < keywordColumns.size(); i++) {
-            CodegenColumnView column = keywordColumns.get(i);
-            builder.append(i == 0 ? "                    .like(" : "                    .or().like(")
-                    .append(entity)
-                    .append("::get")
-                    .append(upperFirst(column.javaField()))
-                    .append(", keyword)");
-            builder.append(i + 1 == keywordColumns.size() ? ");\n" : "\n");
+        builder.append("        if (request != null) {\n");
+        for (CodegenColumnView column : model.queryColumns()) {
+            String getter = entity + "::get" + upperFirst(column.javaField());
+            if (isBetweenQuery(column)) {
+                String start = queryRangeField(column, "Start");
+                String end = queryRangeField(column, "End");
+                builder.append("            if (request.").append(start).append("() != null) {\n");
+                builder.append("                query.ge(").append(getter).append(", request.").append(start).append("());\n");
+                builder.append("            }\n");
+                builder.append("            if (request.").append(end).append("() != null) {\n");
+                builder.append("                query.le(").append(getter).append(", request.").append(end).append("());\n");
+                builder.append("            }\n");
+            } else if (isLikeQuery(column)) {
+                if ("String".equals(column.javaType())) {
+                    builder.append("            if (StringUtils.hasText(request.").append(column.javaField()).append("())) {\n");
+                } else {
+                    builder.append("            if (request.").append(column.javaField()).append("() != null) {\n");
+                }
+                builder.append("                query.like(").append(getter).append(", request.").append(column.javaField()).append("());\n");
+                builder.append("            }\n");
+            } else {
+                if ("String".equals(column.javaType())) {
+                    builder.append("            if (StringUtils.hasText(request.").append(column.javaField()).append("())) {\n");
+                } else {
+                    builder.append("            if (request.").append(column.javaField()).append("() != null) {\n");
+                }
+                builder.append("                query.eq(").append(getter).append(", request.").append(column.javaField()).append("());\n");
+                builder.append("            }\n");
+            }
         }
         builder.append("        }\n");
         return builder.toString();
@@ -916,7 +1148,7 @@ public class CodegenApplicationService {
     }
 
     private boolean requestRequired(CodegenColumnView column) {
-        return !column.nullable() && column.columnDefault() == null && !column.autoIncrement();
+        return column.required() && !column.autoIncrement();
     }
 
     private String columnLabel(CodegenColumnView column) {
@@ -925,6 +1157,18 @@ public class CodegenApplicationService {
 
     private boolean isColumn(CodegenColumnView column, String columnName) {
         return column.columnName().equalsIgnoreCase(columnName);
+    }
+
+    private boolean isLikeQuery(CodegenColumnView column) {
+        return "LIKE".equalsIgnoreCase(column.queryType());
+    }
+
+    private boolean isBetweenQuery(CodegenColumnView column) {
+        return "BETWEEN".equalsIgnoreCase(column.queryType());
+    }
+
+    private String queryRangeField(CodegenColumnView column, String suffix) {
+        return column.javaField() + suffix;
     }
 
     private boolean isTemporal(CodegenColumnView column) {
@@ -949,6 +1193,14 @@ public class CodegenApplicationService {
             case "Long", "Integer", "Double", "java.math.BigDecimal" -> "number";
             case "Boolean" -> "boolean";
             default -> "string";
+        };
+    }
+
+    private String tsTypeFromJava(String javaType, String fallbackDataType) {
+        return switch (javaType) {
+            case "Long", "Integer", "Double", "java.math.BigDecimal" -> "number";
+            case "Boolean" -> "boolean";
+            default -> tsType(fallbackDataType == null ? "varchar" : fallbackDataType);
         };
     }
 

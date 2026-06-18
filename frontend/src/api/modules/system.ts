@@ -158,6 +158,11 @@ export async function queryNotices(params?: NoticeQueryParams) {
   return data.data
 }
 
+export async function fetchPublishedNotice(id: number) {
+  const { data } = await http.get<ApiResponse<NoticeView>>(`/api/system/notices/${id}/published`)
+  return data.data
+}
+
 export async function createNotice(payload: Record<string, unknown>) {
   const { data } = await http.post<ApiResponse<NoticeView>>('/api/system/notices', payload)
   return data.data

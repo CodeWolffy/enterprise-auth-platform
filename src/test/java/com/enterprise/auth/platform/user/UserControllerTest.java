@@ -97,7 +97,7 @@ class UserControllerTest {
                 passwordHasher.hash("UserTest@123"),
                 true,
                 Set.of(),
-                Set.of("upms:sysuser:get"),
+                Set.of("upms:sysuser:page"),
                 Set.of(),
                 DataScopeType.DEPT_AND_CHILDREN,
                 1
@@ -121,7 +121,7 @@ class UserControllerTest {
                 passwordHasher.hash("UserTest@123"),
                 true,
                 Set.of(),
-                Set.of("upms:sysuser:edit"),
+                Set.of("upms:sysuser:add"),
                 Set.of(),
                 DataScopeType.DEPT,
                 1
@@ -155,7 +155,7 @@ class UserControllerTest {
                 passwordHasher.hash("UserTest@123"),
                 true,
                 Set.of(),
-                Set.of("upms:sysuser:edit"),
+                Set.of("upms:sysuser:add"),
                 Set.of(),
                 DataScopeType.DEPT,
                 1
@@ -189,7 +189,7 @@ class UserControllerTest {
                 passwordHasher.hash("UserTest@123"),
                 true,
                 Set.of(),
-                Set.of("upms:sysuser:edit"),
+                Set.of("upms:sysuser:add"),
                 Set.of(),
                 DataScopeType.DEPT,
                 1

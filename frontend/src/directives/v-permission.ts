@@ -14,7 +14,7 @@ function checkPermission(el: HTMLElement, binding: DirectiveBinding<string | str
   const authStore = useAuthStore()
   const requiredPermissions = binding.value
 
-  if (!authStore.hasGrant(requiredPermissions)) {
+  if (!authStore.hasPermission(requiredPermissions)) {
     el.style.display = 'none'
     el.setAttribute('aria-hidden', 'true')
     return

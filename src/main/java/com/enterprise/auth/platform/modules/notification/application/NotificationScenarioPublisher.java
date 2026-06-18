@@ -17,9 +17,9 @@ import org.springframework.util.StringUtils;
 public class NotificationScenarioPublisher {
 
     private static final String WORKFLOW_TODO_LINK = "/platform/workflow/todo";
-    private static final String WORKFLOW_INSTANCE_LINK = "/platform/workflow/instances/my";
+    private static final String WORKFLOW_INSTANCE_LINK = "/platform/workflow/my-instances";
     private static final String ACCOUNT_PROFILE_LINK = "/account/profile";
-    private static final String SYSTEM_NOTICE_LINK = "/platform/notices";
+    private static final String SYSTEM_NOTICE_LINK = "/notices";
 
     private final NotificationPublisher notificationPublisher;
     private final UserQueryFacade userQueryFacade;
@@ -248,7 +248,7 @@ public class NotificationScenarioPublisher {
                 "系统公告：" + fallback(title, "公告"),
                 limit(fallback(stripHtml(content), "请查看系统公告详情。"), 500),
                 "INFO",
-                SYSTEM_NOTICE_LINK,
+                SYSTEM_NOTICE_LINK + "/" + noticeId,
                 Map.of("route", SYSTEM_NOTICE_LINK, "noticeId", noticeId),
                 Map.of("noticeId", noticeId),
                 "SYSTEM_NOTICE_PUBLISHED:" + noticeId,

@@ -1,5 +1,5 @@
 import type { RouteLocationNormalized } from 'vue-router'
-import { resolveRouteManifest } from '@/app/registry/module-manifest'
+import { resolveRouteManifest, resolveRouteManifestByPath } from '@/app/registry/module-manifest'
 import type { MenuItem, PermissionSnapshot } from '@/types/auth-models'
 
 interface RouteAccessTarget {
@@ -35,6 +35,10 @@ export function isAllowedRoute(snapshot: PermissionSnapshot | null, to: RouteAcc
     return false
   }
 
+  if (to.meta.skipMenuAccess) {
+    return hasRequiredGrant(snapshot, requiredGrant)
+  }
+
   if (to.meta.generatedRoute) {
     return isAllowedGeneratedRoute(snapshot, to.path)
   }
@@ -44,8 +48,8 @@ export function isAllowedRoute(snapshot: PermissionSnapshot | null, to: RouteAcc
     return true
   }
 
-  const allowedPaths = collectAllowedRoutePaths(snapshot.menus ?? [])
-  return allowedPaths.has(routePath) && hasRequiredGrant(snapshot, requiredGrant)
+  const menu = findMenuByPath(snapshot.menus ?? [], routePath)
+  return Boolean(menu) && hasRequiredGrant(snapshot, requiredGrant) && hasRequiredGrant(snapshot, resolveMenuRequiredGrant(menu))
 }
 
 function isAllowedGeneratedRoute(snapshot: PermissionSnapshot, path: string) {
@@ -53,7 +57,18 @@ function isAllowedGeneratedRoute(snapshot: PermissionSnapshot, path: string) {
   if (!routePath) {
     return false
   }
-  return collectAllowedRoutePaths(snapshot.menus ?? []).has(routePath)
+  return Boolean(findMenuByPath(snapshot.menus ?? [], routePath)) && hasRequiredGrant(snapshot, generatedPageGrant(routePath))
+}
+
+export function isAllowedMenuPath(snapshot: PermissionSnapshot | null, menu: MenuItem) {
+  if (!snapshot) {
+    return false
+  }
+  const path = normalizeRoutePath(menu.path)
+  if (!path) {
+    return false
+  }
+  return Boolean(findMenuByPath(snapshot.menus ?? [], path)) && hasRequiredGrant(snapshot, resolveMenuRequiredGrant(menu))
 }
 
 export function resolveFirstAllowedPath(snapshot: PermissionSnapshot | null) {
@@ -67,13 +82,44 @@ export function resolveFirstAllowedPath(snapshot: PermissionSnapshot | null) {
     if (!path) {
       continue
     }
-    const requiredGrant = resolveRouteManifest(menu.component?.trim() || menu.permission?.trim() || menu.code?.trim() || '')?.requiredGrant?.trim() ?? ''
+    const requiredGrant = resolveMenuRequiredGrant(menu)
     if (!hasRequiredGrant(snapshot, requiredGrant)) {
       continue
     }
     return path
   }
   return null
+}
+
+function resolveMenuRequiredGrant(menu: MenuItem) {
+  const path = normalizeRoutePath(menu.path)
+  return generatedPageGrant(path)
+    ?? resolveRouteManifestByPath(path)?.requiredGrant?.trim()
+    ?? resolveRouteManifest(menu.component?.trim() || menu.permission?.trim() || menu.code?.trim() || '')?.requiredGrant?.trim()
+    ?? ''
+}
+
+function findMenuByPath(menus: MenuItem[], targetPath: string) {
+  const normalizedTarget = normalizeRoutePath(targetPath)
+  const walk = (items: MenuItem[]): MenuItem | null => {
+    for (const item of items) {
+      if (normalizeRoutePath(item.path) === normalizedTarget) {
+        return item
+      }
+      const child = walk(item.children ?? [])
+      if (child) {
+        return child
+      }
+    }
+    return null
+  }
+  return walk(menus)
+}
+
+function generatedPageGrant(path?: string | null) {
+  const normalizedPath = normalizeRoutePath(path)
+  const match = normalizedPath.match(/^\/platform\/generated\/([^/]+)$/)
+  return match ? `${decodeURIComponent(match[1])}:page` : undefined
 }
 
 function hasRequiredGrant(snapshot: PermissionSnapshot, requiredGrant?: string | null) {

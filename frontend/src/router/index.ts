@@ -1,4 +1,4 @@
-﻿import { createRouter, createWebHistory, type RouteRecordName, type RouteRecordRaw } from 'vue-router'
+import { createRouter, createWebHistory, type RouteRecordName, type RouteRecordRaw } from 'vue-router'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import type { MenuItem, PermissionSnapshot } from '@/types/auth-models'
@@ -44,7 +44,13 @@ const SHELL_ROUTE: RouteRecordRaw = {
       path: 'account/profile',
       name: 'account-profile',
       component: () => import('@/views/account/AccountProfileView.vue'),
-      meta: { title: '个人中心', allowPasswordChangeRequired: true },
+      meta: { title: '个人中心', allowPasswordChangeRequired: true, skipMenuAccess: true },
+    },
+    {
+      path: 'notices/:id',
+      name: 'notice-detail',
+      component: () => import('@/views/system/NoticeDetailView.vue'),
+      meta: { title: '公告详情', skipMenuAccess: true },
     },
   ],
 }

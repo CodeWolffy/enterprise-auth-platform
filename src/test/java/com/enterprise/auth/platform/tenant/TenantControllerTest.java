@@ -412,8 +412,11 @@ class TenantControllerTest {
 
     private UserAccount principal(String authority) {
         java.util.LinkedHashSet<String> authorities = new java.util.LinkedHashSet<>();
+        authorities.add("upms:systenant:page");
         authorities.add("upms:systenant:get");
+        authorities.add("upms:systenant:add");
         authorities.add("upms:systenant:edit");
+        authorities.add("upms:systenant:del");
         authorities.add(authority);
         return new UserAccount(
                 1L,
