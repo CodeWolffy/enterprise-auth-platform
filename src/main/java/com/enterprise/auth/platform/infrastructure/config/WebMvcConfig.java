@@ -27,7 +27,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
             "/api/auth/captcha",
             "/api/auth/captcha/verify",
             "/api/auth/register/options",
-            "/api/files/public/**"
+            "/api/files/public/**",
+            // SSE 端点通过 query token 自行鉴权，跳过 SaToken 与用户上下文拦截器。
+            "/api/notifications/stream"
     );
 
     private final ObjectProvider<RateLimitInterceptor> rateLimitInterceptor;

@@ -4,6 +4,7 @@ import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.notification.application.NotificationInboxService;
 import com.enterprise.auth.platform.modules.notification.application.NotificationView;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -43,5 +44,10 @@ public class NotificationController {
     @PutMapping("/read-all")
     public ApiResponse<Long> markAllRead() {
         return ApiResponse.ok(notificationInboxService.markAllRead());
+    }
+
+    @DeleteMapping("/read")
+    public ApiResponse<Long> clearRead() {
+        return ApiResponse.ok(notificationInboxService.clearReadNotifications());
     }
 }

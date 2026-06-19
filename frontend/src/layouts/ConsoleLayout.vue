@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <el-container class="admin-layout" :class="{ 'admin-layout--page-fullscreen': isPageFullscreen }">
     <el-aside :width="isCollapse ? '64px' : '200px'" class="admin-aside">
       <div class="logo-box">
@@ -479,6 +479,8 @@ async function handleTenantChange(newTenantId: string) {
   try {
     await authStore.switchTenant(targetTenantId)
     await notificationBellRef.value?.loadUnreadNotificationCount()
+    // 租户切换后 SSE 连接的租户上下文已失效，需重新订阅以接收新租户的通知。
+    notificationBellRef.value?.startSseSubscription()
     const redirected = await settleRouteAfterTenantSwitch()
     if (!redirected) {
       ElMessage.success(`已切换到租户 ${authStore.tenantId}`)

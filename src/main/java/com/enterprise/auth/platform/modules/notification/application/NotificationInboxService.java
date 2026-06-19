@@ -82,6 +82,14 @@ public class NotificationInboxService {
                 .set(SysUserNotificationEntity::getReadAt, now));
     }
 
+    @Transactional
+    public long clearReadNotifications() {
+        UserAccount user = currentUserService.requireCurrentUser();
+        String tenantId = currentTenantId(user);
+        // 物理硬删除当前用户所有已读通知，释放存储空间。
+        return notificationMapper.hardDeleteReadNotifications(tenantId, user.id());
+    }
+
     private LambdaQueryWrapper<SysUserNotificationEntity> visibleMineWrapper(String tenantId, Long userId, Boolean read) {
         LocalDateTime now = TimeSupport.utcNowDateTime();
         LambdaQueryWrapper<SysUserNotificationEntity> wrapper = baseMineWrapper(tenantId, userId)

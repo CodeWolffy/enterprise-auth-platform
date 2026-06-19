@@ -22,17 +22,20 @@ public class NotificationPublisher {
     private final RoleQueryFacade roleQueryFacade;
     private final UserQueryFacade userQueryFacade;
     private final ObjectMapper objectMapper;
+    private final NotificationSseRegistry sseRegistry;
 
     public NotificationPublisher(
             SysUserNotificationMapper notificationMapper,
             RoleQueryFacade roleQueryFacade,
             UserQueryFacade userQueryFacade,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            NotificationSseRegistry sseRegistry
     ) {
         this.notificationMapper = notificationMapper;
         this.roleQueryFacade = roleQueryFacade;
         this.userQueryFacade = userQueryFacade;
         this.objectMapper = objectMapper;
+        this.sseRegistry = sseRegistry;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -76,6 +79,7 @@ public class NotificationPublisher {
             try {
                 notificationMapper.insert(entity);
                 published++;
+                sseRegistry.send(command.tenantId(), recipientUserId, NotificationView.from(entity));
             } catch (DuplicateKeyException ex) {
                 // 已由唯一约束兜底保证同一用户同一去重键只写入一次。
             }

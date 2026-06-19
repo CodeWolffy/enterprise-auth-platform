@@ -45,3 +45,17 @@ export async function markAllNotificationsRead() {
   const { data } = await http.put<ApiResponse<number>>('/api/notifications/read-all')
   return data.data
 }
+
+export async function clearReadNotifications() {
+  const { data } = await http.delete<ApiResponse<number>>('/api/notifications/read')
+  return data.data
+}
+
+/**
+ * 构造站内通知 SSE 订阅地址。
+ * 浏览器原生 EventSource 无法携带自定义 Authorization 头，因此通过 query token 鉴权。
+ */
+export function buildNotificationStreamUrl(token: string): string {
+  const base = (http.defaults.baseURL || '').replace(/\/$/, '')
+  return `${base}/api/notifications/stream?token=${encodeURIComponent(token)}`
+}
