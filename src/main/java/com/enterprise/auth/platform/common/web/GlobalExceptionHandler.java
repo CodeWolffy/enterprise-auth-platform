@@ -226,7 +226,9 @@ public class GlobalExceptionHandler {
                     "userAgent", String.valueOf(request.getHeader("User-Agent"))
             );
             auditService.record("SECURITY_ACCESS_DENIED", operator, tenantId, payload);
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            log.debug("Failed to record security deny audit event. method={}, path={}, error={}",
+                    request.getMethod(), request.getRequestURI(), ex.getMessage());
         }
     }
 }

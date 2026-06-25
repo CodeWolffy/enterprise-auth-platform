@@ -111,7 +111,7 @@
 
       <footer v-if="notificationPage.total > notificationPage.size" class="notification-panel__footer">
         <el-pagination
-          small
+          size="small"
           background
           layout="prev, pager, next"
           :current-page="notificationPage.page"

@@ -146,7 +146,7 @@ public class TenantProfileFacade {
         return capability.getCapabilityDesc();
     }
 
-    // Projection methods for cross-module use (no infrastructure entity exposure)
+    // 投影方法，供跨模块使用（不暴露基础设施实体）
 
     public List<TenantRecord> listTenantRecords() {
         return listTenants().stream()

@@ -19,6 +19,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
@@ -26,6 +28,8 @@ import org.springframework.stereotype.Repository;
 @Primary
 @Repository
 public class DatabaseUserRepository implements UserRepository {
+
+    private static final Logger log = LoggerFactory.getLogger(DatabaseUserRepository.class);
 
     private final SysUserMapper sysUserMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
@@ -152,9 +156,13 @@ public class DatabaseUserRepository implements UserRepository {
     }
 
     private DataScopeType parseScope(String value) {
+        if (!org.springframework.util.StringUtils.hasText(value)) {
+            return DataScopeType.SELF;
+        }
         try {
             return DataScopeType.valueOf(value);
-        } catch (Exception ignored) {
+        } catch (IllegalArgumentException ex) {
+            log.debug("未知的用户数据范围类型，回退为 SELF。value={}", value);
             return DataScopeType.SELF;
         }
     }

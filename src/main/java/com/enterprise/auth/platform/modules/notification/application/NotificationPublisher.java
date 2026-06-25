@@ -5,10 +5,13 @@ import com.enterprise.auth.platform.modules.notification.infrastructure.entity.S
 import com.enterprise.auth.platform.modules.notification.infrastructure.mapper.SysUserNotificationMapper;
 import com.enterprise.auth.platform.modules.role.application.RoleQueryFacade;
 import com.enterprise.auth.platform.modules.user.application.UserQueryFacade;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -17,6 +20,8 @@ import org.springframework.util.StringUtils;
 
 @Service
 public class NotificationPublisher {
+
+    private static final Logger log = LoggerFactory.getLogger(NotificationPublisher.class);
 
     private final SysUserNotificationMapper notificationMapper;
     private final RoleQueryFacade roleQueryFacade;
@@ -127,7 +132,8 @@ public class NotificationPublisher {
         }
         try {
             return objectMapper.writeValueAsString(value);
-        } catch (Exception ex) {
+        } catch (JsonProcessingException ex) {
+            log.debug("通知载荷序列化失败，将忽略该载荷。keys={}，error={}", value.keySet(), ex.getMessage());
             return null;
         }
     }

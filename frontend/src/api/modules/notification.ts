@@ -51,11 +51,21 @@ export async function clearReadNotifications() {
   return data.data
 }
 
+export interface NotificationStreamTicket {
+  ticket: string
+  expiresAt: number
+}
+
+export async function createNotificationStreamTicket() {
+  const { data } = await http.post<ApiResponse<NotificationStreamTicket>>('/api/notifications/stream-ticket')
+  return data.data
+}
+
 /**
  * 构造站内通知 SSE 订阅地址。
- * 浏览器原生 EventSource 无法携带自定义 Authorization 头，因此通过 query token 鉴权。
+ * 浏览器原生 EventSource 无法携带自定义 Authorization 头，因此通过短期一次性 ticket 鉴权。
  */
-export function buildNotificationStreamUrl(token: string): string {
+export function buildNotificationStreamUrl(ticket: string): string {
   const base = (http.defaults.baseURL || '').replace(/\/$/, '')
-  return `${base}/api/notifications/stream?token=${encodeURIComponent(token)}`
+  return `${base}/api/notifications/stream?ticket=${encodeURIComponent(ticket)}`
 }

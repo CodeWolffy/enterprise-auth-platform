@@ -307,9 +307,11 @@ import {
   deleteUser,
   queryAssignedRoles,
   queryDepartments,
+  queryPasswordPolicy,
   queryRoles,
   queryUsers,
   updateUser,
+  type SecurityPasswordPolicy,
 } from '@/api/modules'
 import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { RoleView } from '@/types/role'
@@ -354,6 +356,49 @@ const userForm = reactive({
   roleCodes: [] as string[],
 })
 
+const defaultPasswordPolicy: SecurityPasswordPolicy = {
+  passwordMinLength: 8,
+  passwordMaxLength: 64,
+  passwordRequireLetter: true,
+  passwordRequireNumber: true,
+  passwordRequireSpecial: false,
+}
+const passwordPolicy = ref<SecurityPasswordPolicy>(defaultPasswordPolicy)
+
+function passwordPolicyMessage(policy = passwordPolicy.value) {
+  const requirements = [`长度需在 ${policy.passwordMinLength} 到 ${policy.passwordMaxLength} 位之间`]
+  if (policy.passwordRequireLetter) {
+    requirements.push('包含字母')
+  }
+  if (policy.passwordRequireNumber) {
+    requirements.push('包含数字')
+  }
+  if (policy.passwordRequireSpecial) {
+    requirements.push('包含特殊字符')
+  }
+  requirements.push('不能包含空白字符')
+  return `密码${requirements.join('，')}`
+}
+
+function validatePasswordByPolicy(value: string, policy = passwordPolicy.value) {
+  if (value.length < policy.passwordMinLength || value.length > policy.passwordMaxLength) {
+    return false
+  }
+  if (/\s/.test(value)) {
+    return false
+  }
+  if (policy.passwordRequireLetter && !/[A-Za-z]/.test(value)) {
+    return false
+  }
+  if (policy.passwordRequireNumber && !/\d/.test(value)) {
+    return false
+  }
+  if (policy.passwordRequireSpecial && !/[^A-Za-z\d\s]/.test(value)) {
+    return false
+  }
+  return true
+}
+
 const userRules = reactive<FormRules>({
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   mobile: [
@@ -371,8 +416,8 @@ const userRules = reactive<FormRules>({
           callback(new Error('请输入初始密码'))
           return
         }
-        if (value && !/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/.test(value)) {
-          callback(new Error('密码至少8位，包含字母和数字'))
+        if (value && !validatePasswordByPolicy(String(value))) {
+          callback(new Error(passwordPolicyMessage()))
           return
         }
         callback()
@@ -426,7 +471,19 @@ const userTablePrefs = useTablePreferences('eap.table.users', [
   { key: 'actions', label: '操作', width: 320 },
 ])
 
-void load()
+void bootstrap()
+
+async function bootstrap() {
+  await Promise.all([loadPasswordPolicy(), load()])
+}
+
+async function loadPasswordPolicy() {
+  try {
+    passwordPolicy.value = await queryPasswordPolicy()
+  } catch {
+    passwordPolicy.value = defaultPasswordPolicy
+  }
+}
 
 async function load() {
   loading.value = true
@@ -542,7 +599,7 @@ async function submitRoleAssignment() {
     ElMessage.success('用户角色已更新')
     await load()
   } catch {
-    // Error message is handled by the unified http interceptor.
+    // 错误信息由统一的 HTTP 拦截器处理。
   }
 }
 
@@ -551,8 +608,7 @@ function promptResetPassword(row: UserSummary) {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     inputType: 'password',
-    inputPattern: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,64}$/,
-    inputErrorMessage: '密码至少8位，包含字母和数字',
+    inputValidator: (value) => validatePasswordByPolicy(value) || passwordPolicyMessage(),
   })
     .then(async ({ value }) => {
       await updateUser(row.id, {

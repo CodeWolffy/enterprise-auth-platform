@@ -82,6 +82,13 @@ function redirectToLogin(reason?: string) {
   window.location.href = `/login${query ? `?${query}` : ''}`
 }
 
+function redirectToPasswordChange() {
+  if (typeof window === 'undefined' || window.location.pathname === '/account/profile') {
+    return
+  }
+  window.location.href = '/account/profile'
+}
+
 function isAuthEndpoint(url: string) {
   return url.includes('/api/auth/login')
     || url.includes('/api/auth/register')
@@ -127,10 +134,9 @@ http.interceptors.response.use(
 
     releaseAbortController(requestConfig)
 
+    const code = responseCode(error)
+
     if (error.response?.status === 401 && !isAuthEndpoint(requestUrl)) {
-      const code = error.response?.data && typeof error.response.data === 'object' && 'code' in error.response.data
-        ? error.response.data.code
-        : undefined
       const reason = typeof code === 'string' ? code : 'UNAUTHORIZED'
       authStore.clearSession()
       if (!silentAuthFailure) {
@@ -141,6 +147,14 @@ http.interceptors.response.use(
     }
 
     if (error.response?.status === 403) {
+      if (code === 'PASSWORD_CHANGE_REQUIRED') {
+        authStore.requirePasswordChange(authStore.passwordChangeReason || 'PASSWORD_CHANGE_REQUIRED')
+        if (!suppressErrorMessage && window.location.pathname !== '/account/profile') {
+          showError(resolveResponseMessage(error, '当前会话必须先修改密码'))
+        }
+        redirectToPasswordChange()
+        return Promise.reject(error)
+      }
       if (!suppressErrorMessage) {
         showError(resolveResponseMessage(error, '无权限访问'))
       }
@@ -191,6 +205,14 @@ function resolveResponseMessage(error: AxiosError, fallback: string) {
     return data.message
   }
   return fallback
+}
+
+function responseCode(error: AxiosError) {
+  const data = error.response?.data
+  if (data && typeof data === 'object' && 'code' in data && typeof data.code === 'string') {
+    return data.code
+  }
+  return undefined
 }
 
 function authFailureMessage(code: string) {

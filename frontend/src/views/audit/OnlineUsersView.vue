@@ -209,7 +209,7 @@ async function kickSession(sessionId: string) {
     ElMessage.success('会话已下线')
     await load()
   } catch {
-    // Cancelled by user or handled by the HTTP interceptor.
+    // 用户取消操作，或由 HTTP 拦截器统一处理。
   }
 }
 

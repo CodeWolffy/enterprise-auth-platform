@@ -8,6 +8,7 @@ import com.enterprise.auth.platform.modules.codegen.infrastructure.entity.Codege
 import com.enterprise.auth.platform.modules.codegen.infrastructure.mapper.CodegenTemplateMapper;
 import java.util.List;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -135,7 +136,7 @@ public class CodegenTemplateService {
         }
         try {
             return Pattern.compile(pattern).matcher(path).find();
-        } catch (Exception ex) {
+        } catch (PatternSyntaxException ex) {
             return path.contains(pattern);
         }
     }

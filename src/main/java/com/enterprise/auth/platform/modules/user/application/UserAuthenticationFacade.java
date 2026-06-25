@@ -57,7 +57,7 @@ public class UserAuthenticationFacade {
             try {
                 return Optional.of(objectMapper.convertValue(map, AuthenticationUser.class));
             } catch (Exception ex) {
-                log.debug("Failed to convert cached user data to AuthenticationUser", ex);
+                log.debug("缓存用户数据转换为 AuthenticationUser 失败", ex);
             }
         }
         return Optional.empty();

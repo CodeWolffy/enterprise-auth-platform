@@ -87,7 +87,7 @@ public class SessionIndexService {
             redisTemplate.expire(allSessionsKey(), indexTtl());
             redisTemplate.expire(userSessionsKey(userId), indexTtl());
         } catch (RuntimeException ex) {
-            log.warn("Failed to register session index. token={}, error={}", token, ex.getMessage());
+            log.warn("注册会话索引失败。token={}，error={}", token, ex.getMessage());
         }
     }
 
@@ -110,7 +110,7 @@ public class SessionIndexService {
             redisTemplate.opsForZSet().add(userSessionsKey(String.valueOf(userId)), token, lastAccessAt);
             return true;
         } catch (RuntimeException ex) {
-            log.debug("Failed to touch session index. token={}, error={}", token, ex.getMessage());
+            log.debug("刷新会话索引失败。token={}，error={}", token, ex.getMessage());
             return false;
         }
     }
@@ -128,7 +128,7 @@ public class SessionIndexService {
             redisTemplate.opsForHash().put(sessionKey, "activeTenantId", activeTenantId);
             redisTemplate.expire(sessionKey, indexTtl());
         } catch (RuntimeException ex) {
-            log.debug("Failed to update active tenant in session index. token={}, error={}", token, ex.getMessage());
+            log.debug("更新会话索引中的活跃租户失败。token={}，error={}", token, ex.getMessage());
         }
     }
 
@@ -149,7 +149,7 @@ public class SessionIndexService {
             }
             redisTemplate.delete(sessionKey);
         } catch (RuntimeException ex) {
-            log.debug("Failed to remove session index. token={}, error={}", token, ex.getMessage());
+            log.debug("移除会话索引失败。token={}，error={}", token, ex.getMessage());
         }
     }
 
@@ -170,7 +170,7 @@ public class SessionIndexService {
             }
             redisTemplate.delete(userKey);
         } catch (RuntimeException ex) {
-            log.debug("Failed to remove user session index. userId={}, error={}", userId, ex.getMessage());
+            log.debug("移除用户会话索引失败。userId={}，error={}", userId, ex.getMessage());
         }
     }
 
@@ -186,7 +186,7 @@ public class SessionIndexService {
       Long total = redisTemplate.opsForZSet().zCard(allSessionsKey());
       return Optional.of(total == null ? 0L : total);
     } catch (RuntimeException ex) {
-      log.warn("Failed to count session index. error={}", ex.getMessage());
+      log.warn("统计会话索引失败。error={}", ex.getMessage());
       return Optional.empty();
     }
   }
@@ -223,7 +223,7 @@ public class SessionIndexService {
       }
       return Optional.of(total);
     } catch (RuntimeException ex) {
-      log.warn("Failed to count visible session index. error={}", ex.getMessage());
+      log.warn("统计可见会话索引失败。error={}", ex.getMessage());
       return Optional.empty();
     }
   }
@@ -250,7 +250,7 @@ public class SessionIndexService {
           .toList();
       return Optional.of(new Page(total, sessions));
     } catch (RuntimeException ex) {
-      log.warn("Failed to read session index. error={}", ex.getMessage());
+      log.warn("读取会话索引失败。error={}", ex.getMessage());
       return Optional.empty();
     }
   }
@@ -281,7 +281,7 @@ public class SessionIndexService {
           .toList();
       return Optional.of(new Page(total, sessions));
     } catch (RuntimeException ex) {
-      log.warn("Failed to read user session index. userId={}, error={}", userId, ex.getMessage());
+      log.warn("读取用户会话索引失败。userId={}，error={}", userId, ex.getMessage());
       return Optional.empty();
     }
   }

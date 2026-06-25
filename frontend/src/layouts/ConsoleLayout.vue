@@ -55,8 +55,8 @@
           </div>
 
           <div class="header-actions">
-            <NotificationBell ref="notificationBellRef" />
-            <el-tooltip content="在线设备管理" placement="bottom">
+            <NotificationBell v-if="!authStore.passwordChangeRequired" ref="notificationBellRef" />
+            <el-tooltip v-if="!authStore.passwordChangeRequired" content="在线设备管理" placement="bottom">
               <el-icon class="action-icon" title="在线设备管理" data-testid="header-online-devices" @click="openSessions"><Monitor /></el-icon>
             </el-tooltip>
             <el-icon class="action-icon" title="设置"><Setting /></el-icon>
@@ -296,7 +296,7 @@ const avatarName = computed(() => {
 })
 const routerViewKey = computed(() => `${route.fullPath}:${authStore.tenantId}:${routerViewRefreshKey.value}`)
 
-// tags view simplified
+// 简化的标签页视图
 const CACHED_VIEWS_KEY = 'ea_visited_views_cache'
 const cachedViews = sessionStorage.getItem(CACHED_VIEWS_KEY)
 const visitedViews = ref<{ path: string; title: string }[]>(
@@ -436,7 +436,7 @@ function resolveTagIcon(tag: { path: string; title: string }) {
   return Document
 }
 
-// tenant loading
+// 租户加载
 const tenantOptions = ref<Array<{ tenantId: string; name: string }>>([])
 const canLoadTenants = computed(() => {
   return authStore.canSwitchTenant && Boolean(authStore.snapshot?.grants.includes('upms:systenant:page'))
@@ -449,6 +449,9 @@ const tenantSelectWidth = computed(() => {
 })
 
 onMounted(() => {
+  if (authStore.passwordChangeRequired) {
+    return
+  }
   notificationBellRef.value?.loadUnreadNotificationCount()
   if (canLoadTenants.value) {
     loadTenantOptions()
@@ -469,7 +472,7 @@ async function loadTenantOptions() {
     const page = await queryTenants({ page: 1, size: 200 }, { silentAuthFailure: true, suppressErrorMessage: true })
     tenantOptions.value = page.records ?? []
   } catch {
-    // Tenant selector is optional; header still works when tenant loading fails.
+    // 租户选择器为可选功能，租户加载失败时顶部栏仍可正常工作。
   }
 }
 
@@ -544,11 +547,18 @@ async function handleLogout() {
 }
 
 async function openSessions() {
+  if (authStore.passwordChangeRequired) {
+    return
+  }
   sessionsVisible.value = true
   await loadSessions()
 }
 
 async function loadSessions() {
+  if (authStore.passwordChangeRequired) {
+    sessionsList.value = []
+    return
+  }
   sessionsLoading.value = true
   try {
     const sessions = await querySessions('own')
@@ -565,7 +575,7 @@ async function kickSession(sessionId: string) {
     ElMessage.success('设备已下线')
     await loadSessions()
   } catch {
-    // User cancelled the confirmation dialog.
+    // 用户取消了确认对话框。
   }
 }
 
@@ -1063,7 +1073,7 @@ function formatDevice(raw?: string) {
   padding: 16px;
 }
 
-/* Transitions */
+/* 过渡动画 */
 .logo-fade-enter-active,
 .logo-fade-leave-active {
   transition: opacity 0.2s;

@@ -15,11 +15,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 @Service
 public class CatalogService {
+
+    private static final Logger log = LoggerFactory.getLogger(CatalogService.class);
 
     private final RoleCatalogFacade roleCatalogFacade;
     private final DeptCatalogFacade deptCatalogFacade;
@@ -128,9 +132,13 @@ public class CatalogService {
     }
 
     private DataScopeType parseScope(String scopeType) {
+        if (!StringUtils.hasText(scopeType)) {
+            return DataScopeType.SELF;
+        }
         try {
             return DataScopeType.valueOf(scopeType);
-        } catch (Exception ignored) {
+        } catch (IllegalArgumentException ex) {
+            log.debug("未知的目录数据范围类型，回退为 SELF。value={}", scopeType);
             return DataScopeType.SELF;
         }
     }

@@ -46,6 +46,11 @@ export const useSessionStore = defineStore('session', () => {
     passwordChangeReason.value = null
   }
 
+  function requirePasswordChange(reason?: string | null) {
+    passwordChangeRequired.value = true
+    passwordChangeReason.value = reason ?? null
+  }
+
   function clearSessionState() {
     authenticated.value = false
     token.value = ''
@@ -63,6 +68,7 @@ export const useSessionStore = defineStore('session', () => {
     isAuthenticated,
     setSession,
     restoreSession,
+    requirePasswordChange,
     clearPasswordChangeRequirement,
     clearSessionState,
   }

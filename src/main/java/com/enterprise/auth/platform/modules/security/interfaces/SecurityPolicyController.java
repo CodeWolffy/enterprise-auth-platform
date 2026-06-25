@@ -25,6 +25,12 @@ public class SecurityPolicyController {
         this.securityPolicyApplicationService = securityPolicyApplicationService;
     }
 
+    @Operation(summary = "查询当前租户密码策略")
+    @GetMapping("/password-policy")
+    public ApiResponse<SecurityPolicyView> passwordPolicy() {
+        return ApiResponse.ok(securityPolicyApplicationService.currentTenantPolicyView());
+    }
+
     @Operation(summary = "查询当前租户生效安全策略")
     @GetMapping
     @SaCheckPermission(PermissionCodes.SECURITY_GET)

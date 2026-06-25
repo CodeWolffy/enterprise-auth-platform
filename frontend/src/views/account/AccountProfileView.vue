@@ -21,8 +21,8 @@
         </div>
       </div>
       <div class="hero-actions">
-        <el-button :loading="loading" @click="loadProfile">刷新资料</el-button>
-        <el-button type="primary" @click="openSessionDrawer">在线设备</el-button>
+        <el-button :loading="loading" :disabled="isForcedPasswordChange" @click="loadProfile">刷新资料</el-button>
+        <el-button type="primary" :disabled="isForcedPasswordChange" @click="openSessionDrawer">在线设备</el-button>
       </div>
     </div>
 
@@ -158,7 +158,7 @@
           <template #header>
             <div class="card-head">
               <span>账号与安全</span>
-              <el-button link type="primary" @click="openSessionDrawer">管理设备</el-button>
+              <el-button link type="primary" :disabled="isForcedPasswordChange" @click="openSessionDrawer">管理设备</el-button>
             </div>
           </template>
 
@@ -427,6 +427,9 @@ const timelineItems = computed(() => [
 ])
 
 async function loadProfile() {
+  if (isForcedPasswordChange.value) {
+    return
+  }
   loading.value = true
   try {
     const nextProfile = await fetchAccountProfile()
@@ -578,11 +581,18 @@ function validatePasswordComposition(value: string) {
 }
 
 async function openSessionDrawer() {
+  if (isForcedPasswordChange.value) {
+    return
+  }
   sessionDrawerVisible.value = true
   await loadSessions()
 }
 
 async function loadSessions() {
+  if (isForcedPasswordChange.value) {
+    sessionsList.value = []
+    return
+  }
   sessionsLoading.value = true
   try {
     const sessions = await querySessions('own')

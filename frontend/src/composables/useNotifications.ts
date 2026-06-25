@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import {
   buildNotificationStreamUrl,
   clearReadNotifications,
+  createNotificationStreamTicket,
   markAllNotificationsRead,
   markNotificationRead as markNotificationReadRequest,
   queryNotifications,
@@ -141,15 +142,24 @@ export function useNotifications() {
     void loadUnreadNotificationCount()
   }
 
-  function startSseSubscription() {
+  async function startSseSubscription() {
     closeSseSubscription()
-    const token = authStore.token
-    if (!token) {
+    if (!authStore.token) {
       return
     }
     sseManualClose = false
+    let streamTicket: string
     try {
-      sseSource = new EventSource(buildNotificationStreamUrl(token))
+      streamTicket = (await createNotificationStreamTicket()).ticket
+    } catch {
+      scheduleSseReconnect()
+      return
+    }
+    if (sseManualClose || !authStore.token) {
+      return
+    }
+    try {
+      sseSource = new EventSource(buildNotificationStreamUrl(streamTicket))
     } catch {
       scheduleSseReconnect()
       return
@@ -199,7 +209,7 @@ export function useNotifications() {
     sseReconnectTimer = setTimeout(() => {
       sseReconnectTimer = null
       if (!sseManualClose && authStore.token) {
-        startSseSubscription()
+        void startSseSubscription()
       }
     }, 5000)
   }
@@ -234,7 +244,7 @@ export function useNotifications() {
 
   onMounted(() => {
     window.addEventListener('focus', handleWindowFocus)
-    startSseSubscription()
+    void startSseSubscription()
   })
 
   onBeforeUnmount(() => {

@@ -19,6 +19,7 @@ import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfTas
 import com.enterprise.auth.platform.modules.workflow.infrastructure.mapper.WfProcessInstanceMapper;
 import com.enterprise.auth.platform.modules.workflow.infrastructure.mapper.WfTaskMapper;
 import com.enterprise.auth.platform.modules.workflow.infrastructure.mapper.WfTaskUrgeMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
@@ -344,7 +345,7 @@ public class WorkflowTaskUrgeService {
             try {
                 notificationPublisher.publish(command);
             } catch (Exception ex) {
-                log.warn("Failed to publish workflow urge notification. tenantId={}, bizId={}, dedupKey={}",
+                log.warn("流程催办通知发布失败。tenantId={}，bizId={}，dedupKey={}",
                         command.tenantId(), command.bizId(), command.dedupKey(), ex);
             }
         };
@@ -367,7 +368,8 @@ public class WorkflowTaskUrgeService {
         try {
             Set<Long> values = objectMapper.readValue(json, LONG_SET_TYPE);
             return values == null ? Set.of() : values;
-        } catch (Exception ex) {
+        } catch (JsonProcessingException ex) {
+            log.debug("流程候选用户 ID 解析失败，返回空集合。error={}", ex.getMessage());
             return Set.of();
         }
     }
@@ -379,7 +381,8 @@ public class WorkflowTaskUrgeService {
         try {
             Set<String> values = objectMapper.readValue(json, STRING_SET_TYPE);
             return values == null ? Set.of() : values;
-        } catch (Exception ex) {
+        } catch (JsonProcessingException ex) {
+            log.debug("流程候选组编码解析失败，返回空集合。error={}", ex.getMessage());
             return Set.of();
         }
     }

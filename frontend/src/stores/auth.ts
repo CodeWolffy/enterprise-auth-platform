@@ -2,12 +2,11 @@ import { computed } from 'vue'
 import { defineStore } from 'pinia'
 import { ElMessage } from 'element-plus'
 import { fetchPermissionSnapshot, loginWithPassword, logoutCurrentSession, switchTenant as switchTenantSession } from '@/api/modules'
+import { AUTH_SESSION_STORAGE_KEY } from '@/config/storageKeys'
 import type { PermissionSnapshot } from '@/types/auth-models'
 import { usePermissionSnapshotStore } from './permissionSnapshot'
 import { useSessionStore } from './session'
 import { useTenantSessionStore } from './tenantSession'
-
-const storageKey = 'eap.frontend.auth'
 
 interface PersistedSession {
   authenticated: boolean
@@ -47,7 +46,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function restore() {
-    const raw = sessionStorage.getItem(storageKey)
+    const raw = sessionStorage.getItem(AUTH_SESSION_STORAGE_KEY)
     if (!raw) {
       return
     }
@@ -55,14 +54,14 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       parsed = JSON.parse(raw) as PersistedSession
     } catch {
-      sessionStorage.removeItem(storageKey)
+      sessionStorage.removeItem(AUTH_SESSION_STORAGE_KEY)
       return
     }
     sessionStore.restoreSession(parsed)
     tenantStore.restoreTenant(parsed)
     permissionStore.setSnapshot(parsed.snapshot)
     tenantStore.syncTenantFromSnapshot(parsed.snapshot)
-    sessionStorage.setItem(storageKey, raw)
+    sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, raw)
   }
 
   function persist() {
@@ -76,7 +75,7 @@ export const useAuthStore = defineStore('auth', () => {
       operatorTenantId: tenantStore.operatorTenantId,
       snapshot: permissionStore.snapshot,
     }
-    sessionStorage.setItem(storageKey, JSON.stringify(payload))
+    sessionStorage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(payload))
   }
 
   async function login(payload: {
@@ -158,15 +157,24 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-    function clearSession() {
+  function clearSession() {
     sessionStore.clearSessionState()
     tenantStore.clearTenantState()
     permissionStore.clearSnapshot()
-    sessionStorage.removeItem(storageKey)
+    sessionStorage.removeItem(AUTH_SESSION_STORAGE_KEY)
   }
 
   function clearPasswordChangeRequirement() {
     sessionStore.clearPasswordChangeRequirement()
+    persist()
+  }
+
+  function requirePasswordChange(reason?: string | null) {
+    if (!sessionStore.authenticated) {
+      return
+    }
+    sessionStore.requirePasswordChange(reason)
+    permissionStore.clearSnapshot()
     persist()
   }
 
@@ -176,7 +184,7 @@ export const useAuthStore = defineStore('auth', () => {
         await logoutCurrentSession()
       }
     } catch {
-      // Keep local logout reliable even when backend logout fails.
+      // 即使后端登出失败，也要保证本地登出可靠执行。
     }
     clearSession()
     ElMessage.success('已退出当前会话')
@@ -201,6 +209,7 @@ export const useAuthStore = defineStore('auth', () => {
     bootstrapSnapshot,
     login,
     switchTenant,
+    requirePasswordChange,
     clearPasswordChangeRequirement,
     clearSession,
     logout,

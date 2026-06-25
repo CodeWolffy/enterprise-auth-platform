@@ -17,12 +17,15 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 @Service
 public class SessionApplicationService {
 
+    private static final Logger log = LoggerFactory.getLogger(SessionApplicationService.class);
     private static final int SESSION_RESULT_LIMIT = 200;
 
     private final AuditEventPublisher auditEventPublisher;
@@ -158,6 +161,7 @@ public class SessionApplicationService {
         try {
             return Optional.of(toSessionResponse(token, fallbackUser, currentToken));
         } catch (Exception e) {
+            log.debug("构建会话列表时跳过无效会话。token={}，error={}", token, e.getMessage());
             sessionIndexService.remove(token);
             return Optional.empty();
         }
@@ -169,7 +173,9 @@ public class SessionApplicationService {
         }
         try {
             return dataScopeService.canAccessUser(entry.response().tenantId(), entry.userId());
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            log.debug("解析会话用户数据权限失败。tenantId={}，userId={}，error={}",
+                    entry.response().tenantId(), entry.userId(), ex.getMessage());
             return false;
         }
     }
@@ -209,7 +215,8 @@ public class SessionApplicationService {
     private boolean isSessionActive(String token) {
         try {
             return StpUtil.stpLogic.getLoginIdByToken(token) != null;
-        } catch (Exception ignored) {
+        } catch (Exception ex) {
+            log.debug("检查会话活跃状态失败。token={}，error={}", token, ex.getMessage());
             return false;
         }
     }
@@ -273,8 +280,9 @@ public class SessionApplicationService {
             if (lastAccessAt > 0) {
                 payload.put("lastAccessAt", lastAccessAt);
             }
-        } catch (Exception ignored) {
-            // Keep logout/offline operations reliable even if token-session metadata has been cleaned.
+        } catch (Exception ex) {
+            log.debug("构建会话审计载荷失败。sessionId={}，error={}", sessionId, ex.getMessage());
+            // 即使令牌会话元数据已被清理，也要保证登出/下线操作可靠执行。
         }
         return payload;
     }

@@ -88,7 +88,8 @@ public class SaTokenUserContextInterceptor implements HandlerInterceptor {
             return;
         }
         String path = request.getRequestURI();
-        if ("POST".equalsIgnoreCase(request.getMethod()) && "/api/account/password/change".equals(path)) {
+        if ("POST".equalsIgnoreCase(request.getMethod())
+                && ("/api/account/password/change".equals(path) || "/api/auth/logout".equals(path))) {
             return;
         }
         throw new BusinessException("PASSWORD_CHANGE_REQUIRED", "当前会话必须先修改密码");

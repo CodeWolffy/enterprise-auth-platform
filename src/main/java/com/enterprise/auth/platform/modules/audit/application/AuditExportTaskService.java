@@ -23,6 +23,7 @@ import java.io.ByteArrayOutputStream;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -45,6 +46,7 @@ import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.ExcelWriter;
 import com.alibaba.excel.write.metadata.WriteSheet;
 import com.enterprise.auth.platform.modules.audit.interfaces.AuditExportVO;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 @Service
 public class AuditExportTaskService {
@@ -599,7 +601,8 @@ public class AuditExportTaskService {
                     1,
                     AuditQuery.EXPORT_PAGE_SIZE
             );
-        } catch (Exception ex) {
+        } catch (JsonProcessingException | DateTimeParseException ex) {
+            log.warn("审计导出任务查询条件解析失败。taskId={}，error={}", entity.getId(), ex.getMessage());
             throw new BusinessException("审计导出任务处理失败，请稍后重试");
         }
     }
@@ -619,7 +622,8 @@ public class AuditExportTaskService {
     private String toJson(Object payload) {
         try {
             return objectMapper.writeValueAsString(payload);
-        } catch (Exception ex) {
+        } catch (JsonProcessingException ex) {
+            log.debug("审计导出载荷序列化失败，写入空 JSON。error={}", ex.getMessage());
             return "{}";
         }
     }

@@ -67,6 +67,8 @@ class AuthControllerSessionFlowTest {
 
     private String previousPasswordHash;
     private Integer previousSessionVersion;
+    private Integer previousMustChangePassword;
+    private java.time.LocalDateTime previousPasswordUpdatedAt;
 
     @BeforeEach
     void setUp() {
@@ -82,8 +84,20 @@ class AuthControllerSessionFlowTest {
                 "platform",
                 "admin"
         );
+        previousMustChangePassword = jdbcTemplate.queryForObject(
+                "SELECT must_change_password + 0 FROM sys_user WHERE tenant_id = ? AND username = ? AND deleted = 0",
+                Integer.class,
+                "platform",
+                "admin"
+        );
+        previousPasswordUpdatedAt = jdbcTemplate.queryForObject(
+                "SELECT password_updated_at FROM sys_user WHERE tenant_id = ? AND username = ? AND deleted = 0",
+                java.time.LocalDateTime.class,
+                "platform",
+                "admin"
+        );
         jdbcTemplate.update(
-                "UPDATE sys_user SET password_hash = ? WHERE tenant_id = ? AND username = ? AND deleted = 0",
+                "UPDATE sys_user SET password_hash = ?, must_change_password = 0, password_updated_at = NOW() WHERE tenant_id = ? AND username = ? AND deleted = 0",
                 passwordHasher.hash(ADMIN_PASSWORD),
                 "platform",
                 "admin"
@@ -116,6 +130,15 @@ class AuthControllerSessionFlowTest {
             jdbcTemplate.update(
                     "UPDATE sys_user SET session_version = ? WHERE tenant_id = ? AND username = ? AND deleted = 0",
                     previousSessionVersion,
+                    "platform",
+                    "admin"
+            );
+        }
+        if (previousMustChangePassword != null) {
+            jdbcTemplate.update(
+                    "UPDATE sys_user SET must_change_password = ?, password_updated_at = ? WHERE tenant_id = ? AND username = ? AND deleted = 0",
+                    previousMustChangePassword,
+                    previousPasswordUpdatedAt,
                     "platform",
                     "admin"
             );
@@ -395,6 +418,64 @@ class AuthControllerSessionFlowTest {
                 .andExpect(jsonPath("$.data.superAdmin").value(false))
                 .andExpect(jsonPath("$.data.grants[?(@=='upms:systenant:page')]").doesNotExist())
                 .andExpect(jsonPath("$.data.grants[?(@=='upms:audit:page')]").exists());
+    }
+
+    @Test
+    void passwordChangeRequiredSessionShouldRestrictAccessButAllowLogoutAndPasswordChange() throws Exception {
+        jdbcTemplate.update(
+                "UPDATE sys_user SET must_change_password = 1 WHERE tenant_id = ? AND username = ? AND deleted = 0",
+                ADMIN_TENANT,
+                ADMIN_USERNAME
+        );
+
+        MvcResult firstLogin = loginAsAdmin();
+        JsonNode firstLoginData = objectMapper.readTree(firstLogin.getResponse().getContentAsString()).path("data");
+        Assertions.assertTrue(firstLoginData.path("passwordChangeRequired").asBoolean(), "login should enter restricted password change state");
+        Assertions.assertEquals("FORCE_CHANGE", firstLoginData.path("passwordChangeReason").asText());
+        String firstToken = firstLoginData.path("token").asText();
+
+        mockMvc.perform(get("/api/auth/me")
+                        .header("Authorization", "Bearer " + firstToken)
+                        .header("X-Tenant-Id", ADMIN_TENANT))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("PASSWORD_CHANGE_REQUIRED"));
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .header("Authorization", "Bearer " + firstToken)
+                        .header("X-Tenant-Id", ADMIN_TENANT))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"));
+
+        mockMvc.perform(get("/api/auth/me")
+                        .header("Authorization", "Bearer " + firstToken)
+                        .header("X-Tenant-Id", ADMIN_TENANT))
+                .andExpect(status().isUnauthorized());
+
+        MvcResult secondLogin = loginAsAdmin();
+        String secondToken = extractToken(secondLogin);
+
+        mockMvc.perform(post("/api/account/password/change")
+                        .header("Authorization", "Bearer " + secondToken)
+                        .header("X-Tenant-Id", ADMIN_TENANT)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "oldPassword": "%s",
+                                  "newPassword": "AdminForced@123456"
+                                }
+                                """.formatted(ADMIN_PASSWORD)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.mustChangePassword").value(false));
+
+        SaSession tokenSession = StpUtil.getTokenSessionByToken(secondToken);
+        Assertions.assertEquals(false, tokenSession.get("passwordChangeRequired"));
+
+        mockMvc.perform(get("/api/auth/me")
+                        .header("Authorization", "Bearer " + secondToken)
+                        .header("X-Tenant-Id", ADMIN_TENANT))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"));
     }
 
     @Test
