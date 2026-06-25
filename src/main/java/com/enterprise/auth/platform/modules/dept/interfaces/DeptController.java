@@ -3,6 +3,7 @@ package com.enterprise.auth.platform.modules.dept.interfaces;
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.modules.resource.application.CatalogService;
 import com.enterprise.auth.platform.common.web.ApiResponse;
+import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
 import com.enterprise.auth.platform.modules.dept.interfaces.DeptCrudRequest;
 import com.enterprise.auth.platform.modules.dept.application.DeptManagementService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -40,6 +41,7 @@ public class DeptController {
         return ApiResponse.ok(catalogService.departments());
     }
 
+    @SysLog("新增部门")
     @Operation(summary = "新增部门")
     @PostMapping
     @SaCheckPermission(PermissionCodes.SYSDEPT_ADD)
@@ -47,6 +49,7 @@ public class DeptController {
         return ApiResponse.ok(deptManagementService.create(request));
     }
 
+    @SysLog("修改部门")
     @Operation(summary = "修改部门")
     @PutMapping("/{deptId}")
     @SaCheckPermission(PermissionCodes.SYSDEPT_EDIT)
@@ -57,6 +60,7 @@ public class DeptController {
         return ApiResponse.ok(deptManagementService.update(deptId, request));
     }
 
+    @SysLog("删除部门")
     @Operation(summary = "删除部门")
     @DeleteMapping("/{deptId}")
     @SaCheckPermission(PermissionCodes.SYSDEPT_DEL)

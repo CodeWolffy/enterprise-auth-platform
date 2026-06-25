@@ -1,6 +1,5 @@
 package com.enterprise.auth.platform.modules.codegen.application;
 
-import com.enterprise.auth.platform.common.audit.AuditEventPublisher;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.PageResult;
@@ -38,7 +37,6 @@ public class CodegenApplicationService {
     private static final String SERVER_MANAGED_OUTPUT_ROOT = "SERVER_MANAGED";
 
     private final JdbcTemplate jdbcTemplate;
-    private final AuditEventPublisher auditEventPublisher;
     private final Path outputRoot;
     private final CodegenTemplateService templateService;
     private final CodegenResourceRegistrationService registrationService;
@@ -50,14 +48,12 @@ public class CodegenApplicationService {
 
     public CodegenApplicationService(
             DataSource dataSource,
-            AuditEventPublisher auditEventPublisher,
             @Value("${platform.codegen.output-root:target/generated-codegen}") String outputRoot,
             CodegenTemplateService templateService,
             CodegenResourceRegistrationService registrationService,
             CodegenMetadataService metadataService
     ) {
         this.jdbcTemplate = new JdbcTemplate(dataSource);
-        this.auditEventPublisher = auditEventPublisher;
         this.outputRoot = Path.of(outputRoot).toAbsolutePath().normalize();
         this.templateService = templateService;
         this.registrationService = registrationService;
@@ -138,12 +134,6 @@ public class CodegenApplicationService {
         List<String> registered = command.autoRegister()
                 ? registrationService.register(preview.moduleName(), preview.className())
                 : List.of();
-        auditEventPublisher.publish("CODEGEN_GENERATED", "system", TenantContext.getTenantId(), Map.of(
-                "tableName", preview.tableName(),
-                "moduleName", preview.moduleName(),
-                "files", written,
-                "registeredPermissions", registered
-        ));
         return new CodegenGenerateResult(preview.tableName(), preview.moduleName(), SERVER_MANAGED_OUTPUT_ROOT, written, registered);
     }
 

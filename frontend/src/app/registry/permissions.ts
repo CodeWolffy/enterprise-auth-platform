@@ -68,16 +68,11 @@ export const PERMISSIONS = {
   SECURITY_GET: 'upms:security:get',
   SECURITY_EDIT: 'upms:security:edit',
 
-  AUDIT_PAGE: 'upms:audit:page',
-  AUDIT_GET: 'upms:audit:get',
-  AUDIT_EXPORT: 'upms:audit:export',
-  AUDIT_DOWNLOAD: 'upms:audit:download',
-  AUDIT_EDIT: 'upms:audit:edit',
-  AUDIT_DEL: 'upms:audit:del',
-
   OPERATION_LOG_PAGE: 'upms:operationlog:page',
   OPERATION_LOG_GET: 'upms:operationlog:get',
-  OPERATION_LOG_EXPORT: 'upms:operationlog:export',
+
+  LOGIN_LOG_PAGE: 'upms:loginlog:page',
+  LOGIN_LOG_GET: 'upms:loginlog:get',
 
   FILE_PAGE: 'upms:file:page',
   FILE_GET: 'upms:file:get',
@@ -182,15 +177,13 @@ export const PERMISSION_CATALOG: Array<{
   { code: PERMISSIONS.SYSNOTICE_DEL, label: '公告管理删除', module: 'sysnotice' },
   { code: PERMISSIONS.SECURITY_GET, label: '安全策略查询', module: 'security' },
   { code: PERMISSIONS.SECURITY_EDIT, label: '安全策略修改', module: 'security' },
-  { code: PERMISSIONS.AUDIT_PAGE, label: '安全审计列表', module: 'audit' },
-  { code: PERMISSIONS.AUDIT_GET, label: '安全审计查询', module: 'audit' },
-  { code: PERMISSIONS.AUDIT_EXPORT, label: '安全审计导出', module: 'audit' },
-  { code: PERMISSIONS.AUDIT_DOWNLOAD, label: '安全审计下载', module: 'audit' },
-  { code: PERMISSIONS.AUDIT_EDIT, label: '安全审计治理', module: 'audit' },
-  { code: PERMISSIONS.AUDIT_DEL, label: '安全审计删除', module: 'audit' },
+
   { code: PERMISSIONS.OPERATION_LOG_PAGE, label: '操作日志列表', module: 'operationlog' },
   { code: PERMISSIONS.OPERATION_LOG_GET, label: '操作日志查询', module: 'operationlog' },
-  { code: PERMISSIONS.OPERATION_LOG_EXPORT, label: '操作日志导出', module: 'operationlog' },
+
+  { code: PERMISSIONS.LOGIN_LOG_PAGE, label: '登录日志列表', module: 'loginlog' },
+  { code: PERMISSIONS.LOGIN_LOG_GET, label: '登录日志查询', module: 'loginlog' },
+
   { code: PERMISSIONS.FILE_PAGE, label: '文件管理列表', module: 'file' },
   { code: PERMISSIONS.FILE_GET, label: '文件管理查询', module: 'file' },
   { code: PERMISSIONS.FILE_ADD, label: '文件管理上传', module: 'file' },

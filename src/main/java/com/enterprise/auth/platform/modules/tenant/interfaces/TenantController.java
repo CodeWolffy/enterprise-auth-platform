@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.modules.tenant.interfaces;
 
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
+import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
 import com.enterprise.auth.platform.modules.tenant.application.TenantCapabilityApplicationService;
 import com.enterprise.auth.platform.modules.tenant.application.TenantChangeLogApplicationService;
 import com.enterprise.auth.platform.modules.tenant.application.TenantDirectoryApplicationService;
@@ -126,6 +127,7 @@ public class TenantController {
         return ApiResponse.ok(tenantCapabilityApplicationService.capabilityOverrides(tenantId));
     }
 
+    @SysLog("更新租户能力覆盖")
     @Operation(summary = "更新租户能力覆盖")
     @PutMapping("/{tenantId}/capability-overrides")
     @SaCheckPermission(PermissionCodes.SYSTENANT_EDIT)
@@ -136,6 +138,7 @@ public class TenantController {
         return ApiResponse.ok(tenantCapabilityApplicationService.updateCapabilityOverrides(tenantId, request));
     }
 
+    @SysLog("创建租户")
     @Operation(summary = "创建租户")
     @PostMapping
     @SaCheckPermission(PermissionCodes.SYSTENANT_ADD)
@@ -143,6 +146,7 @@ public class TenantController {
         return ApiResponse.ok(tenantLifecycleApplicationService.create(request));
     }
 
+    @SysLog("更新租户")
     @Operation(summary = "更新租户")
     @PutMapping("/{tenantId}")
     @SaCheckPermission(PermissionCodes.SYSTENANT_EDIT)
@@ -153,6 +157,7 @@ public class TenantController {
         return ApiResponse.ok(tenantLifecycleApplicationService.update(tenantId, request));
     }
 
+    @SysLog("删除租户")
     @Operation(summary = "删除租户")
     @DeleteMapping("/{tenantId}")
     @SaCheckPermission(PermissionCodes.SYSTENANT_DEL)

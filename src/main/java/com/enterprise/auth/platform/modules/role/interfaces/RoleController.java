@@ -2,6 +2,7 @@ package com.enterprise.auth.platform.modules.role.interfaces;
 
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.web.ApiResponse;
+import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
 import com.enterprise.auth.platform.modules.role.application.RoleGrantQueryFacade;
 import com.enterprise.auth.platform.modules.resource.application.CatalogService;
 import com.enterprise.auth.platform.modules.role.application.RoleManagementService;
@@ -47,6 +48,7 @@ public class RoleController {
         return ApiResponse.ok(catalogService.roles());
     }
 
+    @SysLog("新增角色")
     @Operation(summary = "新增角色")
     @PostMapping
     @SaCheckPermission(PermissionCodes.SYSROLE_ADD)
@@ -54,6 +56,7 @@ public class RoleController {
         return ApiResponse.ok(roleManagementService.create(request));
     }
 
+    @SysLog("修改角色")
     @Operation(summary = "修改角色")
     @PutMapping("/{roleId}")
     @SaCheckPermission(PermissionCodes.SYSROLE_EDIT)
@@ -71,6 +74,7 @@ public class RoleController {
         return ApiResponse.ok(roleGrantQueryFacade.listRoleMenuIds(roleId));
     }
 
+    @SysLog("分配角色菜单")
     @Operation(summary = "分配角色菜单")
     @PutMapping("/{roleId}/menus")
     @SaCheckPermission(PermissionCodes.SYSROLE_EDIT)
@@ -88,6 +92,7 @@ public class RoleController {
         return ApiResponse.ok(roleManagementService.impact(roleId));
     }
 
+    @SysLog("删除角色")
     @Operation(summary = "删除角色")
     @DeleteMapping("/{roleId}")
     @SaCheckPermission(PermissionCodes.SYSROLE_DEL)

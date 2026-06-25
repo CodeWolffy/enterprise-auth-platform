@@ -3,6 +3,7 @@ package com.enterprise.auth.platform.modules.menu.interfaces;
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.web.ApiResponse;
+import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
 import com.enterprise.auth.platform.modules.menu.application.MenuService;
 import com.enterprise.auth.platform.modules.menu.application.MenuTreeUtil;
 import com.enterprise.auth.platform.modules.menu.domain.MenuTreeNode;
@@ -63,6 +64,7 @@ public class MenuController {
         return ApiResponse.ok(menuService.detail(menuId));
     }
 
+    @SysLog("新增菜单")
     @Operation(summary = "新增菜单")
     @PostMapping
     @SaCheckPermission(PermissionCodes.SYSMENU_ADD)
@@ -70,6 +72,7 @@ public class MenuController {
         return ApiResponse.ok(menuService.create(request));
     }
 
+    @SysLog("修改菜单")
     @Operation(summary = "修改菜单")
     @PutMapping("/{menuId}")
     @SaCheckPermission(PermissionCodes.SYSMENU_EDIT)
@@ -89,6 +92,7 @@ public class MenuController {
         }
     }
 
+    @SysLog("删除菜单")
     @Operation(summary = "删除菜单")
     @DeleteMapping("/{menuId}")
     @SaCheckPermission(PermissionCodes.SYSMENU_DEL)

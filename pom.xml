@@ -21,6 +21,7 @@
         <spring-cloud.version>2023.0.1</spring-cloud.version>
         <spring-cloud-alibaba.version>2023.0.1.2</spring-cloud-alibaba.version>
         <mybatis-plus.version>3.5.15</mybatis-plus.version>
+        <ip2region.version>3.3.7</ip2region.version>
         <jsqlparser.version>4.9</jsqlparser.version>
         <redisson.version>3.52.0</redisson.version>
         <knife4j.version>4.4.0</knife4j.version>
@@ -142,6 +143,11 @@
             <groupId>de.codecentric</groupId>
             <artifactId>spring-boot-admin-starter-client</artifactId>
             <version>${spring-boot-admin.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.lionsoul</groupId>
+            <artifactId>ip2region</artifactId>
+            <version>${ip2region.version}</version>
         </dependency>
         <dependency>
             <groupId>com.mysql</groupId>

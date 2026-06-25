@@ -3,11 +3,13 @@ package com.enterprise.auth.platform.common.web;
 import cn.dev33.satoken.exception.NotLoginException;
 import cn.dev33.satoken.exception.NotPermissionException;
 import cn.dev33.satoken.exception.SaTokenException;
+import com.enterprise.auth.platform.common.context.RequestContext;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.ApiResponse.ErrorDetail;
 import com.enterprise.auth.platform.common.web.RateLimitInterceptor.RateLimitExceededException;
-import com.enterprise.auth.platform.modules.audit.application.AuditService;
+import com.enterprise.auth.platform.modules.log.application.LogPublisher;
+import com.enterprise.auth.platform.modules.log.domain.event.LogEvent;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.security.Principal;
@@ -34,10 +36,12 @@ public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     private static final String RATE_LIMITED_CODE = "RATE_LIMITED";
     private static final String REQUEST_ID_HEADER = "X-Request-Id";
-    private final AuditService auditService;
+    private final LogPublisher logPublisher;
+    private final IpLocationResolver ipLocationResolver;
 
-    public GlobalExceptionHandler(AuditService auditService) {
-        this.auditService = auditService;
+    public GlobalExceptionHandler(LogPublisher logPublisher, IpLocationResolver ipLocationResolver) {
+        this.logPublisher = logPublisher;
+        this.ipLocationResolver = ipLocationResolver;
     }
 
     @ExceptionHandler(BusinessException.class)
@@ -225,9 +229,13 @@ public class GlobalExceptionHandler {
                     "referer", String.valueOf(request.getHeader("Referer")),
                     "userAgent", String.valueOf(request.getHeader("User-Agent"))
             );
-            auditService.record("SECURITY_ACCESS_DENIED", operator, tenantId, payload);
+            String clientIp = RequestContext.getClientIp();
+            String location = ipLocationResolver.resolve(clientIp);
+            String method = request.getMethod();
+            String requestUri = request.getRequestURI();
+            logPublisher.publish(new LogEvent("拒绝访问", operator, tenantId, payload, null, clientIp, location, method, requestUri, null, null, null, null));
         } catch (Exception ex) {
-            log.debug("Failed to record security deny audit event. method={}, path={}, error={}",
+            log.debug("Failed to record security deny log event. method={}, path={}, error={}",
                     request.getMethod(), request.getRequestURI(), ex.getMessage());
         }
     }

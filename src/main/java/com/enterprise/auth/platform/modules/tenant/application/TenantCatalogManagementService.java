@@ -1,7 +1,6 @@
 package com.enterprise.auth.platform.modules.tenant.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.enterprise.auth.platform.modules.audit.application.AuditService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
@@ -43,7 +42,6 @@ public class TenantCatalogManagementService {
     private final SysTenantMapper sysTenantMapper;
     private final SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper;
     private final SysTenantCapabilityResourceScopeMapper sysTenantCapabilityResourceScopeMapper;
-    private final AuditService auditService;
     private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
 
     public TenantCatalogManagementService(
@@ -53,7 +51,6 @@ public class TenantCatalogManagementService {
             SysTenantMapper sysTenantMapper,
             SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper,
             SysTenantCapabilityResourceScopeMapper sysTenantCapabilityResourceScopeMapper,
-            AuditService auditService,
             AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService
     ) {
         this.sysTenantPackageMapper = sysTenantPackageMapper;
@@ -62,7 +59,6 @@ public class TenantCatalogManagementService {
         this.sysTenantMapper = sysTenantMapper;
         this.sysTenantCapabilityOverrideMapper = sysTenantCapabilityOverrideMapper;
         this.sysTenantCapabilityResourceScopeMapper = sysTenantCapabilityResourceScopeMapper;
-        this.auditService = auditService;
         this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
     }
 
@@ -237,8 +233,6 @@ public class TenantCatalogManagementService {
         entity.setTenantId("platform");
         sysTenantPackageMapper.insert(entity);
         replacePackageCapabilities(packageCode, request.capabilityCodes());
-        auditService.record("TENANT_PACKAGE_CREATED", SecuritySupport.currentOperator(), "platform",
-                java.util.Map.of("packageCode", packageCode));
         evictPrincipalSnapshots();
         return toPackageView(entity, normalizedCodes(request.capabilityCodes()), loadPackageReferences().get(packageCode));
     }
@@ -259,8 +253,6 @@ public class TenantCatalogManagementService {
             migratePackageReference(oldCode, packageCode);
         }
         replacePackageCapabilities(packageCode, request.capabilityCodes());
-        auditService.record("TENANT_PACKAGE_UPDATED", SecuritySupport.currentOperator(), "platform",
-                java.util.Map.of("packageId", id, "packageCode", packageCode));
         evictPrincipalSnapshots();
         return toPackageView(entity, normalizedCodes(request.capabilityCodes()), loadPackageReferences().get(packageCode));
     }
@@ -277,8 +269,6 @@ public class TenantCatalogManagementService {
         sysTenantPackageCapabilityMapper.delete(new LambdaQueryWrapper<SysTenantPackageCapabilityEntity>()
                 .eq(SysTenantPackageCapabilityEntity::getTenantId, "platform")
                 .eq(SysTenantPackageCapabilityEntity::getPackageCode, entity.getPackageCode()));
-        auditService.record("TENANT_PACKAGE_DELETED", SecuritySupport.currentOperator(), "platform",
-                java.util.Map.of("packageId", id, "packageCode", entity.getPackageCode()));
         evictPrincipalSnapshots();
     }
 
@@ -293,8 +283,6 @@ public class TenantCatalogManagementService {
         apply(entity, request);
         entity.setTenantId("platform");
         sysTenantCapabilityMapper.insert(entity);
-        auditService.record("TENANT_CAPABILITY_CREATED", SecuritySupport.currentOperator(), "platform",
-                java.util.Map.of("capabilityCode", capabilityCode));
         evictPrincipalSnapshots();
         return toCapabilityView(entity, loadCapabilityReferences().get(capabilityCode));
     }
@@ -313,8 +301,6 @@ public class TenantCatalogManagementService {
         if (!oldCode.equals(capabilityCode)) {
             migrateCapabilityReference(oldCode, capabilityCode);
         }
-        auditService.record("TENANT_CAPABILITY_UPDATED", SecuritySupport.currentOperator(), "platform",
-                java.util.Map.of("capabilityId", id, "capabilityCode", capabilityCode));
         evictPrincipalSnapshots();
         return toCapabilityView(entity, loadCapabilityReferences().get(capabilityCode));
     }
@@ -336,8 +322,6 @@ public class TenantCatalogManagementService {
             throw new BusinessException("该能力存在租户覆盖记录，暂不允许删除");
         }
         sysTenantCapabilityMapper.deleteById(id);
-        auditService.record("TENANT_CAPABILITY_DELETED", SecuritySupport.currentOperator(), "platform",
-                java.util.Map.of("capabilityId", id, "capabilityCode", entity.getCapabilityCode()));
         evictPrincipalSnapshots();
     }
 

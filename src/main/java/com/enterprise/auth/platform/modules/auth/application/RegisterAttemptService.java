@@ -1,6 +1,6 @@
 package com.enterprise.auth.platform.modules.auth.application;
 
-import com.enterprise.auth.platform.modules.audit.application.AuditService;
+import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.RateLimitSupport;
 import com.enterprise.auth.platform.modules.auth.infrastructure.RegistrationProperties;
@@ -16,20 +16,20 @@ public class RegisterAttemptService {
     private final RateLimitSupport rateLimitSupport;
     private final RegistrationProperties registrationProperties;
     private final RegistrationPolicyService registrationPolicyService;
-    private final AuditService auditService;
+    private final LogPublisher logPublisher;
 
     public RegisterAttemptService(
             StringRedisTemplate stringRedisTemplate,
             RateLimitSupport rateLimitSupport,
             RegistrationProperties registrationProperties,
             RegistrationPolicyService registrationPolicyService,
-            AuditService auditService
+            LogPublisher logPublisher
     ) {
         this.stringRedisTemplate = stringRedisTemplate;
         this.rateLimitSupport = rateLimitSupport;
         this.registrationProperties = registrationProperties;
         this.registrationPolicyService = registrationPolicyService;
-        this.auditService = auditService;
+        this.logPublisher = logPublisher;
     }
 
     public void checkRateLimit(String username, String clientIp) {
@@ -48,7 +48,7 @@ public class RegisterAttemptService {
             return;
         }
 
-        auditService.record("REGISTER_RATE_LIMITED",
+        logPublisher.publish("REGISTER_RATE_LIMITED",
                 rateLimitSupport.normalizeKeyPart(username),
                 registrationPolicyService.resolveDefaultTenantId(),
                 Map.of(

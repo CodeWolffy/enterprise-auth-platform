@@ -438,7 +438,7 @@ class WorkflowApplicationServiceP2Test {
 
     private void assertWorkflowAuditRecorded(String eventType, String tenantId) {
         Long count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(1) FROM sys_audit_log WHERE tenant_id = ? AND event_type = ?",
+                "SELECT COUNT(1) FROM sys_log WHERE tenant_id = ? AND event_type = ?",
                 Long.class,
                 tenantId,
                 eventType
@@ -452,7 +452,7 @@ class WorkflowApplicationServiceP2Test {
         jdbcTemplate.update("DELETE FROM wf_task WHERE tenant_id IN (?, ?)", TENANT_A, TENANT_B);
         jdbcTemplate.update("DELETE FROM wf_process_instance WHERE tenant_id IN (?, ?)", TENANT_A, TENANT_B);
         jdbcTemplate.update("DELETE FROM wf_process_definition WHERE tenant_id IN (?, ?)", TENANT_A, TENANT_B);
-        jdbcTemplate.update("DELETE FROM sys_audit_log WHERE tenant_id IN (?, ?) AND event_type LIKE 'WORKFLOW_%'", TENANT_A, TENANT_B);
+        jdbcTemplate.update("DELETE FROM sys_log WHERE tenant_id IN (?, ?)", TENANT_A, TENANT_B);
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id IN (?, ?) AND username IN (?, ?, ?, ?, ?)",
                 TENANT_A, TENANT_B, STARTER, APPROVER_ONE, APPROVER_TWO, OUTSIDER, OTHER_TENANT_USER);
         jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id IN (?, ?) AND role_code = ?", TENANT_A, TENANT_B, GROUP_APPROVER);

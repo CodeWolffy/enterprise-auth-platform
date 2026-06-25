@@ -77,7 +77,7 @@ class DatabaseUserRepositoryRolePayloadTest {
                 SELECT id FROM sys_menu
                 WHERE del_flag = '0'
                   AND type = '1'
-                  AND permission IN ('upms:sysuser:get', 'upms:audit:get')
+                  AND permission IN ('upms:sysuser:get', 'upms:operationlog:get')
                 """,
                 Long.class
         );
@@ -156,7 +156,7 @@ class DatabaseUserRepositoryRolePayloadTest {
         assertThat(result).isPresent();
         var user = result.orElseThrow();
         assertThat(user.roles()).contains(roleCode);
-        assertThat(user.permissions()).containsExactlyInAnyOrder("upms:sysuser:get", "upms:audit:get");
+        assertThat(user.permissions()).containsExactlyInAnyOrder("upms:sysuser:get", "upms:operationlog:get");
         assertThat(user.permissions()).doesNotContain("payload:extra");
         assertThat(user.dataScopeType()).isEqualTo(DataScopeType.CUSTOM);
         assertThat(user.customDeptIds()).containsExactlyInAnyOrder(2L, 3L);

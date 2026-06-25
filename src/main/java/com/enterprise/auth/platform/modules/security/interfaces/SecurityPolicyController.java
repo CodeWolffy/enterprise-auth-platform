@@ -3,6 +3,7 @@ package com.enterprise.auth.platform.modules.security.interfaces;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.web.ApiResponse;
+import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
 import com.enterprise.auth.platform.modules.security.application.SecurityPolicyApplicationService;
 import com.enterprise.auth.platform.modules.security.application.SecurityPolicyView;
 import io.swagger.v3.oas.annotations.Operation;
@@ -38,6 +39,7 @@ public class SecurityPolicyController {
         return ApiResponse.ok(securityPolicyApplicationService.currentTenantPolicyView());
     }
 
+    @SysLog("更新当前租户安全策略覆盖")
     @Operation(summary = "更新当前租户安全策略覆盖")
     @PutMapping
     @SaCheckPermission(PermissionCodes.SECURITY_EDIT)
@@ -52,6 +54,7 @@ public class SecurityPolicyController {
         return ApiResponse.ok(securityPolicyApplicationService.platformPolicyView());
     }
 
+    @SysLog("更新平台默认安全策略")
     @Operation(summary = "更新平台默认安全策略")
     @PutMapping("/platform")
     @SaCheckPermission(PermissionCodes.SECURITY_EDIT)

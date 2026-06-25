@@ -13,7 +13,6 @@ import com.enterprise.auth.platform.modules.auth.domain.SessionPrincipal;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.auth.interfaces.PermissionSnapshotResponse;
 import com.enterprise.auth.platform.modules.auth.application.PermissionSnapshotApplicationService;
-import com.enterprise.auth.platform.modules.audit.application.AuditService;
 import com.enterprise.auth.platform.modules.auth.application.SessionIndexService;
 import java.util.Map;
 import org.springframework.stereotype.Service;
@@ -22,20 +21,17 @@ import org.springframework.util.StringUtils;
 @Service
 public class TenantSwitchApplicationService {
 
-    private final AuditService auditService;
     private final PlatformAdminSupport platformAdminSupport;
     private final PermissionSnapshotApplicationService permissionSnapshotApplicationService;
     private final SessionIndexService sessionIndexService;
     private final TenantProfileFacade tenantProfileFacade;
 
     public TenantSwitchApplicationService(
-            AuditService auditService,
             PlatformAdminSupport platformAdminSupport,
             PermissionSnapshotApplicationService permissionSnapshotApplicationService,
             SessionIndexService sessionIndexService,
             TenantProfileFacade tenantProfileFacade
     ) {
-        this.auditService = auditService;
         this.platformAdminSupport = platformAdminSupport;
         this.permissionSnapshotApplicationService = permissionSnapshotApplicationService;
         this.sessionIndexService = sessionIndexService;
@@ -77,12 +73,6 @@ public class TenantSwitchApplicationService {
             ));
             PermissionSnapshotResponse snapshot = permissionSnapshotApplicationService.build(currentUser);
             sessionIndexService.updateActiveTenant(sessionId, normalizedTargetTenantId);
-            auditService.record("TENANT_SWITCH", currentUser.username(), normalizedTargetTenantId, Map.of(
-                    "sessionId", sessionId,
-                    "operatorTenantId", currentUser.tenantId(),
-                    "fromTenantId", fromTenantId,
-                    "targetTenantId", normalizedTargetTenantId
-            ));
             return snapshot;
         } catch (RuntimeException ex) {
             if (switched) {

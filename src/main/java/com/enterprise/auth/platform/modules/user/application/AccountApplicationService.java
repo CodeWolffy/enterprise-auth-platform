@@ -6,7 +6,7 @@ import com.enterprise.auth.platform.common.PasswordValidator;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
-import com.enterprise.auth.platform.modules.audit.application.AuditService;
+import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
@@ -34,7 +34,7 @@ public class AccountApplicationService {
     private final PasswordHasher passwordHasher;
     private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
     private final FileApplicationService fileApplicationService;
-    private final AuditService auditService;
+    private final LogPublisher logPublisher;
     private final NotificationScenarioPublisher notificationScenarioPublisher;
 
     public AccountApplicationService(
@@ -43,7 +43,7 @@ public class AccountApplicationService {
             PasswordHasher passwordHasher,
             AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
             FileApplicationService fileApplicationService,
-            AuditService auditService,
+            LogPublisher logPublisher,
             NotificationScenarioPublisher notificationScenarioPublisher
     ) {
         this.currentUserService = currentUserService;
@@ -51,7 +51,7 @@ public class AccountApplicationService {
         this.passwordHasher = passwordHasher;
         this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
         this.fileApplicationService = fileApplicationService;
-        this.auditService = auditService;
+        this.logPublisher = logPublisher;
         this.notificationScenarioPublisher = notificationScenarioPublisher;
     }
 
@@ -74,7 +74,6 @@ public class AccountApplicationService {
             user.setUpdatedBy(user.getUsername());
             sysUserMapper.updateById(user);
             permissionSnapshotInvalidationService.invalidateUser(user.getId(), user.getTenantId(), user.getUsername());
-            auditService.record("PROFILE_UPDATED", user.getUsername(), user.getTenantId(), Map.of("userId", user.getId()));
             return toProfile(user);
         });
     }
@@ -89,10 +88,6 @@ public class AccountApplicationService {
             user.setUpdatedBy(user.getUsername());
             sysUserMapper.updateById(user);
             permissionSnapshotInvalidationService.invalidateUser(user.getId(), user.getTenantId(), user.getUsername());
-            auditService.record("AVATAR_UPDATED", user.getUsername(), user.getTenantId(), Map.of(
-                    "userId", user.getId(),
-                    "fileKey", uploaded.fileKey()
-            ));
             return toProfile(user);
         });
     }
@@ -122,7 +117,6 @@ public class AccountApplicationService {
             StpUtil.getTokenSession().set("passwordChangeRequired", false);
             StpUtil.getTokenSession().delete("passwordChangeReason");
             permissionSnapshotInvalidationService.invalidateUser(user.getId(), user.getTenantId(), user.getUsername());
-            auditService.record("PASSWORD_CHANGED", user.getUsername(), user.getTenantId(), Map.of("userId", user.getId()));
             notificationScenarioPublisher.passwordChanged(user.getTenantId(), user.getId(), user.getUsername());
             return toProfile(user);
         });

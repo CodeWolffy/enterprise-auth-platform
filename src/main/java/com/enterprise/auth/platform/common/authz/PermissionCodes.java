@@ -78,16 +78,11 @@ public final class PermissionCodes {
     public static final String SECURITY_GET = "upms:security:get";
     public static final String SECURITY_EDIT = "upms:security:edit";
 
-    public static final String AUDIT_PAGE = "upms:audit:page";
-    public static final String AUDIT_GET = "upms:audit:get";
-    public static final String AUDIT_EXPORT = "upms:audit:export";
-    public static final String AUDIT_DOWNLOAD = "upms:audit:download";
-    public static final String AUDIT_EDIT = "upms:audit:edit";
-    public static final String AUDIT_DEL = "upms:audit:del";
-
     public static final String OPERATION_LOG_PAGE = "upms:operationlog:page";
     public static final String OPERATION_LOG_GET = "upms:operationlog:get";
-    public static final String OPERATION_LOG_EXPORT = "upms:operationlog:export";
+
+    public static final String LOGIN_LOG_PAGE = "upms:loginlog:page";
+    public static final String LOGIN_LOG_GET = "upms:loginlog:get";
 
     public static final String FILE_PAGE = "upms:file:page";
     public static final String FILE_GET = "upms:file:get";
@@ -185,15 +180,10 @@ public final class PermissionCodes {
             SYSNOTICE_DEL,
             SECURITY_GET,
             SECURITY_EDIT,
-            AUDIT_PAGE,
-            AUDIT_GET,
-            AUDIT_EXPORT,
-            AUDIT_DOWNLOAD,
-            AUDIT_EDIT,
-            AUDIT_DEL,
             OPERATION_LOG_PAGE,
             OPERATION_LOG_GET,
-            OPERATION_LOG_EXPORT,
+            LOGIN_LOG_PAGE,
+            LOGIN_LOG_GET,
             FILE_PAGE,
             FILE_GET,
             FILE_ADD,
@@ -287,15 +277,10 @@ public final class PermissionCodes {
             new PermissionDescriptor(SYSNOTICE_DEL, "公告管理删除", "sysnotice"),
             new PermissionDescriptor(SECURITY_GET, "安全策略查询", "security"),
             new PermissionDescriptor(SECURITY_EDIT, "安全策略修改", "security"),
-            new PermissionDescriptor(AUDIT_PAGE, "安全审计列表", "audit"),
-            new PermissionDescriptor(AUDIT_GET, "安全审计查询", "audit"),
-            new PermissionDescriptor(AUDIT_EXPORT, "安全审计导出", "audit"),
-            new PermissionDescriptor(AUDIT_DOWNLOAD, "安全审计下载", "audit"),
-            new PermissionDescriptor(AUDIT_EDIT, "安全审计治理", "audit"),
-            new PermissionDescriptor(AUDIT_DEL, "安全审计删除", "audit"),
             new PermissionDescriptor(OPERATION_LOG_PAGE, "操作日志列表", "operationlog"),
             new PermissionDescriptor(OPERATION_LOG_GET, "操作日志查询", "operationlog"),
-            new PermissionDescriptor(OPERATION_LOG_EXPORT, "操作日志导出", "operationlog"),
+            new PermissionDescriptor(LOGIN_LOG_PAGE, "登录日志列表", "loginlog"),
+            new PermissionDescriptor(LOGIN_LOG_GET, "登录日志查询", "loginlog"),
             new PermissionDescriptor(FILE_PAGE, "文件管理列表", "file"),
             new PermissionDescriptor(FILE_GET, "文件管理查询", "file"),
             new PermissionDescriptor(FILE_ADD, "文件管理上传", "file"),

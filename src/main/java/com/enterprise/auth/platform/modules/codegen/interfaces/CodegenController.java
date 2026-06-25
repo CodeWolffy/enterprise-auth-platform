@@ -14,6 +14,7 @@ import com.enterprise.auth.platform.modules.codegen.application.CodegenTableDeta
 import com.enterprise.auth.platform.modules.codegen.application.CodegenTableView;
 import com.enterprise.auth.platform.modules.codegen.application.CodegenTemplateService;
 import com.enterprise.auth.platform.modules.codegen.application.CodegenTemplateView;
+import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -57,6 +58,7 @@ public class CodegenController {
         return ApiResponse.ok(metadataService.dataSources());
     }
 
+    @SysLog("新增代码生成数据源")
     @Operation(summary = "新增代码生成数据源")
     @PostMapping("/datasources")
     @SaCheckPermission(PermissionCodes.CODEGEN_ADD)
@@ -64,6 +66,7 @@ public class CodegenController {
         return ApiResponse.ok(metadataService.createDataSource(request));
     }
 
+    @SysLog("修改代码生成数据源")
     @Operation(summary = "修改代码生成数据源")
     @PutMapping("/datasources/{id}")
     @SaCheckPermission(PermissionCodes.CODEGEN_EDIT)
@@ -71,6 +74,7 @@ public class CodegenController {
         return ApiResponse.ok(metadataService.updateDataSource(id, request));
     }
 
+    @SysLog("删除代码生成数据源")
     @Operation(summary = "删除代码生成数据源")
     @DeleteMapping("/datasources/{id}")
     @SaCheckPermission(PermissionCodes.CODEGEN_DEL)
@@ -79,6 +83,7 @@ public class CodegenController {
         return ApiResponse.ok();
     }
 
+    @SysLog("确认外部代码生成数据源授权")
     @Operation(summary = "确认外部代码生成数据源授权")
     @PostMapping("/datasources/{id}/authorize")
     @SaCheckPermission(PermissionCodes.CODEGEN_EDIT)
@@ -89,6 +94,7 @@ public class CodegenController {
         return ApiResponse.ok(metadataService.authorizeDataSource(id, request));
     }
 
+    @SysLog("测试代码生成数据源连接")
     @Operation(summary = "测试代码生成数据源连接")
     @PostMapping("/datasources/{id}/test")
     @SaCheckPermission(PermissionCodes.CODEGEN_GET)
@@ -108,6 +114,7 @@ public class CodegenController {
         return ApiResponse.ok(metadataService.dataSourceTables(id, keyword, page, size));
     }
 
+    @SysLog("导入代码生成表配置")
     @Operation(summary = "导入代码生成表配置")
     @PostMapping("/tables/import")
     @SaCheckPermission(PermissionCodes.CODEGEN_ADD)
@@ -133,6 +140,7 @@ public class CodegenController {
         return ApiResponse.ok(metadataService.tableConfig(tableId));
     }
 
+    @SysLog("保存导入表字段配置")
     @Operation(summary = "保存导入表字段配置")
     @PutMapping("/imported-tables/{tableId}/columns")
     @SaCheckPermission(PermissionCodes.CODEGEN_EDIT)
@@ -161,6 +169,7 @@ public class CodegenController {
         return ApiResponse.ok(codegenApplicationService.table(tableName));
     }
 
+    @SysLog("预览生成结果")
     @Operation(summary = "预览生成结果")
     @PostMapping("/preview")
     @SaCheckPermission(PermissionCodes.CODEGEN_GET)
@@ -168,6 +177,7 @@ public class CodegenController {
         return ApiResponse.ok(codegenApplicationService.preview(request.toCommand()));
     }
 
+    @SysLog("生成代码到隔离目录")
     @Operation(summary = "生成代码到隔离目录")
     @PostMapping("/generate")
     @SaCheckPermission(PermissionCodes.CODEGEN_ADD)
@@ -175,6 +185,7 @@ public class CodegenController {
         return ApiResponse.ok(codegenApplicationService.generate(request.toCommand()));
     }
 
+    @SysLog("下载生成产物（ZIP 包）")
     @Operation(summary = "下载生成产物（ZIP 包）")
     @PostMapping("/download")
     @SaCheckPermission(PermissionCodes.CODEGEN_DOWNLOAD)
@@ -209,6 +220,7 @@ public class CodegenController {
         return ApiResponse.ok(templateService.detail(templateId));
     }
 
+    @SysLog("新增自定义模板")
     @Operation(summary = "新增自定义模板")
     @PostMapping("/templates")
     @SaCheckPermission(PermissionCodes.CODEGEN_ADD)
@@ -216,6 +228,7 @@ public class CodegenController {
         return ApiResponse.ok(templateService.create(request.toView()));
     }
 
+    @SysLog("修改自定义模板")
     @Operation(summary = "修改自定义模板")
     @PutMapping("/templates/{templateId}")
     @SaCheckPermission(PermissionCodes.CODEGEN_EDIT)
@@ -226,6 +239,7 @@ public class CodegenController {
         return ApiResponse.ok(templateService.update(templateId, request.toView()));
     }
 
+    @SysLog("删除自定义模板")
     @Operation(summary = "删除自定义模板")
     @DeleteMapping("/templates/{templateId}")
     @SaCheckPermission(PermissionCodes.CODEGEN_DEL)

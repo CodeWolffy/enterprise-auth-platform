@@ -3,7 +3,6 @@ package com.enterprise.auth.platform.auth;
 import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.bearer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -105,34 +104,6 @@ class AuthorizationBoundaryTest {
                                   "deptCode": "AUTH_BOUNDARY_DEPT",
                                   "deptName": "",
                                   "leaderUserId": null
-                                }
-                                """))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
-    }
-
-    @Test
-    void auditWriteEndpointsShouldRequireAuditWritePermission() throws Exception {
-        mockMvc.perform(get("/api/audit/events/export")
-                        .with(bearer(principal(Set.of("upms:audit:get"))))
-                        .header("X-Tenant-Id", "platform"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
-
-        mockMvc.perform(post("/api/audit/exports")
-                        .with(bearer(principal(Set.of("upms:audit:get"))))
-                        .header("X-Tenant-Id", "platform"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
-
-        mockMvc.perform(put("/api/audit/exports/policy")
-                        .with(bearer(principal(Set.of("upms:audit:get"))))
-                        .header("X-Tenant-Id", "platform")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "retentionDays": 7,
-                                  "maxTasks": 100
                                 }
                                 """))
                 .andExpect(status().isForbidden())

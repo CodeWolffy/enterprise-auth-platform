@@ -83,7 +83,7 @@
         <div v-if="recentEvents.length" class="event-list">
           <article v-for="event in recentEvents" :key="`${event.eventType}-${event.occurredAt}-${event.operator}`">
             <div>
-              <strong>{{ eventLabel(event.eventType) }}</strong>
+              <strong>{{ event.eventType }}</strong>
               <span>{{ event.operator || '-' }} · {{ event.tenantId || 'platform' }}</span>
             </div>
             <time>{{ formatDateTime(event.occurredAt) }}</time>
@@ -318,17 +318,6 @@ function healthStatusText(status: string) {
     return '异常'
   }
   return status
-}
-
-function eventLabel(eventType: string) {
-  const labels: Record<string, string> = {
-    LOGIN_SUCCESS: '登录成功',
-    LOGIN_FAILED: '登录失败',
-    LOGIN_BLOCKED: '登录拦截',
-    ACCOUNT_LOCKED: '账户锁定',
-    LOGOUT: '退出登录',
-  }
-  return labels[eventType] ?? eventType
 }
 
 function formatDateTime(epochMs?: number | null) {

@@ -5,6 +5,7 @@ import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.common.web.RateLimit;
+import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
 import com.enterprise.auth.platform.modules.system.application.MailChannelApplicationService;
 import com.enterprise.auth.platform.modules.system.application.MailChannelPreset;
 import io.swagger.v3.oas.annotations.Operation;
@@ -66,6 +67,7 @@ public class MailChannelController {
         return ApiResponse.ok(mailChannelService.getVisibleChannel(currentTenant()).orElse(null));
     }
 
+    @SysLog("保存邮件渠道配置")
     @Operation(summary = "保存或更新当前租户的邮件渠道配置")
     @PostMapping
     @SaCheckPermission(PermissionCodes.SYSMAIL_EDIT)
@@ -73,6 +75,7 @@ public class MailChannelController {
         return ApiResponse.ok(mailChannelService.saveOrUpdate(request));
     }
 
+    @SysLog("删除邮件渠道配置")
     @Operation(summary = "删除当前租户的邮件渠道配置")
     @DeleteMapping
     @SaCheckPermission(PermissionCodes.SYSMAIL_DEL)
@@ -81,6 +84,7 @@ public class MailChannelController {
         return ApiResponse.ok();
     }
 
+    @SysLog("发送测试邮件")
     @Operation(summary = "发送测试邮件")
     @RateLimit(key = "mail-channel-test", strategy = RateLimit.Strategy.USER_AND_IP, capacity = 3, refillTokens = 3, refillDurationSeconds = 60)
     @PostMapping("/test")

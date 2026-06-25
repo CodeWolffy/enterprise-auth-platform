@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.common.TimeSupport;
-import com.enterprise.auth.platform.modules.audit.application.AuditService;
+import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
 import com.enterprise.auth.platform.modules.dept.application.DeptTenantDataFacade;
 import com.enterprise.auth.platform.modules.menu.application.MenuService;
@@ -48,7 +48,7 @@ public class TenantManagementService {
     private final SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper;
     private final MenuService menuService;
     private final CatalogService catalogService;
-    private final AuditService auditService;
+    private final LogPublisher logPublisher;
     private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
     private final TenantAccessPolicy tenantAccessPolicy;
     private final TenantChangeLogApplicationService tenantChangeLogApplicationService;
@@ -67,7 +67,7 @@ public class TenantManagementService {
             SysTenantCapabilityOverrideMapper sysTenantCapabilityOverrideMapper,
             MenuService menuService,
             CatalogService catalogService,
-            AuditService auditService,
+            LogPublisher logPublisher,
             AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
             TenantAccessPolicy tenantAccessPolicy,
             TenantChangeLogApplicationService tenantChangeLogApplicationService,
@@ -85,7 +85,7 @@ public class TenantManagementService {
         this.sysTenantCapabilityOverrideMapper = sysTenantCapabilityOverrideMapper;
         this.menuService = menuService;
         this.catalogService = catalogService;
-        this.auditService = auditService;
+        this.logPublisher = logPublisher;
         this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
         this.tenantAccessPolicy = tenantAccessPolicy;
         this.tenantChangeLogApplicationService = tenantChangeLogApplicationService;
@@ -134,7 +134,6 @@ public class TenantManagementService {
         recordTenantChange(request.tenantId(), "PROFILE", "contactName", null, request.contactName(), "初始化联系人", operator);
         recordTenantChange(request.tenantId(), "PROFILE", "lifecycleNote", null, request.lifecycleNote(), "初始化运营备注", operator);
 
-        auditService.record("TENANT_CREATED", operator, request.tenantId(), Map.of("tenantId", request.tenantId()));
         evictPrincipalSnapshots();
         return catalogService.tenant(request.tenantId());
     }
@@ -192,7 +191,6 @@ public class TenantManagementService {
                 newProfile.capabilityCodes().isEmpty() ? null : String.join(",", newProfile.capabilityCodes()), "更新租户能力范围", operator);
         recordIfChanged(tenantId, "PROFILE", "lifecycleNote", oldProfile.lifecycleNote(), request.lifecycleNote(), "更新运营备注", operator);
 
-        auditService.record("TENANT_UPDATED", operator, tenantId, Map.of("tenantId", tenantId));
         evictPrincipalSnapshots();
         return catalogService.tenant(tenantId);
     }
@@ -216,7 +214,6 @@ public class TenantManagementService {
             return null;
         });
         recordTenantChange(tenantId, "DELETED", "tenant", entity.getTenantName(), null, "删除租户", operator);
-        auditService.record("TENANT_DELETED", operator, tenantId, Map.of("tenantId", entity.getTenantId()));
         evictPrincipalSnapshots();
     }
 
@@ -319,7 +316,6 @@ public class TenantManagementService {
                 "更新租户能力覆盖",
                 operator
         );
-        auditService.record("TENANT_CAPABILITY_OVERRIDES_UPDATED", operator, tenantId, Map.of("tenantId", tenantId));
         evictPrincipalSnapshots();
         return capabilityOverrides(tenantId);
     }

@@ -13,7 +13,6 @@ import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysCate
 import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysConfigMapper;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.system.interfaces.ConfigCrudRequest;
-import com.enterprise.auth.platform.modules.audit.application.AuditService;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -34,18 +33,15 @@ public class ConfigApplicationService {
 
     private final SysConfigMapper sysConfigMapper;
     private final SysCategoryRuleMapper sysCategoryRuleMapper;
-    private final AuditService auditService;
     private final DataScopeService dataScopeService;
 
     public ConfigApplicationService(
             SysConfigMapper sysConfigMapper,
             SysCategoryRuleMapper sysCategoryRuleMapper,
-            AuditService auditService,
             DataScopeService dataScopeService
     ) {
         this.sysConfigMapper = sysConfigMapper;
         this.sysCategoryRuleMapper = sysCategoryRuleMapper;
-        this.auditService = auditService;
         this.dataScopeService = dataScopeService;
     }
 
@@ -92,7 +88,6 @@ public class ConfigApplicationService {
         entity.setConfigName(request.configName());
         entity.setConfigValue(request.configValue());
         sysConfigMapper.insert(entity);
-        auditService.record("CONFIG_CREATED", operator, tenantId, Map.of("configId", entity.getId()));
         return toConfigView(entity);
     }
 
@@ -105,7 +100,6 @@ public class ConfigApplicationService {
         entity.setConfigName(request.configName());
         entity.setConfigValue(request.configValue());
         sysConfigMapper.updateById(entity);
-        auditService.record("CONFIG_UPDATED", SecuritySupport.currentOperator(), tenantId, Map.of("configId", id));
         return toConfigView(entity);
     }
 
@@ -115,7 +109,6 @@ public class ConfigApplicationService {
         String tenantId = currentTenantId();
         SysConfigEntity entity = getConfig(id, tenantId);
         sysConfigMapper.deleteById(entity.getId());
-        auditService.record("CONFIG_DELETED", SecuritySupport.currentOperator(), tenantId, Map.of("configId", id));
     }
 
     public String currentTenantId() {

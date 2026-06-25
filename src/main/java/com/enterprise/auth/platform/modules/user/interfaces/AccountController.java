@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.modules.user.interfaces;
 
 import com.enterprise.auth.platform.common.web.ApiResponse;
+import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
 import com.enterprise.auth.platform.modules.user.application.AccountApplicationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -33,12 +34,14 @@ public class AccountController {
         return ApiResponse.ok(accountApplicationService.profile());
     }
 
+    @SysLog("更新当前账户资料")
     @Operation(summary = "更新当前账户资料")
     @PutMapping("/profile")
     public ApiResponse<AccountProfileResponse> updateProfile(@Valid @RequestBody AccountProfileUpdateRequest request) {
         return ApiResponse.ok(accountApplicationService.updateProfile(request));
     }
 
+    @SysLog("更新当前账户头像")
     @Operation(summary = "更新当前账户头像（兼容旧路径）")
     @PutMapping(value = "/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<AccountProfileResponse> updateAvatar(
@@ -46,6 +49,7 @@ public class AccountController {
         return ApiResponse.ok(accountApplicationService.updateAvatar(file));
     }
 
+    @SysLog("更新当前账户头像")
     @Operation(summary = "更新当前账户头像")
     @PutMapping(value = "/profile/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<AccountProfileResponse> updateProfileAvatar(
@@ -53,6 +57,7 @@ public class AccountController {
         return ApiResponse.ok(accountApplicationService.updateAvatar(file));
     }
 
+    @SysLog("修改当前账户密码")
     @Operation(summary = "修改当前账户密码")
     @PostMapping("/password/change")
     public ApiResponse<AccountProfileResponse> changePassword(@Valid @RequestBody AccountPasswordChangeRequest request) {

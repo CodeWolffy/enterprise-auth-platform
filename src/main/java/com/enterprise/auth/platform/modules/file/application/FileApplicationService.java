@@ -6,7 +6,6 @@ import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.PageResult;
-import com.enterprise.auth.platform.modules.audit.application.AuditService;
 import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.file.domain.FileVisibility;
@@ -38,22 +37,19 @@ public class FileApplicationService {
     private final SysStorageFileMapper storageFileMapper;
     private final CurrentUserService currentUserService;
     private final PlatformAdminSupport platformAdminSupport;
-    private final AuditService auditService;
 
     public FileApplicationService(
             FileStorageProperties properties,
             ObjectStorageService objectStorageService,
             SysStorageFileMapper storageFileMapper,
             CurrentUserService currentUserService,
-            PlatformAdminSupport platformAdminSupport,
-            AuditService auditService
+            PlatformAdminSupport platformAdminSupport
     ) {
         this.properties = properties;
         this.objectStorageService = objectStorageService;
         this.storageFileMapper = storageFileMapper;
         this.currentUserService = currentUserService;
         this.platformAdminSupport = platformAdminSupport;
-        this.auditService = auditService;
     }
 
     @Transactional
@@ -149,11 +145,6 @@ public class FileApplicationService {
         assertDeletable(entity, user);
         objectStorageService.delete(entity.getBucketName(), entity.getObjectKey());
         storageFileMapper.softDeleteByIdIgnoreTenant(entity.getId());
-        auditService.record("FILE_DELETED", user.username(), entity.getTenantId(), Map.of(
-                "fileKey", entity.getFileKey(),
-                "visibility", entity.getVisibility(),
-                "storageType", entity.getStorageType()
-        ));
     }
 
     public String publicUrl(String fileKey) {
@@ -208,14 +199,6 @@ public class FileApplicationService {
         entity.setVisibility(resolvedVisibility.name());
         entity.setOwnerUserId(user.id());
         storageFileMapper.insert(entity);
-
-        auditService.record(auditType, user.username(), tenantId, Map.of(
-                "fileKey", fileKey,
-                "visibility", resolvedVisibility.name(),
-                "contentType", validatedUpload.contentType(),
-                "size", file.getSize(),
-                "storageType", storedObject.storageType()
-        ));
         return toView(entity);
     }
 

@@ -360,7 +360,7 @@ async function mockApis(page: Page) {
               deptId: 2,
               enabled: true,
               roles: ['OPS'],
-              permissions: ['audit:read'],
+              permissions: ['upms:operationlog:page'],
               dataScopeType: 'DEPT',
             },
           ],

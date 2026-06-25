@@ -3,6 +3,7 @@ package com.enterprise.auth.platform.modules.system.interfaces;
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.common.web.PageResult;
+import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
 import com.enterprise.auth.platform.modules.system.interfaces.ConfigCrudRequest;
 import com.enterprise.auth.platform.modules.system.interfaces.CategoryConfigRequest;
 import com.enterprise.auth.platform.modules.system.interfaces.DictCrudRequest;
@@ -97,6 +98,7 @@ public class SystemController {
         return ApiResponse.ok(categoryRuleApplicationService.analyzeCategoryOption(targetType, code));
     }
 
+    @SysLog("新增分类配置")
     @Operation(summary = "新增分类配置")
     @PostMapping("/categories/{targetType}")
     @SaCheckPermission(PermissionCodes.SYSCATEGORY_ADD)
@@ -107,6 +109,7 @@ public class SystemController {
         return ApiResponse.ok(categoryRuleApplicationService.createCategoryOption(targetType, request));
     }
 
+    @SysLog("修改分类配置")
     @Operation(summary = "修改分类配置")
     @PutMapping("/categories/{targetType}/{code}")
     @SaCheckPermission(PermissionCodes.SYSCATEGORY_EDIT)
@@ -118,6 +121,7 @@ public class SystemController {
         return ApiResponse.ok(categoryRuleApplicationService.updateCategoryOption(targetType, code, request));
     }
 
+    @SysLog("删除分类配置")
     @Operation(summary = "删除分类配置")
     @DeleteMapping("/categories/{targetType}/{code}")
     @SaCheckPermission(PermissionCodes.SYSCATEGORY_DEL)
@@ -151,6 +155,7 @@ public class SystemController {
         return ApiResponse.ok(dictApplicationService.detail(id));
     }
 
+    @SysLog("新增字典")
     @Operation(summary = "新增字典")
     @PostMapping("/dicts")
     @SaCheckPermission(PermissionCodes.SYSDICT_ADD)
@@ -158,6 +163,7 @@ public class SystemController {
         return ApiResponse.ok(dictApplicationService.createDict(request));
     }
 
+    @SysLog("修改字典")
     @Operation(summary = "修改字典")
     @PutMapping("/dicts/{id}")
     @SaCheckPermission(PermissionCodes.SYSDICT_EDIT)
@@ -168,6 +174,7 @@ public class SystemController {
         return ApiResponse.ok(dictApplicationService.updateDict(id, request));
     }
 
+    @SysLog("删除字典")
     @Operation(summary = "删除字典")
     @DeleteMapping("/dicts/{id}")
     @SaCheckPermission(PermissionCodes.SYSDICT_DEL)
@@ -194,6 +201,7 @@ public class SystemController {
         return ApiResponse.ok(dictValueApplicationService.listByDictId(id));
     }
 
+    @SysLog("新增字典值")
     @Operation(summary = "新增字典值")
     @PostMapping("/dicts/{id}/values")
     @SaCheckPermission(PermissionCodes.SYSDICT_ADD)
@@ -204,6 +212,7 @@ public class SystemController {
         return ApiResponse.ok(dictValueApplicationService.create(id, request));
     }
 
+    @SysLog("修改字典值")
     @Operation(summary = "修改字典值")
     @PutMapping("/dict-values/{valueId}")
     @SaCheckPermission(PermissionCodes.SYSDICT_EDIT)
@@ -214,6 +223,7 @@ public class SystemController {
         return ApiResponse.ok(dictValueApplicationService.update(valueId, request));
     }
 
+    @SysLog("删除字典值")
     @Operation(summary = "删除字典值")
     @DeleteMapping("/dict-values/{valueId}")
     @SaCheckPermission(PermissionCodes.SYSDICT_DEL)
@@ -222,6 +232,7 @@ public class SystemController {
         return ApiResponse.ok();
     }
 
+    @SysLog("刷新字典缓存")
     @Operation(summary = "刷新字典缓存")
     @DeleteMapping("/dicts/cache")
     @SaCheckPermission(PermissionCodes.SYSDICT_EDIT)
@@ -243,6 +254,7 @@ public class SystemController {
         return ApiResponse.ok(configApplicationService.configs(category, keyword, page, size, sortBy, sortDirection));
     }
 
+    @SysLog("新增参数")
     @Operation(summary = "新增参数")
     @PostMapping("/configs")
     @SaCheckPermission(PermissionCodes.SYSCONFIG_ADD)
@@ -250,6 +262,7 @@ public class SystemController {
         return ApiResponse.ok(configApplicationService.createConfig(request));
     }
 
+    @SysLog("修改参数")
     @Operation(summary = "修改参数")
     @PutMapping("/configs/{id}")
     @SaCheckPermission(PermissionCodes.SYSCONFIG_EDIT)
@@ -260,6 +273,7 @@ public class SystemController {
         return ApiResponse.ok(configApplicationService.updateConfig(id, request));
     }
 
+    @SysLog("删除参数")
     @Operation(summary = "删除参数")
     @DeleteMapping("/configs/{id}")
     @SaCheckPermission(PermissionCodes.SYSCONFIG_DEL)
@@ -289,6 +303,7 @@ public class SystemController {
         return ApiResponse.ok(noticeApplicationService.publishedNotice(id));
     }
 
+    @SysLog("新增公告")
     @Operation(summary = "新增公告")
     @PostMapping("/notices")
     @SaCheckPermission(PermissionCodes.SYSNOTICE_ADD)
@@ -296,6 +311,7 @@ public class SystemController {
         return ApiResponse.ok(noticeApplicationService.createNotice(request));
     }
 
+    @SysLog("修改公告")
     @Operation(summary = "修改公告")
     @PutMapping("/notices/{id}")
     @SaCheckPermission(PermissionCodes.SYSNOTICE_EDIT)
@@ -306,6 +322,7 @@ public class SystemController {
         return ApiResponse.ok(noticeApplicationService.updateNotice(id, request));
     }
 
+    @SysLog("删除公告")
     @Operation(summary = "删除公告")
     @DeleteMapping("/notices/{id}")
     @SaCheckPermission(PermissionCodes.SYSNOTICE_DEL)

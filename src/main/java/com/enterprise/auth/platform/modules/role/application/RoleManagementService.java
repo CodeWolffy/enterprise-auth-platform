@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.modules.role.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.enterprise.auth.platform.modules.audit.application.AuditService;
+import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.modules.resource.application.CatalogService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.authz.DataScopeType;
@@ -32,7 +32,7 @@ public class RoleManagementService {
     private final UserQueryFacade userQueryFacade;
     private final DeptQueryFacade deptQueryFacade;
     private final CatalogService catalogService;
-    private final AuditService auditService;
+    private final LogPublisher logPublisher;
     private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
     private final RolePayloadCodec rolePayloadCodec;
     private final MenuService menuService;
@@ -43,7 +43,7 @@ public class RoleManagementService {
             UserQueryFacade userQueryFacade,
             DeptQueryFacade deptQueryFacade,
             CatalogService catalogService,
-            AuditService auditService,
+            LogPublisher logPublisher,
             AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
             RolePayloadCodec rolePayloadCodec,
             MenuService menuService
@@ -53,7 +53,7 @@ public class RoleManagementService {
         this.userQueryFacade = userQueryFacade;
         this.deptQueryFacade = deptQueryFacade;
         this.catalogService = catalogService;
-        this.auditService = auditService;
+        this.logPublisher = logPublisher;
         this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
         this.rolePayloadCodec = rolePayloadCodec;
         this.menuService = menuService;
@@ -75,7 +75,6 @@ public class RoleManagementService {
         applyDataScope(entity, tenantId, request.dataScopeType(), request.customDeptIds());
         sysRoleMapper.insert(entity);
 
-        auditService.record("ROLE_CREATED", operator, tenantId, Map.of("roleId", entity.getId(), "roleCode", entity.getRoleCode()));
         return catalogService.role(entity.getRoleCode());
     }
 
@@ -89,7 +88,6 @@ public class RoleManagementService {
         sysRoleMapper.updateById(entity);
         evictPrincipalsByRole(tenantId, roleId);
 
-        auditService.record("ROLE_UPDATED", SecuritySupport.currentOperator(), tenantId, Map.of("roleId", entity.getId(), "roleCode", entity.getRoleCode()));
         return catalogService.role(entity.getRoleCode());
     }
 
@@ -110,8 +108,6 @@ public class RoleManagementService {
             sysRoleMenuMapper.insert(relation);
         }
         evictPrincipalsByRole(tenantId, roleId);
-        auditService.record("ROLE_MENU_ASSIGNED", operator, tenantId,
-                Map.of("roleId", entity.getId(), "roleCode", entity.getRoleCode(), "menuIds", assigned));
         return assigned;
     }
 
@@ -164,7 +160,6 @@ public class RoleManagementService {
                 .eq(SysRoleMenuEntity::getTenantId, tenantId)
                 .eq(SysRoleMenuEntity::getRoleId, roleId));
         evictPrincipalsByRole(tenantId, roleId);
-        auditService.record("ROLE_DELETED", operator, tenantId, Map.of("roleId", roleId, "roleCode", entity.getRoleCode()));
     }
 
     public Set<Long> listRoleMenuIds(String tenantId, Long roleId) {

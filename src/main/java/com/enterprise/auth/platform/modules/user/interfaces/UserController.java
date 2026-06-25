@@ -4,6 +4,7 @@ import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.modules.resource.application.CatalogService;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.common.web.PageResult;
+import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
 import com.enterprise.auth.platform.modules.user.application.UserDirectoryService;
 import com.enterprise.auth.platform.modules.user.application.UserManagementService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -57,6 +58,7 @@ public class UserController {
         return ApiResponse.ok(userManagementService.listAssignedRoles(userId));
     }
 
+    @SysLog("新增用户")
     @Operation(summary = "新增用户")
     @PostMapping
     @SaCheckPermission(PermissionCodes.SYSUSER_ADD)
@@ -64,6 +66,7 @@ public class UserController {
         return ApiResponse.ok(userManagementService.create(request));
     }
 
+    @SysLog("修改用户")
     @Operation(summary = "修改用户")
     @PutMapping("/{userId}")
     @SaCheckPermission(PermissionCodes.SYSUSER_EDIT)
@@ -74,6 +77,7 @@ public class UserController {
         return ApiResponse.ok(userManagementService.update(userId, request));
     }
 
+    @SysLog("分配用户角色")
     @Operation(summary = "分配用户角色")
     @PutMapping("/{userId}/roles")
     @SaCheckPermission(PermissionCodes.SYSUSER_EDIT)
@@ -84,6 +88,7 @@ public class UserController {
         return ApiResponse.ok(userManagementService.assignRoles(userId, request.roleCodes()));
     }
 
+    @SysLog("删除用户")
     @Operation(summary = "删除用户")
     @DeleteMapping("/{userId}")
     @SaCheckPermission(PermissionCodes.SYSUSER_DEL)

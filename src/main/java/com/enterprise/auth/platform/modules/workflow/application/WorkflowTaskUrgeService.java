@@ -2,8 +2,6 @@ package com.enterprise.auth.platform.modules.workflow.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.TimeSupport;
-import com.enterprise.auth.platform.common.audit.AuditEventPublisher;
-import com.enterprise.auth.platform.common.audit.PlatformAuditEvent;
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
@@ -48,7 +46,6 @@ public class WorkflowTaskUrgeService {
     private final WfTaskMapper taskMapper;
     private final WfProcessInstanceMapper instanceMapper;
     private final CurrentUserService currentUserService;
-    private final AuditEventPublisher auditEventPublisher;
     private final ObjectMapper objectMapper;
     private final NotificationPublisher notificationPublisher;
     private static final TypeReference<java.util.Set<Long>> LONG_SET_TYPE = new TypeReference<>() { };
@@ -59,7 +56,6 @@ public class WorkflowTaskUrgeService {
             WfTaskMapper taskMapper,
             WfProcessInstanceMapper instanceMapper,
             CurrentUserService currentUserService,
-            AuditEventPublisher auditEventPublisher,
             ObjectMapper objectMapper,
             NotificationPublisher notificationPublisher
     ) {
@@ -67,7 +63,6 @@ public class WorkflowTaskUrgeService {
         this.taskMapper = taskMapper;
         this.instanceMapper = instanceMapper;
         this.currentUserService = currentUserService;
-        this.auditEventPublisher = auditEventPublisher;
         this.objectMapper = objectMapper;
         this.notificationPublisher = notificationPublisher;
     }
@@ -104,12 +99,6 @@ public class WorkflowTaskUrgeService {
         publishAfterCommit(buildUrgeNotification(tenantId, task, entity, user));
         WorkflowTaskUrgeView view = WorkflowTaskUrgeView.from(entity, targets);
         int total = countUrges(task.getTenantId(), task.getId());
-        auditEventPublisher.publish(PlatformAuditEvent.of("WORKFLOW_TASK_URGED", user.username(), tenantId, Map.of(
-                "taskId", task.getId(),
-                "instanceId", task.getInstanceId(),
-                "urgeId", entity.getId(),
-                "totalUrgeCount", total
-        )));
         return new WorkflowTaskUrgeResult(view, total, null);
     }
 

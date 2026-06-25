@@ -146,8 +146,8 @@ class AuthControllerSessionFlowTest {
         jdbcTemplate.update("DELETE FROM sys_user_role WHERE tenant_id = ? AND user_id IN (SELECT id FROM sys_user WHERE tenant_id = ? AND username = ?)", "tenant-a", "tenant-a", TENANT_USER);
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username = ?", "tenant-a", TENANT_USER);
         jdbcTemplate.update("DELETE FROM sys_dict WHERE tenant_id = ? AND dict_type = ?", TENANT_A, "tenant_context_audit");
-        jdbcTemplate.update("DELETE FROM sys_audit_log WHERE request_id = ?", "tenant-context-audit-ut");
-        jdbcTemplate.update("DELETE FROM sys_audit_log WHERE request_id = ?", "tenant-switch-ut");
+        jdbcTemplate.update("DELETE FROM sys_log WHERE request_id = ?", "tenant-context-audit-ut");
+        jdbcTemplate.update("DELETE FROM sys_log WHERE request_id = ?", "tenant-switch-ut");
         clearAuthState();
     }
 
@@ -222,7 +222,7 @@ class AuthControllerSessionFlowTest {
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"));
-        JsonNode logoutPayload = auditPayload("LOGOUT");
+        JsonNode logoutPayload = logPayload("LOGOUT");
         Assertions.assertEquals("******", logoutPayload.path("sessionId").asText());
         Assertions.assertEquals("admin", logoutPayload.path("targetUsername").asText());
         Assertions.assertEquals("platform", logoutPayload.path("targetTenantId").asText());
@@ -324,7 +324,7 @@ class AuthControllerSessionFlowTest {
                 .andExpect(jsonPath("$.data.operatorTenantId").value(ADMIN_TENANT))
                 .andExpect(jsonPath("$.data.superAdmin").value(true))
                 .andExpect(jsonPath("$.data.menus[?(@.path=='/dashboard')]").doesNotExist())
-                .andExpect(jsonPath("$.data.menus[?(@.path=='/system/audit')]").exists());
+                .andExpect(jsonPath("$.data.menus[?(@.path=='/system/logs/operation')]").exists());
     }
 
     @Test
@@ -353,7 +353,7 @@ class AuthControllerSessionFlowTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[?(@.sessionId=='" + token + "' && @.activeTenantId=='" + TENANT_A + "')]").exists());
 
-        JsonNode payload = latestAuditPayload("TENANT_SWITCH", requestId);
+        JsonNode payload = latestLogPayload("TENANT_SWITCH", requestId);
         Assertions.assertEquals(ADMIN_TENANT, payload.path("operatorTenantId").asText());
         Assertions.assertEquals(ADMIN_TENANT, payload.path("fromTenantId").asText());
         Assertions.assertEquals(TENANT_A, payload.path("activeTenantId").asText());
@@ -417,7 +417,7 @@ class AuthControllerSessionFlowTest {
                 .andExpect(jsonPath("$.data.operatorTenantId").value(TENANT_A))
                 .andExpect(jsonPath("$.data.superAdmin").value(false))
                 .andExpect(jsonPath("$.data.grants[?(@=='upms:systenant:page')]").doesNotExist())
-                .andExpect(jsonPath("$.data.grants[?(@=='upms:audit:page')]").exists());
+                .andExpect(jsonPath("$.data.grants[?(@=='upms:operationlog:page')]").exists());
     }
 
     @Test
@@ -758,11 +758,11 @@ class AuthControllerSessionFlowTest {
         throw new AssertionError("session not found: " + token);
     }
 
-    private JsonNode auditPayload(String eventType) throws Exception {
+    private JsonNode logPayload(String eventType) throws Exception {
         List<String> payloads = jdbcTemplate.queryForList(
                 """
                 SELECT payload_json
-                FROM sys_audit_log
+                FROM sys_log
                 WHERE event_type = ?
                 ORDER BY id DESC
                 LIMIT 1
@@ -770,15 +770,15 @@ class AuthControllerSessionFlowTest {
                 String.class,
                 eventType
         );
-        Assertions.assertFalse(payloads.isEmpty(), "missing audit event " + eventType);
+        Assertions.assertFalse(payloads.isEmpty(), "missing log event " + eventType);
         return objectMapper.readTree(payloads.get(0));
     }
 
-    private JsonNode latestAuditPayload(String eventType, String requestId) throws Exception {
+  private JsonNode latestLogPayload(String eventType, String requestId) throws Exception {
         List<String> payloads = jdbcTemplate.queryForList(
                 """
                 SELECT payload_json
-                FROM sys_audit_log
+                FROM sys_log
                 WHERE event_type = ? AND request_id = ?
                 ORDER BY id DESC
                 LIMIT 1
@@ -787,7 +787,7 @@ class AuthControllerSessionFlowTest {
                 eventType,
                 requestId
         );
-        Assertions.assertFalse(payloads.isEmpty(), "missing audit event " + eventType + " for request " + requestId);
+        Assertions.assertFalse(payloads.isEmpty(), "missing log event " + eventType + " for request " + requestId);
         return objectMapper.readTree(payloads.get(0));
     }
 
@@ -842,6 +842,39 @@ class AuthControllerSessionFlowTest {
                 "tenant-a",
                 TENANT_USER
         );
+    }
+
+    private JsonNode auditPayload(String eventType) throws Exception {
+        List<String> payloads = jdbcTemplate.queryForList(
+                """
+                SELECT payload_json
+                FROM sys_audit_log
+                WHERE event_type = ?
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                String.class,
+                eventType
+        );
+        Assertions.assertFalse(payloads.isEmpty(), "missing audit event " + eventType);
+        return objectMapper.readTree(payloads.get(0));
+    }
+
+    private JsonNode latestAuditPayload(String eventType, String requestId) throws Exception {
+        List<String> payloads = jdbcTemplate.queryForList(
+                """
+                SELECT payload_json
+                FROM sys_audit_log
+                WHERE event_type = ? AND request_id = ?
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                String.class,
+                eventType,
+                requestId
+        );
+        Assertions.assertFalse(payloads.isEmpty(), "missing audit event " + eventType + " for request " + requestId);
+        return objectMapper.readTree(payloads.get(0));
     }
 
 }

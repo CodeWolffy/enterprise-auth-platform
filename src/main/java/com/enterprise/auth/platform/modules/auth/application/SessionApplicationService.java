@@ -2,7 +2,6 @@ package com.enterprise.auth.platform.modules.auth.application;
 
 import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
-import com.enterprise.auth.platform.common.audit.AuditEventPublisher;
 import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
@@ -28,20 +27,17 @@ public class SessionApplicationService {
     private static final Logger log = LoggerFactory.getLogger(SessionApplicationService.class);
     private static final int SESSION_RESULT_LIMIT = 200;
 
-    private final AuditEventPublisher auditEventPublisher;
     private final DataScopeService dataScopeService;
     private final PlatformAdminSupport platformAdminSupport;
     private final SessionIndexService sessionIndexService;
     private final NotificationScenarioPublisher notificationScenarioPublisher;
 
     public SessionApplicationService(
-            AuditEventPublisher auditEventPublisher,
             DataScopeService dataScopeService,
             PlatformAdminSupport platformAdminSupport,
             SessionIndexService sessionIndexService,
             NotificationScenarioPublisher notificationScenarioPublisher
     ) {
-        this.auditEventPublisher = auditEventPublisher;
         this.dataScopeService = dataScopeService;
         this.platformAdminSupport = platformAdminSupport;
         this.sessionIndexService = sessionIndexService;
@@ -52,7 +48,6 @@ public class SessionApplicationService {
         Map<String, Object> payload = sessionAuditPayload(sessionId);
         StpUtil.logoutByTokenValue(sessionId);
         sessionIndexService.remove(sessionId);
-        auditEventPublisher.publish("LOGOUT", username, tenantId, payload);
     }
 
     public List<UserSessionResponse> sessions(UserAccount currentUser, String scope, String currentToken) {
@@ -90,7 +85,6 @@ public class SessionApplicationService {
         StpUtil.kickoutByTokenValue(sessionId);
         sessionIndexService.remove(sessionId);
         payload.put("targetUserId", targetUserId);
-        auditEventPublisher.publish("SESSION_FORCED_OFFLINE", currentUser.username(), currentUser.tenantId(), payload);
         notificationScenarioPublisher.sessionForcedOffline(targetTenantId, targetUserId, currentUser.username(), payload);
     }
 

@@ -4,6 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.common.web.PageResult;
+import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
 import com.enterprise.auth.platform.modules.file.application.FileApplicationService;
 import com.enterprise.auth.platform.modules.file.application.FileDownloadResult;
 import com.enterprise.auth.platform.modules.file.application.FileMetadataView;
@@ -53,6 +54,7 @@ public class FileController {
         return ApiResponse.ok(fileApplicationService.page(new FileQuery(keyword, contentType, storageType, visibility, page, size)));
     }
 
+    @SysLog("上传文件")
     @Operation(summary = "上传文件")
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @SaCheckPermission(PermissionCodes.FILE_ADD)
@@ -81,6 +83,7 @@ public class FileController {
         return downloadResponse(fileApplicationService.publicDownload(fileKey));
     }
 
+    @SysLog("删除文件")
     @Operation(summary = "删除文件")
     @DeleteMapping("/{fileKey}")
     @SaCheckPermission(PermissionCodes.FILE_DEL)

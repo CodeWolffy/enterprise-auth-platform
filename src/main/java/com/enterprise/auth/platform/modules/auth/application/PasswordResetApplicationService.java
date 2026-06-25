@@ -7,7 +7,7 @@ import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.ClientIpResolver;
-import com.enterprise.auth.platform.modules.audit.application.AuditService;
+import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 import com.enterprise.auth.platform.modules.auth.infrastructure.SecurityProperties;
 import com.enterprise.auth.platform.modules.auth.infrastructure.entity.SysPasswordResetTokenEntity;
@@ -45,7 +45,7 @@ public class PasswordResetApplicationService {
     private final PasswordHasher passwordHasher;
     private final SecurityPolicyApplicationService securityPolicyApplicationService;
     private final PasswordResetNotificationService notificationService;
-    private final AuditService auditService;
+    private final LogPublisher logPublisher;
     private final SecurityProperties securityProperties;
     private final ClientIpResolver clientIpResolver;
     private final SessionIndexService sessionIndexService;
@@ -59,7 +59,7 @@ public class PasswordResetApplicationService {
             PasswordHasher passwordHasher,
             SecurityPolicyApplicationService securityPolicyApplicationService,
             PasswordResetNotificationService notificationService,
-            AuditService auditService,
+            LogPublisher logPublisher,
             SecurityProperties securityProperties,
             ClientIpResolver clientIpResolver,
             SessionIndexService sessionIndexService,
@@ -71,7 +71,7 @@ public class PasswordResetApplicationService {
         this.passwordHasher = passwordHasher;
         this.securityPolicyApplicationService = securityPolicyApplicationService;
         this.notificationService = notificationService;
-        this.auditService = auditService;
+        this.logPublisher = logPublisher;
         this.securityProperties = securityProperties;
         this.clientIpResolver = clientIpResolver;
         this.sessionIndexService = sessionIndexService;
@@ -90,7 +90,7 @@ public class PasswordResetApplicationService {
         if (!StringUtils.hasText(request.tenantId())) {
             List<String> tenantIds = userAuthenticationFacade.activeTenantIdsByUsername(username);
             if (tenantIds.isEmpty()) {
-                auditService.record("PASSWORD_RESET_REQUESTED", username, "unknown",
+                logPublisher.publish("PASSWORD_RESET_REQUESTED", username, "unknown",
                         Map.of("result", "not_found", "clientIp", clientIp));
                 return acceptedPasswordResetRequest();
             }
@@ -102,29 +102,29 @@ public class PasswordResetApplicationService {
         if (user == null) {
             // 显式指定了租户但用户不存在，或未指定租户但用户跨多租户存在
             if (StringUtils.hasText(request.tenantId())) {
-                auditService.record("PASSWORD_RESET_REQUESTED", username, request.tenantId(),
+                logPublisher.publish("PASSWORD_RESET_REQUESTED", username, request.tenantId(),
                         Map.of("result", "not_found", "clientIp", clientIp));
                 return acceptedPasswordResetRequest();
             }
-            auditService.record("PASSWORD_RESET_REQUESTED", username, "unknown",
+            logPublisher.publish("PASSWORD_RESET_REQUESTED", username, "unknown",
                     Map.of("result", "accepted", "clientIp", clientIp, "accountMatched", false));
             return acceptedPasswordResetRequest();
         }
 
         if (user.getEnabled() == null || user.getEnabled() != 1) {
-            auditService.record("PASSWORD_RESET_REQUESTED", username, tenantId,
+            logPublisher.publish("PASSWORD_RESET_REQUESTED", username, tenantId,
                     Map.of("result", "disabled", "clientIp", clientIp));
             return acceptedPasswordResetRequest();
         }
 
         if (!StringUtils.hasText(user.getEmail())) {
-            auditService.record("PASSWORD_RESET_REQUESTED", username, tenantId,
+            logPublisher.publish("PASSWORD_RESET_REQUESTED", username, tenantId,
                     Map.of("result", "no_email", "clientIp", clientIp));
             return acceptedPasswordResetRequest();
         }
 
         if (!emailMatches(user.getEmail(), email)) {
-            auditService.record("PASSWORD_RESET_REQUESTED", username, tenantId,
+            logPublisher.publish("PASSWORD_RESET_REQUESTED", username, tenantId,
                     Map.of("result", "email_mismatch", "clientIp", clientIp));
             return acceptedPasswordResetRequest();
         }
@@ -152,7 +152,7 @@ public class PasswordResetApplicationService {
         String resetLink = buildResetLink(rawToken);
         notificationService.sendPasswordResetLink(user.getTenantId(), user.getEmail(), user.getUsername(), resetLink);
         notificationScenarioPublisher.passwordResetRequested(user.getTenantId(), user.getId(), user.getUsername(), clientIp);
-        auditService.record("PASSWORD_RESET_REQUESTED", user.getUsername(), user.getTenantId(),
+        logPublisher.publish("PASSWORD_RESET_REQUESTED", user.getUsername(), user.getTenantId(),
                 Map.of("userId", user.getId(), "clientIp", clientIp));
         return new PasswordResetRequestResponse(GENERIC_REQUEST_MESSAGE, "EMAIL_SENT");
     }
@@ -160,7 +160,7 @@ public class PasswordResetApplicationService {
     public PasswordResetVerifyResponse verify(PasswordResetVerifyRequest request) {
         SysPasswordResetTokenEntity token = activeToken(request.token());
         if (token == null) {
-            auditService.record("PASSWORD_RESET_FAILED", "anonymous", "unknown", Map.of("reason", "invalid_or_expired"));
+            logPublisher.publish("PASSWORD_RESET_FAILED", "anonymous", "unknown", Map.of("reason", "invalid_or_expired"));
             return new PasswordResetVerifyResponse(false, null);
         }
         return new PasswordResetVerifyResponse(true, token.getUsername());
@@ -170,13 +170,13 @@ public class PasswordResetApplicationService {
     public PasswordResetConfirmResponse confirm(PasswordResetConfirmRequest request) {
         SysPasswordResetTokenEntity token = activeTokenForUpdate(request.token());
         if (token == null) {
-            auditService.record("PASSWORD_RESET_FAILED", "anonymous", "unknown", Map.of("reason", "invalid_or_expired"));
+            logPublisher.publish("PASSWORD_RESET_FAILED", "anonymous", "unknown", Map.of("reason", "invalid_or_expired"));
             throw new BusinessException("PASSWORD_RESET_TOKEN_INVALID", "重置链接无效、已使用或已过期");
         }
         SysUserEntity user = userAuthenticationFacade.findActiveEntityById(token.getTenantId(), token.getUserId()).orElse(null);
         if (user == null || (user.getDeleted() != null && user.getDeleted() == 1) || user.getEnabled() == null || user.getEnabled() != 1) {
             tokenMapper.revokeIfActive(token.getId(), TimeSupport.utcNowDateTime(), "password-reset");
-            auditService.record("PASSWORD_RESET_FAILED", token.getUsername(), token.getTenantId(), Map.of("reason", "user_unavailable"));
+            logPublisher.publish("PASSWORD_RESET_FAILED", token.getUsername(), token.getTenantId(), Map.of("reason", "user_unavailable"));
             throw new BusinessException("PASSWORD_RESET_TOKEN_INVALID", "重置链接无效、已使用或已过期");
         }
 
@@ -205,7 +205,7 @@ public class PasswordResetApplicationService {
             sessionIndexService.removeUser(user.getId());
             StpUtil.kickout(user.getId());
         });
-        auditService.record("PASSWORD_RESET_COMPLETED", user.getUsername(), user.getTenantId(), Map.of("userId", user.getId()));
+        logPublisher.publish("PASSWORD_RESET_COMPLETED", user.getUsername(), user.getTenantId(), Map.of("userId", user.getId()));
         notificationScenarioPublisher.passwordResetCompleted(user.getTenantId(), user.getId(), user.getUsername());
         return new PasswordResetConfirmResponse("密码已重置，请使用新密码登录");
     }

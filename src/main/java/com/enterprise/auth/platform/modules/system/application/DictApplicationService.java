@@ -16,7 +16,6 @@ import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysDict
 import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysDictValueMapper;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.system.interfaces.DictCrudRequest;
-import com.enterprise.auth.platform.modules.audit.application.AuditService;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -41,20 +40,17 @@ public class DictApplicationService {
     private final SysDictMapper sysDictMapper;
     private final SysDictValueMapper sysDictValueMapper;
     private final SysCategoryRuleMapper sysCategoryRuleMapper;
-    private final AuditService auditService;
     private final DataScopeService dataScopeService;
 
     public DictApplicationService(
             SysDictMapper sysDictMapper,
             SysDictValueMapper sysDictValueMapper,
             SysCategoryRuleMapper sysCategoryRuleMapper,
-            AuditService auditService,
             DataScopeService dataScopeService
     ) {
         this.sysDictMapper = sysDictMapper;
         this.sysDictValueMapper = sysDictValueMapper;
         this.sysCategoryRuleMapper = sysCategoryRuleMapper;
-        this.auditService = auditService;
         this.dataScopeService = dataScopeService;
     }
 
@@ -97,7 +93,6 @@ public class DictApplicationService {
         entity.setTenantId(tenantId);
         applyDictProfile(entity, request, dictType);
         sysDictMapper.insert(entity);
-        auditService.record("DICT_CREATED", operator, tenantId, Map.of("dictId", entity.getId(), "dictType", entity.getDictType()));
         return toDictView(entity);
     }
 
@@ -114,7 +109,6 @@ public class DictApplicationService {
         if (!oldType.equals(dictType)) {
             syncValueTypes(tenantId, id, dictType);
         }
-        auditService.record("DICT_UPDATED", SecuritySupport.currentOperator(), tenantId, Map.of("dictId", id, "dictType", entity.getDictType()));
         return toDictView(entity);
     }
 
@@ -137,7 +131,6 @@ public class DictApplicationService {
         releaseDeletedDictIdentity(entity);
         sysDictMapper.updateById(entity);
         sysDictMapper.deleteById(entity.getId());
-        auditService.record("DICT_DELETED", SecuritySupport.currentOperator(), tenantId, Map.of("dictId", id, "dictType", entity.getDictType()));
     }
 
     public String currentTenantId() {

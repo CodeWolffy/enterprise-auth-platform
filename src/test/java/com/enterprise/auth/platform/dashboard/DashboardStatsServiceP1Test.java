@@ -194,7 +194,7 @@ class DashboardStatsServiceP1Test {
 
     private void ensureAudit(String tenantId, String operator, String eventType) {
         jdbcTemplate.update(
-                "INSERT INTO sys_audit_log(tenant_id, event_type, operator, payload_json, occurred_at, request_id, client_ip) VALUES(?,?,?,?,?,?,?)",
+                "INSERT INTO sys_log(tenant_id, event_type, operator, payload_json, create_time, request_id, client_ip) VALUES(?,?,?,?,?,?,?)",
                 tenantId,
                 eventType,
                 operator,
@@ -203,6 +203,23 @@ class DashboardStatsServiceP1Test {
                 "p1db-" + operator + "-" + eventType,
                 "127.0.0.1"
         );
+        String loginStatus = switch (eventType) {
+            case "LOGIN_SUCCESS" -> "SUCCESS";
+            case "LOGIN_FAILED" -> "FAILED";
+            case "ACCOUNT_LOCKED" -> "LOCKED";
+            default -> null;
+        };
+        if (loginStatus != null) {
+            jdbcTemplate.update(
+                    "INSERT INTO sys_login_log(tenant_id, user_name, status, msg, ip_addr, create_time) VALUES(?,?,?,?,?,?)",
+                    tenantId,
+                    operator,
+                    loginStatus,
+                    eventType,
+                    "127.0.0.1",
+                    TimeSupport.utcNowDateTime()
+            );
+        }
     }
 
     private UserAccount principal(Long userId, String tenantId, String username, DataScopeType dataScopeType) {
@@ -221,8 +238,10 @@ class DashboardStatsServiceP1Test {
     }
 
     private void cleanup() {
-        jdbcTemplate.update("DELETE FROM sys_audit_log WHERE tenant_id IN (?, ?) AND request_id LIKE 'p1db-%'",
+        jdbcTemplate.update("DELETE FROM sys_log WHERE tenant_id IN (?, ?) AND request_id LIKE 'p1db-%'",
                 TENANT_A, TENANT_B);
+        jdbcTemplate.update("DELETE FROM sys_login_log WHERE tenant_id IN (?, ?) AND user_name IN (?, ?, ?, ?)",
+                TENANT_A, TENANT_B, ADMIN, VISIBLE, HIDDEN, OTHER_TENANT);
         jdbcTemplate.update("DELETE FROM sys_storage_file WHERE tenant_id IN (?, ?) AND file_key LIKE 'p1-dashboard-%'",
                 TENANT_A, TENANT_B);
         jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id IN (?, ?) AND role_code LIKE 'p1_dashboard_role_%'",

@@ -23,7 +23,8 @@ public class ClientIpResolver {
 
     public String resolve(HttpServletRequest request) {
         String remoteAddr = normalize(request.getRemoteAddr());
-        if (!isTrustedProxy(remoteAddr)) {
+
+        if (!UNKNOWN.equals(remoteAddr) && !isTrustedProxy(remoteAddr)) {
             return remoteAddr;
         }
 
@@ -33,7 +34,11 @@ public class ClientIpResolver {
         }
 
         String realIp = normalize(request.getHeader(X_REAL_IP));
-        return StringUtils.hasText(realIp) ? realIp : remoteAddr;
+        if (StringUtils.hasText(realIp) && !UNKNOWN.equals(realIp)) {
+            return realIp;
+        }
+
+        return UNKNOWN.equals(remoteAddr) ? "127.0.0.1" : remoteAddr;
     }
 
     boolean isTrustedProxy(String remoteAddr) {

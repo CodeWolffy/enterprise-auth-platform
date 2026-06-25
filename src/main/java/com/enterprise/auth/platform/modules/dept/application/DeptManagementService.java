@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.modules.dept.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.enterprise.auth.platform.modules.audit.application.AuditService;
+import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.modules.resource.application.CatalogService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.dept.interfaces.DeptCrudRequest;
@@ -21,19 +21,19 @@ public class DeptManagementService {
 
     private final SysDeptMapper sysDeptMapper;
     private final UserQueryFacade userQueryFacade;
-    private final AuditService auditService;
+    private final LogPublisher logPublisher;
     private final DataScopeService dataScopeService;
 
     public DeptManagementService(
             SysDeptMapper sysDeptMapper,
             UserQueryFacade userQueryFacade,
             CatalogService catalogService,
-            AuditService auditService,
+            LogPublisher logPublisher,
             DataScopeService dataScopeService
     ) {
         this.sysDeptMapper = sysDeptMapper;
         this.userQueryFacade = userQueryFacade;
-        this.auditService = auditService;
+        this.logPublisher = logPublisher;
         this.dataScopeService = dataScopeService;
     }
 
@@ -55,7 +55,6 @@ public class DeptManagementService {
         entity.setOrderNo(request.orderNo() == null ? 0 : request.orderNo());
         entity.setEnabled(request.enabled() == null ? 1 : request.enabled());
         sysDeptMapper.insert(entity);
-        auditService.record("DEPT_CREATED", operator, tenantId, Map.of("deptId", entity.getId()));
         return toDepartmentView(entity);
     }
 
@@ -75,7 +74,6 @@ public class DeptManagementService {
         entity.setOrderNo(request.orderNo() == null ? 0 : request.orderNo());
         entity.setEnabled(request.enabled() == null ? 1 : request.enabled());
         sysDeptMapper.updateById(entity);
-        auditService.record("DEPT_UPDATED", SecuritySupport.currentOperator(), tenantId, Map.of("deptId", entity.getId()));
         return toDepartmentView(entity);
     }
 
@@ -93,7 +91,6 @@ public class DeptManagementService {
             throw new BusinessException("部门下仍存在子部门或用户，暂不允许删除");
         }
         sysDeptMapper.deleteById(entity.getId());
-        auditService.record("DEPT_DELETED", operator, tenantId, Map.of("deptId", deptId));
     }
 
     private SysDeptEntity getDept(Long deptId, String tenantId) {

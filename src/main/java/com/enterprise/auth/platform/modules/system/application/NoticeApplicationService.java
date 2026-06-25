@@ -14,7 +14,6 @@ import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysNoti
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.notification.application.NotificationScenarioPublisher;
 import com.enterprise.auth.platform.modules.system.interfaces.NoticeCrudRequest;
-import com.enterprise.auth.platform.modules.audit.application.AuditService;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -33,18 +32,15 @@ public class NoticeApplicationService {
     private static final String SORT_DESC = "desc";
 
     private final SysNoticeMapper sysNoticeMapper;
-    private final AuditService auditService;
     private final DataScopeService dataScopeService;
     private final NotificationScenarioPublisher notificationScenarioPublisher;
 
     public NoticeApplicationService(
             SysNoticeMapper sysNoticeMapper,
-            AuditService auditService,
             DataScopeService dataScopeService,
             NotificationScenarioPublisher notificationScenarioPublisher
     ) {
         this.sysNoticeMapper = sysNoticeMapper;
-        this.auditService = auditService;
         this.dataScopeService = dataScopeService;
         this.notificationScenarioPublisher = notificationScenarioPublisher;
     }
@@ -85,7 +81,6 @@ public class NoticeApplicationService {
         entity.setPublished(Boolean.TRUE.equals(request.published()) ? 1 : 0);
         entity.setPublishTime(TimeSupport.localDateTimeFromEpochMilli(request.publishTime()));
         sysNoticeMapper.insert(entity);
-        auditService.record("NOTICE_CREATED", operator, tenantId, Map.of("noticeId", entity.getId(), "workflowStatus", workflowStatus(entity)));
         publishNoticeNotificationIfActive(entity, operator, false);
         return toNoticeView(entity);
     }
@@ -101,7 +96,6 @@ public class NoticeApplicationService {
         entity.setPublished(Boolean.TRUE.equals(request.published()) ? 1 : 0);
         entity.setPublishTime(TimeSupport.localDateTimeFromEpochMilli(request.publishTime()));
         sysNoticeMapper.updateById(entity);
-        auditService.record("NOTICE_UPDATED", SecuritySupport.currentOperator(), tenantId, Map.of("noticeId", id, "workflowStatus", workflowStatus(entity)));
         publishNoticeNotificationIfActive(entity, SecuritySupport.currentOperator(), wasActivePublished);
         return toNoticeView(entity);
     }
@@ -112,7 +106,6 @@ public class NoticeApplicationService {
         String tenantId = currentTenantId();
         SysNoticeEntity entity = getNotice(id, tenantId);
         sysNoticeMapper.deleteById(entity.getId());
-        auditService.record("NOTICE_DELETED", SecuritySupport.currentOperator(), tenantId, Map.of("noticeId", id));
     }
 
     public SystemViewModels.NoticeView publishedNotice(Long id) {

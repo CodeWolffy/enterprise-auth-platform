@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.modules.tenant.interfaces;
 
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
+import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
 import com.enterprise.auth.platform.modules.tenant.application.TenantCapabilityApplicationService;
 import com.enterprise.auth.platform.modules.tenant.application.TenantCatalogApplicationService;
 import com.enterprise.auth.platform.common.web.ApiResponse;
@@ -45,6 +46,7 @@ public class TenantCatalogController {
         return ApiResponse.ok(tenantCatalogApplicationService.packages());
     }
 
+    @SysLog("新增套餐")
     @Operation(summary = "新增套餐")
     @PostMapping("/packages")
     @SaCheckPermission(PermissionCodes.TENANT_CATALOG_ADD)
@@ -54,6 +56,7 @@ public class TenantCatalogController {
         return ApiResponse.ok(tenantCatalogApplicationService.createPackage(request));
     }
 
+    @SysLog("修改套餐")
     @Operation(summary = "修改套餐")
     @PutMapping("/packages/{id}")
     @SaCheckPermission(PermissionCodes.TENANT_CATALOG_EDIT)
@@ -73,6 +76,7 @@ public class TenantCatalogController {
         return ApiResponse.ok(tenantCatalogApplicationService.packageImpact(id));
     }
 
+    @SysLog("删除套餐")
     @Operation(summary = "删除套餐")
     @DeleteMapping("/packages/{id}")
     @SaCheckPermission(PermissionCodes.TENANT_CATALOG_DEL)
@@ -88,6 +92,7 @@ public class TenantCatalogController {
         return ApiResponse.ok(tenantCapabilityApplicationService.capabilities());
     }
 
+    @SysLog("新增能力")
     @Operation(summary = "新增能力")
     @PostMapping("/capabilities")
     @SaCheckPermission(PermissionCodes.TENANT_CATALOG_ADD)
@@ -97,6 +102,7 @@ public class TenantCatalogController {
         return ApiResponse.ok(tenantCapabilityApplicationService.createCapability(request));
     }
 
+    @SysLog("修改能力")
     @Operation(summary = "修改能力")
     @PutMapping("/capabilities/{id}")
     @SaCheckPermission(PermissionCodes.TENANT_CATALOG_EDIT)
@@ -116,6 +122,7 @@ public class TenantCatalogController {
         return ApiResponse.ok(tenantCapabilityApplicationService.capabilityImpact(id));
     }
 
+    @SysLog("删除能力")
     @Operation(summary = "删除能力")
     @DeleteMapping("/capabilities/{id}")
     @SaCheckPermission(PermissionCodes.TENANT_CATALOG_DEL)

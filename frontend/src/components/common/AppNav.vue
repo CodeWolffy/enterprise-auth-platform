@@ -135,9 +135,21 @@ function normalizeRoutePath(path?: string | null) {
   }
 }
 
-.sidebar-menu :deep(.el-sub-menu .el-menu-item) {
-  min-width: 0;
-  padding-left: 38px !important;
+// 多级菜单按真实层级缩进：一级保持紧凑，二级开始逐级右移。
+$child-level-padding: 38px;
+$child-level-step: 20px;
+
+@for $depth from 1 through 5 {
+  $selector-prefix: '.sidebar-menu:not(.el-menu--collapse) :deep(';
+  @for $i from 1 through $depth {
+    $selector-prefix: $selector-prefix + '.el-sub-menu > .el-menu > ';
+  }
+  $padding: $child-level-padding + ($depth - 1) * $child-level-step;
+
+  #{$selector-prefix + '.el-menu-item)'},
+  #{$selector-prefix + '.el-sub-menu > .el-sub-menu__title)'} {
+    padding-left: $padding !important;
+  }
 }
 
 .sidebar-menu :deep(.el-sub-menu__icon-arrow) {

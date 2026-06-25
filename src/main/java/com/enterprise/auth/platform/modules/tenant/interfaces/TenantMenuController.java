@@ -4,6 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.modules.tenant.application.TenantMenuService;
+import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -35,6 +36,7 @@ public class TenantMenuController {
         return ApiResponse.ok(tenantMenuService.findTenantMenuIds(tenantId));
     }
 
+    @SysLog("保存租户菜单分配")
     @Operation(summary = "保存租户菜单分配（全量替换）")
     @PostMapping("/{tenantId}")
     @SaCheckPermission(PermissionCodes.SYSTENANT_EDIT)

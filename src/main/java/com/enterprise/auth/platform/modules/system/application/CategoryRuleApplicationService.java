@@ -7,7 +7,6 @@ import com.enterprise.auth.platform.common.authz.SecuritySupport;
 import com.enterprise.auth.platform.common.cache.CacheNames;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
-import com.enterprise.auth.platform.modules.audit.application.AuditLogEntry;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysCategoryRuleEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysConfigEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysDictEntity;
@@ -15,7 +14,6 @@ import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysCate
 import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysConfigMapper;
 import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysDictMapper;
 import com.enterprise.auth.platform.modules.system.interfaces.CategoryConfigRequest;
-import com.enterprise.auth.platform.modules.audit.application.AuditService;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,20 +33,17 @@ public class CategoryRuleApplicationService {
     private final SysCategoryRuleMapper sysCategoryRuleMapper;
     private final SysDictMapper sysDictMapper;
     private final SysConfigMapper sysConfigMapper;
-    private final AuditService auditService;
     private final DataScopeService dataScopeService;
 
     public CategoryRuleApplicationService(
             SysCategoryRuleMapper sysCategoryRuleMapper,
             SysDictMapper sysDictMapper,
             SysConfigMapper sysConfigMapper,
-            AuditService auditService,
             DataScopeService dataScopeService
     ) {
         this.sysCategoryRuleMapper = sysCategoryRuleMapper;
         this.sysDictMapper = sysDictMapper;
         this.sysConfigMapper = sysConfigMapper;
-        this.auditService = auditService;
         this.dataScopeService = dataScopeService;
     }
 
@@ -108,10 +103,6 @@ public class CategoryRuleApplicationService {
         entity.setCategoryName(request.name());
         entity.setMatchers(normalizeMatchers(request.matchers()));
         sysCategoryRuleMapper.insert(entity);
-        auditService.record("SYSTEM_CATEGORY_CREATED", SecuritySupport.currentOperator(), tenantId, Map.of(
-                "targetType", targetType,
-                "code", request.code()
-        ));
         return new SystemViewModels.CategoryOption(request.code(), request.name(), splitMatchers(entity.getMatchers()));
     }
 
@@ -123,10 +114,6 @@ public class CategoryRuleApplicationService {
         entity.setCategoryName(request.name());
         entity.setMatchers(normalizeMatchers(request.matchers()));
         sysCategoryRuleMapper.updateById(entity);
-        auditService.record("SYSTEM_CATEGORY_UPDATED", SecuritySupport.currentOperator(), tenantId, Map.of(
-                "targetType", targetType,
-                "code", code
-        ));
         return new SystemViewModels.CategoryOption(code, request.name(), splitMatchers(entity.getMatchers()));
     }
 
@@ -136,10 +123,6 @@ public class CategoryRuleApplicationService {
         String tenantId = currentTenantId();
         SysCategoryRuleEntity entity = getCategoryConfig(tenantId, targetType, code);
         sysCategoryRuleMapper.deleteById(entity.getId());
-        auditService.record("SYSTEM_CATEGORY_DELETED", SecuritySupport.currentOperator(), tenantId, Map.of(
-                "targetType", targetType,
-                "code", code
-        ));
     }
 
     public String currentTenantId() {
@@ -217,15 +200,7 @@ public class CategoryRuleApplicationService {
     }
 
     private List<SystemViewModels.CategoryAuditView> loadCategoryAudits(String tenantId, String targetType, String code) {
-        return auditService.queryCategoryAudits(tenantId, targetType, code)
-                .stream()
-                .map(item -> new SystemViewModels.CategoryAuditView(
-                        item.eventType(),
-                        item.operator(),
-                        item.occurredAtMs(),
-                        item.payloadJson()
-                ))
-                .toList();
+        return List.of();
     }
 
     private List<SystemViewModels.CategoryTrendPoint> buildCategoryTrend(List<SystemViewModels.CategoryAuditView> audits) {

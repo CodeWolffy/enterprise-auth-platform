@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.authz.SecuritySupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
-import com.enterprise.auth.platform.modules.audit.application.AuditService;
+import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.modules.security.domain.EffectiveSecurityPolicy;
 import com.enterprise.auth.platform.modules.security.infrastructure.entity.SysPlatformSecurityPolicyEntity;
 import com.enterprise.auth.platform.modules.security.infrastructure.entity.SysTenantSecurityPolicyEntity;
@@ -24,18 +24,18 @@ public class SecurityPolicyApplicationService {
 
     private final SysPlatformSecurityPolicyMapper platformPolicyMapper;
     private final SysTenantSecurityPolicyMapper tenantPolicyMapper;
-    private final AuditService auditService;
+    private final LogPublisher logPublisher;
     private final TenantAccessPolicy tenantAccessPolicy;
 
     public SecurityPolicyApplicationService(
             SysPlatformSecurityPolicyMapper platformPolicyMapper,
             SysTenantSecurityPolicyMapper tenantPolicyMapper,
-            AuditService auditService,
+            LogPublisher logPublisher,
             TenantAccessPolicy tenantAccessPolicy
     ) {
         this.platformPolicyMapper = platformPolicyMapper;
         this.tenantPolicyMapper = tenantPolicyMapper;
-        this.auditService = auditService;
+        this.logPublisher = logPublisher;
         this.tenantAccessPolicy = tenantAccessPolicy;
     }
 
@@ -65,8 +65,6 @@ public class SecurityPolicyApplicationService {
         SysPlatformSecurityPolicyEntity entity = ensurePlatformPolicy();
         applyPlatform(entity, request);
         platformPolicyMapper.updateById(entity);
-        auditService.record("PLATFORM_SECURITY_POLICY_UPDATED", SecuritySupport.currentOperator(), PLATFORM_TENANT_ID,
-                Map.of("policyId", entity.getId()));
         return platformPolicyView();
     }
 
@@ -82,8 +80,6 @@ public class SecurityPolicyApplicationService {
         }
         applyTenant(entity, request);
         tenantPolicyMapper.updateById(entity);
-        auditService.record("TENANT_SECURITY_POLICY_UPDATED", SecuritySupport.currentOperator(), tenantId,
-                Map.of("tenantId", tenantId, "policyId", entity.getId()));
         return SecurityPolicyView.from(effectivePolicy(tenantId));
     }
 

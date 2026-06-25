@@ -236,7 +236,7 @@ class AuthPasswordResetTest {
                 TENANT_ID, USERNAME, MISSING_USERNAME);
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username IN (?, ?)",
                 TENANT_ID, USERNAME, MISSING_USERNAME);
-        jdbcTemplate.update("DELETE FROM sys_audit_log WHERE event_type IN ('PASSWORD_RESET_REQUESTED', 'PASSWORD_RESET_FAILED', 'PASSWORD_RESET_COMPLETED') AND operator IN (?, ?)",
+        jdbcTemplate.update("DELETE FROM sys_log WHERE operator IN (?, ?)",
                 USERNAME, MISSING_USERNAME);
     }
 

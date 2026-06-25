@@ -3,8 +3,6 @@ package com.enterprise.auth.platform.modules.workflow.application;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.enterprise.auth.platform.common.TimeSupport;
-import com.enterprise.auth.platform.common.audit.AuditEventPublisher;
-import com.enterprise.auth.platform.common.audit.PlatformAuditEvent;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
@@ -55,7 +53,6 @@ public class WorkflowApplicationService {
     private final UserQueryFacade userQueryFacade;
     private final RoleQueryFacade roleQueryFacade;
     private final CurrentUserService currentUserService;
-    private final AuditEventPublisher auditEventPublisher;
     private final ObjectMapper objectMapper;
     private final WorkflowTaskUrgeService urgeService;
     private final NotificationScenarioPublisher notificationScenarioPublisher;
@@ -67,7 +64,6 @@ public class WorkflowApplicationService {
             UserQueryFacade userQueryFacade,
             RoleQueryFacade roleQueryFacade,
             CurrentUserService currentUserService,
-            AuditEventPublisher auditEventPublisher,
             ObjectMapper objectMapper,
             WorkflowTaskUrgeService urgeService,
             NotificationScenarioPublisher notificationScenarioPublisher
@@ -78,7 +74,6 @@ public class WorkflowApplicationService {
         this.userQueryFacade = userQueryFacade;
         this.roleQueryFacade = roleQueryFacade;
         this.currentUserService = currentUserService;
-        this.auditEventPublisher = auditEventPublisher;
         this.objectMapper = objectMapper;
         this.urgeService = urgeService;
         this.notificationScenarioPublisher = notificationScenarioPublisher;
@@ -101,11 +96,6 @@ public class WorkflowApplicationService {
         entity.setStepsJson(toJson(steps));
         entity.setRemark(normalizeText(command.remark()));
         definitionMapper.insert(entity);
-        publish("WORKFLOW_DEFINITION_CREATED", user, tenantId, Map.of(
-                "definitionId", entity.getId(),
-                "definitionKey", entity.getDefinitionKey(),
-                "version", entity.getVersion()
-        ));
         return toDefinitionView(entity);
     }
 
@@ -119,11 +109,6 @@ public class WorkflowApplicationService {
         }
         entity.setStatus(WorkflowDefinitionStatus.DEPLOYED.name());
         definitionMapper.updateById(entity);
-        publish("WORKFLOW_DEFINITION_DEPLOYED", user, tenantId, Map.of(
-                "definitionId", entity.getId(),
-                "definitionKey", entity.getDefinitionKey(),
-                "version", entity.getVersion()
-        ));
         return toDefinitionView(entity);
     }
 
@@ -134,11 +119,6 @@ public class WorkflowApplicationService {
         WfProcessDefinitionEntity entity = requireDefinition(tenantId, definitionId);
         entity.setStatus(WorkflowDefinitionStatus.DISABLED.name());
         definitionMapper.updateById(entity);
-        publish("WORKFLOW_DEFINITION_DISABLED", user, tenantId, Map.of(
-                "definitionId", entity.getId(),
-                "definitionKey", entity.getDefinitionKey(),
-                "version", entity.getVersion()
-        ));
         return toDefinitionView(entity);
     }
 
@@ -202,12 +182,6 @@ public class WorkflowApplicationService {
         }
 
         WfTaskEntity task = createPendingTask(tenantId, instance, definition, steps.get(0), 0);
-        publish("WORKFLOW_INSTANCE_STARTED", user, tenantId, Map.of(
-                "instanceId", instance.getId(),
-                "definitionKey", definition.getDefinitionKey(),
-                "definitionVersion", definition.getVersion(),
-                "businessKey", instance.getBusinessKey()
-        ));
         publishWorkflowTodoCreated(tenantId, instance, task, user.username());
         return new WorkflowStartResult(toInstanceView(instance), toTaskView(task, user));
     }
@@ -274,12 +248,6 @@ public class WorkflowApplicationService {
             nextTask = toTaskView(nextTaskEntity, user);
         }
         instanceMapper.updateById(instance);
-        publish("WORKFLOW_TASK_APPROVED", user, tenantId, Map.of(
-                "instanceId", instance.getId(),
-                "taskId", task.getId(),
-                "stepIndex", task.getStepIndex(),
-                "ended", WorkflowInstanceStatus.APPROVED.name().equals(instance.getStatus())
-        ));
         publishWorkflowTaskDecision(tenantId, instance, task, user.username(), true);
         if (nextTaskEntity != null) {
             publishWorkflowTodoCreated(tenantId, instance, nextTaskEntity, user.username());
@@ -323,14 +291,6 @@ public class WorkflowApplicationService {
             nextTask = toTaskView(nextTaskEntity, user);
         }
         instanceMapper.updateById(instance);
-        publish("WORKFLOW_TASK_REJECTED", user, tenantId, Map.of(
-                "instanceId", instance.getId(),
-                "taskId", task.getId(),
-                "stepIndex", task.getStepIndex(),
-                "strategy", strategy.name(),
-                "nextStepIndex", nextStepIndex,
-                "ended", nextStepIndex == -1
-        ));
         publishWorkflowTaskDecision(tenantId, instance, task, user.username(), false);
         if (nextTaskEntity != null) {
             publishWorkflowTodoCreated(tenantId, instance, nextTaskEntity, user.username());
@@ -406,14 +366,6 @@ public class WorkflowApplicationService {
         transferredTask.setComment("由 " + user.username() + " 转签");
         taskMapper.insert(transferredTask);
 
-        publish("WORKFLOW_TASK_TRANSFERRED", user, tenantId, Map.of(
-                "instanceId", instance.getId(),
-                "taskId", task.getId(),
-                "newTaskId", transferredTask.getId(),
-                "stepIndex", task.getStepIndex(),
-                "targetUserId", targetUser.id(),
-                "targetUsername", targetUser.username()
-        ));
         publishWorkflowTaskTransferred(tenantId, instance, task, transferredTask, targetUser, user.username());
         publishWorkflowTodoCreated(tenantId, instance, transferredTask, user.username());
         return new WorkflowActionResult(toInstanceView(instance), toTaskView(transferredTask, user));
@@ -432,7 +384,6 @@ public class WorkflowApplicationService {
         instance.setStatus(WorkflowInstanceStatus.WITHDRAWN.name());
         instance.setEndedAt(TimeSupport.utcNowDateTime());
         instanceMapper.updateById(instance);
-        publish("WORKFLOW_INSTANCE_WITHDRAWN", user, tenantId, Map.of("instanceId", instance.getId()));
         publishWorkflowInstanceClosed(tenantId, instance, recipients, user.id(), user.username(), true);
         return toInstanceView(instance);
     }
@@ -447,7 +398,6 @@ public class WorkflowApplicationService {
         instance.setStatus(WorkflowInstanceStatus.TERMINATED.name());
         instance.setEndedAt(TimeSupport.utcNowDateTime());
         instanceMapper.updateById(instance);
-        publish("WORKFLOW_INSTANCE_TERMINATED", user, tenantId, Map.of("instanceId", instance.getId()));
         publishWorkflowInstanceClosed(tenantId, instance, recipients, user.id(), user.username(), false);
         return toInstanceView(instance);
     }
@@ -1067,9 +1017,5 @@ public class WorkflowApplicationService {
         } catch (JsonProcessingException ex) {
             throw new BusinessException("JSON_PARSE_FAILED", "变量快照解析失败");
         }
-    }
-
-    private void publish(String eventType, UserAccount user, String tenantId, Map<String, Object> details) {
-        auditEventPublisher.publish(PlatformAuditEvent.of(eventType, user.username(), tenantId, details));
     }
 }

@@ -5,6 +5,7 @@ import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.notification.application.NotificationInboxService;
 import com.enterprise.auth.platform.modules.notification.application.NotificationStreamTicketService;
 import com.enterprise.auth.platform.modules.notification.application.NotificationView;
+import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -55,6 +56,7 @@ public class NotificationController {
         return ApiResponse.ok(notificationInboxService.unreadCount());
     }
 
+    @SysLog("标记单条通知为已读")
     @Operation(summary = "标记单条通知为已读")
     @PutMapping("/{notificationId}/read")
     public ApiResponse<NotificationView> markRead(
@@ -62,12 +64,14 @@ public class NotificationController {
         return ApiResponse.ok(notificationInboxService.markRead(notificationId));
     }
 
+    @SysLog("标记当前用户所有通知为已读")
     @Operation(summary = "标记当前用户所有通知为已读")
     @PutMapping("/read-all")
     public ApiResponse<Long> markAllRead() {
         return ApiResponse.ok(notificationInboxService.markAllRead());
     }
 
+    @SysLog("清空当前用户已读通知")
     @Operation(summary = "清空当前用户已读通知")
     @DeleteMapping("/read")
     public ApiResponse<Long> clearRead() {

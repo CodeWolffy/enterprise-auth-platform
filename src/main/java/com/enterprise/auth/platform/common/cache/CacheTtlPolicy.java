@@ -14,7 +14,6 @@ public final class CacheTtlPolicy {
     public static final Duration SYSTEM_CONFIG = Duration.ofMinutes(30);
     public static final Duration TENANT_CATALOG = Duration.ofMinutes(30);
     public static final Duration SESSION_META = Duration.ofDays(7);
-    public static final Duration AUDIT_EXPORT_POLICY = Duration.ofMinutes(30);
     public static final Duration RATE_LIMIT_BUCKET = Duration.ofMinutes(10);
 
     private CacheTtlPolicy() {

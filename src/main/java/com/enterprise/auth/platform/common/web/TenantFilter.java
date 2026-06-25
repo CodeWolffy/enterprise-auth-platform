@@ -36,6 +36,7 @@ public class TenantFilter extends OncePerRequestFilter {
 
         RequestContext.setRequestId(requestId);
         RequestContext.setClientIp(clientIpResolver.resolve(request));
+        RequestContext.setStartTime(System.currentTimeMillis());
         response.setHeader(REQUEST_ID_HEADER, requestId);
         try {
             filterChain.doFilter(request, response);

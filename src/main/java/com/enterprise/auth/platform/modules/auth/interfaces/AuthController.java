@@ -19,6 +19,7 @@ import com.enterprise.auth.platform.common.context.AuthContextHolder;
 import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import com.enterprise.auth.platform.modules.auth.interfaces.RegisterRequest;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
+import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
 import com.enterprise.auth.platform.modules.user.interfaces.UserSummary;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -106,6 +107,7 @@ public class AuthController {
         return ApiResponse.ok(loginApplicationService.login(request, servletRequest));
     }
 
+    @SysLog("发起忘记密码")
     @Operation(summary = "发起忘记密码")
     @RateLimit(key = "password-reset-request", strategy = RateLimit.Strategy.IP)
     @PostMapping("/password/reset/request")
@@ -116,6 +118,7 @@ public class AuthController {
         return ApiResponse.ok(passwordResetApplicationService.request(request, servletRequest));
     }
 
+    @SysLog("校验密码重置令牌")
     @Operation(summary = "校验密码重置令牌")
     @PostMapping("/password/reset/verify")
     public ApiResponse<PasswordResetApplicationService.PasswordResetVerifyResponse> verifyPasswordReset(
@@ -124,6 +127,7 @@ public class AuthController {
         return ApiResponse.ok(passwordResetApplicationService.verify(request));
     }
 
+    @SysLog("确认重置密码")
     @Operation(summary = "确认重置密码")
     @RateLimit(key = "password-reset-confirm", strategy = RateLimit.Strategy.IP)
     @PostMapping("/password/reset/confirm")
@@ -133,6 +137,7 @@ public class AuthController {
         return ApiResponse.ok(passwordResetApplicationService.confirm(request));
     }
 
+    @SysLog("退出登录")
     @Operation(summary = "退出登录")
     @PostMapping("/logout")
     public ApiResponse<Void> logout() {
@@ -148,6 +153,7 @@ public class AuthController {
         return ApiResponse.ok(permissionSnapshotApplicationService.build(currentUser()));
     }
 
+    @SysLog("切换租户")
     @Operation(summary = "切换当前会话活跃租户")
     @PostMapping("/tenants/{tenantId}/switch")
     public ApiResponse<PermissionSnapshotResponse> switchTenant(
@@ -169,6 +175,7 @@ public class AuthController {
     return ApiResponse.ok(sessionApplicationService.sessions(currentUser(), scope, StpUtil.getTokenValue(), page, size).records());
   }
 
+    @SysLog("强制下线")
     @Operation(summary = "强制指定会话下线")
     @PostMapping("/sessions/{sessionId}/offline")
     public ApiResponse<Void> forceOffline(
@@ -178,6 +185,7 @@ public class AuthController {
         return ApiResponse.ok();
     }
 
+    @SysLog("用户注册")
     @Operation(summary = "用户注册")
     @RateLimit(key = "register", strategy = RateLimit.Strategy.IP)
     @PostMapping("/register")

@@ -2,7 +2,8 @@ package com.enterprise.auth.platform.modules.auth.application;
 
 import com.enterprise.auth.platform.common.RateLimitSupport;
 import com.enterprise.auth.platform.infrastructure.config.RateLimitProperties;
-import com.enterprise.auth.platform.modules.audit.application.AuditService;
+import com.enterprise.auth.platform.modules.log.application.LogPublisher;
+import com.enterprise.auth.platform.modules.log.domain.event.LoginLogEvent;
 import com.enterprise.auth.platform.modules.security.application.SecurityPolicyApplicationService;
 import com.enterprise.auth.platform.modules.security.domain.EffectiveSecurityPolicy;
 import java.time.Duration;
@@ -19,20 +20,20 @@ public class LoginAttemptService {
     private final StringRedisTemplate stringRedisTemplate;
     private final RateLimitSupport rateLimitSupport;
     private final RateLimitProperties rateLimitProperties;
-    private final AuditService auditService;
+    private final LogPublisher logPublisher;
     private final SecurityPolicyApplicationService securityPolicyApplicationService;
 
     public LoginAttemptService(
             StringRedisTemplate stringRedisTemplate,
             RateLimitSupport rateLimitSupport,
             RateLimitProperties rateLimitProperties,
-            AuditService auditService,
+            LogPublisher logPublisher,
             SecurityPolicyApplicationService securityPolicyApplicationService
     ) {
         this.stringRedisTemplate = stringRedisTemplate;
         this.rateLimitSupport = rateLimitSupport;
         this.rateLimitProperties = rateLimitProperties;
-        this.auditService = auditService;
+        this.logPublisher = logPublisher;
         this.securityPolicyApplicationService = securityPolicyApplicationService;
     }
 
@@ -43,14 +44,17 @@ public class LoginAttemptService {
         return Boolean.TRUE.equals(stringRedisTemplate.hasKey(lockKey(tenantId, username)));
     }
 
-    public void recordBlockedAttempt(String tenantId, String username, String clientIp) {
-        auditService.record("LOGIN_BLOCKED", username, tenantId,
-                Map.of("reason", "account_locked", "clientIp", clientIp));
+    public void recordBlockedAttempt(String tenantId, String username, String clientIp,
+                                      String browser, String os, String location) {
+        logPublisher.publish(new LoginLogEvent(username, tenantId, "LOCKED", "账户已锁定",
+                clientIp, location, browser, os));
     }
 
-    public LoginFailureResult recordFailure(String tenantId, String username, String reason, String clientIp) {
+    public LoginFailureResult recordFailure(String tenantId, String username, String reason, String clientIp,
+                                             String browser, String os, String location) {
         if (!rateLimitProperties.enabled()) {
-            auditService.record("LOGIN_FAILED", username, tenantId, Map.of("reason", reason, "clientIp", clientIp));
+            logPublisher.publish(new LoginLogEvent(username, tenantId, "FAILED", reason,
+                    clientIp, location, browser, os));
             return new LoginFailureResult(false, MAX_LOGIN_FAILURES);
         }
 
@@ -65,13 +69,14 @@ public class LoginAttemptService {
         if (fails != null && fails >= policy.loginFailureMaxAttempts()) {
             stringRedisTemplate.opsForValue().set(lockKey, "LOCKED", Duration.ofMinutes(policy.loginFailureLockMinutes()));
             stringRedisTemplate.delete(failKey);
-            auditService.record("ACCOUNT_LOCKED", username, tenantId,
-                    Map.of("reason", "exceed_max_failures", "clientIp", clientIp));
+            logPublisher.publish(new LoginLogEvent(username, tenantId, "LOCKED", "账户已锁定",
+                    clientIp, location, browser, os));
             return new LoginFailureResult(true, 0);
         }
 
         long remaining = Math.max(0, policy.loginFailureMaxAttempts() - (fails == null ? 0 : fails));
-        auditService.record("LOGIN_FAILED", username, tenantId, Map.of("reason", reason, "clientIp", clientIp));
+        logPublisher.publish(new LoginLogEvent(username, tenantId, "FAILED", reason,
+                clientIp, location, browser, os));
         return new LoginFailureResult(false, remaining);
     }
 

@@ -12,6 +12,7 @@ import com.enterprise.auth.platform.modules.workflow.application.WorkflowStartRe
 import com.enterprise.auth.platform.modules.workflow.application.WorkflowTaskUrgeResult;
 import com.enterprise.auth.platform.modules.workflow.application.WorkflowTaskUrgeView;
 import com.enterprise.auth.platform.modules.workflow.application.WorkflowTaskView;
+import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -40,6 +41,7 @@ public class WorkflowController {
         this.urgeService = urgeService;
     }
 
+    @SysLog("创建流程定义草稿")
     @Operation(summary = "创建流程定义草稿")
     @PostMapping("/process-definitions")
     @SaCheckPermission(PermissionCodes.WORKFLOW_DEFINITION_ADD)
@@ -65,6 +67,7 @@ public class WorkflowController {
         return ApiResponse.ok(workflowApplicationService.definition(definitionId));
     }
 
+    @SysLog("部署流程定义")
     @Operation(summary = "部署流程定义")
     @PutMapping("/process-definitions/{definitionId}/deploy")
     @SaCheckPermission(PermissionCodes.WORKFLOW_DEFINITION_DEPLOY)
@@ -72,6 +75,7 @@ public class WorkflowController {
         return ApiResponse.ok(workflowApplicationService.deployDefinition(definitionId));
     }
 
+    @SysLog("停用流程定义")
     @Operation(summary = "停用流程定义")
     @PutMapping("/process-definitions/{definitionId}/disable")
     @SaCheckPermission(PermissionCodes.WORKFLOW_DEFINITION_DEPLOY)
@@ -79,6 +83,7 @@ public class WorkflowController {
         return ApiResponse.ok(workflowApplicationService.disableDefinition(definitionId));
     }
 
+    @SysLog("发起流程实例")
     @Operation(summary = "发起流程实例")
     @PostMapping("/instances")
     @SaCheckPermission(PermissionCodes.WORKFLOW_INSTANCE_ADD)
@@ -104,6 +109,7 @@ public class WorkflowController {
         return ApiResponse.ok(workflowApplicationService.instance(instanceId));
     }
 
+    @SysLog("撤回流程实例")
     @Operation(summary = "撤回流程实例")
     @PutMapping("/instances/{instanceId}/withdraw")
     @SaCheckPermission(PermissionCodes.WORKFLOW_INSTANCE_EDIT)
@@ -111,6 +117,7 @@ public class WorkflowController {
         return ApiResponse.ok(workflowApplicationService.withdrawInstance(instanceId));
     }
 
+    @SysLog("终止流程实例")
     @Operation(summary = "终止流程实例")
     @PutMapping("/instances/{instanceId}/terminate")
     @SaCheckPermission(PermissionCodes.WORKFLOW_INSTANCE_DEL)
@@ -143,6 +150,7 @@ public class WorkflowController {
         return ApiResponse.ok(workflowApplicationService.doneTasks(page, size));
     }
 
+    @SysLog("审批通过任务")
     @Operation(summary = "审批通过任务")
     @PutMapping("/tasks/{taskId}/approve")
     @SaCheckPermission(PermissionCodes.WORKFLOW_TODO_EDIT)
@@ -154,6 +162,7 @@ public class WorkflowController {
         return ApiResponse.ok(workflowApplicationService.approveTask(taskId, safeRequest.toCommand()));
     }
 
+    @SysLog("驳回任务")
     @Operation(summary = "驳回任务")
     @PutMapping("/tasks/{taskId}/reject")
     @SaCheckPermission(PermissionCodes.WORKFLOW_TODO_EDIT)
@@ -165,6 +174,7 @@ public class WorkflowController {
         return ApiResponse.ok(workflowApplicationService.rejectTask(taskId, safeRequest.toCommand()));
     }
 
+    @SysLog("转签任务")
     @Operation(summary = "转签任务")
     @PutMapping("/tasks/{taskId}/transfer")
     @SaCheckPermission(PermissionCodes.WORKFLOW_TODO_EDIT)
@@ -175,6 +185,7 @@ public class WorkflowController {
         return ApiResponse.ok(workflowApplicationService.transferTask(taskId, request.toCommand()));
     }
 
+    @SysLog("催办任务")
     @Operation(summary = "催办任务")
     @PutMapping("/tasks/{taskId}/urge")
     @SaCheckPermission(PermissionCodes.WORKFLOW_TODO_EDIT)

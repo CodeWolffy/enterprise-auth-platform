@@ -4,7 +4,7 @@ import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
-import com.enterprise.auth.platform.modules.audit.application.AuditStatsFacade;
+import com.enterprise.auth.platform.modules.log.application.LogStatsFacade;
 import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import com.enterprise.auth.platform.modules.auth.application.SessionIndexService;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
@@ -33,7 +33,7 @@ public class DashboardStatsService {
     private final RoleStatsFacade roleStatsFacade;
     private final TenantStatsFacade tenantStatsFacade;
     private final FileStatsFacade fileStatsFacade;
-    private final AuditStatsFacade auditStatsFacade;
+    private final LogStatsFacade logStatsFacade;
     private final SessionIndexService sessionIndexService;
 
     public DashboardStatsService(
@@ -44,7 +44,7 @@ public class DashboardStatsService {
             RoleStatsFacade roleStatsFacade,
             TenantStatsFacade tenantStatsFacade,
             FileStatsFacade fileStatsFacade,
-            AuditStatsFacade auditStatsFacade,
+            LogStatsFacade logStatsFacade,
             SessionIndexService sessionIndexService
     ) {
         this.currentUserService = currentUserService;
@@ -54,7 +54,7 @@ public class DashboardStatsService {
         this.roleStatsFacade = roleStatsFacade;
         this.tenantStatsFacade = tenantStatsFacade;
         this.fileStatsFacade = fileStatsFacade;
-        this.auditStatsFacade = auditStatsFacade;
+        this.logStatsFacade = logStatsFacade;
         this.sessionIndexService = sessionIndexService;
     }
 
@@ -71,18 +71,18 @@ public class DashboardStatsService {
         long tenantCount = platformScope ? tenantStatsFacade.countTenants() : 1;
         long fileCount = fileStatsFacade.countFiles(activeTenantId, platformScope, visibleUserIds);
         long storageBytes = fileStatsFacade.sumStorageBytes(activeTenantId, platformScope, visibleUserIds);
-        long operationLogCount = auditStatsFacade.countOperationLogs(activeTenantId, platformScope, visibleUsernames, false);
-        long recentOperationLogCount = auditStatsFacade.countOperationLogs(activeTenantId, platformScope, visibleUsernames, true);
+        long operationLogCount = logStatsFacade.countOperationLogs(activeTenantId, platformScope, visibleUsernames, false);
+        long recentOperationLogCount = logStatsFacade.countOperationLogs(activeTenantId, platformScope, visibleUsernames, true);
         LocalDateTime todayStart = TimeSupport.utcNowDateTime().toLocalDate().atStartOfDay();
-        long todayLoginCount = auditStatsFacade.countOperationLogs(activeTenantId, platformScope, visibleUsernames, "LOGIN_SUCCESS", todayStart, null);
+        long todayLoginCount = logStatsFacade.countLoginLogs(activeTenantId, platformScope, visibleUsernames, "SUCCESS", todayStart, null);
         Optional<Long> onlineUserSnapshot = sessionIndexService.countVisible(activeTenantId, platformScope, visibleUserIds);
         long onlineUserCount = onlineUserSnapshot.orElse(0L);
-        long todayOperationLogCount = auditStatsFacade.countOperationLogs(activeTenantId, platformScope, visibleUsernames, todayStart, null);
-        long todayLoginFailedCount = auditStatsFacade.countOperationLogs(activeTenantId, platformScope, visibleUsernames, "LOGIN_FAILED", todayStart, null);
-        long todayRiskEventCount = auditStatsFacade.countOperationLogs(activeTenantId, platformScope, visibleUsernames, Set.of("LOGIN_BLOCKED", "ACCOUNT_LOCKED"), todayStart, null);
-        List<DailyTrendPoint> dailyTrend = auditStatsFacade.dailyTrend(activeTenantId, platformScope, visibleUsernames);
+        long todayOperationLogCount = logStatsFacade.countOperationLogs(activeTenantId, platformScope, visibleUsernames, todayStart, null);
+        long todayLoginFailedCount = logStatsFacade.countLoginLogs(activeTenantId, platformScope, visibleUsernames, "FAILED", todayStart, null);
+        long todayRiskEventCount = logStatsFacade.countLoginLogs(activeTenantId, platformScope, visibleUsernames, "LOCKED", todayStart, null);
+        List<DailyTrendPoint> dailyTrend = logStatsFacade.dailyTrend(activeTenantId, platformScope, visibleUsernames);
         List<ServiceHealthItem> serviceHealth = serviceHealth(onlineUserSnapshot, fileCount, storageBytes);
-        List<RecentAuditEvent> recentAuditEvents = auditStatsFacade.recentAuditEvents(activeTenantId, platformScope, visibleUsernames);
+        List<RecentAuditEvent> recentAuditEvents = logStatsFacade.recentAuditEvents(activeTenantId, platformScope, visibleUsernames);
 
         return new DashboardStatsResponse(
                 scope,

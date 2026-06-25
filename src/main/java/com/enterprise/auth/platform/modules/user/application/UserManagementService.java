@@ -2,7 +2,7 @@ package com.enterprise.auth.platform.modules.user.application;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.enterprise.auth.platform.modules.audit.application.AuditService;
+import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.modules.auth.application.SessionIndexService;
 import com.enterprise.auth.platform.modules.resource.application.CatalogService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
@@ -43,7 +43,7 @@ public class UserManagementService {
     private final PasswordHasher passwordHasher;
     private final UserDirectoryService userDirectoryService;
     private final CatalogService catalogService;
-    private final AuditService auditService;
+    private final LogPublisher logPublisher;
     private final DataScopeService dataScopeService;
     private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
     private final SessionIndexService sessionIndexService;
@@ -57,7 +57,7 @@ public class UserManagementService {
             PasswordHasher passwordHasher,
             UserDirectoryService userDirectoryService,
             CatalogService catalogService,
-            AuditService auditService,
+            LogPublisher logPublisher,
             DataScopeService dataScopeService,
             AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
             SessionIndexService sessionIndexService,
@@ -70,7 +70,7 @@ public class UserManagementService {
         this.passwordHasher = passwordHasher;
         this.userDirectoryService = userDirectoryService;
         this.catalogService = catalogService;
-        this.auditService = auditService;
+        this.logPublisher = logPublisher;
         this.dataScopeService = dataScopeService;
         this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
         this.sessionIndexService = sessionIndexService;
@@ -107,7 +107,6 @@ public class UserManagementService {
 
         syncUserRoles(tenantId, entity.getId(), request.roleCodes());
         permissionSnapshotInvalidationService.invalidateUser(entity.getId(), tenantId, entity.getUsername());
-        auditService.record("USER_CREATED", operator, tenantId, Map.of("userId", entity.getId(), "username", entity.getUsername()));
         return loadSummary(entity.getId(), tenantId);
     }
 
@@ -154,13 +153,6 @@ public class UserManagementService {
         if (invalidateSessions) {
             kickoutUserSessions(entity.getId());
         }
-        auditService.record("USER_UPDATED", operator, tenantId, Map.of("userId", entity.getId(), "username", entity.getUsername()));
-        if (passwordResetByAdmin) {
-            notificationScenarioPublisher.adminPasswordReset(tenantId, entity.getId(), entity.getUsername(), operator);
-        }
-        if (disabledByUpdate) {
-            notificationScenarioPublisher.accountDisabled(tenantId, entity.getId(), entity.getUsername(), operator);
-        }
         return loadSummary(entity.getId(), tenantId);
     }
 
@@ -173,7 +165,6 @@ public class UserManagementService {
         validateRoleCodesRequired(roleCodes);
         syncUserRoles(tenantId, userId, roleCodes);
         permissionSnapshotInvalidationService.invalidateUser(entity.getId(), tenantId, entity.getUsername());
-        auditService.record("USER_ROLE_ASSIGNED", operator, tenantId, Map.of("userId", userId, "roleCodes", roleCodes));
         return loadSummary(userId, tenantId);
     }
 
@@ -214,7 +205,6 @@ public class UserManagementService {
         sysUserMapper.deleteById(entity.getId());
         permissionSnapshotInvalidationService.invalidateUser(entity.getId(), tenantId, entity.getUsername());
         kickoutUserSessions(entity.getId());
-        auditService.record("USER_DELETED", operator, tenantId, Map.of("userId", userId, "username", entity.getUsername()));
         notificationScenarioPublisher.accountDisabled(tenantId, entity.getId(), entity.getUsername(), operator);
     }
 

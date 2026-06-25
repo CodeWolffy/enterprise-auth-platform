@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="panel-stack">
     <section class="dashboard-grid">
       <article class="stat-card">
