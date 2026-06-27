@@ -69,7 +69,7 @@ public class TenantChangeLogApplicationService {
                         .orderByDesc(SysTenantChangeLogEntity::getId)
         );
         long packageChanges = records.stream().filter(item -> "PACKAGE".equals(item.getChangeType())).count();
-        long capabilityChanges = records.stream().filter(item -> "CAPABILITY".equals(item.getChangeType())).count();
+        long menuChanges = records.stream().filter(item -> "MENU".equals(item.getChangeType())).count();
         long statusChanges = records.stream().filter(item -> "STATUS".equals(item.getChangeType())).count();
         long profileChanges = records.stream().filter(item -> "PROFILE".equals(item.getChangeType())).count();
         List<TenantChangeView> recentTimeline = records.stream()
@@ -86,7 +86,7 @@ public class TenantChangeLogApplicationService {
                 tenantId,
                 records.size(),
                 packageChanges,
-                capabilityChanges,
+                menuChanges,
                 statusChanges,
                 profileChanges,
                 affectedFieldCounts,
@@ -171,19 +171,10 @@ public class TenantChangeLogApplicationService {
     private String buildImpactSummary(SysTenantChangeLogEntity entity) {
         String fieldKey = entity.getFieldKey();
         if ("packageCode".equals(fieldKey) || "packageName".equals(fieldKey)) {
-            return "套餐变更会影响当前租户的默认能力集、配额说明和运营策略展示。";
+            return "套餐变更会重建当前租户的默认菜单范围和运营策略展示。";
         }
-        if ("userQuota".equals(fieldKey)) {
-            return "用户配额变更会影响新增用户容量和租户运营阈值。";
-        }
-        if ("storageQuotaGb".equals(fieldKey)) {
-            return "存储配额变更会影响文件容量规划与对象存储成本预估。";
-        }
-        if ("capabilityCodes".equals(fieldKey)) {
-            return "能力范围变更会影响当前租户可见模块与功能开关。";
-        }
-        if ("capabilityOverrides".equals(fieldKey)) {
-            return "能力覆盖变更会在套餐默认能力之外，单独调整当前租户的生效状态和说明文案。";
+        if ("menuIds".equals(fieldKey)) {
+            return "菜单范围变更会影响当前租户可见模块与角色可授权范围。";
         }
         if ("tenantStatus".equals(fieldKey)) {
             return "租户状态变更会直接影响登录、访问和管理操作可用性。";
@@ -221,7 +212,7 @@ public class TenantChangeLogApplicationService {
             @Schema(description = "租户编码") String tenantId,
             @Schema(description = "命中的变更总数") Integer totalChanges,
             @Schema(description = "套餐变更数") Long packageChanges,
-            @Schema(description = "能力变更数") Long capabilityChanges,
+            @Schema(description = "菜单授权变更数") Long menuChanges,
             @Schema(description = "状态变更数") Long statusChanges,
             @Schema(description = "资料变更数") Long profileChanges,
             @Schema(description = "字段影响分布") Map<String, Long> affectedFieldCounts,

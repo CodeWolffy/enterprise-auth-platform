@@ -12,7 +12,6 @@ import com.enterprise.auth.platform.modules.menu.infrastructure.entity.SysMenuEn
 import com.enterprise.auth.platform.modules.menu.infrastructure.mapper.SysMenuMapper;
 import com.enterprise.auth.platform.modules.menu.interfaces.CreateMenuRequest;
 import com.enterprise.auth.platform.modules.role.application.RoleMenuReferenceFacade;
-import com.enterprise.auth.platform.modules.tenant.application.TenantCapabilityResourceScopeFacade;
 import com.enterprise.auth.platform.modules.tenant.application.TenantMenuService;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
 import java.util.ArrayList;
@@ -48,7 +47,6 @@ public class MenuService {
     private final SysMenuMapper sysMenuMapper;
     private final RoleMenuReferenceFacade roleMenuReferenceFacade;
     private final ApplicationEventPublisher eventPublisher;
-    private final TenantCapabilityResourceScopeFacade tenantCapabilityResourceScopeFacade;
     private final TenantMenuService tenantMenuService;
     private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
     private final TenantProperties tenantProperties;
@@ -57,7 +55,6 @@ public class MenuService {
             SysMenuMapper sysMenuMapper,
             RoleMenuReferenceFacade roleMenuReferenceFacade,
             ApplicationEventPublisher eventPublisher,
-            TenantCapabilityResourceScopeFacade tenantCapabilityResourceScopeFacade,
             TenantMenuService tenantMenuService,
             AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
             TenantProperties tenantProperties
@@ -65,7 +62,6 @@ public class MenuService {
         this.sysMenuMapper = sysMenuMapper;
         this.roleMenuReferenceFacade = roleMenuReferenceFacade;
         this.eventPublisher = eventPublisher;
-        this.tenantCapabilityResourceScopeFacade = tenantCapabilityResourceScopeFacade;
         this.tenantMenuService = tenantMenuService;
         this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
         this.tenantProperties = tenantProperties;
@@ -90,7 +86,7 @@ public class MenuService {
         if (grantedIds.isEmpty()) {
             return Set.of();
         }
-        Set<Long> grantableIds = tenantCapabilityResourceScopeFacade.grantableMenuIds(activeTenantId, template);
+        Set<Long> grantableIds = tenantScopedMenuIds(activeTenantId, template);
         if (grantableIds.isEmpty()) {
             return Set.of();
         }
@@ -123,19 +119,11 @@ public class MenuService {
         }
 
         Set<Long> expanded = expandWithAncestors(grantedIds, menuById);
-        Set<Long> activeIds = tenantCapabilityResourceScopeFacade.visibleMenuIds(activeTenantId, template);
+        Set<Long> activeIds = tenantScopedMenuIds(activeTenantId, template);
         if (activeIds.isEmpty()) {
             return List.of();
         }
         expanded.retainAll(activeIds);
-        // 非平台租户需与租户分配的菜单取交集（对齐 haorong-mall sys_tenant_menu 模型）
-        if (!platformTenantId().equals(activeTenantId)) {
-            Set<Long> tenantMenuIds = tenantMenuService.findTenantMenuIds(activeTenantId);
-            if (tenantMenuIds.isEmpty()) {
-                return List.of();
-            }
-            expanded.retainAll(tenantMenuIds);
-        }
         Map<Long, RuntimeMenuNodeBuilder> nodes = new LinkedHashMap<>();
         for (Long menuId : expanded) {
             SysMenuEntity menu = menuById.get(menuId);
@@ -179,7 +167,7 @@ public class MenuService {
 
     public List<MenuTreeNode> grantableTree(String activeTenantId) {
         List<SysMenuEntity> template = listTemplateMenus();
-        Set<Long> grantableIds = tenantCapabilityResourceScopeFacade.grantableMenuIds(activeTenantId, template);
+        Set<Long> grantableIds = tenantScopedMenuIds(activeTenantId, template);
         if (grantableIds.isEmpty()) {
             return List.of();
         }
@@ -191,7 +179,7 @@ public class MenuService {
 
     public Set<Long> filterGrantableMenuIds(String activeTenantId, Set<Long> menuIds) {
         List<SysMenuEntity> template = listTemplateMenus();
-        Set<Long> grantableIds = tenantCapabilityResourceScopeFacade.grantableMenuIds(activeTenantId, template);
+        Set<Long> grantableIds = tenantScopedMenuIds(activeTenantId, template);
         if (grantableIds.isEmpty()) {
             return Set.of();
         }
@@ -204,7 +192,7 @@ public class MenuService {
         List<SysMenuEntity> template = listTemplateMenus();
         Map<Long, SysMenuEntity> menuById = toMenuMap(template);
         Set<Long> normalized = normalizeMenuIds(requestedMenuIds);
-        Set<Long> grantableIds = tenantCapabilityResourceScopeFacade.grantableMenuIds(activeTenantId, template);
+        Set<Long> grantableIds = tenantScopedMenuIds(activeTenantId, template);
         for (Long menuId : normalized) {
             if (!menuById.containsKey(menuId)) {
                 throw new BusinessException("存在无效的菜单权限 ID");
@@ -648,6 +636,16 @@ public class MenuService {
         return menuIds.stream()
                 .filter(Objects::nonNull)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private Set<Long> tenantScopedMenuIds(String activeTenantId, List<SysMenuEntity> template) {
+        if (platformTenantId().equals(activeTenantId)) {
+            return template.stream()
+                    .map(SysMenuEntity::getId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+        }
+        return tenantMenuService.findTenantMenuIds(activeTenantId);
     }
 
     private Set<Long> expandWithAncestors(Collection<Long> menuIds, Map<Long, SysMenuEntity> menuById) {

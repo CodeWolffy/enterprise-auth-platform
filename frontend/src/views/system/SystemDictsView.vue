@@ -339,6 +339,7 @@ import {
 } from '@/api/modules'
 import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { CategoryOption, DictValueView, DictView } from '@/types/system'
+import { formatDateTime } from '@/utils/datetime'
 
 type SortBy = 'createdAt' | 'dictType' | 'dictCode'
 type SortDirection = 'asc' | 'desc'
@@ -640,10 +641,7 @@ function nextValueSort() {
 }
 
 function formatTime(value?: number | null) {
-  if (!value) {
-    return '-'
-  }
-  return new Date(value).toLocaleString('zh-CN', { hour12: false })
+  return formatDateTime(value)
 }
 
 function resolveTagType(showClass?: string | null): TagType {

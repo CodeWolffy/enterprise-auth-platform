@@ -43,8 +43,8 @@ public final class CacheKeys {
         return of(CacheNamespaces.SYSTEM, "config", configKey);
     }
 
-    public static String tenantCatalog(String tenantId) {
-        return of(CacheNamespaces.TENANT, "catalog", tenantId);
+    public static String tenantPackage(String tenantId) {
+        return of(CacheNamespaces.TENANT, "package", tenantId);
     }
 
     public static String sessionMeta(String sessionId) {

@@ -457,7 +457,7 @@ test.describe('关键流程回归', () => {
     await expect(page.locator('.tenant-selector')).toHaveCount(0)
   })
 
-  test('tenant-catalog: 两个 tab 都能持久化列偏好', async ({ page }) => {
+  test('tenant-catalog: 套餐页展示应用标识与引用租户', async ({ page }) => {
     await seedAuthSession(page)
     await mockDashboardApis(page)
 
@@ -480,30 +480,10 @@ test.describe('关键流程回归', () => {
             userQuota: 200,
             storageQuotaGb: 200,
             packageDesc: '适用于常规业务租户',
+            appKey: 'upms,workflow',
             enabled: true,
-            capabilityCodes: ['log'],
             referencedTenantCount: 1,
             referencedTenantIds: ['tenant-a'],
-          },
-        ]))
-        return
-      }
-
-      if (url.pathname === '/api/tenant-catalog/capabilities' && method === 'GET') {
-        await fulfillJson(route, 200, apiEnvelope([
-          {
-            id: 11,
-            tenantId: 'platform',
-            capabilityCode: 'log',
-            capabilityName: '日志',
-            capabilityDesc: '日志查询',
-            sortOrder: 10,
-            enabled: true,
-            referencedPackageCount: 1,
-            referencedPackageCodes: ['pkg-standard'],
-            referencedTenantCount: 0,
-            referencedTenantIds: [],
-            overrideReferenceCount: 0,
           },
         ]))
         return
@@ -513,39 +493,10 @@ test.describe('关键流程回归', () => {
     })
 
     await page.goto('/platform/tenant-catalog')
-    await expect(page.getByText('套餐定义')).toBeVisible()
-
-    await page.getByRole('button', { name: '列显示' }).first().click()
-    await page.locator('.column-chooser .el-checkbox').filter({ hasText: '套餐说明' }).click()
-    await page.keyboard.press('Escape')
-    await expect(page.locator('.el-table th').filter({ hasText: '套餐说明' })).toHaveCount(0)
-
-    await page.getByRole('tab', { name: '能力管理' }).click()
-    await page.getByRole('button', { name: '列显示' }).first().click()
-    await page.locator('.column-chooser .el-checkbox').filter({ hasText: '排序' }).click()
-    await page.keyboard.press('Escape')
-    await expect(page.locator('.el-table th').filter({ hasText: '排序' })).toHaveCount(0)
-
-    await page.reload()
-    await expect(page.locator('.el-table th').filter({ hasText: '套餐说明' })).toHaveCount(0)
-    await expect
-      .poll(async () =>
-        page.evaluate(() => {
-          const raw = window.localStorage.getItem('eap.table.tenant.catalog.packages')
-          return raw ? JSON.parse(raw) : null
-        }),
-      )
-      .toMatchObject({ visibleColumns: expect.not.arrayContaining(['packageDesc']) })
-
-    await page.getByRole('tab', { name: '能力管理' }).click()
-    await expect(page.locator('.el-table th').filter({ hasText: '排序' })).toHaveCount(0)
-    await expect
-      .poll(async () =>
-        page.evaluate(() => {
-          const raw = window.localStorage.getItem('eap.table.tenant.catalog.capabilities')
-          return raw ? JSON.parse(raw) : null
-        }),
-      )
-      .toMatchObject({ visibleColumns: expect.not.arrayContaining(['sortOrder']) })
+    await expect(page.getByRole('heading', { name: '租户套餐' })).toBeVisible()
+    await expect(page.getByText('标准版')).toBeVisible()
+    await expect(page.getByText('upms')).toBeVisible()
+    await expect(page.getByText('workflow')).toBeVisible()
+    await expect(page.locator('.el-table__body')).toContainText('1')
   })
 })

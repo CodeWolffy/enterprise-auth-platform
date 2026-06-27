@@ -6,11 +6,27 @@ import type { ApiResponse } from '@/types/api'
 import type { PageResult } from '@/types/api'
 import type { RoleImpactView, RoleView } from '@/types/role'
 
-export async function queryRoles() {
-  const { data } = await http.get<ApiResponse<RoleView[] | PageResult<RoleView>>>('/api/roles', {
+export interface RoleQueryParams {
+  keyword?: string
+  dataScopeType?: string
+  tenantId?: string
+  page?: number
+  size?: number
+}
+
+export async function queryRoles(params?: RoleQueryParams) {
+  const { data } = await http.get<ApiResponse<PageResult<RoleView>>>('/api/roles', {
+    params,
     tenantScope: 'operator',
   } satisfies TenantRequestConfig)
-  return normalizeRoleList(data.data)
+  return data.data
+}
+
+export async function queryRoleOptions() {
+  const { data } = await http.get<ApiResponse<RoleView[]>>('/api/roles/options', {
+    tenantScope: 'operator',
+  } satisfies TenantRequestConfig)
+  return data.data
 }
 
 export async function createRole(payload: Record<string, unknown>) {
@@ -52,14 +68,4 @@ export async function assignRoleMenus(roleId: number, menuIds: number[]) {
     tenantScope: 'operator',
   } satisfies TenantRequestConfig)
   return data.data
-}
-
-function normalizeRoleList(payload: RoleView[] | PageResult<RoleView> | null | undefined) {
-  if (Array.isArray(payload)) {
-    return payload
-  }
-  if (payload && Array.isArray(payload.records)) {
-    return payload.records
-  }
-  return []
 }

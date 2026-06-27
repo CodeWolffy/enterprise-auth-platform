@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.common;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -14,6 +15,10 @@ public final class TimeSupport {
 
     public static LocalDateTime utcNowDateTime() {
         return LocalDateTime.now(UTC);
+    }
+
+    public static LocalDate utcToday() {
+        return LocalDate.now(UTC);
     }
 
     public static Instant fromEpochMilli(Long epochMs) {

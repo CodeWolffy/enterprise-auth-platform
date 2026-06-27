@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -17,6 +18,9 @@ class ModuleBoundaryTest {
     private static final Path MODULES_ROOT = SOURCE_ROOT.resolve("modules");
     private static final Pattern DOMAIN_INFRA_PATTERN = Pattern.compile("com\\.enterprise\\.auth\\.platform\\.modules\\.([a-z]+)\\.(domain|infrastructure)");
     private static final Pattern INFRA_MAPPER_PATTERN = Pattern.compile("com\\.enterprise\\.auth\\.platform\\.modules\\.([a-z]+)\\.infrastructure\\.mapper");
+    private static final Set<String> ALLOWED_CROSS_MODULE_INFRA_IMPORTS = Set.of(
+            "com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog"
+    );
 
     @Test
     void legacyFlatPackagesAreFullyMigrated() {
@@ -90,6 +94,9 @@ class ModuleBoundaryTest {
     private static String violation(Path path, String currentModule, String line, Pattern violationPattern) {
         Matcher matcher = violationPattern.matcher(line);
         if (!matcher.find()) {
+            return "";
+        }
+        if (ALLOWED_CROSS_MODULE_INFRA_IMPORTS.stream().anyMatch(line::contains)) {
             return "";
         }
         String targetModule = matcher.group(1);

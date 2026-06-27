@@ -3,6 +3,7 @@ package com.enterprise.auth.platform.modules.resource.application;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.common.TimeSupport;
+import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.dept.application.DeptCatalogFacade;
 import com.enterprise.auth.platform.modules.role.application.RoleCatalogFacade;
 import com.enterprise.auth.platform.modules.role.application.RolePayloadCodec;
@@ -56,6 +57,26 @@ public class CatalogService {
                 .filter(role -> globalScope || tenantId.equals(role.tenantId()))
                 .map(this::toRoleView)
                 .toList();
+    }
+
+    public PageResult<RoleView> rolesPage(String keyword, String dataScopeType, String tenantId, int page, int size) {
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.max(size, 1);
+        String normalizedKeyword = StringUtils.hasText(keyword) ? keyword.trim().toLowerCase() : null;
+        String normalizedScope = StringUtils.hasText(dataScopeType) ? dataScopeType.trim() : null;
+        String normalizedTenantId = StringUtils.hasText(tenantId) ? tenantId.trim() : null;
+        List<RoleView> filtered = roles().stream()
+                .filter(role -> normalizedTenantId == null || normalizedTenantId.equals(role.tenantId()))
+                .filter(role -> normalizedScope == null || normalizedScope.equals(role.dataScopeType().name()))
+                .filter(role -> normalizedKeyword == null
+                        || containsIgnoreCase(role.tenantId(), normalizedKeyword)
+                        || containsIgnoreCase(role.code(), normalizedKeyword)
+                        || containsIgnoreCase(role.name(), normalizedKeyword)
+                        || containsIgnoreCase(role.description(), normalizedKeyword))
+                .toList();
+        int fromIndex = Math.min((safePage - 1) * safeSize, filtered.size());
+        int toIndex = Math.min(fromIndex + safeSize, filtered.size());
+        return PageResult.of(filtered.size(), safePage, safeSize, filtered.subList(fromIndex, toIndex));
     }
 
     public List<RoleView> tenantRoles(String tenantId) {
@@ -115,15 +136,11 @@ public class CatalogService {
                             tenant.tenantStatus(),
                             TimeSupport.toEpochMilli(tenant.authBeginAt()),
                             TimeSupport.toEpochMilli(tenant.expireAt()),
-                            profile.packageCode(),
-                            profile.packageName(),
-                            profile.userQuota(),
-                            profile.storageQuotaGb(),
-                            profile.capabilityCodes(),
-                            profile.capabilityDescriptions(),
-                            tenant.logoUrl(),
-                            tenant.contactName(),
-                            tenant.contactPhone(),
+                profile.packageCode(),
+                profile.packageName(),
+                tenant.logoUrl(),
+                tenant.contactName(),
+                tenant.contactPhone(),
                             tenant.contactEmail(),
                             tenant.website(),
                             tenant.address(),
@@ -167,6 +184,10 @@ public class CatalogService {
         return TenantContext.isGlobalScope() || dataScopeService.isPlatformSuperAdmin();
     }
 
+    private boolean containsIgnoreCase(String value, String normalizedKeyword) {
+        return value != null && value.toLowerCase().contains(normalizedKeyword);
+    }
+
     private DataScopeType parseScope(String scopeType) {
         if (!StringUtils.hasText(scopeType)) {
             return DataScopeType.SELF;
@@ -183,46 +204,18 @@ public class CatalogService {
         if (tenants.isEmpty()) {
             return Map.of();
         }
-        List<String> tenantIds = tenants.stream().map(TenantProfileFacade.TenantRecord::tenantId).toList();
         List<String> packageCodes = tenants.stream()
                 .map(TenantProfileFacade.TenantRecord::packageCode)
                 .filter(StringUtils::hasText)
                 .distinct()
                 .toList();
         Map<String, TenantProfileFacade.PackageRecord> packages = tenantProfileFacade.loadPackageRecords(packageCodes);
-        Map<String, TenantProfileFacade.CapabilityRecord> capabilities = tenantProfileFacade.loadCapabilityRecords();
-        Map<String, List<String>> packageCapabilities = tenantProfileFacade.loadPackageCapabilities(packageCodes);
-        Map<String, List<TenantProfileFacade.OverrideRecord>> overrides = tenantProfileFacade.loadOverrideRecords(tenantIds);
         Map<String, TenantProfile> result = new LinkedHashMap<>();
         for (TenantProfileFacade.TenantRecord tenant : tenants) {
             TenantProfileFacade.PackageRecord pkg = packages.get(tenant.packageCode());
-            List<String> capabilityCodes = new java.util.ArrayList<>(packageCapabilities.getOrDefault(tenant.packageCode(), List.of()));
-            Map<String, String> descriptions = capabilityCodes.stream().collect(Collectors.toMap(
-                    java.util.function.Function.identity(),
-                    code -> tenantProfileFacade.capabilityDescription(capabilities.get(code)),
-                    (left, right) -> right,
-                    LinkedHashMap::new
-            ));
-            for (TenantProfileFacade.OverrideRecord override : overrides.getOrDefault(tenant.tenantId(), List.of())) {
-                if (override.enabled() != null && override.enabled() == 1) {
-                    if (!capabilityCodes.contains(override.capabilityCode())) {
-                        capabilityCodes.add(override.capabilityCode());
-                    }
-                    descriptions.put(override.capabilityCode(), StringUtils.hasText(override.capabilityDescOverride())
-                            ? override.capabilityDescOverride()
-                            : tenantProfileFacade.capabilityDescription(capabilities.get(override.capabilityCode())));
-                } else {
-                    capabilityCodes.remove(override.capabilityCode());
-                    descriptions.remove(override.capabilityCode());
-                }
-            }
             result.put(tenant.tenantId(), new TenantProfile(
                     tenant.packageCode(),
                     pkg == null ? null : pkg.packageName(),
-                    pkg == null ? null : pkg.userQuota(),
-                    pkg == null ? null : pkg.storageQuotaGb(),
-                    capabilityCodes,
-                    descriptions,
                     tenant.lifecycleNote()
             ));
         }
@@ -266,10 +259,6 @@ public class CatalogService {
             @Schema(description = "授权结束时间") Long expireAt,
             @Schema(description = "套餐编码") String packageCode,
             @Schema(description = "套餐名称") String packageName,
-            @Schema(description = "用户配额") Integer userQuota,
-            @Schema(description = "存储配额(GB)") Integer storageQuotaGb,
-            @Schema(description = "能力编码集合") List<String> capabilityCodes,
-            @Schema(description = "能力说明映射") Map<String, String> capabilityDescriptions,
             @Schema(description = "Logo 地址") String logoUrl,
             @Schema(description = "联系人姓名") String contactName,
             @Schema(description = "联系人电话") String contactPhone,
@@ -283,14 +272,10 @@ public class CatalogService {
     private record TenantProfile(
             String packageCode,
             String packageName,
-            Integer userQuota,
-            Integer storageQuotaGb,
-            List<String> capabilityCodes,
-            Map<String, String> capabilityDescriptions,
             String lifecycleNote
     ) {
         static TenantProfile empty() {
-            return new TenantProfile(null, null, null, null, List.of(), Map.of(), null);
+            return new TenantProfile(null, null, null);
         }
     }
 }

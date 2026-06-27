@@ -144,7 +144,7 @@ export const APP_ROUTE_MANIFESTS = [
     name: 'tenant-catalog',
     title: '租户套餐',
     icon: 'Tickets',
-    requiredGrant: PERMISSIONS.TENANT_CATALOG_PAGE,
+    requiredGrant: PERMISSIONS.TENANT_PACKAGE_PAGE,
     component: () => import('@/views/platform/TenantCatalogView.vue'),
   },
   {

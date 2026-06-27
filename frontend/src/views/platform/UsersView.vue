@@ -344,7 +344,7 @@ import {
   queryAssignedRoles,
   queryDepartments,
   queryPasswordPolicy,
-  queryRoles,
+  queryRoleOptions,
   queryTenants,
   queryUsers,
   updateUser,
@@ -572,7 +572,7 @@ async function load() {
     const shouldLoadRoles = authStore.snapshot?.grants.includes('upms:sysrole:page')
     const [userPage, roleList, departmentList, tenantList] = await Promise.all([
       queryUsers(queryParams),
-      shouldLoadRoles ? queryRoles() : Promise.resolve([] as RoleView[]),
+      shouldLoadRoles ? queryRoleOptions() : Promise.resolve([] as RoleView[]),
       queryDepartments(),
       loadTenantCatalog(),
     ])
@@ -603,7 +603,7 @@ async function refreshRolesIfAllowed() {
   if (!shouldLoadRoles) {
     return
   }
-  roles.value = await queryRoles()
+  roles.value = await queryRoleOptions()
 }
 
 function mergeRoleOptions(roleList: RoleView[]) {

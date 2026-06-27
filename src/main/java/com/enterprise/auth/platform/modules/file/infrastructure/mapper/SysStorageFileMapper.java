@@ -135,7 +135,7 @@ public interface SysStorageFileMapper extends BaseMapper<SysStorageFileEntity> {
     @Update("""
             UPDATE sys_storage_file
             SET deleted = 1,
-                updated_at = NOW()
+                updated_at = UTC_TIMESTAMP()
             WHERE id = #{id}
               AND deleted = 0
             """)

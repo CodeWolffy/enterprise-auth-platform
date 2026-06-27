@@ -130,7 +130,7 @@ public class CodegenMetadataService {
         String note = trimToNull(request == null ? null : request.note());
         jdbcTemplate.update("""
                         UPDATE codegen_data_source
-                        SET external_authorized = 1, authorized_at = CURRENT_TIMESTAMP, authorization_note = ?, updated_by = 'system'
+                        SET external_authorized = 1, authorized_at = UTC_TIMESTAMP(), authorization_note = ?, updated_by = 'system'
                         WHERE tenant_id = ? AND id = ? AND deleted = 0
                         """,
                 note == null ? "已确认该外部数据源属于当前授权范围" : note,
@@ -340,7 +340,7 @@ public class CodegenMetadataService {
         jdbcTemplate.update("""
                         INSERT INTO codegen_table(tenant_id, data_source_id, table_name, table_comment, class_name, tpl_category, package_name, module_name, business_name, function_name, function_author, gen_type, gen_path, options, created_by, updated_by, deleted)
                         VALUES(?,?,?,?,?,'crud',?,?,?,?,?,'preview',NULL,NULL,'system','system',0)
-                        ON DUPLICATE KEY UPDATE table_comment = VALUES(table_comment), class_name = VALUES(class_name), package_name = VALUES(package_name), module_name = VALUES(module_name), function_author = VALUES(function_author), updated_by = VALUES(updated_by), updated_at = NOW()
+                        ON DUPLICATE KEY UPDATE table_comment = VALUES(table_comment), class_name = VALUES(class_name), package_name = VALUES(package_name), module_name = VALUES(module_name), function_author = VALUES(function_author), updated_by = VALUES(updated_by), updated_at = UTC_TIMESTAMP()
                         """,
                 tenantId,
                 dataSourceId,
@@ -371,7 +371,7 @@ public class CodegenMetadataService {
             jdbcTemplate.update("""
                             INSERT INTO codegen_table_column(tenant_id, table_id, column_name, column_comment, column_type, data_type, java_type, java_field, is_pk, is_required, is_insert, is_edit, is_list, is_query, query_type, html_type, dict_type, sort, created_by, updated_by)
                             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'system','system')
-                            ON DUPLICATE KEY UPDATE column_comment = VALUES(column_comment), column_type = VALUES(column_type), data_type = VALUES(data_type), is_pk = VALUES(is_pk), updated_by = VALUES(updated_by), updated_at = NOW()
+                            ON DUPLICATE KEY UPDATE column_comment = VALUES(column_comment), column_type = VALUES(column_type), data_type = VALUES(data_type), is_pk = VALUES(is_pk), updated_by = VALUES(updated_by), updated_at = UTC_TIMESTAMP()
                             """,
                     currentTenantId(),
                     tableId,
@@ -467,7 +467,7 @@ public class CodegenMetadataService {
         }
         jdbcTemplate.update("""
                         INSERT INTO codegen_data_source(tenant_id, name, jdbc_url, db_name, host, enabled, external_authorized, authorized_at, authorization_note, created_by, updated_by, deleted)
-                        VALUES(?, '当前应用库', 'LOCAL', DATABASE(), 'LOCAL', 1, 1, CURRENT_TIMESTAMP, '当前应用库默认授权', 'system', 'system', 0)
+                        VALUES(?, '当前应用库', 'LOCAL', DATABASE(), 'LOCAL', 1, 1, UTC_TIMESTAMP(), '当前应用库默认授权', 'system', 'system', 0)
                         """,
                 tenantId);
     }

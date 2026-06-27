@@ -1,8 +1,6 @@
 import { http, type TenantRequestConfig } from '../http'
 import type { ApiResponse } from '@/types/api'
 import type {
-  TenantCapabilityImpactView,
-  TenantCapabilityView,
   TenantPackageImpactView,
   TenantPackageView,
 } from '@/types/tenant'
@@ -16,19 +14,8 @@ export interface TenantPackagePayload {
   descriptionMd?: string
   appKey?: string
   orderNo?: number
-  userQuota?: number
-  storageQuotaGb?: number
   packageDesc?: string
-  enabled?: boolean
-  capabilityCodes: string[]
-}
-
-export interface TenantCapabilityPayload {
-  capabilityCode: string
-  capabilityName: string
-  capabilityDesc?: string
-  sortOrder?: number
-  enabled?: boolean
+  status?: '0' | '1'
 }
 
 export async function queryTenantPackages() {
@@ -61,40 +48,6 @@ export async function queryTenantPackageImpact(id: number) {
 
 export async function deleteTenantPackage(id: number) {
   await http.delete(`/api/tenant-catalog/packages/${id}`, {
-    tenantScope: 'operator',
-  } satisfies TenantRequestConfig)
-}
-
-export async function queryTenantCapabilities() {
-  const { data } = await http.get<ApiResponse<TenantCapabilityView[]>>('/api/tenant-catalog/capabilities', {
-    tenantScope: 'operator',
-  } satisfies TenantRequestConfig)
-  return data.data
-}
-
-export async function createTenantCapability(payload: TenantCapabilityPayload) {
-  const { data } = await http.post<ApiResponse<TenantCapabilityView>>('/api/tenant-catalog/capabilities', payload, {
-    tenantScope: 'operator',
-  } satisfies TenantRequestConfig)
-  return data.data
-}
-
-export async function updateTenantCapability(id: number, payload: TenantCapabilityPayload) {
-  const { data } = await http.put<ApiResponse<TenantCapabilityView>>(`/api/tenant-catalog/capabilities/${id}`, payload, {
-    tenantScope: 'operator',
-  } satisfies TenantRequestConfig)
-  return data.data
-}
-
-export async function queryTenantCapabilityImpact(id: number) {
-  const { data } = await http.get<ApiResponse<TenantCapabilityImpactView>>(`/api/tenant-catalog/capabilities/${id}/impact`, {
-    tenantScope: 'operator',
-  } satisfies TenantRequestConfig)
-  return data.data
-}
-
-export async function deleteTenantCapability(id: number) {
-  await http.delete(`/api/tenant-catalog/capabilities/${id}`, {
     tenantScope: 'operator',
   } satisfies TenantRequestConfig)
 }

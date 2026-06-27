@@ -1026,3 +1026,4 @@ INSERT INTO `sys_role_menu` (`tenant_id`, `role_id`, `menu_id`, `create_time`) S
 INSERT INTO `sys_tenant_menu` (`tenant_id`, `menu_id`, `create_by`, `create_time`) SELECT 'platform', `id`, 'system', UTC_TIMESTAMP() FROM `sys_menu` WHERE `del_flag` = '0';
 
 SET FOREIGN_KEY_CHECKS = 1;
+

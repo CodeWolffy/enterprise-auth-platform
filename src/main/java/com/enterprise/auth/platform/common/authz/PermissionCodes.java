@@ -36,11 +36,11 @@ public final class PermissionCodes {
     public static final String SYSTENANT_EDIT = "upms:systenant:edit";
     public static final String SYSTENANT_DEL = "upms:systenant:del";
 
-    public static final String TENANT_CATALOG_PAGE = "upms:tenantcatalog:page";
-    public static final String TENANT_CATALOG_GET = "upms:tenantcatalog:get";
-    public static final String TENANT_CATALOG_ADD = "upms:tenantcatalog:add";
-    public static final String TENANT_CATALOG_EDIT = "upms:tenantcatalog:edit";
-    public static final String TENANT_CATALOG_DEL = "upms:tenantcatalog:del";
+    public static final String TENANT_PACKAGE_PAGE = "upms:tenantpackage:page";
+    public static final String TENANT_PACKAGE_GET = "upms:tenantpackage:get";
+    public static final String TENANT_PACKAGE_ADD = "upms:tenantpackage:add";
+    public static final String TENANT_PACKAGE_EDIT = "upms:tenantpackage:edit";
+    public static final String TENANT_PACKAGE_DEL = "upms:tenantpackage:del";
 
     public static final String SYSTEM_PAGE = "upms:system:page";
     public static final String SYSTEM_GET = "upms:system:get";
@@ -146,11 +146,11 @@ public final class PermissionCodes {
             SYSTENANT_ADD,
             SYSTENANT_EDIT,
             SYSTENANT_DEL,
-            TENANT_CATALOG_PAGE,
-            TENANT_CATALOG_GET,
-            TENANT_CATALOG_ADD,
-            TENANT_CATALOG_EDIT,
-            TENANT_CATALOG_DEL,
+            TENANT_PACKAGE_PAGE,
+            TENANT_PACKAGE_GET,
+            TENANT_PACKAGE_ADD,
+            TENANT_PACKAGE_EDIT,
+            TENANT_PACKAGE_DEL,
             SYSTEM_PAGE,
             SYSTEM_GET,
             SYSDICT_PAGE,
@@ -243,11 +243,11 @@ public final class PermissionCodes {
             new PermissionDescriptor(SYSTENANT_ADD, "租户管理新增", "systenant"),
             new PermissionDescriptor(SYSTENANT_EDIT, "租户管理修改", "systenant"),
             new PermissionDescriptor(SYSTENANT_DEL, "租户管理删除", "systenant"),
-            new PermissionDescriptor(TENANT_CATALOG_PAGE, "租户套餐列表", "tenantcatalog"),
-            new PermissionDescriptor(TENANT_CATALOG_GET, "租户套餐查询", "tenantcatalog"),
-            new PermissionDescriptor(TENANT_CATALOG_ADD, "租户套餐新增", "tenantcatalog"),
-            new PermissionDescriptor(TENANT_CATALOG_EDIT, "租户套餐修改", "tenantcatalog"),
-            new PermissionDescriptor(TENANT_CATALOG_DEL, "租户套餐删除", "tenantcatalog"),
+            new PermissionDescriptor(TENANT_PACKAGE_PAGE, "租户套餐列表", "tenantpackage"),
+            new PermissionDescriptor(TENANT_PACKAGE_GET, "租户套餐查询", "tenantpackage"),
+            new PermissionDescriptor(TENANT_PACKAGE_ADD, "租户套餐新增", "tenantpackage"),
+            new PermissionDescriptor(TENANT_PACKAGE_EDIT, "租户套餐修改", "tenantpackage"),
+            new PermissionDescriptor(TENANT_PACKAGE_DEL, "租户套餐删除", "tenantpackage"),
             new PermissionDescriptor(SYSTEM_PAGE, "系统设置列表", "system"),
             new PermissionDescriptor(SYSTEM_GET, "系统设置查询", "system"),
             new PermissionDescriptor(SYSDICT_PAGE, "字典管理列表", "sysdict"),

@@ -140,6 +140,7 @@ import { CanvasRenderer } from 'echarts/renderers'
 import { init, use, type EChartsType } from 'echarts/core'
 import { fetchDashboardStats, type DashboardStatsResponse } from '@/api/modules'
 import { useAuthStore } from '@/stores/auth'
+import { formatDateTime as formatEpochDateTime } from '@/utils/datetime'
 
 use([LineChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer])
 
@@ -321,15 +322,7 @@ function healthStatusText(status: string) {
 }
 
 function formatDateTime(epochMs?: number | null) {
-  if (!epochMs) {
-    return '-'
-  }
-  return new Intl.DateTimeFormat('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(epochMs))
+  return formatEpochDateTime(epochMs)
 }
 
 onMounted(() => {

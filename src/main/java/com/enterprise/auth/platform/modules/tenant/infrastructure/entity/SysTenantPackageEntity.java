@@ -25,10 +25,8 @@ public class SysTenantPackageEntity {
     private String descriptionMd;
     private String appKey;
     private Integer orderNo;
-    private Integer userQuota;
-    private Integer storageQuotaGb;
     private String packageDesc;
-    private Integer enabled;
+    private String status;
     @TableField(fill = FieldFill.INSERT)
     private String createdBy;
     @TableField(fill = FieldFill.INSERT_UPDATE)

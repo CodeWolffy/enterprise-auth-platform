@@ -15,6 +15,12 @@ public record TenantProperties(
     public List<String> resolvedIgnoreTables() {
                 LinkedHashSet<String> defaults = new LinkedHashSet<>();
                 defaults.add("sys_menu");
+                defaults.add("sys_dict");
+                defaults.add("sys_dict_value");
+                defaults.add("sys_config");
+                defaults.add("sys_tenant");
+                defaults.add("sys_tenant_package");
+                defaults.add("sys_category_rule");
                 if (mybatisIgnoreTables != null) {
                         defaults.addAll(mybatisIgnoreTables);
                 }

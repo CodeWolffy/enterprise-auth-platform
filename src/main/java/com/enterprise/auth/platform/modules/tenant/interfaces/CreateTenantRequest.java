@@ -2,7 +2,6 @@ package com.enterprise.auth.platform.modules.tenant.interfaces;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
-import java.util.List;
 
 @Schema(description = "新增租户请求")
 public record CreateTenantRequest(
@@ -14,9 +13,6 @@ public record CreateTenantRequest(
         @Schema(description = "授权结束时间") Long expireAt,
         @Schema(description = "套餐编码") String packageCode,
         @Schema(description = "套餐名称") String packageName,
-        @Schema(description = "用户配额") Integer userQuota,
-        @Schema(description = "存储配额，单位 GB") Integer storageQuotaGb,
-        @Schema(description = "启用的能力编码集合") List<String> capabilityCodes,
         @Schema(description = "Logo 地址") String logoUrl,
         @Schema(description = "联系人姓名") String contactName,
         @Schema(description = "联系人电话") String contactPhone,

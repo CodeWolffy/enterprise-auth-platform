@@ -273,7 +273,6 @@ async function mockApis(page: Page) {
               packageName: '平台治理版',
               userQuota: 100,
               storageQuotaGb: 100,
-              capabilityCodes: ['auth', 'tenant'],
               logoUrl: null,
               contactName: '平台运维',
               contactPhone: '13800000000',
@@ -300,28 +299,9 @@ async function mockApis(page: Page) {
             userQuota: 100,
             storageQuotaGb: 100,
             packageDesc: 'mock package',
+            appKey: 'upms,tenant',
             enabled: true,
-            capabilityCodes: ['auth', 'tenant'],
             referencedTenantCount: 1,
-          },
-        ]),
-      )
-      return
-    }
-
-    if (url.pathname === '/api/tenant-catalog/capabilities' && method === 'GET') {
-      await fulfillJson(
-        route,
-        200,
-        apiEnvelope([
-          {
-            id: 1,
-            capabilityCode: 'auth',
-            capabilityName: '认证安全',
-            capabilityDesc: 'mock capability',
-            sortOrder: 10,
-            enabled: true,
-            referencedPackageCount: 1,
           },
         ]),
       )

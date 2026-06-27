@@ -15,6 +15,7 @@ spring:
       pool-name: EnterpriseAuthHikariCP
       minimum-idle: 5
       maximum-pool-size: 20
+      connection-init-sql: SET time_zone = '+00:00'
       connection-timeout: 30000
       validation-timeout: 5000
       idle-timeout: 600000

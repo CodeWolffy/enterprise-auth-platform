@@ -6,8 +6,6 @@ import type {
   TenantView,
   TenantChangeView,
   TenantHistorySummaryView,
-  TenantCapabilityOverrideView,
-  TenantCapabilitySummaryView,
 } from '@/types/tenant'
 
 export interface TenantQueryParams {
@@ -89,36 +87,17 @@ export async function queryTenantHistorySummary(tenantId: string, params?: Omit<
   return data.data
 }
 
-export async function queryTenantCapabilitySummary(tenantId: string) {
-  const { data } = await http.get<ApiResponse<TenantCapabilitySummaryView>>(
-    `/api/tenants/${tenantId}/capability-summary`,
-    { tenantScope: 'operator' } satisfies TenantRequestConfig,
-  )
+export async function queryTenantMenus(tenantId: string) {
+  const { data } = await http.get<ApiResponse<number[]>>(`/api/tenants/${tenantId}/menus`, {
+    tenantScope: 'operator',
+  } satisfies TenantRequestConfig)
   return data.data
 }
 
-export async function queryTenantCapabilityOverrides(tenantId: string) {
-  const { data } = await http.get<ApiResponse<TenantCapabilityOverrideView>>(
-    `/api/tenants/${tenantId}/capability-overrides`,
+export async function saveTenantMenus(tenantId: string, menuIds: number[]) {
+  await http.put(
+    `/api/tenants/${tenantId}/menus`,
+    { menuIds },
     { tenantScope: 'operator' } satisfies TenantRequestConfig,
   )
-  return data.data
-}
-
-export async function updateTenantCapabilityOverrides(
-  tenantId: string,
-  payload: {
-    overrides: Array<{
-      capabilityCode: string
-      enabled?: boolean | null
-      capabilityDescOverride?: string | null
-    }>
-  },
-) {
-  const { data } = await http.put<ApiResponse<TenantCapabilityOverrideView>>(
-    `/api/tenants/${tenantId}/capability-overrides`,
-    payload,
-    { tenantScope: 'operator' } satisfies TenantRequestConfig,
-  )
-  return data.data
 }

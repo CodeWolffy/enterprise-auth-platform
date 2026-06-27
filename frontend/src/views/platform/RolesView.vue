@@ -471,12 +471,12 @@ async function load() {
   loading.value = true
   try {
     const [roleList, menuTree, departmentList, tenantList] = await Promise.all([
-      queryRoles(),
+      queryRoles({ page: 1, size: 500 }),
       queryGrantableMenuTree(defaultTenantId()),
       queryDepartments(),
       loadTenantCatalog(),
     ])
-    roles.value = Array.isArray(roleList) ? roleList : []
+    roles.value = roleList.records
     menus.value = menuTree
     departments.value = departmentList
     tenantCatalog.value = tenantList

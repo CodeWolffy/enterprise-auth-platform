@@ -54,7 +54,7 @@ describe('isAllowedRoute', () => {
   })
 
   it('普通菜单路径必须出现在快照菜单中', () => {
-    const s = snapshot({ menus: [{ path: '/dashboard' }] })
+    const s = snapshot({ grants: ['upms:dashboard:page'], menus: [{ path: '/dashboard' }] })
     expect(isAllowedRoute(s, { path: '/system/users', meta: {} })).toBe(false)
     expect(isAllowedRoute(s, { path: '/dashboard', meta: {} })).toBe(true)
   })
@@ -68,7 +68,7 @@ describe('isAllowedRoute', () => {
 
 describe('resolveFirstAllowedPath', () => {
   it('返回第一个可访问的菜单路径', () => {
-    const s = snapshot({ menus: [{ path: '/dashboard' }, { path: '/system/users' }] })
+    const s = snapshot({ grants: ['upms:dashboard:page'], menus: [{ path: '/dashboard' }, { path: '/system/users' }] })
     expect(resolveFirstAllowedPath(s)).toBe('/dashboard')
   })
 

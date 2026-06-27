@@ -2,6 +2,7 @@ package com.enterprise.auth.platform.modules.role.interfaces;
 
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.web.ApiResponse;
+import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
 import com.enterprise.auth.platform.modules.role.application.RoleGrantQueryFacade;
 import com.enterprise.auth.platform.modules.resource.application.CatalogService;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "角色管理")
@@ -44,7 +46,20 @@ public class RoleController {
     @Operation(summary = "查询角色列表")
     @GetMapping
     @SaCheckPermission(PermissionCodes.SYSROLE_PAGE)
-    public ApiResponse<List<CatalogService.RoleView>> list() {
+    public ApiResponse<PageResult<CatalogService.RoleView>> list(
+            @Parameter(description = "角色关键字") @RequestParam(required = false) String keyword,
+            @Parameter(description = "数据权限范围") @RequestParam(required = false) String dataScopeType,
+            @Parameter(description = "租户编码") @RequestParam(required = false) String tenantId,
+            @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "每页大小") @RequestParam(defaultValue = "10") int size
+    ) {
+        return ApiResponse.ok(catalogService.rolesPage(keyword, dataScopeType, tenantId, page, size));
+    }
+
+    @Operation(summary = "查询角色选项")
+    @GetMapping("/options")
+    @SaCheckPermission(PermissionCodes.SYSROLE_PAGE)
+    public ApiResponse<List<CatalogService.RoleView>> options() {
         return ApiResponse.ok(catalogService.roles());
     }
 

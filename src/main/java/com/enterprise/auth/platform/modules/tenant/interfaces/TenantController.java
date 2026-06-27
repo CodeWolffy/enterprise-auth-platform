@@ -1,22 +1,24 @@
 package com.enterprise.auth.platform.modules.tenant.interfaces;
 
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
+import com.enterprise.auth.platform.common.authz.SecuritySupport;
 import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
-import com.enterprise.auth.platform.modules.tenant.application.TenantCapabilityApplicationService;
 import com.enterprise.auth.platform.modules.tenant.application.TenantChangeLogApplicationService;
 import com.enterprise.auth.platform.modules.tenant.application.TenantDirectoryApplicationService;
 import com.enterprise.auth.platform.modules.tenant.application.TenantLifecycleApplicationService;
+import com.enterprise.auth.platform.modules.tenant.application.TenantMenuService;
 import com.enterprise.auth.platform.modules.resource.application.CatalogService;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.common.context.TenantContext;
-import com.enterprise.auth.platform.modules.tenant.interfaces.CreateTenantRequest;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.function.Supplier;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -36,21 +38,21 @@ public class TenantController {
 
     private final TenantLifecycleApplicationService tenantLifecycleApplicationService;
     private final TenantDirectoryApplicationService tenantDirectoryApplicationService;
-    private final TenantCapabilityApplicationService tenantCapabilityApplicationService;
     private final TenantChangeLogApplicationService tenantChangeLogApplicationService;
+    private final TenantMenuService tenantMenuService;
     private final TenantProperties tenantProperties;
 
     public TenantController(
             TenantLifecycleApplicationService tenantLifecycleApplicationService,
             TenantDirectoryApplicationService tenantDirectoryApplicationService,
-            TenantCapabilityApplicationService tenantCapabilityApplicationService,
             TenantChangeLogApplicationService tenantChangeLogApplicationService,
+            TenantMenuService tenantMenuService,
             TenantProperties tenantProperties
     ) {
         this.tenantLifecycleApplicationService = tenantLifecycleApplicationService;
         this.tenantDirectoryApplicationService = tenantDirectoryApplicationService;
-        this.tenantCapabilityApplicationService = tenantCapabilityApplicationService;
         this.tenantChangeLogApplicationService = tenantChangeLogApplicationService;
+        this.tenantMenuService = tenantMenuService;
         this.tenantProperties = tenantProperties;
     }
 
@@ -113,35 +115,6 @@ public class TenantController {
         )));
     }
 
-    @Operation(summary = "获取租户能力摘要")
-    @GetMapping("/{tenantId}/capability-summary")
-    @SaCheckPermission(PermissionCodes.SYSTENANT_GET)
-    public ApiResponse<TenantCapabilityApplicationService.TenantCapabilitySummaryView> capabilitySummary(
-            @Parameter(description = "租户编码") @PathVariable String tenantId
-    ) {
-        return ApiResponse.ok(platformScope(() -> tenantCapabilityApplicationService.capabilitySummary(tenantId)));
-    }
-
-    @Operation(summary = "获取租户能力覆盖")
-    @GetMapping("/{tenantId}/capability-overrides")
-    @SaCheckPermission(PermissionCodes.SYSTENANT_GET)
-    public ApiResponse<TenantCapabilityApplicationService.TenantCapabilityOverrideView> capabilityOverrides(
-            @Parameter(description = "租户编码") @PathVariable String tenantId
-    ) {
-        return ApiResponse.ok(platformScope(() -> tenantCapabilityApplicationService.capabilityOverrides(tenantId)));
-    }
-
-    @SysLog("更新租户能力覆盖")
-    @Operation(summary = "更新租户能力覆盖")
-    @PutMapping("/{tenantId}/capability-overrides")
-    @SaCheckPermission(PermissionCodes.SYSTENANT_EDIT)
-    public ApiResponse<TenantCapabilityApplicationService.TenantCapabilityOverrideView> updateCapabilityOverrides(
-            @Parameter(description = "租户编码") @PathVariable String tenantId,
-            @Valid @RequestBody UpdateTenantCapabilityOverridesRequest request
-    ) {
-        return ApiResponse.ok(platformScope(() -> tenantCapabilityApplicationService.updateCapabilityOverrides(tenantId, request)));
-    }
-
     @SysLog("创建租户")
     @Operation(summary = "创建租户")
     @PostMapping
@@ -159,6 +132,39 @@ public class TenantController {
             @Valid @RequestBody CreateTenantRequest request
     ) {
         return ApiResponse.ok(platformScope(() -> tenantLifecycleApplicationService.update(tenantId, request)));
+    }
+
+    @Operation(summary = "查询租户分配的菜单ID集合")
+    @GetMapping("/{tenantId}/menus")
+    @SaCheckPermission(PermissionCodes.SYSTENANT_GET)
+    public ApiResponse<Set<Long>> tenantMenus(@Parameter(description = "租户编码") @PathVariable String tenantId) {
+        return ApiResponse.ok(platformScope(() -> tenantMenuService.findTenantMenuIds(tenantId)));
+    }
+
+    @SysLog("保存租户菜单分配")
+    @Operation(summary = "保存租户菜单分配（全量替换）")
+    @PutMapping("/{tenantId}/menus")
+    @SaCheckPermission(PermissionCodes.SYSTENANT_EDIT)
+    public ApiResponse<Void> saveTenantMenus(
+            @Parameter(description = "租户编码") @PathVariable String tenantId,
+            @Valid @RequestBody AssignTenantMenusRequest request
+    ) {
+        platformScope(() -> {
+            Set<Long> before = tenantMenuService.findTenantMenuIds(tenantId);
+            tenantMenuService.saveTenantMenu(tenantId, request.menuIds());
+            Set<Long> after = tenantMenuService.findTenantMenuIds(tenantId);
+            tenantChangeLogApplicationService.recordIfChanged(
+                    tenantId,
+                    "MENU",
+                    "menuIds",
+                    summarizeMenuIds(before),
+                    summarizeMenuIds(after),
+                    "更新租户菜单分配",
+                    SecuritySupport.currentOperator()
+            );
+            return null;
+        });
+        return ApiResponse.ok();
     }
 
     @SysLog("删除租户")
@@ -182,5 +188,16 @@ public class TenantController {
 
     private <T> T platformScope(Supplier<T> supplier) {
         return TenantContext.runWithTenant(tenantProperties.platformTenantId(), supplier);
+    }
+
+    private String summarizeMenuIds(Set<Long> menuIds) {
+        if (menuIds == null || menuIds.isEmpty()) {
+            return null;
+        }
+        return String.join(",", menuIds.stream()
+                .filter(Objects::nonNull)
+                .sorted()
+                .map(String::valueOf)
+                .toList());
     }
 }

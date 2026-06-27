@@ -1,9 +1,9 @@
 package com.enterprise.auth.platform.common.web;
 
+import com.enterprise.auth.platform.common.TimeSupport;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.stereotype.Component;
@@ -34,7 +34,7 @@ public class StringToInstantConverter implements Converter<String, Instant> {
         String normalized = text.replace(' ', 'T');
         try {
             LocalDateTime localDateTime = LocalDateTime.parse(normalized);
-            return localDateTime.atZone(ZoneId.systemDefault()).toInstant();
+            return TimeSupport.toInstant(localDateTime);
         } catch (DateTimeParseException ex) {
             throw new IllegalArgumentException("无效的日期时间格式：" + source, ex);
         }

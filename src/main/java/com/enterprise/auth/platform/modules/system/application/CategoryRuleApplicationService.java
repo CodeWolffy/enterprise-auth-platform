@@ -204,7 +204,7 @@ public class CategoryRuleApplicationService {
     }
 
     private List<SystemViewModels.CategoryTrendPoint> buildCategoryTrend(List<SystemViewModels.CategoryAuditView> audits) {
-        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalDate today = TimeSupport.utcToday();
         Map<java.time.LocalDate, Long> counts = audits.stream()
                 .filter(item -> item.occurredAt() != null)
                 .collect(java.util.stream.Collectors.groupingBy(
