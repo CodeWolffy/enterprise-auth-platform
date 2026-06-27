@@ -194,6 +194,56 @@ class UserManagementServiceTest {
                 .hasMessageContaining("当前登录用户");
     }
 
+    @Test
+    void platformAdminShouldAssignAndLoadRolesFromTargetTenant() {
+        TenantContext.setGlobalScope("platform");
+        Long tenantUserId = ensureUser("tenant-a", CROSS_TENANT_USER, 2L);
+        Long tenantRoleId = ensureRole("tenant-a", STAFF_ROLE);
+        Long platformRoleId = ensureRole("platform", STAFF_ROLE);
+        authenticatePlatformAdmin();
+
+        var summary = userManagementService.assignRoles(tenantUserId, Set.of(" " + STAFF_ROLE + " "));
+
+        assertThat(summary.tenantId()).isEqualTo("tenant-a");
+        assertThat(summary.roles()).contains(STAFF_ROLE);
+
+        var assignedRoles = userManagementService.listAssignedRoles(tenantUserId);
+        assertThat(assignedRoles).hasSize(1);
+        assertThat(assignedRoles.get(0).id()).isEqualTo(tenantRoleId);
+        assertThat(assignedRoles.get(0).tenantId()).isEqualTo("tenant-a");
+        assertThat(assignedRoles).extracting(role -> role.id()).doesNotContain(platformRoleId);
+    }
+
+    @Test
+    void platformAdminShouldCreateUserInRequestedTenant() {
+        TenantContext.setGlobalScope("platform");
+        ensureRole("tenant-a", STAFF_ROLE);
+        authenticatePlatformAdmin();
+
+        var summary = userManagementService.create(new CreateUserRequest(
+                CREATED_USER,
+                "Tenant A User",
+                null,
+                null,
+                "UserTest@123",
+                2L,
+                true,
+                Set.of(STAFF_ROLE),
+                "tenant-a"
+        ));
+
+        assertThat(summary.tenantId()).isEqualTo("tenant-a");
+        assertThat(summary.roles()).contains(STAFF_ROLE);
+
+        Long count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM sys_user WHERE tenant_id = ? AND username = ? AND deleted = 0",
+                Long.class,
+                "tenant-a",
+                CREATED_USER
+        );
+        assertThat(count).isEqualTo(1L);
+    }
+
     private Long ensureUser(String tenantId, String username, Long deptId) {
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username = ?", tenantId, username);
         SysUserEntity entity = new SysUserEntity();
@@ -230,6 +280,22 @@ class UserManagementServiceTest {
                 Set.of(permission),
                 Set.of(),
                 DataScopeType.DEPT,
+                1
+        );
+        bind(principal);
+    }
+
+    private void authenticatePlatformAdmin() {
+        UserAccount principal = new UserAccount(
+                1L,
+                "platform",
+                "admin",
+                passwordHasher.hash("UserTest@123"),
+                true,
+                Set.of("ADMIN"),
+                Set.of("upms:sysuser:edit", "upms:sysuser:get"),
+                Set.of(),
+                DataScopeType.ALL,
                 1
         );
         bind(principal);

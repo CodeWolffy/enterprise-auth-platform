@@ -47,30 +47,50 @@ public class CatalogService {
 
     public List<RoleView> roles() {
         String tenantId = currentTenantId();
-        return roleCatalogFacade.listRoleItems(tenantId)
+        boolean globalScope = isGlobalScope();
+        List<RoleCatalogFacade.RoleItem> roles = globalScope && !TenantContext.isGlobalScope()
+                ? TenantContext.runWithGlobalScope(tenantId, () -> roleCatalogFacade.listRoleItems(tenantId))
+                : roleCatalogFacade.listRoleItems(tenantId);
+        return roles
                 .stream()
-                .map(role -> new RoleView(
-                        role.id(),
-                        role.roleCode(),
-                        role.roleName(),
-                        role.roleDesc(),
-                        parseScope(role.dataScopeType()),
-                        rolePayloadCodec.readDeptIds(role.dataScopeValueJson()).stream().sorted().toList()
-                ))
+                .filter(role -> globalScope || tenantId.equals(role.tenantId()))
+                .map(this::toRoleView)
                 .toList();
     }
+
+    public List<RoleView> tenantRoles(String tenantId) {
+        String normalizedTenantId = StringUtils.hasText(tenantId) ? tenantId : currentTenantId();
+        return roleCatalogFacade.listTenantRoleItems(normalizedTenantId).stream()
+                .map(this::toRoleView)
+                .toList();
+    }
+
+    public RoleView tenantRole(String tenantId, Long roleId) {
+        String normalizedTenantId = StringUtils.hasText(tenantId) ? tenantId : currentTenantId();
+        return tenantRoles(normalizedTenantId).stream()
+                .filter(role -> role.id().equals(roleId))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException("角色不存在"));
+    }
+
     public List<DepartmentView> departments() {
         String tenantId = currentTenantId();
-        List<DeptCatalogFacade.DeptItem> departments = deptCatalogFacade.listDeptItems(tenantId);
-        Set<Long> visibleDeptIds = dataScopeService.visibleDeptIds(tenantId).orElse(null);
-        if (visibleDeptIds != null) {
-            departments = departments.stream()
-                    .filter(d -> d.id() != null && visibleDeptIds.contains(d.id()))
-                    .toList();
+        boolean globalScope = isGlobalScope();
+        List<DeptCatalogFacade.DeptItem> departments = globalScope && !TenantContext.isGlobalScope()
+                ? TenantContext.runWithGlobalScope(tenantId, () -> deptCatalogFacade.listDeptItems(tenantId))
+                : deptCatalogFacade.listDeptItems(tenantId);
+        if (!globalScope) {
+            Set<Long> visibleDeptIds = dataScopeService.visibleDeptIds(tenantId).orElse(null);
+            if (visibleDeptIds != null) {
+                departments = departments.stream()
+                        .filter(d -> d.id() != null && visibleDeptIds.contains(d.id()))
+                        .toList();
+            }
         }
         return departments.stream()
                 .map(dept -> new DepartmentView(
                         dept.id(),
+                        dept.tenantId(),
                         dept.deptCode(),
                         dept.deptName(),
                         dept.parentId(),
@@ -119,6 +139,18 @@ public class CatalogService {
                 .orElseThrow(() -> new BusinessException("角色不存在"));
     }
 
+    private RoleView toRoleView(RoleCatalogFacade.RoleItem role) {
+        return new RoleView(
+                role.id(),
+                role.tenantId(),
+                role.roleCode(),
+                role.roleName(),
+                role.roleDesc(),
+                parseScope(role.dataScopeType()),
+                rolePayloadCodec.readDeptIds(role.dataScopeValueJson()).stream().sorted().toList()
+        );
+    }
+
     public TenantView tenant(String tenantId) {
         return tenants().stream()
                 .filter(tenant -> tenant.tenantId().equals(tenantId))
@@ -129,6 +161,10 @@ public class CatalogService {
     private String currentTenantId() {
         String tenantId = TenantContext.getTenantId();
         return StringUtils.hasText(tenantId) ? tenantId : "platform";
+    }
+
+    private boolean isGlobalScope() {
+        return TenantContext.isGlobalScope() || dataScopeService.isPlatformSuperAdmin();
     }
 
     private DataScopeType parseScope(String scopeType) {
@@ -196,6 +232,7 @@ public class CatalogService {
     @Schema(description = "角色目录项")
     public record RoleView(
             @Schema(description = "角色 ID") Long id,
+            @Schema(description = "租户编码") String tenantId,
             @Schema(description = "角色编码") String code,
             @Schema(description = "角色名称") String name,
             @Schema(description = "角色描述") String description,
@@ -207,6 +244,7 @@ public class CatalogService {
     @Schema(description = "部门目录项")
     public record DepartmentView(
             @Schema(description = "部门 ID") Long id,
+            @Schema(description = "租户编码") String tenantId,
             @Schema(description = "部门编码") String code,
             @Schema(description = "部门名称") String name,
             @Schema(description = "父部门 ID") Long parentId,

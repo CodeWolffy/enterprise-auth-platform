@@ -1,6 +1,8 @@
 package com.enterprise.auth.platform.modules.user.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.plugins.IgnoreStrategy;
+import com.baomidou.mybatisplus.core.plugins.InterceptorIgnoreHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.common.web.PageResult;
@@ -52,10 +54,46 @@ public class UserDirectoryService {
     }
 
     public PageResult<UserSummary> listUsers(String username, String mobile, String email, Boolean enabled, Long deptId, int page, int size) {
+        return listUsers(username, mobile, email, enabled, deptId, null, page, size);
+    }
+
+    public PageResult<UserSummary> listUsers(
+            String username,
+            String mobile,
+            String email,
+            Boolean enabled,
+            Long deptId,
+            String tenantIdFilter,
+            int page,
+            int size
+    ) {
+        boolean globalScope = isGlobalScope();
+        if (globalScope) {
+            return InterceptorIgnoreHelper.execute(
+                    IgnoreStrategy.builder().tenantLine(true).build(),
+                    () -> doListUsers(username, mobile, email, enabled, deptId, tenantIdFilter, page, size, true)
+            );
+        }
+        return doListUsers(username, mobile, email, enabled, deptId, null, page, size, false);
+    }
+
+    private PageResult<UserSummary> doListUsers(
+            String username,
+            String mobile,
+            String email,
+            Boolean enabled,
+            Long deptId,
+            String tenantIdFilter,
+            int page,
+            int size,
+            boolean globalScope
+    ) {
         String tenantId = currentTenantId();
+        String normalizedTenantFilter = StringUtils.hasText(tenantIdFilter) ? tenantIdFilter.trim() : null;
 
         LambdaQueryWrapper<SysUserEntity> query = new LambdaQueryWrapper<SysUserEntity>()
-                .eq(SysUserEntity::getTenantId, tenantId)
+                .eq(!globalScope, SysUserEntity::getTenantId, tenantId)
+                .eq(globalScope && StringUtils.hasText(normalizedTenantFilter), SysUserEntity::getTenantId, normalizedTenantFilter)
                 .eq(SysUserEntity::getDeleted, 0);
         if (StringUtils.hasText(username)) {
             query.like(SysUserEntity::getUsername, username);
@@ -72,14 +110,16 @@ public class UserDirectoryService {
         if (deptId != null) {
             query.eq(SysUserEntity::getDeptId, deptId);
         }
-        dataScopeService.visibleUserIds(tenantId).ifPresent(visibleUserIds -> {
-            if (visibleUserIds.isEmpty()) {
-                query.apply("1 = 0");
-            } else {
-                query.in(SysUserEntity::getId, visibleUserIds);
-            }
-        });
-        query.orderByAsc(SysUserEntity::getId);
+        if (!globalScope) {
+            dataScopeService.visibleUserIds(tenantId).ifPresent(visibleUserIds -> {
+                if (visibleUserIds.isEmpty()) {
+                    query.apply("1 = 0");
+                } else {
+                    query.in(SysUserEntity::getId, visibleUserIds);
+                }
+            });
+        }
+        query.orderByAsc(SysUserEntity::getTenantId).orderByAsc(SysUserEntity::getId);
 
         Page<SysUserEntity> userPage = sysUserMapper.selectPage(Page.of(page, size), query);
         List<SysUserEntity> users = userPage.getRecords();
@@ -87,8 +127,8 @@ public class UserDirectoryService {
             return PageResult.of(userPage.getTotal(), page, size, List.of());
         }
 
-        Map<Long, Set<String>> roleCodesByUserId = loadRoleCodes(tenantId, users);
-        Map<Long, Set<String>> permissionsByUserId = loadPermissionCodes(tenantId, roleCodesByUserId);
+        Map<Long, Set<String>> roleCodesByUserId = loadRoleCodes(tenantId, users, globalScope);
+        Map<Long, Set<String>> permissionsByUserId = loadPermissionCodes(tenantId, users, roleCodesByUserId, globalScope);
 
         List<UserSummary> records = users.stream()
                 .map(user -> new UserSummary(
@@ -109,33 +149,49 @@ public class UserDirectoryService {
         return PageResult.of(userPage.getTotal(), page, size, records);
     }
 
-    private Map<Long, Set<String>> loadRoleCodes(String tenantId, List<SysUserEntity> users) {
+    private Map<Long, Set<String>> loadRoleCodes(String tenantId, List<SysUserEntity> users, boolean globalScope) {
         List<Long> userIds = users.stream().map(SysUserEntity::getId).toList();
         List<SysUserRoleEntity> userRoles = sysUserRoleMapper.selectList(new LambdaQueryWrapper<SysUserRoleEntity>()
-                .eq(SysUserRoleEntity::getTenantId, tenantId)
+                .eq(!globalScope, SysUserRoleEntity::getTenantId, tenantId)
                 .in(SysUserRoleEntity::getUserId, userIds));
         if (userRoles.isEmpty()) {
             return Map.of();
         }
-        List<Long> roleIds = userRoles.stream().map(SysUserRoleEntity::getRoleId).distinct().toList();
-        Map<Long, String> roleCodeMap = roleQueryFacade.loadRoleCodeMap(tenantId);
+        Map<String, Map<Long, String>> roleCodeMapByTenant = userRoles.stream()
+                .map(SysUserRoleEntity::getTenantId)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .collect(Collectors.toMap(
+                        java.util.function.Function.identity(),
+                        roleQueryFacade::loadRoleCodeMap
+                ));
 
         return userRoles.stream().collect(Collectors.groupingBy(
                 SysUserRoleEntity::getUserId,
-                Collectors.mapping(link -> roleCodeMap.get(link.getRoleId()), Collectors.toSet())
+                Collectors.mapping(link -> roleCodeMapByTenant
+                        .getOrDefault(link.getTenantId(), Map.of())
+                        .get(link.getRoleId()), Collectors.filtering(java.util.Objects::nonNull, Collectors.toSet()))
         ));
     }
 
-    private Map<Long, Set<String>> loadPermissionCodes(String tenantId, Map<Long, Set<String>> roleCodesByUserId) {
+    private Map<Long, Set<String>> loadPermissionCodes(
+            String tenantId,
+            List<SysUserEntity> users,
+            Map<Long, Set<String>> roleCodesByUserId,
+            boolean globalScope
+    ) {
         if (roleCodesByUserId.isEmpty()) {
             return Map.of();
         }
-        Map<Set<String>, Set<String>> cache = new java.util.HashMap<>();
+        Map<Long, String> userTenantMap = users.stream().collect(Collectors.toMap(SysUserEntity::getId, SysUserEntity::getTenantId));
+        Map<String, Map<Set<String>, Set<String>>> cache = new java.util.HashMap<>();
         return roleCodesByUserId.entrySet().stream().collect(Collectors.toMap(
                 Map.Entry::getKey,
                 entry -> {
+                    String effectiveTenantId = globalScope ? userTenantMap.getOrDefault(entry.getKey(), tenantId) : tenantId;
                     Set<String> key = entry.getValue() == null ? Set.of() : new java.util.TreeSet<>(entry.getValue());
-                    return cache.computeIfAbsent(key, item -> roleGrantQueryFacade.resolveGrantKeys(tenantId, item, false));
+                    return cache.computeIfAbsent(effectiveTenantId, ignored -> new java.util.HashMap<>())
+                            .computeIfAbsent(key, item -> roleGrantQueryFacade.resolveGrantKeys(effectiveTenantId, item, false));
                 }
         ));
     }
@@ -143,5 +199,9 @@ public class UserDirectoryService {
     private String currentTenantId() {
         String tenantId = TenantContext.getTenantId();
         return StringUtils.hasText(tenantId) ? tenantId : "platform";
+    }
+
+    private boolean isGlobalScope() {
+        return TenantContext.isGlobalScope() || dataScopeService.isPlatformSuperAdmin();
     }
 }

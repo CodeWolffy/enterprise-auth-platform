@@ -45,7 +45,9 @@ public class MybatisPlusConfig {
 
                 @Override
                 public boolean ignoreTable(String tableName) {
-                    return tableName == null || ignoreTables.contains(tableName.toLowerCase());
+                    return TenantContext.isTenantFilterIgnored()
+                            || tableName == null
+                            || ignoreTables.contains(tableName.toLowerCase());
                 }
             }));
         }

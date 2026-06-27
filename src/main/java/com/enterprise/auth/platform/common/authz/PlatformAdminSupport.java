@@ -9,6 +9,15 @@ import org.springframework.util.StringUtils;
 @Component
 public class PlatformAdminSupport {
 
+    private static final Set<String> PLATFORM_ADMIN_ROLE_CODES = Set.of("ADMIN", "PLATFORM_ADMIN", "TENANT_ADMIN");
+    private static final Set<String> PLATFORM_ADMIN_PERMISSION_CODES = Set.of(
+            PermissionCodes.SYSTENANT_PAGE,
+            PermissionCodes.SYSTENANT_GET,
+            PermissionCodes.SYSTENANT_ADD,
+            PermissionCodes.SYSTENANT_EDIT,
+            PermissionCodes.SYSTENANT_DEL
+    );
+
     private final TenantProperties tenantProperties;
 
     public PlatformAdminSupport(TenantProperties tenantProperties) {
@@ -22,11 +31,22 @@ public class PlatformAdminSupport {
         if (!tenantProperties.platformTenantId().equals(user.tenantId())) {
             return false;
         }
-        if (user.roles() != null && user.roles().contains("ADMIN")) {
+        if (user.roles() != null && user.roles().stream().anyMatch(PLATFORM_ADMIN_ROLE_CODES::contains)) {
             return true;
         }
         Set<String> permissions = user.permissions();
-        return permissions != null && (permissions.contains(PermissionCodes.SYSTENANT_EDIT) || permissions.contains(PermissionCodes.SYSTENANT_GET));
+        return permissions != null && permissions.stream().anyMatch(PLATFORM_ADMIN_PERMISSION_CODES::contains);
+    }
+
+    public boolean usesGlobalTenantScope(UserAccount user, String activeTenantId) {
+        if (!isPlatformSuperAdmin(user)) {
+            return false;
+        }
+        return !StringUtils.hasText(activeTenantId) || tenantProperties.platformTenantId().equals(activeTenantId);
+    }
+
+    public String platformTenantId() {
+        return tenantProperties.platformTenantId();
     }
 
     public boolean canSwitchTenant(UserAccount user, String requestedTenantId) {

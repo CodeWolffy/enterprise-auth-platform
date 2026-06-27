@@ -1,5 +1,6 @@
 /target/
 /.idea/
+/.trae
 /.m2repo
 /.DS_Store
 /.vscode/
@@ -22,3 +23,5 @@ pnpm-debug.log*
 /src/main/resources/application-local.yml
 /src/test/resources/application.yml
 /haorong-mall-master
+/frontend/e2e/visual-baseline.spec.ts-snapshots/
+/frontend/screenshots/

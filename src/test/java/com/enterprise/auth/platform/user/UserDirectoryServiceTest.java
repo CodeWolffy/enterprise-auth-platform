@@ -7,12 +7,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.authz.DataScopeType;
-import com.enterprise.auth.platform.modules.dept.infrastructure.entity.SysDeptEntity;
-import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
-import com.enterprise.auth.platform.modules.dept.infrastructure.mapper.SysDeptMapper;
-import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
+import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.web.PageResult;
+import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
+import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.user.application.AuthenticationUser;
 import com.enterprise.auth.platform.modules.user.interfaces.UserSummary;
@@ -44,9 +43,6 @@ class UserDirectoryServiceTest {
 
     @Autowired
     private SysUserMapper sysUserMapper;
-
-    @Autowired
-    private SysDeptMapper sysDeptMapper;
 
     @Autowired
     private PasswordHasher passwordHasher;
@@ -86,22 +82,70 @@ class UserDirectoryServiceTest {
     @Test
     void listUsersShouldRespectCurrentTenant() {
         TenantContext.setTenantId("tenant-a");
-        AuthenticationUser auditor = userRepository.findByUsername("tenant-a", "auditor").orElseThrow();
-        bind(auditor);
+        bind(loadScopedUser(TENANT_TEST_USER, DataScopeType.ALL, Set.of()));
         List<UserSummary> tenantUsers = userDirectoryService.listUsers();
         assertThat(tenantUsers).extracting(UserSummary::tenantId).containsOnly("tenant-a");
-        assertThat(tenantUsers).extracting(UserSummary::username).contains("auditor");
         assertThat(tenantUsers).extracting(UserSummary::username).contains(TENANT_TEST_USER);
         assertThat(tenantUsers).extracting(UserSummary::username).doesNotContain(PLATFORM_TEST_USER);
-        assertThat(tenantUsers).extracting(UserSummary::username).doesNotContain(TENANT_OTHER_DEPT_USER);
+    }
 
-        TenantContext.setTenantId("platform");
+    @Test
+    void listUsersShouldExposeAllTenantsInGlobalScope() {
+        TenantContext.setGlobalScope("platform");
         AuthenticationUser admin = userRepository.findByUsername("platform", "admin").orElseThrow();
         bind(admin);
-        List<UserSummary> platformUsers = userDirectoryService.listUsers();
-        assertThat(platformUsers).extracting(UserSummary::tenantId).containsOnly("platform");
-        assertThat(platformUsers).extracting(UserSummary::username).contains(PLATFORM_TEST_USER);
-        assertThat(platformUsers).extracting(UserSummary::username).doesNotContain(TENANT_TEST_USER);
+
+        List<UserSummary> users = userDirectoryService.listUsers();
+
+        assertThat(users).extracting(UserSummary::tenantId).contains("platform", "tenant-a");
+        assertThat(users).extracting(UserSummary::username)
+                .contains(PLATFORM_TEST_USER, TENANT_TEST_USER, TENANT_OTHER_DEPT_USER);
+    }
+
+    @Test
+    void platformAdminShouldSeeAllUsersEvenWhenActiveTenantDiffers() {
+        TenantContext.setTenantId("tenant-a");
+        bind(new UserAccount(
+                1L,
+                "platform",
+                "admin",
+                "{noop}ignored",
+                true,
+                Set.of("ADMIN"),
+                Set.of("upms:sysuser:get"),
+                Set.of(),
+                DataScopeType.ALL,
+                1
+        ));
+
+        List<UserSummary> users = userDirectoryService.listUsers();
+
+        assertThat(users).extracting(UserSummary::tenantId).contains("platform", "tenant-a");
+        assertThat(users).extracting(UserSummary::username)
+                .contains(PLATFORM_TEST_USER, TENANT_TEST_USER);
+    }
+
+    @Test
+    void platformTenantUserWithTenantManagementPermissionShouldSeeAllUsers() {
+        TenantContext.setTenantId("tenant-a");
+        bind(new UserAccount(
+                1L,
+                "platform",
+                "tenant_manager",
+                "{noop}ignored",
+                true,
+                Set.of(),
+                Set.of(PermissionCodes.SYSTENANT_PAGE),
+                Set.of(),
+                DataScopeType.ALL,
+                1
+        ));
+
+        List<UserSummary> users = userDirectoryService.listUsers();
+
+        assertThat(users).extracting(UserSummary::tenantId).contains("platform", "tenant-a");
+        assertThat(users).extracting(UserSummary::username)
+                .contains(PLATFORM_TEST_USER, TENANT_TEST_USER);
     }
 
     @Test
@@ -147,15 +191,16 @@ class UserDirectoryServiceTest {
 
     private void ensureUser(String tenantId, String username, Long deptId) {
         deleteUser(tenantId, username);
-        SysUserEntity entity = new SysUserEntity();
-        entity.setTenantId(tenantId);
-        entity.setDeptId(deptId);
-        entity.setUsername(username);
-        entity.setDisplayName(username);
-        entity.setPasswordHash(passwordHasher.hash("UserTest@123"));
-        entity.setEnabled(1);
-        entity.setSessionVersion(1);
-        sysUserMapper.insert(entity);
+        jdbcTemplate.update("""
+                        INSERT INTO sys_user(tenant_id, dept_id, username, display_name, password_hash, enabled, session_version, deleted)
+                        VALUES(?, ?, ?, ?, ?, 1, 1, 0)
+                        """,
+                tenantId,
+                deptId,
+                username,
+                username,
+                passwordHasher.hash("UserTest@123")
+        );
     }
 
     private void deleteUser(String tenantId, String username) {
@@ -164,13 +209,21 @@ class UserDirectoryServiceTest {
 
     private Long ensureDept(String tenantId, String deptCode, String deptName, Long parentId) {
         deleteDept(tenantId, deptCode);
-        SysDeptEntity entity = new SysDeptEntity();
-        entity.setTenantId(tenantId);
-        entity.setDeptCode(deptCode);
-        entity.setDeptName(deptName);
-        entity.setParentId(parentId);
-        sysDeptMapper.insert(entity);
-        return entity.getId();
+        jdbcTemplate.update("""
+                        INSERT INTO sys_dept(tenant_id, dept_code, dept_name, parent_id, deleted)
+                        VALUES(?, ?, ?, ?, 0)
+                        """,
+                tenantId,
+                deptCode,
+                deptName,
+                parentId
+        );
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_dept WHERE tenant_id = ? AND dept_code = ? LIMIT 1",
+                Long.class,
+                tenantId,
+                deptCode
+        );
     }
 
     private void deleteDept(String tenantId, String deptCode) {

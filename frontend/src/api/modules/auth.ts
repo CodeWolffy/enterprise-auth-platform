@@ -1,4 +1,4 @@
-import { http } from '../http'
+import { http, type TenantRequestConfig } from '../http'
 import type { ApiResponse } from '@/types/api'
 import type {
   CaptchaResponse,
@@ -10,12 +10,16 @@ import type {
 } from '@/types/auth-models'
 
 export async function fetchPermissionSnapshot() {
-  const { data } = await http.get<ApiResponse<PermissionSnapshot>>('/api/auth/me')
+  const { data } = await http.get<ApiResponse<PermissionSnapshot>>('/api/auth/me', {
+    tenantScope: 'active',
+  } satisfies TenantRequestConfig)
   return data.data
 }
 
 export async function switchTenant(targetTenantId: string) {
-  const { data } = await http.post<ApiResponse<PermissionSnapshot>>(`/api/auth/tenants/${encodeURIComponent(targetTenantId)}/switch`)
+  const { data } = await http.post<ApiResponse<PermissionSnapshot>>(`/api/auth/tenants/${encodeURIComponent(targetTenantId)}/switch`, undefined, {
+    tenantScope: 'operator',
+  } satisfies TenantRequestConfig)
   return data.data
 }
 
@@ -25,7 +29,9 @@ export async function fetchRegisterOptions() {
 }
 
 export async function fetchCaptcha() {
-  const { data } = await http.get<ApiResponse<CaptchaResponse>>('/api/auth/captcha')
+  const { data } = await http.get<ApiResponse<CaptchaResponse>>('/api/auth/captcha', {
+    tenantScope: 'none',
+  } satisfies TenantRequestConfig)
   if (!data.data?.captchaId) {
     throw new Error('验证码 ID 缺失')
   }

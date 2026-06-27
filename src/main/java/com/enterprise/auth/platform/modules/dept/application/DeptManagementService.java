@@ -1,12 +1,15 @@
 package com.enterprise.auth.platform.modules.dept.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.plugins.IgnoreStrategy;
+import com.baomidou.mybatisplus.core.plugins.InterceptorIgnoreHelper;
 import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.modules.resource.application.CatalogService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.dept.interfaces.DeptCrudRequest;
 import com.enterprise.auth.platform.modules.dept.infrastructure.entity.SysDeptEntity;
 import com.enterprise.auth.platform.modules.dept.infrastructure.mapper.SysDeptMapper;
+import com.enterprise.auth.platform.modules.tenant.application.TenantProfileFacade;
 import com.enterprise.auth.platform.modules.user.application.UserQueryFacade;
 import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.common.authz.SecuritySupport;
@@ -23,23 +26,26 @@ public class DeptManagementService {
     private final UserQueryFacade userQueryFacade;
     private final LogPublisher logPublisher;
     private final DataScopeService dataScopeService;
+    private final TenantProfileFacade tenantProfileFacade;
 
     public DeptManagementService(
             SysDeptMapper sysDeptMapper,
             UserQueryFacade userQueryFacade,
             CatalogService catalogService,
             LogPublisher logPublisher,
-            DataScopeService dataScopeService
+            DataScopeService dataScopeService,
+            TenantProfileFacade tenantProfileFacade
     ) {
         this.sysDeptMapper = sysDeptMapper;
         this.userQueryFacade = userQueryFacade;
         this.logPublisher = logPublisher;
         this.dataScopeService = dataScopeService;
+        this.tenantProfileFacade = tenantProfileFacade;
     }
 
     @Transactional
     public CatalogService.DepartmentView create(DeptCrudRequest request) {
-        String tenantId = currentTenantId();
+        String tenantId = resolveTargetTenantId(request.tenantId());
         String operator = SecuritySupport.currentOperator();
         validateParentAccess(tenantId, request.parentId());
         validateLeaderAccess(tenantId, request.leaderUserId());
@@ -60,8 +66,8 @@ public class DeptManagementService {
 
     @Transactional
     public CatalogService.DepartmentView update(Long deptId, DeptCrudRequest request) {
-        String tenantId = currentTenantId();
-        SysDeptEntity entity = getDept(deptId, tenantId);
+        SysDeptEntity entity = getDept(deptId);
+        String tenantId = entity.getTenantId();
         validateParentAccess(tenantId, request.parentId());
         validateLeaderAccess(tenantId, request.leaderUserId());
 
@@ -79,45 +85,70 @@ public class DeptManagementService {
 
     @Transactional
     public void delete(Long deptId) {
-        String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
-        SysDeptEntity entity = getDept(deptId, tenantId);
+        SysDeptEntity entity = getDept(deptId);
+        String tenantId = entity.getTenantId();
         long childCount = sysDeptMapper.selectCount(new LambdaQueryWrapper<SysDeptEntity>()
                 .eq(SysDeptEntity::getTenantId, tenantId)
                 .eq(SysDeptEntity::getDeleted, 0)
                 .eq(SysDeptEntity::getParentId, deptId));
-        long userCount = userQueryFacade.countByDept(deptId);
+        long userCount = userQueryFacade.countByDept(tenantId, deptId);
         if (childCount > 0 || userCount > 0) {
             throw new BusinessException("部门下仍存在子部门或用户，暂不允许删除");
         }
         sysDeptMapper.deleteById(entity.getId());
     }
 
-    private SysDeptEntity getDept(Long deptId, String tenantId) {
-        SysDeptEntity entity = sysDeptMapper.selectOne(new LambdaQueryWrapper<SysDeptEntity>()
-                .eq(SysDeptEntity::getId, deptId)
-                .eq(SysDeptEntity::getTenantId, tenantId)
-                .eq(SysDeptEntity::getDeleted, 0)
-                .last("limit 1"));
+    private SysDeptEntity getDept(Long deptId) {
+        SysDeptEntity entity;
+        if (dataScopeService.isPlatformSuperAdmin()) {
+            entity = InterceptorIgnoreHelper.execute(
+                    IgnoreStrategy.builder().tenantLine(true).build(),
+                    () -> sysDeptMapper.selectOne(new LambdaQueryWrapper<SysDeptEntity>()
+                            .eq(SysDeptEntity::getId, deptId)
+                            .eq(SysDeptEntity::getDeleted, 0)
+                            .last("limit 1"))
+            );
+        } else {
+            entity = sysDeptMapper.selectOne(new LambdaQueryWrapper<SysDeptEntity>()
+                    .eq(SysDeptEntity::getId, deptId)
+                    .eq(SysDeptEntity::getTenantId, currentTenantId())
+                    .eq(SysDeptEntity::getDeleted, 0)
+                    .last("limit 1"));
+        }
         if (entity == null) {
             throw new BusinessException("部门不存在");
         }
-        if (!dataScopeService.canAccessDept(tenantId, entity.getId())) {
+        if (!dataScopeService.canAccessDept(entity.getTenantId(), entity.getId())) {
             throw new BusinessException("无权访问该部门");
         }
         return entity;
     }
 
     private void validateParentAccess(String tenantId, Long parentId) {
-        if (parentId != null && !dataScopeService.canAccessDept(tenantId, parentId)) {
+        if (parentId == null) {
+            return;
+        }
+        if (!dataScopeService.canAccessDept(tenantId, parentId) || !deptExists(tenantId, parentId)) {
             throw new BusinessException("无权使用该父级部门");
         }
     }
 
     private void validateLeaderAccess(String tenantId, Long leaderUserId) {
-        if (leaderUserId != null && !dataScopeService.canAccessUser(tenantId, leaderUserId)) {
+        if (leaderUserId == null) {
+            return;
+        }
+        if (!dataScopeService.canAccessUser(tenantId, leaderUserId)
+                || userQueryFacade.countExistingByIds(tenantId, java.util.Set.of(leaderUserId)) != 1) {
             throw new BusinessException("无权指定该部门负责人");
         }
+    }
+
+    private boolean deptExists(String tenantId, Long deptId) {
+        return sysDeptMapper.selectCount(new LambdaQueryWrapper<SysDeptEntity>()
+                .eq(SysDeptEntity::getTenantId, tenantId)
+                .eq(SysDeptEntity::getId, deptId)
+                .eq(SysDeptEntity::getDeleted, 0)) == 1;
     }
 
     private String currentTenantId() {
@@ -125,9 +156,21 @@ public class DeptManagementService {
         return StringUtils.hasText(tenantId) ? tenantId : "platform";
     }
 
+    private String resolveTargetTenantId(String requestedTenantId) {
+        String currentTenantId = currentTenantId();
+        if (!dataScopeService.isPlatformSuperAdmin()) {
+            return currentTenantId;
+        }
+        String targetTenantId = StringUtils.hasText(requestedTenantId) ? requestedTenantId.trim() : currentTenantId;
+        tenantProfileFacade.findByTenantId(targetTenantId)
+                .orElseThrow(() -> new BusinessException("TENANT_NOT_FOUND", "租户不存在"));
+        return targetTenantId;
+    }
+
     private CatalogService.DepartmentView toDepartmentView(SysDeptEntity entity) {
         return new CatalogService.DepartmentView(
                 entity.getId(),
+                entity.getTenantId(),
                 entity.getDeptCode(),
                 entity.getDeptName(),
                 entity.getParentId(),

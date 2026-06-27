@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.modules.menu.interfaces;
 
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
+import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
@@ -29,11 +30,13 @@ public class MenuController {
     private final MenuService menuService;
     private final ObjectMapper objectMapper;
     private final Validator validator;
+    private final DataScopeService dataScopeService;
 
-    public MenuController(MenuService menuService, ObjectMapper objectMapper, Validator validator) {
+    public MenuController(MenuService menuService, ObjectMapper objectMapper, Validator validator, DataScopeService dataScopeService) {
         this.menuService = menuService;
         this.objectMapper = objectMapper;
         this.validator = validator;
+        this.dataScopeService = dataScopeService;
     }
 
     @Operation(summary = "查询菜单树")
@@ -46,8 +49,11 @@ public class MenuController {
     @Operation(summary = "查询可授权菜单树")
     @GetMapping("/grantable-tree")
     @SaCheckPermission(PermissionCodes.SYSROLE_GET)
-    public ApiResponse<List<MenuTreeNode>> grantableTree() {
-        return ApiResponse.ok(MenuTreeUtil.buildTree(menuService.grantableTree(TenantContext.getTenantId())));
+    public ApiResponse<List<MenuTreeNode>> grantableTree(@RequestParam(required = false) String tenantId) {
+        String effectiveTenantId = dataScopeService.isPlatformSuperAdmin() && org.springframework.util.StringUtils.hasText(tenantId)
+                ? tenantId.trim()
+                : TenantContext.getTenantId();
+        return ApiResponse.ok(MenuTreeUtil.buildTree(menuService.grantableTree(effectiveTenantId)));
     }
 
     @Operation(summary = "查询平台菜单模板树")

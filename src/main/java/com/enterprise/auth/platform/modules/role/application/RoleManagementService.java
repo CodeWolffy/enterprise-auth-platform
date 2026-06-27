@@ -1,6 +1,8 @@
 package com.enterprise.auth.platform.modules.role.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.plugins.IgnoreStrategy;
+import com.baomidou.mybatisplus.core.plugins.InterceptorIgnoreHelper;
 import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.modules.resource.application.CatalogService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
@@ -15,6 +17,8 @@ import com.enterprise.auth.platform.modules.role.interfaces.CreateRoleRequest;
 import com.enterprise.auth.platform.modules.role.application.RolePayloadCodec;
 import com.enterprise.auth.platform.modules.menu.application.MenuService;
 import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
+import com.enterprise.auth.platform.modules.tenant.application.TenantProfileFacade;
+import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.common.authz.SecuritySupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import java.util.List;
@@ -36,6 +40,8 @@ public class RoleManagementService {
     private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
     private final RolePayloadCodec rolePayloadCodec;
     private final MenuService menuService;
+    private final DataScopeService dataScopeService;
+    private final TenantProfileFacade tenantProfileFacade;
 
     public RoleManagementService(
             SysRoleMapper sysRoleMapper,
@@ -46,7 +52,9 @@ public class RoleManagementService {
             LogPublisher logPublisher,
             AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
             RolePayloadCodec rolePayloadCodec,
-            MenuService menuService
+            MenuService menuService,
+            DataScopeService dataScopeService,
+            TenantProfileFacade tenantProfileFacade
     ) {
         this.sysRoleMapper = sysRoleMapper;
         this.sysRoleMenuMapper = sysRoleMenuMapper;
@@ -57,11 +65,13 @@ public class RoleManagementService {
         this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
         this.rolePayloadCodec = rolePayloadCodec;
         this.menuService = menuService;
+        this.dataScopeService = dataScopeService;
+        this.tenantProfileFacade = tenantProfileFacade;
     }
 
     @Transactional
     public CatalogService.RoleView create(CreateRoleRequest request) {
-        String tenantId = currentTenantId();
+        String tenantId = resolveTargetTenantId(request.tenantId());
         String operator = SecuritySupport.currentOperator();
         if (existsRoleCode(tenantId, request.roleCode())) {
             throw new BusinessException("角色编码已存在");
@@ -75,27 +85,27 @@ public class RoleManagementService {
         applyDataScope(entity, tenantId, request.dataScopeType(), request.customDeptIds());
         sysRoleMapper.insert(entity);
 
-        return catalogService.role(entity.getRoleCode());
+        return catalogService.tenantRole(tenantId, entity.getId());
     }
 
     @Transactional
     public CatalogService.RoleView update(Long roleId, CreateRoleRequest request) {
-        String tenantId = currentTenantId();
-        SysRoleEntity entity = getRole(roleId, tenantId);
+        SysRoleEntity entity = getRole(roleId);
+        String tenantId = entity.getTenantId();
         entity.setRoleName(request.roleName());
         entity.setRoleDesc(request.roleDesc());
         applyDataScope(entity, tenantId, request.dataScopeType(), request.customDeptIds());
         sysRoleMapper.updateById(entity);
         evictPrincipalsByRole(tenantId, roleId);
 
-        return catalogService.role(entity.getRoleCode());
+        return catalogService.tenantRole(tenantId, entity.getId());
     }
 
     @Transactional
     public Set<Long> assignMenus(Long roleId, Set<Long> menuIds) {
-        String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
-        SysRoleEntity entity = getRole(roleId, tenantId);
+        SysRoleEntity entity = getRole(roleId);
+        String tenantId = entity.getTenantId();
         Set<Long> assigned = menuService.expandMenuIdsWithAncestors(tenantId, menuIds);
         sysRoleMenuMapper.delete(new LambdaQueryWrapper<SysRoleMenuEntity>()
                 .eq(SysRoleMenuEntity::getTenantId, tenantId)
@@ -112,14 +122,14 @@ public class RoleManagementService {
     }
 
     public Set<Long> listAssignedMenus(Long roleId) {
-        String tenantId = currentTenantId();
-        getRole(roleId, tenantId);
-        return listRoleMenuIds(tenantId, roleId);
+        SysRoleEntity entity = getRole(roleId);
+        String tenantId = entity.getTenantId();
+        return menuService.filterGrantableMenuIds(tenantId, listRoleMenuIds(tenantId, roleId));
     }
 
     public RoleImpactView impact(Long roleId) {
-        String tenantId = currentTenantId();
-        SysRoleEntity entity = getRole(roleId, tenantId);
+        SysRoleEntity entity = getRole(roleId);
+        String tenantId = entity.getTenantId();
         List<Long> assignedUserIds = userQueryFacade.listUserIdsByRole(tenantId, roleId);
         Set<Long> assignedMenuIds = listRoleMenuIds(tenantId, roleId);
         boolean deleteBlocked = !assignedUserIds.isEmpty();
@@ -147,9 +157,9 @@ public class RoleManagementService {
 
     @Transactional
     public void delete(Long roleId) {
-        String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
-        SysRoleEntity entity = getRole(roleId, tenantId);
+        SysRoleEntity entity = getRole(roleId);
+        String tenantId = entity.getTenantId();
         long assignedUsers = userQueryFacade.countUsersByRole(tenantId, roleId);
         if (assignedUsers > 0) {
             throw new BusinessException("角色已分配给用户，暂不允许删除");
@@ -215,7 +225,7 @@ public class RoleManagementService {
     }
 
     private void evictPrincipalsByRole(String tenantId, Long roleId) {
-        List<Long> userIds = userQueryFacade.listUserIdsByRole(roleId);
+        List<Long> userIds = userQueryFacade.listUserIdsByRole(tenantId, roleId);
         if (userIds.isEmpty()) {
             return;
         }
@@ -235,12 +245,23 @@ public class RoleManagementService {
                 .eq(SysRoleEntity::getDeleted, 0)) > 0;
     }
 
-    private SysRoleEntity getRole(Long roleId, String tenantId) {
-        SysRoleEntity entity = sysRoleMapper.selectOne(new LambdaQueryWrapper<SysRoleEntity>()
-                .eq(SysRoleEntity::getId, roleId)
-                .eq(SysRoleEntity::getTenantId, tenantId)
-                .eq(SysRoleEntity::getDeleted, 0)
-                .last("limit 1"));
+    private SysRoleEntity getRole(Long roleId) {
+        SysRoleEntity entity;
+        if (dataScopeService.isPlatformSuperAdmin()) {
+            entity = InterceptorIgnoreHelper.execute(
+                    IgnoreStrategy.builder().tenantLine(true).build(),
+                    () -> sysRoleMapper.selectOne(new LambdaQueryWrapper<SysRoleEntity>()
+                            .eq(SysRoleEntity::getId, roleId)
+                            .eq(SysRoleEntity::getDeleted, 0)
+                            .last("limit 1"))
+            );
+        } else {
+            entity = sysRoleMapper.selectOne(new LambdaQueryWrapper<SysRoleEntity>()
+                    .eq(SysRoleEntity::getId, roleId)
+                    .eq(SysRoleEntity::getTenantId, currentTenantId())
+                    .eq(SysRoleEntity::getDeleted, 0)
+                    .last("limit 1"));
+        }
         if (entity == null) {
             throw new BusinessException("角色不存在");
         }
@@ -262,5 +283,16 @@ public class RoleManagementService {
     private String currentTenantId() {
         String tenantId = TenantContext.getTenantId();
         return StringUtils.hasText(tenantId) ? tenantId : "platform";
+    }
+
+    private String resolveTargetTenantId(String requestedTenantId) {
+        String currentTenantId = currentTenantId();
+        if (!dataScopeService.isPlatformSuperAdmin()) {
+            return currentTenantId;
+        }
+        String targetTenantId = StringUtils.hasText(requestedTenantId) ? requestedTenantId.trim() : currentTenantId;
+        tenantProfileFacade.findByTenantId(targetTenantId)
+                .orElseThrow(() -> new BusinessException("TENANT_NOT_FOUND", "租户不存在"));
+        return targetTenantId;
     }
 }

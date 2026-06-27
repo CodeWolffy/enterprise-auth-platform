@@ -1,130 +1,17 @@
 import { createRouter, createWebHistory, type RouteRecordName, type RouteRecordRaw } from 'vue-router'
-import axios from 'axios'
-import { ElMessage } from 'element-plus'
 import type { MenuItem, PermissionSnapshot } from '@/types/auth-models'
-import { useAuthStore } from '@/stores/auth'
 import { APP_ROUTE_MANIFESTS, type AppRouteManifest } from '@/app/registry/module-manifest'
-import { isAllowedRoute, resolveFirstAllowedPath } from './route-access'
-
-const CONSOLE_SHELL_ROUTE_NAME = 'console-shell'
-
-const PUBLIC_ROUTES: RouteRecordRaw[] = [
-  {
-    path: '/login',
-    name: 'login',
-    component: () => import('@/views/auth/LoginView.vue'),
-    meta: { public: true, title: '登录' },
-  },
-  {
-    path: '/reset-password',
-    name: 'reset-password',
-    component: () => import('@/views/auth/ResetPasswordView.vue'),
-    meta: { public: true, title: '重置密码' },
-  },
-  {
-    path: '/register',
-    name: 'register',
-    component: () => import('@/views/auth/RegisterView.vue'),
-    meta: { public: true, title: '注册' },
-  },
-]
-
-const SHELL_ROUTE: RouteRecordRaw = {
-  path: '/',
-  name: CONSOLE_SHELL_ROUTE_NAME,
-  component: () => import('@/layouts/ConsoleLayout.vue'),
-  children: [
-    {
-      path: '',
-      name: 'console-home',
-      redirect: '/dashboard',
-      meta: { hidden: true },
-    },
-    {
-      path: 'account/profile',
-      name: 'account-profile',
-      component: () => import('@/views/account/AccountProfileView.vue'),
-      meta: { title: '个人中心', allowPasswordChangeRequired: true, skipMenuAccess: true },
-    },
-    {
-      path: 'notices/:id',
-      name: 'notice-detail',
-      component: () => import('@/views/system/NoticeDetailView.vue'),
-      meta: { title: '公告详情', skipMenuAccess: true },
-    },
-  ],
-}
-
-const FALLBACK_ROUTE: RouteRecordRaw = {
-  path: '/:pathMatch(.*)*',
-  name: 'not-found',
-  component: () => import('@/views/NotFoundView.vue'),
-  meta: { title: '页面未找到' },
-}
+import { setupRouterGuards } from './guard'
+import { CONSOLE_SHELL_ROUTE_NAME, coreRoutes } from './routes'
 
 const router = createRouter({
   history: createWebHistory(),
-  routes: [...PUBLIC_ROUTES, SHELL_ROUTE, FALLBACK_ROUTE],
+  routes: coreRoutes,
   scrollBehavior() {
     return { top: 0, left: 0 }
   },
 })
-
-router.beforeEach(async (to) => {
-  const authStore = useAuthStore()
-
-  if (to.meta.public) {
-    return true
-  }
-
-  if (!authStore.authenticated) {
-    return { path: '/login', query: { redirect: to.fullPath } }
-  }
-
-  if (authStore.passwordChangeRequired) {
-    if (to.meta.allowPasswordChangeRequired) {
-      return true
-    }
-    return { path: '/account/profile', replace: true }
-  }
-
-  try {
-    if (!authStore.snapshot) {
-      await authStore.bootstrapSnapshot()
-    }
-  } catch (error) {
-    const status = axios.isAxiosError(error) ? error.response?.status : undefined
-    if (status === 401) {
-      authStore.clearSession()
-      return { path: '/login', query: { redirect: to.fullPath } }
-    }
-    ElMessage.error('会话引导失败，请重试')
-    return false
-  }
-
-  if (to.name === 'not-found') {
-    const resolvedRoute = router.resolve(to.fullPath)
-    if (resolvedRoute.name !== 'not-found') {
-      return { path: to.path, query: to.query, hash: to.hash, replace: true }
-    }
-    return true
-  }
-
-  if (!isAllowedRoute(authStore.snapshot, to)) {
-    const fallbackPath = resolveFirstAllowedPath(authStore.snapshot)
-    if (fallbackPath && fallbackPath !== to.path) {
-      return fallbackPath
-    }
-    ElMessage.error('当前账号暂无该页面访问权限')
-    return false
-  }
-
-  return true
-})
-
-router.afterEach((to) => {
-  document.title = `${String(to.meta.title ?? 'Console')} | Enterprise Auth Platform`
-})
+setupRouterGuards(router)
 
 const dynamicRouteNames = new Set<RouteRecordName>()
 

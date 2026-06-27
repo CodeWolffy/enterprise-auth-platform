@@ -69,7 +69,8 @@ public class TenantSwitchApplicationService {
             AuthContextHolder.set(currentUser, new SessionPrincipal(
                     sessionId,
                     normalizedTargetTenantId,
-                    currentUser.tenantId()
+                    currentUser.tenantId(),
+                    false
             ));
             PermissionSnapshotResponse snapshot = permissionSnapshotApplicationService.build(currentUser);
             sessionIndexService.updateActiveTenant(sessionId, normalizedTargetTenantId);

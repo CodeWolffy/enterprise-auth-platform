@@ -2,6 +2,7 @@
 
 export interface DepartmentView {
   id: number
+  tenantId?: string | null
   code?: string | null
   name: string
   parentId?: number | null
@@ -13,6 +14,7 @@ export interface DepartmentView {
 }
 
 export interface DepartmentPayload {
+  tenantId?: string | null
   parentId?: number | null
   deptCode?: string | null
   deptName: string

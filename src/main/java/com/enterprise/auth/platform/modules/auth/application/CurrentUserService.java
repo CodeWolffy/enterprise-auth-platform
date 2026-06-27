@@ -58,7 +58,8 @@ public class CurrentUserService {
             tokenSession.set("activeTenantId", effectiveTenantId);
         }
         UserAccount effectiveUser = mergeSessionAuthorities(user, tokenSession);
-        SessionPrincipal principal = new SessionPrincipal(StpUtil.getTokenValue(), effectiveTenantId, effectiveUser.tenantId());
+        boolean globalScope = platformAdminSupport.usesGlobalTenantScope(effectiveUser, effectiveTenantId);
+        SessionPrincipal principal = new SessionPrincipal(StpUtil.getTokenValue(), effectiveTenantId, effectiveUser.tenantId(), globalScope);
         AuthContextHolder.set(effectiveUser, principal);
         return principal;
     }
@@ -172,17 +173,7 @@ public class CurrentUserService {
         if (!StringUtils.hasText(tenantId)) {
             return supplier.get();
         }
-        String previousTenantId = TenantContext.getTenantId();
-        try {
-            TenantContext.setTenantId(tenantId);
-            return supplier.get();
-        } finally {
-            if (StringUtils.hasText(previousTenantId)) {
-                TenantContext.setTenantId(previousTenantId);
-            } else {
-                TenantContext.clear();
-            }
-        }
+        return TenantContext.runWithTenant(tenantId, supplier);
     }
 
     private int sessionInt(SaSession session, String key, int fallback) {

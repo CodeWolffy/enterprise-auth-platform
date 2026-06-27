@@ -56,10 +56,11 @@ public class NoticeApplicationService {
             String sortDirection
     ) {
         String tenantId = currentTenantId();
-        Optional<Set<String>> visibleCreators = dataScopeService.visibleUsernames(tenantId);
+        boolean globalScope = TenantContext.isGlobalScope();
+        Optional<Set<String>> visibleCreators = globalScope ? Optional.empty() : dataScopeService.visibleUsernames(tenantId);
         return pageQuery(
-                buildNoticeQuery(tenantId, published, workflowStatus, keyword, visibleCreators),
-                buildNoticeQuery(tenantId, published, workflowStatus, keyword, visibleCreators),
+                buildNoticeQuery(tenantId, globalScope, published, workflowStatus, keyword, visibleCreators),
+                buildNoticeQuery(tenantId, globalScope, published, workflowStatus, keyword, visibleCreators),
                 page,
                 size,
                 sysNoticeMapper::selectCount,
@@ -150,13 +151,14 @@ public class NoticeApplicationService {
 
     private LambdaQueryWrapper<SysNoticeEntity> buildNoticeQuery(
             String tenantId,
+            boolean globalScope,
             Boolean published,
             String workflowStatus,
             String keyword,
             Optional<Set<String>> visibleCreators
     ) {
         LambdaQueryWrapper<SysNoticeEntity> query = new LambdaQueryWrapper<SysNoticeEntity>()
-                .eq(SysNoticeEntity::getTenantId, tenantId)
+                .eq(!globalScope, SysNoticeEntity::getTenantId, tenantId)
                 .eq(SysNoticeEntity::getDeleted, 0)
                 .eq(published != null, SysNoticeEntity::getPublished, Boolean.TRUE.equals(published) ? 1 : 0)
                 .and(StringUtils.hasText(keyword), wrapper -> wrapper

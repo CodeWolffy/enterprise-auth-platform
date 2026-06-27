@@ -29,6 +29,16 @@ public class UserQueryFacade {
                 .eq(SysUserEntity::getDeleted, 0));
     }
 
+    public long countByDept(String tenantId, Long deptId) {
+        if (!StringUtils.hasText(tenantId) || deptId == null) {
+            return 0;
+        }
+        return sysUserMapper.selectCount(new LambdaQueryWrapper<SysUserEntity>()
+                .eq(SysUserEntity::getTenantId, tenantId)
+                .eq(SysUserEntity::getDeptId, deptId)
+                .eq(SysUserEntity::getDeleted, 0));
+    }
+
     public List<SysUserEntity> findByIds(List<Long> userIds) {
         return sysUserMapper.selectList(new LambdaQueryWrapper<SysUserEntity>()
                 .in(SysUserEntity::getId, userIds)

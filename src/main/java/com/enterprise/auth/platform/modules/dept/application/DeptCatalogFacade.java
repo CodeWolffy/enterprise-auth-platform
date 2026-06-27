@@ -16,9 +16,11 @@ public class DeptCatalogFacade {
     }
 
     public List<SysDeptEntity> listDepartments(String tenantId) {
+        boolean globalScope = com.enterprise.auth.platform.common.context.TenantContext.isGlobalScope();
         return sysDeptMapper.selectList(new LambdaQueryWrapper<SysDeptEntity>()
-                .eq(SysDeptEntity::getTenantId, tenantId)
+                .eq(!globalScope, SysDeptEntity::getTenantId, tenantId)
                 .eq(SysDeptEntity::getDeleted, 0)
+                .orderByAsc(SysDeptEntity::getTenantId)
                 .orderByAsc(SysDeptEntity::getOrderNo)
                 .orderByAsc(SysDeptEntity::getId));
     }
@@ -27,6 +29,7 @@ public class DeptCatalogFacade {
         return listDepartments(tenantId).stream()
                 .map(d -> new DeptItem(
                         d.getId(),
+                        d.getTenantId(),
                         d.getDeptCode(),
                         d.getDeptName(),
                         d.getParentId(),
@@ -41,6 +44,7 @@ public class DeptCatalogFacade {
 
     public record DeptItem(
             Long id,
+            String tenantId,
             String deptCode,
             String deptName,
             Long parentId,

@@ -41,6 +41,10 @@ public class DataScopeService {
         return currentUserService.currentUser();
     }
 
+    public boolean isPlatformSuperAdmin() {
+        return currentUser().map(platformAdminSupport::isPlatformSuperAdmin).orElse(false);
+    }
+
     public List<SysUserEntity> filterUsers(String tenantId, List<SysUserEntity> users) {
         Optional<UserAccount> currentUser = currentUser();
         if (currentUser.isEmpty()) {

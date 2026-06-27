@@ -54,7 +54,11 @@ public class SaTokenUserContextInterceptor implements HandlerInterceptor {
                 sessionIndexService.touch(token, lastAccessAt);
             }
             sessionIndexService.updateActiveTenant(token, principal.tenantId());
-            TenantContext.setTenantId(principal.tenantId());
+            if (principal.globalScope()) {
+                TenantContext.setGlobalScope(principal.tenantId());
+            } else {
+                TenantContext.setTenantId(principal.tenantId());
+            }
             enforcePasswordChangeRestriction(request);
         }
         return true;

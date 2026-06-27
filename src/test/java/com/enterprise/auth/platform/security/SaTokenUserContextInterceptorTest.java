@@ -41,6 +41,18 @@ class SaTokenUserContextInterceptorTest {
         assertThat(TenantContext.getTenantId()).isNull();
     }
 
+    @Test
+    void tenantContextShouldRestoreGlobalScope() {
+        TenantContext.setGlobalScope("platform");
+
+        String tenantId = TenantContext.runWithTenant("tenant-a", TenantContext::getTenantId);
+
+        assertThat(tenantId).isEqualTo("tenant-a");
+        assertThat(TenantContext.getTenantId()).isEqualTo("platform");
+        assertThat(TenantContext.isGlobalScope()).isTrue();
+        assertThat(TenantContext.isTenantFilterIgnored()).isTrue();
+    }
+
     private RateLimitProperties properties() {
         return new RateLimitProperties(
                 true,

@@ -31,6 +31,7 @@ class DeptManagementServiceTest {
     private static final String SCOPE_USER = "dept_scope_user_ut";
     private static final String HIDDEN_LEADER = "dept_hidden_leader_ut";
     private static final String CHILD_DEPT_CODE = "DEPT_SCOPE_CHILD_UT";
+    private static final String PLATFORM_DEPT_CODE = "PLATFORM_DEPT_SCOPE_UT";
 
     @Autowired
     private DeptManagementService deptManagementService;
@@ -56,6 +57,7 @@ class DeptManagementServiceTest {
         clear();
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username IN (?, ?)", "tenant-a", SCOPE_USER, HIDDEN_LEADER);
         jdbcTemplate.update("DELETE FROM sys_dept WHERE tenant_id = ? AND dept_code = ?", "tenant-a", CHILD_DEPT_CODE);
+        jdbcTemplate.update("DELETE FROM sys_dept WHERE tenant_id = ? AND dept_code = ?", "platform", PLATFORM_DEPT_CODE);
     }
 
     @Test
@@ -142,6 +144,56 @@ class DeptManagementServiceTest {
         assertThatThrownBy(() -> deptManagementService.create(new DeptCrudRequest(2L, CHILD_DEPT_CODE, "负责人越权部门", hiddenLeaderId)))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("负责人");
+    }
+
+    @Test
+    void platformAdminShouldSeeAllDepartmentsEvenWhenActiveTenantDiffers() {
+        TenantContext.setTenantId("platform");
+        deptManagementService.create(new DeptCrudRequest(null, PLATFORM_DEPT_CODE, "平台部门", null));
+
+        TenantContext.setTenantId("tenant-a");
+        Long userId = ensureScopedUser();
+        UserAccount admin = new UserAccount(
+                userId,
+                "platform",
+                "admin",
+                passwordHasher.hash("DeptTest@123"),
+                true,
+                Set.of("ADMIN"),
+                Set.of("upms:sysdept:get"),
+                Set.of(),
+                DataScopeType.ALL,
+                1
+        );
+        bind(admin);
+
+        assertThat(catalogService.departments()).extracting(CatalogService.DepartmentView::tenantId)
+                .contains("platform", "tenant-a");
+    }
+
+    @Test
+    void platformAdminShouldCreateDepartmentInRequestedTenant() {
+        TenantContext.setGlobalScope("platform");
+        UserAccount admin = new UserAccount(
+                1L,
+                "platform",
+                "admin",
+                passwordHasher.hash("DeptTest@123"),
+                true,
+                Set.of("ADMIN"),
+                Set.of("upms:sysdept:add"),
+                Set.of(),
+                DataScopeType.ALL,
+                1
+        );
+        bind(admin);
+
+        CatalogService.DepartmentView created = deptManagementService.create(
+                new DeptCrudRequest(2L, CHILD_DEPT_CODE, "租户A部门", null, null, null, 0, 1, "tenant-a")
+        );
+
+        assertThat(created.tenantId()).isEqualTo("tenant-a");
+        assertThat(created.parentId()).isEqualTo(2L);
     }
 
     private Long ensureChildDept() {

@@ -132,8 +132,9 @@ public class WorkflowApplicationService {
         String tenantId = currentTenantId(user);
         int normalizedPage = Math.max(page, 1);
         int normalizedSize = normalizeSize(size);
+        boolean globalScope = TenantContext.isGlobalScope();
         LambdaQueryWrapper<WfProcessDefinitionEntity> wrapper = new LambdaQueryWrapper<WfProcessDefinitionEntity>()
-                .eq(WfProcessDefinitionEntity::getTenantId, tenantId)
+                .eq(!globalScope, WfProcessDefinitionEntity::getTenantId, tenantId)
                 .eq(WfProcessDefinitionEntity::getDeleted, 0);
         if (StringUtils.hasText(status)) {
             wrapper.eq(WfProcessDefinitionEntity::getStatus, status.trim().toUpperCase());
@@ -647,7 +648,7 @@ public class WorkflowApplicationService {
 
     private WfProcessDefinitionEntity requireDefinition(String tenantId, Long definitionId) {
         WfProcessDefinitionEntity entity = definitionMapper.selectOne(new LambdaQueryWrapper<WfProcessDefinitionEntity>()
-                .eq(WfProcessDefinitionEntity::getTenantId, tenantId)
+                .eq(!TenantContext.isGlobalScope(), WfProcessDefinitionEntity::getTenantId, tenantId)
                 .eq(WfProcessDefinitionEntity::getId, definitionId)
                 .eq(WfProcessDefinitionEntity::getDeleted, 0)
                 .last("limit 1"));

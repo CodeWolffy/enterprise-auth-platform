@@ -749,17 +749,7 @@ public class MenuService {
     }
 
     private <T> T runWithTenant(String tenantId, Supplier<T> supplier) {
-        String previous = TenantContext.getTenantId();
-        try {
-            TenantContext.setTenantId(StringUtils.hasText(tenantId) ? tenantId : platformTenantId());
-            return supplier.get();
-        } finally {
-            if (StringUtils.hasText(previous)) {
-                TenantContext.setTenantId(previous);
-            } else {
-                TenantContext.clear();
-            }
-        }
+        return TenantContext.runWithTenant(StringUtils.hasText(tenantId) ? tenantId : platformTenantId(), supplier);
     }
 
     private void sortRuntimeChildrenRecursively(RuntimeMenuNodeBuilder node, Comparator<RuntimeMenuNodeBuilder> comparator) {

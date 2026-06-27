@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="panel-stack">
     <section class="dashboard-grid">
       <article class="stat-card">
@@ -80,6 +80,14 @@
         @header-dragend="onRoleHeaderDragEnd"
       >
         <el-table-column
+          v-if="roleTablePrefs.visibleColumnMap.tenantId"
+          column-key="tenantId"
+          prop="tenantId"
+          label="租户"
+          min-width="130"
+          :width="roleTablePrefs.getColumnWidth('tenantId')"
+        />
+        <el-table-column
           v-if="roleTablePrefs.visibleColumnMap.code"
           column-key="code"
           prop="code"
@@ -150,6 +158,7 @@
     <el-drawer v-model="detailVisible" title="角色详情" size="680px">
       <template v-if="detailRole">
         <el-descriptions :column="2" border class="drawer-section drawer-section--overview">
+          <el-descriptions-item label="租户">{{ detailRole.tenantId || '-' }}</el-descriptions-item>
           <el-descriptions-item label="角色编码">{{ detailRole.code }}</el-descriptions-item>
           <el-descriptions-item label="角色名称">{{ detailRole.name }}</el-descriptions-item>
           <el-descriptions-item label="数据范围">{{ detailRole.dataScopeType }}</el-descriptions-item>
@@ -194,6 +203,21 @@
 
     <el-dialog v-model="roleVisible" :title="editingRoleId ? '编辑角色' : '新增角色'" width="640px">
       <el-form ref="formRef" label-position="top" :model="roleForm" :rules="roleRules">
+        <el-row v-if="isPlatformAdmin" :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="所属租户">
+              <el-select
+                v-model="roleForm.tenantId"
+                :disabled="Boolean(editingRoleId)"
+                filterable
+                style="width: 100%"
+                @change="handleRoleTenantChange"
+              >
+                <el-option v-for="tenant in tenantOptions" :key="tenant.tenantId" :label="tenant.label" :value="tenant.tenantId" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
         <el-row :gutter="16">
           <el-col :span="12">
             <el-form-item label="角色编码" prop="roleCode">
@@ -221,12 +245,12 @@
         <el-form-item v-if="roleForm.dataScopeType === 'CUSTOM'" label="自定义部门" prop="customDeptIds">
           <el-tree-select
             v-model="roleForm.customDeptIds"
-            :data="departmentTree"
+            :data="roleDepartmentTree"
             multiple
             show-checkbox
             check-strictly
             node-key="id"
-            :props="{ label: 'label', children: 'children' }"
+            :props="{ label: 'label', value: 'id', children: 'children' }"
             style="width: 100%"
           />
         </el-form-item>
@@ -301,12 +325,15 @@ import {
   queryGrantableMenuTree,
   queryRoleImpact,
   queryRoles,
+  queryTenants,
   updateRole,
 } from '@/api/modules'
 import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { DepartmentView } from '@/types/dept'
+import type { TenantView } from '@/types/tenant'
 import type { MenuTreeNode, MenuType } from '@/api/modules/menu'
 import type { RoleView } from '@/types/role'
+import { useAuthStore } from '@/stores/auth'
 
 type MenuDisplayNode = {
   id: number
@@ -318,9 +345,25 @@ type MenuDisplayNode = {
   children?: MenuDisplayNode[]
 }
 
+type DepartmentTreeNode = {
+  id: number
+  key: string
+  label: string
+  tenantId: string
+  parentId: number
+  children?: DepartmentTreeNode[]
+}
+
+type TenantOption = {
+  tenantId: string
+  label: string
+}
+
 const roles = ref<RoleView[]>([])
 const menus = ref<MenuTreeNode[]>([])
 const departments = ref<DepartmentView[]>([])
+const tenantCatalog = ref<TenantView[]>([])
+const authStore = useAuthStore()
 const menuTreeRef = ref<any>(null)
 const formRef = ref<FormInstance>()
 const roleVisible = ref(false)
@@ -328,6 +371,7 @@ const menuVisible = ref(false)
 const detailVisible = ref(false)
 const editingRoleId = ref<number | null>(null)
 const menuTargetRoleId = ref<number | null>(null)
+const menuTargetTenantId = ref('')
 const detailRole = ref<RoleView | null>(null)
 const assignedMenuIds = ref<number[]>([])
 const assignedCountByRoleId = reactive<Record<number, number>>({})
@@ -341,6 +385,7 @@ const page = ref(1)
 const size = ref(10)
 
 const roleForm = reactive({
+  tenantId: '',
   roleCode: '',
   roleName: '',
   roleDesc: '',
@@ -371,7 +416,11 @@ const roleRules = reactive<FormRules>({
 
 const menuTreeData = computed(() => toMenuDisplayTree(menus.value))
 const detailMenuTree = computed(() => filterTreeBySelected(menuTreeData.value, new Set(assignedMenuIds.value)))
-const departmentTree = computed(() => buildDepartmentTree(departments.value))
+const roleDepartmentTree = computed(() => buildDepartmentTree(
+  departments.value.filter((department) => department.tenantId === roleForm.tenantId),
+))
+const isPlatformAdmin = computed(() => Boolean(authStore.snapshot?.superAdmin))
+const tenantOptions = computed<TenantOption[]>(() => buildTenantOptions())
 
 const filteredMenuTree = computed(() => {
   const normalizedKeyword = menuKeyword.value.trim().toLowerCase()
@@ -386,7 +435,7 @@ const filteredRoles = computed(() =>
     const normalizedKeyword = keyword.value.trim().toLowerCase()
     const matchesKeyword =
       !normalizedKeyword ||
-      [role.code, role.name, role.description || ''].some((value) => value.toLowerCase().includes(normalizedKeyword))
+      [role.tenantId || '', role.code, role.name, role.description || ''].some((value) => value.toLowerCase().includes(normalizedKeyword))
     const matchesScope = !scopeFilter.value || role.dataScopeType === scopeFilter.value
     return matchesKeyword && matchesScope
   }),
@@ -407,6 +456,7 @@ const customScopeCount = computed(() => filteredRoles.value.filter((item) => ite
 const allMenuCount = computed(() => flattenTree(menuTreeData.value).length)
 
 const roleTablePrefs = useTablePreferences('eap.table.roles', [
+  { key: 'tenantId', label: '租户', width: 130 },
   { key: 'code', label: '角色编码', width: 140 },
   { key: 'name', label: '角色名称', width: 160 },
   { key: 'description', label: '角色描述', width: 220 },
@@ -420,12 +470,30 @@ void load()
 async function load() {
   loading.value = true
   try {
-    const [roleList, menuTree, departmentList] = await Promise.all([queryRoles(), queryGrantableMenuTree(), queryDepartments()])
-    roles.value = roleList
+    const [roleList, menuTree, departmentList, tenantList] = await Promise.all([
+      queryRoles(),
+      queryGrantableMenuTree(defaultTenantId()),
+      queryDepartments(),
+      loadTenantCatalog(),
+    ])
+    roles.value = Array.isArray(roleList) ? roleList : []
     menus.value = menuTree
     departments.value = departmentList
+    tenantCatalog.value = tenantList
   } finally {
     loading.value = false
+  }
+}
+
+async function loadTenantCatalog() {
+  if (!isPlatformAdmin.value) {
+    return [] as TenantView[]
+  }
+  try {
+    const page = await queryTenants({ page: 1, size: 500 }, { suppressErrorMessage: true })
+    return page.records
+  } catch {
+    return [] as TenantView[]
   }
 }
 
@@ -443,9 +511,49 @@ function handlePageChange() {
   return
 }
 
+function buildTenantOptions() {
+  const tenantMap = new Map<string, TenantOption>()
+  const addTenant = (tenantId?: string | null, name?: string | null) => {
+    if (!tenantId) {
+      return
+    }
+    tenantMap.set(tenantId, {
+      tenantId,
+      label: name ? `${name} (${tenantId})` : tenantId,
+    })
+  }
+  tenantCatalog.value.forEach((tenant) => addTenant(tenant.tenantId, tenant.name))
+  roles.value.forEach((role) => addTenant(role.tenantId))
+  departments.value.forEach((department) => addTenant(department.tenantId))
+  addTenant(authStore.snapshot?.operatorTenantId || authStore.operatorTenantId || authStore.snapshot?.tenantId || authStore.tenantId)
+  return Array.from(tenantMap.values()).sort((left, right) => {
+    if (left.tenantId === 'platform') {
+      return -1
+    }
+    if (right.tenantId === 'platform') {
+      return 1
+    }
+    return left.tenantId.localeCompare(right.tenantId)
+  })
+}
+
+function defaultTenantId() {
+  return authStore.snapshot?.operatorTenantId
+    || authStore.operatorTenantId
+    || authStore.snapshot?.tenantId
+    || authStore.tenantId
+    || tenantOptions.value[0]?.tenantId
+    || 'platform'
+}
+
+function handleRoleTenantChange() {
+  roleForm.customDeptIds = []
+}
+
 function openRole(row?: RoleView) {
   editingRoleId.value = row?.id ?? null
   Object.assign(roleForm, {
+    tenantId: row?.tenantId || defaultTenantId(),
     roleCode: row?.code ?? '',
     roleName: row?.name ?? '',
     roleDesc: row?.description ?? '',
@@ -457,7 +565,12 @@ function openRole(row?: RoleView) {
 
 async function openDetail(row: RoleView) {
   detailRole.value = row
-  assignedMenuIds.value = await queryAssignedRoleMenus(row.id)
+  const [menuTree, assignedIds] = await Promise.all([
+    queryGrantableMenuTree(row.tenantId),
+    queryAssignedRoleMenus(row.id),
+  ])
+  menus.value = menuTree
+  assignedMenuIds.value = assignedIds
   assignedCountByRoleId[row.id] = assignedMenuIds.value.length
   detailVisible.value = true
 }
@@ -468,6 +581,7 @@ async function submitRole() {
   }
   await formRef.value.validate()
   const payload = {
+    tenantId: roleForm.tenantId,
     roleCode: roleForm.roleCode,
     roleName: roleForm.roleName,
     roleDesc: roleForm.roleDesc || null,
@@ -487,7 +601,12 @@ async function submitRole() {
 
 async function openMenuAssignment(row: RoleView) {
   menuTargetRoleId.value = row.id
-  const assignedIds = await queryAssignedRoleMenus(row.id)
+  menuTargetTenantId.value = row.tenantId || defaultTenantId()
+  const [menuTree, assignedIds] = await Promise.all([
+    queryGrantableMenuTree(menuTargetTenantId.value),
+    queryAssignedRoleMenus(row.id),
+  ])
+  menus.value = menuTree
   assignedCountByRoleId[row.id] = assignedIds.length
   menuVisible.value = true
   menuKeyword.value = ''
@@ -698,21 +817,38 @@ function typeLabel(type: MenuType) {
 function buildDepartmentTree(source: DepartmentView[]) {
   const nodes = source.map((item) => ({
     id: item.id,
+    key: departmentKey(item),
     label: item.name,
+    tenantId: item.tenantId || '',
     parentId: item.parentId ?? 0,
-    children: [] as Array<{ id: number; label: string; parentId: number; children: unknown[] }>,
+    children: [] as DepartmentTreeNode[],
   }))
-  const map = new Map(nodes.map((item) => [item.id, item]))
+  const map = new Map(nodes.map((item) => [item.key, item]))
   const roots: typeof nodes = []
   nodes.forEach((node) => {
-    const parent = node.parentId ? map.get(node.parentId) : null
+    const parent = node.parentId ? map.get(`${node.tenantId}:${node.parentId}`) : null
     if (parent) {
       parent.children.push(node)
       return
     }
     roots.push(node)
   })
+  pruneEmptyDepartmentChildren(roots)
   return roots
+}
+
+function pruneEmptyDepartmentChildren(nodes: DepartmentTreeNode[]) {
+  nodes.forEach((node) => {
+    if (!node.children || node.children.length === 0) {
+      delete node.children
+      return
+    }
+    pruneEmptyDepartmentChildren(node.children)
+  })
+}
+
+function departmentKey(department: Pick<DepartmentView, 'tenantId' | 'id'>) {
+  return `${department.tenantId || ''}:${department.id}`
 }
 
 function onRoleHeaderDragEnd(newWidth: number, _oldWidth: number, column: { property?: string; columnKey?: string }) {

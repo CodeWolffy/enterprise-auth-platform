@@ -42,7 +42,7 @@ public final class SaTokenMockMvcSupport {
     }
 
     public static void bind(UserAccount user) {
-        AuthContextHolder.set(user, new SessionPrincipal("test-token", user.tenantId(), user.tenantId()));
+        AuthContextHolder.set(user, new SessionPrincipal("test-token", user.tenantId(), user.tenantId(), false));
     }
 
     public static void bind(AuthenticationUser user) {

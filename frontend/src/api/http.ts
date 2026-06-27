@@ -1,13 +1,19 @@
-import axios, { AxiosHeaders, type AxiosError, type InternalAxiosRequestConfig } from 'axios'
+import axios, { AxiosHeaders, type AxiosError, type AxiosRequestConfig, type InternalAxiosRequestConfig } from 'axios'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 
-type RetryableRequestConfig = InternalAxiosRequestConfig & {
+export type TenantScope = 'active' | 'operator' | 'none'
+
+export type TenantRequestConfig = AxiosRequestConfig & {
+  tenantScope?: TenantScope
+  silentAuthFailure?: boolean
+  suppressErrorMessage?: boolean
   requestKey?: string
   retry?: number
   retryDelay?: number
-  silentAuthFailure?: boolean
-  suppressErrorMessage?: boolean
+}
+
+type RetryableRequestConfig = InternalAxiosRequestConfig & TenantRequestConfig & {
   __retryCount?: number
 }
 
@@ -105,8 +111,12 @@ http.interceptors.request.use((config) => {
   if (token && !isAuthEndpoint(requestUrl)) {
     headers.set('Authorization', `Bearer ${token}`)
   }
-  if (authStore.tenantId && !isAuthEndpoint(requestUrl) && !headers.has('X-Tenant-Id')) {
-    headers.set('X-Tenant-Id', authStore.tenantId)
+  const scope = (config as RetryableRequestConfig).tenantScope ?? 'active'
+  if (authStore.tenantId && scope !== 'none' && !isAuthEndpoint(requestUrl) && !headers.has('X-Tenant-Id')) {
+    const scopedTenantId = scope === 'operator'
+      ? authStore.operatorTenantId || authStore.tenantId
+      : authStore.tenantId
+    headers.set('X-Tenant-Id', scopedTenantId)
   }
 
   config.headers = headers

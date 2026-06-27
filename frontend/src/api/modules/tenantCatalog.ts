@@ -1,4 +1,4 @@
-import { http } from '../http'
+import { http, type TenantRequestConfig } from '../http'
 import type { ApiResponse } from '@/types/api'
 import type {
   TenantCapabilityImpactView,
@@ -32,49 +32,69 @@ export interface TenantCapabilityPayload {
 }
 
 export async function queryTenantPackages() {
-  const { data } = await http.get<ApiResponse<TenantPackageView[]>>('/api/tenant-catalog/packages')
+  const { data } = await http.get<ApiResponse<TenantPackageView[]>>('/api/tenant-catalog/packages', {
+    tenantScope: 'operator',
+  } satisfies TenantRequestConfig)
   return data.data
 }
 
 export async function createTenantPackage(payload: TenantPackagePayload) {
-  const { data } = await http.post<ApiResponse<TenantPackageView>>('/api/tenant-catalog/packages', payload)
+  const { data } = await http.post<ApiResponse<TenantPackageView>>('/api/tenant-catalog/packages', payload, {
+    tenantScope: 'operator',
+  } satisfies TenantRequestConfig)
   return data.data
 }
 
 export async function updateTenantPackage(id: number, payload: TenantPackagePayload) {
-  const { data } = await http.put<ApiResponse<TenantPackageView>>(`/api/tenant-catalog/packages/${id}`, payload)
+  const { data } = await http.put<ApiResponse<TenantPackageView>>(`/api/tenant-catalog/packages/${id}`, payload, {
+    tenantScope: 'operator',
+  } satisfies TenantRequestConfig)
   return data.data
 }
 
 export async function queryTenantPackageImpact(id: number) {
-  const { data } = await http.get<ApiResponse<TenantPackageImpactView>>(`/api/tenant-catalog/packages/${id}/impact`)
+  const { data } = await http.get<ApiResponse<TenantPackageImpactView>>(`/api/tenant-catalog/packages/${id}/impact`, {
+    tenantScope: 'operator',
+  } satisfies TenantRequestConfig)
   return data.data
 }
 
 export async function deleteTenantPackage(id: number) {
-  await http.delete(`/api/tenant-catalog/packages/${id}`)
+  await http.delete(`/api/tenant-catalog/packages/${id}`, {
+    tenantScope: 'operator',
+  } satisfies TenantRequestConfig)
 }
 
 export async function queryTenantCapabilities() {
-  const { data } = await http.get<ApiResponse<TenantCapabilityView[]>>('/api/tenant-catalog/capabilities')
+  const { data } = await http.get<ApiResponse<TenantCapabilityView[]>>('/api/tenant-catalog/capabilities', {
+    tenantScope: 'operator',
+  } satisfies TenantRequestConfig)
   return data.data
 }
 
 export async function createTenantCapability(payload: TenantCapabilityPayload) {
-  const { data } = await http.post<ApiResponse<TenantCapabilityView>>('/api/tenant-catalog/capabilities', payload)
+  const { data } = await http.post<ApiResponse<TenantCapabilityView>>('/api/tenant-catalog/capabilities', payload, {
+    tenantScope: 'operator',
+  } satisfies TenantRequestConfig)
   return data.data
 }
 
 export async function updateTenantCapability(id: number, payload: TenantCapabilityPayload) {
-  const { data } = await http.put<ApiResponse<TenantCapabilityView>>(`/api/tenant-catalog/capabilities/${id}`, payload)
+  const { data } = await http.put<ApiResponse<TenantCapabilityView>>(`/api/tenant-catalog/capabilities/${id}`, payload, {
+    tenantScope: 'operator',
+  } satisfies TenantRequestConfig)
   return data.data
 }
 
 export async function queryTenantCapabilityImpact(id: number) {
-  const { data } = await http.get<ApiResponse<TenantCapabilityImpactView>>(`/api/tenant-catalog/capabilities/${id}/impact`)
+  const { data } = await http.get<ApiResponse<TenantCapabilityImpactView>>(`/api/tenant-catalog/capabilities/${id}/impact`, {
+    tenantScope: 'operator',
+  } satisfies TenantRequestConfig)
   return data.data
 }
 
 export async function deleteTenantCapability(id: number) {
-  await http.delete(`/api/tenant-catalog/capabilities/${id}`)
+  await http.delete(`/api/tenant-catalog/capabilities/${id}`, {
+    tenantScope: 'operator',
+  } satisfies TenantRequestConfig)
 }

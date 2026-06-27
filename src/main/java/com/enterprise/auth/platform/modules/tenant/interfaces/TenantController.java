@@ -11,12 +11,13 @@ import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.modules.tenant.interfaces.CreateTenantRequest;
-import com.enterprise.auth.platform.modules.tenant.interfaces.UpdateTenantCapabilityOverridesRequest;
+import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.Map;
+import java.util.function.Supplier;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,17 +38,20 @@ public class TenantController {
     private final TenantDirectoryApplicationService tenantDirectoryApplicationService;
     private final TenantCapabilityApplicationService tenantCapabilityApplicationService;
     private final TenantChangeLogApplicationService tenantChangeLogApplicationService;
+    private final TenantProperties tenantProperties;
 
     public TenantController(
             TenantLifecycleApplicationService tenantLifecycleApplicationService,
             TenantDirectoryApplicationService tenantDirectoryApplicationService,
             TenantCapabilityApplicationService tenantCapabilityApplicationService,
-            TenantChangeLogApplicationService tenantChangeLogApplicationService
+            TenantChangeLogApplicationService tenantChangeLogApplicationService,
+            TenantProperties tenantProperties
     ) {
         this.tenantLifecycleApplicationService = tenantLifecycleApplicationService;
         this.tenantDirectoryApplicationService = tenantDirectoryApplicationService;
         this.tenantCapabilityApplicationService = tenantCapabilityApplicationService;
         this.tenantChangeLogApplicationService = tenantChangeLogApplicationService;
+        this.tenantProperties = tenantProperties;
     }
 
     @Operation(summary = "租户列表")
@@ -60,7 +64,7 @@ public class TenantController {
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "每页大小") @RequestParam(defaultValue = "10") int size
     ) {
-        return ApiResponse.ok(tenantDirectoryApplicationService.page(keyword, platformLevel, tenantStatus, page, size));
+        return ApiResponse.ok(platformScope(() -> tenantDirectoryApplicationService.page(keyword, platformLevel, tenantStatus, page, size)));
     }
 
     @Operation(summary = "租户变更历史")
@@ -76,7 +80,7 @@ public class TenantController {
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "每页大小") @RequestParam(defaultValue = "10") int size
     ) {
-        return ApiResponse.ok(tenantChangeLogApplicationService.history(
+        return ApiResponse.ok(platformScope(() -> tenantChangeLogApplicationService.history(
                 tenantId,
                 changeType,
                 fieldKey,
@@ -85,7 +89,7 @@ public class TenantController {
                 toEpochMs,
                 page,
                 size
-        ));
+        )));
     }
 
     @Operation(summary = "租户变更历史摘要")
@@ -99,14 +103,14 @@ public class TenantController {
             @Parameter(description = "起始时间（Unix 毫秒时间戳，包含）") @RequestParam(required = false) Long fromEpochMs,
             @Parameter(description = "结束时间（Unix 毫秒时间戳，不包含）") @RequestParam(required = false) Long toEpochMs
     ) {
-        return ApiResponse.ok(tenantChangeLogApplicationService.historySummary(
+        return ApiResponse.ok(platformScope(() -> tenantChangeLogApplicationService.historySummary(
                 tenantId,
                 changeType,
                 fieldKey,
                 operator,
                 fromEpochMs,
                 toEpochMs
-        ));
+        )));
     }
 
     @Operation(summary = "获取租户能力摘要")
@@ -115,7 +119,7 @@ public class TenantController {
     public ApiResponse<TenantCapabilityApplicationService.TenantCapabilitySummaryView> capabilitySummary(
             @Parameter(description = "租户编码") @PathVariable String tenantId
     ) {
-        return ApiResponse.ok(tenantCapabilityApplicationService.capabilitySummary(tenantId));
+        return ApiResponse.ok(platformScope(() -> tenantCapabilityApplicationService.capabilitySummary(tenantId)));
     }
 
     @Operation(summary = "获取租户能力覆盖")
@@ -124,7 +128,7 @@ public class TenantController {
     public ApiResponse<TenantCapabilityApplicationService.TenantCapabilityOverrideView> capabilityOverrides(
             @Parameter(description = "租户编码") @PathVariable String tenantId
     ) {
-        return ApiResponse.ok(tenantCapabilityApplicationService.capabilityOverrides(tenantId));
+        return ApiResponse.ok(platformScope(() -> tenantCapabilityApplicationService.capabilityOverrides(tenantId)));
     }
 
     @SysLog("更新租户能力覆盖")
@@ -135,7 +139,7 @@ public class TenantController {
             @Parameter(description = "租户编码") @PathVariable String tenantId,
             @Valid @RequestBody UpdateTenantCapabilityOverridesRequest request
     ) {
-        return ApiResponse.ok(tenantCapabilityApplicationService.updateCapabilityOverrides(tenantId, request));
+        return ApiResponse.ok(platformScope(() -> tenantCapabilityApplicationService.updateCapabilityOverrides(tenantId, request)));
     }
 
     @SysLog("创建租户")
@@ -143,7 +147,7 @@ public class TenantController {
     @PostMapping
     @SaCheckPermission(PermissionCodes.SYSTENANT_ADD)
     public ApiResponse<CatalogService.TenantView> create(@Valid @RequestBody CreateTenantRequest request) {
-        return ApiResponse.ok(tenantLifecycleApplicationService.create(request));
+        return ApiResponse.ok(platformScope(() -> tenantLifecycleApplicationService.create(request)));
     }
 
     @SysLog("更新租户")
@@ -154,7 +158,7 @@ public class TenantController {
             @Parameter(description = "租户编码") @PathVariable String tenantId,
             @Valid @RequestBody CreateTenantRequest request
     ) {
-        return ApiResponse.ok(tenantLifecycleApplicationService.update(tenantId, request));
+        return ApiResponse.ok(platformScope(() -> tenantLifecycleApplicationService.update(tenantId, request)));
     }
 
     @SysLog("删除租户")
@@ -162,7 +166,10 @@ public class TenantController {
     @DeleteMapping("/{tenantId}")
     @SaCheckPermission(PermissionCodes.SYSTENANT_DEL)
     public ApiResponse<Void> delete(@Parameter(description = "租户编码") @PathVariable String tenantId) {
-        tenantLifecycleApplicationService.delete(tenantId);
+        platformScope(() -> {
+            tenantLifecycleApplicationService.delete(tenantId);
+            return null;
+        });
         return ApiResponse.ok();
     }
 
@@ -171,5 +178,9 @@ public class TenantController {
     @SaCheckPermission(PermissionCodes.SYSTENANT_GET)
     public ApiResponse<Map<String, String>> current() {
         return ApiResponse.ok(Map.of("tenantId", TenantContext.getTenantId()));
+    }
+
+    private <T> T platformScope(Supplier<T> supplier) {
+        return TenantContext.runWithTenant(tenantProperties.platformTenantId(), supplier);
     }
 }

@@ -1,6 +1,7 @@
 /** 菜单管理 API */
 
 import { http } from '../http'
+import type { TenantRequestConfig } from '../http'
 import type { ApiResponse } from '@/types/api'
 
 export type MenuType = '0' | '1'
@@ -44,8 +45,11 @@ export async function queryMenuTree() {
   return data.data
 }
 
-export async function queryGrantableMenuTree() {
-  const { data } = await http.get<ApiResponse<MenuTreeNode[]>>('/api/menus/grantable-tree')
+export async function queryGrantableMenuTree(tenantId?: string | null) {
+  const { data } = await http.get<ApiResponse<MenuTreeNode[]>>('/api/menus/grantable-tree', {
+    params: tenantId ? { tenantId } : undefined,
+    tenantScope: 'operator',
+  } satisfies TenantRequestConfig)
   return data.data
 }
 

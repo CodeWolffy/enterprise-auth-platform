@@ -15,6 +15,19 @@ public record CreateUserRequest(
         @Schema(description = "登录密码，创建时必填，修改时留空表示不变") String password,
         @Schema(description = "所属部门ID") Long deptId,
         @Schema(description = "是否启用，默认 true") Boolean enabled,
-        @Schema(description = "初始角色编码集合") Set<@NotBlank String> roleCodes
+        @Schema(description = "初始角色编码集合") Set<@NotBlank String> roleCodes,
+        @Schema(description = "目标租户编码，仅平台管理员新增时生效") String tenantId
 ) {
+    public CreateUserRequest(
+            String username,
+            String displayName,
+            String mobile,
+            String email,
+            String password,
+            Long deptId,
+            Boolean enabled,
+            Set<@NotBlank String> roleCodes
+    ) {
+        this(username, displayName, mobile, email, password, deptId, enabled, roleCodes, null);
+    }
 }

@@ -44,7 +44,8 @@ public class NotificationSseRegistry {
      * 向指定租户+用户的所有活跃连接推送一条通知。
      */
     public void send(String tenantId, Long userId, NotificationView notification) {
-        Set<SseEmitter> emitters = emittersByUser.get(key(tenantId, userId));
+        String emitterKey = key(tenantId, userId);
+        Set<SseEmitter> emitters = emittersByUser.get(emitterKey);
         if (emitters == null || emitters.isEmpty()) {
             return;
         }
@@ -54,8 +55,7 @@ public class NotificationSseRegistry {
                         .name("notification")
                         .data(notification));
             } catch (IOException | IllegalStateException ex) {
-                remove(key(tenantId, userId), emitter);
-                emitter.completeWithError(ex);
+                discardEmitter(emitterKey, emitter, ex, "notification");
             }
         }
     }
@@ -73,8 +73,7 @@ public class NotificationSseRegistry {
                 try {
                     emitter.send(SseEmitter.event().name("ping").data("ping"));
                 } catch (IOException | IllegalStateException ex) {
-                    remove(entry.getKey(), emitter);
-                    emitter.completeWithError(ex);
+                    discardEmitter(entry.getKey(), emitter, ex, "heartbeat");
                 }
             }
         }
@@ -107,6 +106,11 @@ public class NotificationSseRegistry {
         if (removed && emitters.isEmpty()) {
             emittersByUser.remove(key, emitters);
         }
+    }
+
+    private void discardEmitter(String key, SseEmitter emitter, Exception ex, String operation) {
+        remove(key, emitter);
+        log.debug("站内通知 SSE {} 发送失败，连接将被移除。key={}", operation, key, ex);
     }
 
     private String key(String tenantId, Long userId) {

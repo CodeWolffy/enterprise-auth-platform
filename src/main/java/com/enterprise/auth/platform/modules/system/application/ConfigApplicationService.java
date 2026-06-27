@@ -64,10 +64,11 @@ public class ConfigApplicationService {
             String sortDirection
     ) {
         String tenantId = currentTenantId();
-        Optional<Set<String>> visibleCreators = dataScopeService.visibleUsernames(tenantId);
+        boolean globalScope = TenantContext.isGlobalScope();
+        Optional<Set<String>> visibleCreators = globalScope ? Optional.empty() : dataScopeService.visibleUsernames(tenantId);
         return pageQuery(
-                buildConfigQuery(tenantId, category, keyword, visibleCreators),
-                buildConfigQuery(tenantId, category, keyword, visibleCreators),
+                buildConfigQuery(tenantId, globalScope, category, keyword, visibleCreators),
+                buildConfigQuery(tenantId, globalScope, category, keyword, visibleCreators),
                 page,
                 size,
                 sysConfigMapper::selectCount,
@@ -139,12 +140,13 @@ public class ConfigApplicationService {
 
     private LambdaQueryWrapper<SysConfigEntity> buildConfigQuery(
             String tenantId,
+            boolean globalScope,
             String category,
             String keyword,
             Optional<Set<String>> visibleCreators
     ) {
         LambdaQueryWrapper<SysConfigEntity> query = new LambdaQueryWrapper<SysConfigEntity>()
-                .eq(SysConfigEntity::getTenantId, tenantId)
+                .eq(!globalScope, SysConfigEntity::getTenantId, tenantId)
                 .eq(SysConfigEntity::getDeleted, 0)
                 .and(StringUtils.hasText(keyword), wrapper -> wrapper
                         .like(SysConfigEntity::getConfigKey, keyword)

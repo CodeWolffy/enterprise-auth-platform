@@ -45,10 +45,11 @@ public class UserController {
             @RequestParam(required = false) String email,
             @RequestParam(required = false) Boolean enabled,
             @RequestParam(required = false) Long deptId,
+            @RequestParam(required = false) String tenantId,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        return ApiResponse.ok(userDirectoryService.listUsers(username, mobile, email, enabled, deptId, page, size));
+        return ApiResponse.ok(userDirectoryService.listUsers(username, mobile, email, enabled, deptId, tenantId, page, size));
     }
 
     @Operation(summary = "查询用户已分配角色")

@@ -34,6 +34,18 @@
       </div>
 
       <AdvancedSearch @search="doSearch" @reset="resetSearch">
+        <el-form-item v-if="isPlatformAdmin" label="租户">
+          <el-select
+            v-model="queryParams.tenantId"
+            placeholder="全部租户"
+            clearable
+            filterable
+            style="width: 220px"
+            @change="handleQueryTenantChange"
+          >
+            <el-option v-for="tenant in tenantOptions" :key="tenant.tenantId" :label="tenant.label" :value="tenant.tenantId" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="用户名">
           <el-input v-model="queryParams.username" placeholder="按用户名搜索" clearable />
         </el-form-item>
@@ -45,14 +57,15 @@
         </el-form-item>
         <el-form-item label="部门">
           <el-tree-select
-            v-model="queryParams.deptId"
-            :data="departmentTree"
+            v-model="queryDeptKey"
+            :data="queryDepartmentTree"
             clearable
             check-strictly
-            node-key="id"
-            :props="{ label: 'label', children: 'children' }"
+            node-key="key"
+            :props="{ label: 'label', value: 'key', children: 'children' }"
             placeholder="按部门筛选"
-            style="width: 180px"
+            style="width: 220px"
+            @change="handleQueryDeptChange"
           />
         </el-form-item>
         <el-form-item label="状态">
@@ -94,6 +107,14 @@
         :class="`table-density-${userTablePrefs.density}`"
         @header-dragend="onUserHeaderDragEnd"
       >
+        <el-table-column
+          v-if="userTablePrefs.visibleColumnMap.tenantId"
+          column-key="tenantId"
+          prop="tenantId"
+          label="租户"
+          min-width="130"
+          :width="userTablePrefs.getColumnWidth('tenantId')"
+        />
         <el-table-column
           v-if="userTablePrefs.visibleColumnMap.username"
           column-key="username"
@@ -206,6 +227,21 @@
 
     <el-dialog v-model="userVisible" :title="editingUserId ? '编辑用户' : '新增用户'" width="760px">
       <el-form ref="formRef" label-position="top" :model="userForm" :rules="userRules">
+        <el-row v-if="isPlatformAdmin" :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="所属租户">
+              <el-select
+                v-model="userFormTenantId"
+                :disabled="Boolean(editingUserId)"
+                filterable
+                style="width: 100%"
+                @change="handleUserTenantChange"
+              >
+                <el-option v-for="tenant in tenantOptions" :key="tenant.tenantId" :label="tenant.label" :value="tenant.tenantId" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
         <el-row :gutter="16">
           <el-col :span="12">
             <el-form-item label="用户名" prop="username">
@@ -245,10 +281,10 @@
             <el-form-item label="所属部门" prop="deptId">
               <el-tree-select
                 v-model="userForm.deptId"
-                :data="departmentTree"
+                :data="userDepartmentTree"
                 check-strictly
                 node-key="id"
-                :props="{ label: 'label', children: 'children' }"
+                :props="{ label: 'label', value: 'id', children: 'children' }"
                 placeholder="请选择部门"
                 style="width: 100%"
               />
@@ -256,10 +292,10 @@
           </el-col>
         </el-row>
         <el-form-item label="角色" prop="roleCodes">
-          <el-select v-model="userForm.roleCodes" multiple style="width: 100%" placeholder="请选择至少一个角色">
+          <el-select v-model="userForm.roleCodes" multiple style="width: 100%" placeholder="请选择至少一个角色" :disabled="!userFormTenantId">
             <el-option
-              v-for="role in roles"
-              :key="role.code"
+              v-for="role in userAssignableRoles"
+              :key="roleKey(role)"
               :label="`${role.name} (${role.code})`"
               :value="role.code"
             />
@@ -280,8 +316,8 @@
         <el-form-item label="角色集合">
           <el-select v-model="selectedRoleCodes" multiple style="width: 100%">
             <el-option
-              v-for="role in roles"
-              :key="role.code"
+              v-for="role in roleAssignmentRoles"
+              :key="roleKey(role)"
               :label="`${role.name} (${role.code})`"
               :value="role.code"
             />
@@ -309,6 +345,7 @@ import {
   queryDepartments,
   queryPasswordPolicy,
   queryRoles,
+  queryTenants,
   queryUsers,
   updateUser,
   type SecurityPasswordPolicy,
@@ -316,12 +353,28 @@ import {
 import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { RoleView } from '@/types/role'
 import type { DepartmentView } from '@/types/dept'
+import type { TenantView } from '@/types/tenant'
 import type { UserSummary } from '@/types/user'
 import { useAuthStore } from '@/stores/auth'
+
+type DepartmentTreeNode = {
+  id: number
+  key: string
+  label: string
+  tenantId: string
+  parentId: number
+  children?: DepartmentTreeNode[]
+}
+
+type TenantOption = {
+  tenantId: string
+  label: string
+}
 
 const users = ref<UserSummary[]>([])
 const roles = ref<RoleView[]>([])
 const departments = ref<DepartmentView[]>([])
+const tenantCatalog = ref<TenantView[]>([])
 const authStore = useAuthStore()
 const totalUsers = ref(0)
 const userVisible = ref(false)
@@ -329,13 +382,17 @@ const roleVisible = ref(false)
 const detailVisible = ref(false)
 const editingUserId = ref<number | null>(null)
 const roleTargetUserId = ref<number | null>(null)
+const roleTargetTenantId = ref<string>('')
 const roleTargetIsCurrentUser = ref(false)
 const detailData = ref<UserSummary | null>(null)
 const selectedRoleCodes = ref<string[]>([])
 const loading = ref(false)
 const formRef = ref<FormInstance>()
+const userFormTenantId = ref('')
+const queryDeptKey = ref<string | undefined>()
 
 const queryParams = reactive({
+  tenantId: undefined as string | undefined,
   username: '',
   mobile: '',
   email: '',
@@ -460,8 +517,32 @@ const averageRoleCount = computed(() => {
   const total = users.value.reduce((sum, item) => sum + item.roles.length, 0)
   return (total / users.value.length).toFixed(1)
 })
-const departmentTree = computed(() => buildDepartmentTree(departments.value))
+const isPlatformAdmin = computed(() => Boolean(authStore.snapshot?.superAdmin))
+const tenantOptions = computed<TenantOption[]>(() => buildTenantOptions())
+const queryDepartmentTree = computed(() => {
+  const visibleDepartments = queryParams.tenantId
+    ? departments.value.filter((item) => item.tenantId === queryParams.tenantId)
+    : departments.value
+  return buildDepartmentTree(visibleDepartments, isPlatformAdmin.value && !queryParams.tenantId)
+})
+const userDepartmentTree = computed(() => buildDepartmentTree(
+  departments.value.filter((item) => item.tenantId === userFormTenantId.value),
+))
+const userAssignableRoles = computed(() => {
+  if (!userFormTenantId.value) {
+    return roles.value
+  }
+  return roles.value.filter((role) => role.tenantId === userFormTenantId.value)
+})
+const roleAssignmentRoles = computed(() => {
+  if (!roleTargetTenantId.value) {
+    return []
+  }
+  return roles.value.filter((role) => role.tenantId === roleTargetTenantId.value)
+})
+const roleAssignmentRoleCodeSet = computed(() => new Set(roleAssignmentRoles.value.map((role) => role.code)))
 const userTablePrefs = useTablePreferences('eap.table.users', [
+  { key: 'tenantId', label: '租户', width: 130 },
   { key: 'username', label: '用户名', width: 140 },
   { key: 'displayName', label: '显示名称', width: 140 },
   { key: 'mobile', label: '手机号', width: 140 },
@@ -489,18 +570,126 @@ async function load() {
   loading.value = true
   try {
     const shouldLoadRoles = authStore.snapshot?.grants.includes('upms:sysrole:page')
-    const [userPage, roleList, departmentList] = await Promise.all([
+    const [userPage, roleList, departmentList, tenantList] = await Promise.all([
       queryUsers(queryParams),
       shouldLoadRoles ? queryRoles() : Promise.resolve([] as RoleView[]),
       queryDepartments(),
+      loadTenantCatalog(),
     ])
     users.value = userPage.records
     totalUsers.value = userPage.total
     roles.value = roleList
     departments.value = departmentList
+    tenantCatalog.value = tenantList
   } finally {
     loading.value = false
   }
+}
+
+async function loadTenantCatalog() {
+  if (!isPlatformAdmin.value) {
+    return [] as TenantView[]
+  }
+  try {
+    const page = await queryTenants({ page: 1, size: 500 }, { suppressErrorMessage: true })
+    return page.records
+  } catch {
+    return [] as TenantView[]
+  }
+}
+
+async function refreshRolesIfAllowed() {
+  const shouldLoadRoles = authStore.snapshot?.grants.includes('upms:sysrole:page')
+  if (!shouldLoadRoles) {
+    return
+  }
+  roles.value = await queryRoles()
+}
+
+function mergeRoleOptions(roleList: RoleView[]) {
+  if (roleList.length === 0) {
+    return
+  }
+  const roleMap = new Map(roles.value.map((role) => [`${role.tenantId ?? ''}:${role.id}`, role]))
+  roleList.forEach((role) => roleMap.set(`${role.tenantId ?? ''}:${role.id}`, role))
+  roles.value = Array.from(roleMap.values())
+}
+
+function normalizeRoleCodes(roleCodes: string[]) {
+  return Array.from(new Set(roleCodes.map((code) => code.trim()).filter(Boolean)))
+}
+
+function roleKey(role: RoleView) {
+  return `${role.tenantId ?? ''}:${role.id}:${role.code}`
+}
+
+function buildTenantOptions() {
+  const tenantMap = new Map<string, TenantOption>()
+  const addTenant = (tenantId?: string | null, name?: string | null) => {
+    if (!tenantId) {
+      return
+    }
+    const label = name ? `${name} (${tenantId})` : tenantId
+    tenantMap.set(tenantId, { tenantId, label })
+  }
+  tenantCatalog.value.forEach((tenant) => addTenant(tenant.tenantId, tenant.name))
+  users.value.forEach((user) => addTenant(user.tenantId))
+  departments.value.forEach((department) => addTenant(department.tenantId))
+  roles.value.forEach((role) => addTenant(role.tenantId))
+  addTenant(authStore.snapshot?.operatorTenantId || authStore.operatorTenantId || authStore.snapshot?.tenantId || authStore.tenantId)
+  return Array.from(tenantMap.values()).sort((left, right) => {
+    if (left.tenantId === 'platform') {
+      return -1
+    }
+    if (right.tenantId === 'platform') {
+      return 1
+    }
+    return left.tenantId.localeCompare(right.tenantId)
+  })
+}
+
+function defaultTenantId() {
+  return queryParams.tenantId
+    || authStore.snapshot?.operatorTenantId
+    || authStore.operatorTenantId
+    || authStore.snapshot?.tenantId
+    || authStore.tenantId
+    || tenantOptions.value[0]?.tenantId
+    || 'platform'
+}
+
+function defaultDeptIdForTenant(tenantId: string) {
+  return departments.value.find((department) => department.tenantId === tenantId)?.id ?? null
+}
+
+function parseDepartmentKey(value?: string | number | null) {
+  if (value == null || value === '') {
+    return null
+  }
+  const [tenantId, rawId] = String(value).split(':')
+  const id = Number(rawId)
+  if (!tenantId || !Number.isFinite(id)) {
+    return null
+  }
+  return { tenantId, id }
+}
+
+function handleQueryTenantChange() {
+  queryDeptKey.value = undefined
+  queryParams.deptId = undefined
+}
+
+function handleQueryDeptChange(value?: string | number) {
+  const parsed = parseDepartmentKey(value)
+  queryParams.deptId = parsed?.id
+  if (parsed?.tenantId) {
+    queryParams.tenantId = parsed.tenantId
+  }
+}
+
+function handleUserTenantChange() {
+  userForm.deptId = defaultDeptIdForTenant(userFormTenantId.value)
+  userForm.roleCodes = []
 }
 
 function doSearch() {
@@ -509,10 +698,12 @@ function doSearch() {
 }
 
 function resetSearch() {
+  queryParams.tenantId = undefined
   queryParams.username = ''
   queryParams.mobile = ''
   queryParams.email = ''
   queryParams.deptId = undefined
+  queryDeptKey.value = undefined
   queryParams.enabled = undefined
   queryParams.page = 1
   void load()
@@ -529,13 +720,14 @@ function isCurrentUser(row: UserSummary) {
 
 function openUser(row?: UserSummary) {
   editingUserId.value = row?.id ?? null
+  userFormTenantId.value = row?.tenantId || defaultTenantId()
   Object.assign(userForm, {
     username: row?.username ?? '',
     displayName: row?.displayName ?? '',
     mobile: row?.mobile ?? '',
     email: row?.email ?? '',
     password: '',
-    deptId: row?.deptId ?? 1,
+    deptId: row?.deptId ?? defaultDeptIdForTenant(userFormTenantId.value),
     enabled: row?.enabled ?? true,
     roleCodes: [...(row?.roles ?? [])],
   })
@@ -553,6 +745,7 @@ async function submitUser() {
     return
   }
   const payload = {
+    tenantId: userFormTenantId.value,
     username: userForm.username,
     displayName: userForm.displayName || null,
     mobile: userForm.mobile || null,
@@ -579,9 +772,13 @@ async function submitUser() {
 
 async function openRoleAssignment(row: UserSummary) {
   roleTargetUserId.value = row.id
+  roleTargetTenantId.value = row.tenantId || ''
   roleTargetIsCurrentUser.value = isCurrentUser(row)
+  await refreshRolesIfAllowed()
   const assignedRoles = await queryAssignedRoles(row.id)
-  selectedRoleCodes.value = assignedRoles.map((item) => item.code)
+  mergeRoleOptions(assignedRoles)
+  selectedRoleCodes.value = normalizeRoleCodes(assignedRoles.map((item) => item.code))
+    .filter((code) => roleAssignmentRoleCodeSet.value.has(code))
   roleVisible.value = true
 }
 
@@ -589,12 +786,14 @@ async function submitRoleAssignment() {
   if (!roleTargetUserId.value) {
     return
   }
-  if (selectedRoleCodes.value.length === 0) {
+  const normalizedRoleCodes = normalizeRoleCodes(selectedRoleCodes.value)
+    .filter((code) => roleAssignmentRoleCodeSet.value.has(code))
+  if (normalizedRoleCodes.length === 0) {
     ElMessage.warning(roleTargetIsCurrentUser.value ? '不能移除当前登录用户的全部角色' : '请至少选择一个角色')
     return
   }
   try {
-    await assignUserRoles(roleTargetUserId.value, selectedRoleCodes.value)
+    await assignUserRoles(roleTargetUserId.value, normalizedRoleCodes)
     roleVisible.value = false
     ElMessage.success('用户角色已更新')
     await load()
@@ -612,6 +811,7 @@ function promptResetPassword(row: UserSummary) {
   })
     .then(async ({ value }) => {
       await updateUser(row.id, {
+        tenantId: row.tenantId,
         displayName: row.displayName || null,
         mobile: row.mobile || null,
         email: row.email || null,
@@ -635,24 +835,41 @@ async function removeUser(row: UserSummary) {
   await load()
 }
 
-function buildDepartmentTree(source: DepartmentView[]) {
+function buildDepartmentTree(source: DepartmentView[], showTenant = false) {
   const nodes = source.map((item) => ({
     id: item.id,
-    label: item.name,
+    key: departmentKey(item),
+    label: showTenant && item.tenantId ? `${item.tenantId} / ${item.name}` : item.name,
+    tenantId: item.tenantId || '',
     parentId: item.parentId ?? 0,
-    children: [] as Array<{ id: number; label: string; parentId: number; children: unknown[] }>,
+    children: [] as DepartmentTreeNode[],
   }))
-  const map = new Map(nodes.map((item) => [item.id, item]))
+  const map = new Map(nodes.map((item) => [item.key, item]))
   const roots: typeof nodes = []
   nodes.forEach((node) => {
-    const parent = node.parentId ? map.get(node.parentId) : null
+    const parent = node.parentId ? map.get(`${node.tenantId}:${node.parentId}`) : null
     if (parent) {
       parent.children.push(node)
       return
     }
     roots.push(node)
   })
+  pruneEmptyChildren(roots)
   return roots
+}
+
+function pruneEmptyChildren(nodes: DepartmentTreeNode[]) {
+  nodes.forEach((node) => {
+    if (!node.children || node.children.length === 0) {
+      delete node.children
+      return
+    }
+    pruneEmptyChildren(node.children)
+  })
+}
+
+function departmentKey(department: Pick<DepartmentView, 'tenantId' | 'id'>) {
+  return `${department.tenantId || ''}:${department.id}`
 }
 
 function onUserHeaderDragEnd(newWidth: number, _oldWidth: number, column: { property?: string; columnKey?: string }) {

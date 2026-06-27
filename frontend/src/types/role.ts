@@ -13,6 +13,7 @@ export interface RoleImpactView {
 
 export interface RoleView {
   id: number
+  tenantId?: string | null
   code: string
   name: string
   description?: string | null

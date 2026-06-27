@@ -1,0 +1,312 @@
+.el-button--primary.is-plain {
+  background: rgba(22, 119, 255, 0.08);
+  border-color: rgba(22, 119, 255, 0.26);
+  color: var(--accent);
+}
+
+.el-table {
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.el-table .el-table__inner-wrapper::before {
+  height: 0;
+}
+
+.el-table th.el-table__cell {
+  background: #f6f9ff !important;
+  color: #334155;
+  font-weight: 650;
+  border-bottom-color: var(--line);
+}
+
+.el-table .el-table__row td.el-table__cell {
+  border-bottom-color: var(--line);
+  transition: background-color 0.2s ease;
+}
+
+.el-table .el-table__cell {
+  padding-top: 11px;
+  padding-bottom: 11px;
+}
+
+.el-table.table-density-compact .el-table__cell {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.el-table.table-density-default .el-table__cell {
+  padding-top: 11px;
+  padding-bottom: 11px;
+}
+
+.el-table.table-density-comfortable .el-table__cell {
+  padding-top: 15px;
+  padding-bottom: 15px;
+}
+
+.el-table .cell {
+  line-height: 1.5;
+}
+
+.el-table__body tr.hover-row > td.el-table__cell,
+.el-table__body tr:hover > td.el-table__cell {
+  background: #f7fbff !important;
+}
+
+.el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+  background: #fbfcfe;
+}
+
+.el-table__fixed-right::before,
+.el-table__fixed::before {
+  background-color: var(--line);
+}
+
+.el-table__fixed-right {
+  box-shadow: -6px 0 10px rgba(15, 23, 42, 0.06);
+}
+
+.el-table__fixed {
+  box-shadow: 6px 0 10px rgba(15, 23, 42, 0.06);
+}
+
+.el-table .el-loading-mask {
+  background-color: rgba(248, 250, 252, 0.72);
+  backdrop-filter: blur(2px);
+}
+
+.el-table .el-loading-spinner .path {
+  stroke: var(--accent);
+}
+
+.el-empty {
+  padding: 28px 0 30px;
+}
+
+.el-empty__description p {
+  color: var(--text-soft);
+}
+
+.el-dialog,
+.el-drawer {
+  border-radius: 18px;
+}
+
+.el-dialog {
+  border: 1px solid var(--line);
+  box-shadow: 0 28px 68px rgba(15, 23, 42, 0.18);
+  overflow: hidden;
+}
+
+.el-dialog__header,
+.el-drawer__header {
+  margin-right: 0;
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, #f8fbff, #ffffff);
+}
+
+.el-dialog__title,
+.el-drawer__title {
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--text-main);
+}
+
+.el-dialog__body,
+.el-drawer__body {
+  padding: 18px 20px;
+}
+
+.el-dialog__footer {
+  padding: 12px 20px 18px;
+  border-top: 1px solid var(--line);
+  background: var(--bg-card-muted);
+}
+
+.el-dialog__footer,
+.drawer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.el-dialog__footer .el-button,
+.drawer-actions .el-button {
+  min-width: 96px;
+}
+
+.el-drawer {
+  border-left: 1px solid var(--line);
+}
+
+.el-drawer__body {
+  display: grid;
+  gap: 14px;
+}
+
+.drawer-section {
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--bg-card-muted);
+  display: grid;
+  gap: 12px;
+}
+
+.drawer-section--overview { order: 1; }
+.drawer-section--scopes { order: 2; }
+.drawer-section--guide { order: 3; }
+.drawer-section--history { order: 4; }
+
+.drawer-actions,
+.el-drawer__body .override-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(8px);
+}
+
+.el-drawer__body .panel-head {
+  margin-bottom: 0;
+}
+
+.el-drawer__body .panel-head h3 {
+  font-size: 20px;
+}
+
+.el-drawer__body .el-descriptions,
+.el-drawer__body .el-table,
+.el-drawer__body .el-timeline {
+  margin-top: 2px;
+}
+
+.el-dialog__body .el-form,
+.el-drawer__body .el-form {
+  display: grid;
+  gap: 4px;
+}
+
+.el-dialog__body .el-form-item,
+.el-drawer__body .el-form-item {
+  margin-bottom: 14px;
+}
+
+.el-dialog__body .el-form-item__label,
+.el-drawer__body .el-form-item__label {
+  color: var(--text-soft);
+  font-weight: 500;
+}
+
+.el-dialog__body .el-form-item.is-required:not(.is-no-asterisk).asterisk-left > .el-form-item__label:before,
+.el-drawer__body .el-form-item.is-required:not(.is-no-asterisk).asterisk-left > .el-form-item__label:before {
+  color: var(--warning);
+}
+
+.el-dialog__body .el-form-item__error,
+.el-drawer__body .el-form-item__error {
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.el-dialog__body .el-input__wrapper.is-focus,
+.el-dialog__body .el-textarea__inner:focus,
+.el-dialog__body .el-select .el-input.is-focus .el-input__wrapper,
+.el-drawer__body .el-input__wrapper.is-focus,
+.el-drawer__body .el-textarea__inner:focus,
+.el-drawer__body .el-select .el-input.is-focus .el-input__wrapper {
+  box-shadow: 0 0 0 1px rgba(22, 119, 255, 0.58) inset !important;
+}
+
+.el-dialog__body .el-switch.is-checked .el-switch__core,
+.el-drawer__body .el-switch.is-checked .el-switch__core {
+  border-color: var(--accent);
+  background-color: var(--accent);
+}
+
+.el-card,
+.el-descriptions {
+  border-radius: 14px;
+}
+
+.el-pagination {
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--bg-card-muted);
+}
+
+.tag-row,
+.switch-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.summary-card,
+.insight-card,
+.snapshot-block,
+.detail-block {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg-card-muted);
+}
+
+.summary-card strong,
+.insight-card strong {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.timeline-item,
+.history-item {
+  display: grid;
+  gap: 6px;
+}
+
+.timeline-item span,
+.history-item span {
+  color: var(--text-soft);
+}
+
+.el-timeline {
+  padding-left: 8px;
+}
+
+.el-timeline-item__node {
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.14);
+}
+
+.dashboard-grid--animated > * {
+  opacity: 0;
+  transform: translateY(12px);
+  animation: dashboard-reveal 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.dashboard-grid--animated > *:nth-child(1) { animation-delay: 0.03s; }
+.dashboard-grid--animated > *:nth-child(2) { animation-delay: 0.08s; }
+.dashboard-grid--animated > *:nth-child(3) { animation-delay: 0.13s; }
+.dashboard-grid--animated > *:nth-child(4) { animation-delay: 0.18s; }
+.dashboard-grid--animated > *:nth-child(5) { animation-delay: 0.24s; }
+.dashboard-grid--animated > *:nth-child(6) { animation-delay: 0.3s; }
+
+@keyframes dashboard-reveal {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes management-reveal {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

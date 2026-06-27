@@ -1,6 +1,5 @@
 package com.enterprise.auth.platform.modules.role.application;
 
-import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.modules.menu.application.MenuService;
 import java.util.List;
 import java.util.Set;
@@ -28,11 +27,6 @@ public class RoleGrantQueryFacade {
     }
 
     public Set<Long> listRoleMenuIds(Long roleId) {
-        return menuService.filterGrantableMenuIds(currentTenantId(), roleManagementService.listRoleMenuIds(currentTenantId(), roleId));
-    }
-
-    private String currentTenantId() {
-        String tenantId = TenantContext.getTenantId();
-        return org.springframework.util.StringUtils.hasText(tenantId) ? tenantId : "platform";
+        return roleManagementService.listAssignedMenus(roleId);
     }
 }

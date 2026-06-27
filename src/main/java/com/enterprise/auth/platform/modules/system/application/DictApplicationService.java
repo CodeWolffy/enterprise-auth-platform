@@ -65,13 +65,14 @@ public class DictApplicationService {
             String sortDirection
     ) {
         String tenantId = currentTenantId();
-        Optional<Set<String>> visibleCreators = dataScopeService.visibleUsernames(tenantId);
+        boolean globalScope = TenantContext.isGlobalScope();
+        Optional<Set<String>> visibleCreators = globalScope ? Optional.empty() : dataScopeService.visibleUsernames(tenantId);
         String normalizedDictType = blankToNull(dictType);
         String normalizedCategory = blankToNull(category);
         String normalizedKeyword = blankToNull(keyword);
         return pageQuery(
-                buildDictQuery(tenantId, normalizedDictType, normalizedCategory, normalizedKeyword, visibleCreators),
-                buildDictQuery(tenantId, normalizedDictType, normalizedCategory, normalizedKeyword, visibleCreators),
+                buildDictQuery(tenantId, globalScope, normalizedDictType, normalizedCategory, normalizedKeyword, visibleCreators),
+                buildDictQuery(tenantId, globalScope, normalizedDictType, normalizedCategory, normalizedKeyword, visibleCreators),
                 page,
                 size,
                 sysDictMapper::selectCount,
@@ -167,13 +168,14 @@ public class DictApplicationService {
 
     private LambdaQueryWrapper<SysDictEntity> buildDictQuery(
             String tenantId,
+            boolean globalScope,
             String dictType,
             String category,
             String keyword,
             Optional<Set<String>> visibleCreators
     ) {
         LambdaQueryWrapper<SysDictEntity> query = new LambdaQueryWrapper<SysDictEntity>()
-                .eq(SysDictEntity::getTenantId, tenantId)
+                .eq(!globalScope, SysDictEntity::getTenantId, tenantId)
                 .eq(SysDictEntity::getDeleted, 0)
                 .eq(StringUtils.hasText(dictType), SysDictEntity::getDictType, dictType)
                 .and(StringUtils.hasText(keyword), wrapper -> wrapper

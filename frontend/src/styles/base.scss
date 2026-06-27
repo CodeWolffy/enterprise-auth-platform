@@ -1,0 +1,46 @@
+:root {
+  --bg-shell: #f5f6f8;
+  --bg-card: rgba(255, 255, 255, 0.96);
+  --bg-card-muted: #f8fafc;
+  --line: #edf0f5;
+  --line-strong: #dfe5ee;
+  --text-main: #1f2937;
+  --text-soft: #687386;
+  --accent: #1677ff;
+  --accent-soft: #e8f3ff;
+  --accent-2: #14b8a6;
+  --accent-2-soft: #e6fffb;
+  --success: #16c784;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --shadow-soft: 0 10px 28px rgba(15, 23, 42, 0.08);
+  --shadow-card: 0 14px 36px rgba(15, 23, 42, 0.06);
+  --radius-card: 16px;
+  --radius-control: 10px;
+  --font-body: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-display: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  min-height: 100%;
+  scrollbar-gutter: stable;
+  font-family: var(--font-body);
+  background: #f5f6f8;
+  color: var(--text-main);
+}
+
+body {
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}

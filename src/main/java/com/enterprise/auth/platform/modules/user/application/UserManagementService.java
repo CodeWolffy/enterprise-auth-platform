@@ -2,13 +2,17 @@ package com.enterprise.auth.platform.modules.user.application;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.plugins.IgnoreStrategy;
+import com.baomidou.mybatisplus.core.plugins.InterceptorIgnoreHelper;
 import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.modules.auth.application.SessionIndexService;
+import com.enterprise.auth.platform.modules.dept.application.DeptQueryFacade;
 import com.enterprise.auth.platform.modules.resource.application.CatalogService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.PasswordValidator;
 import com.enterprise.auth.platform.modules.role.application.RoleQueryFacade;
+import com.enterprise.auth.platform.modules.tenant.application.TenantProfileFacade;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserRoleEntity;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
@@ -23,8 +27,8 @@ import com.enterprise.auth.platform.common.context.AuthContextHolder;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.modules.user.interfaces.CreateUserRequest;
 import com.enterprise.auth.platform.modules.user.interfaces.UserSummary;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.dao.DuplicateKeyException;
@@ -40,6 +44,7 @@ public class UserManagementService {
     private final SysUserMapper sysUserMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
     private final RoleQueryFacade roleQueryFacade;
+    private final DeptQueryFacade deptQueryFacade;
     private final PasswordHasher passwordHasher;
     private final UserDirectoryService userDirectoryService;
     private final CatalogService catalogService;
@@ -49,11 +54,13 @@ public class UserManagementService {
     private final SessionIndexService sessionIndexService;
     private final SecurityPolicyApplicationService securityPolicyApplicationService;
     private final NotificationScenarioPublisher notificationScenarioPublisher;
+    private final TenantProfileFacade tenantProfileFacade;
 
     public UserManagementService(
             SysUserMapper sysUserMapper,
             SysUserRoleMapper sysUserRoleMapper,
             RoleQueryFacade roleQueryFacade,
+            DeptQueryFacade deptQueryFacade,
             PasswordHasher passwordHasher,
             UserDirectoryService userDirectoryService,
             CatalogService catalogService,
@@ -62,11 +69,13 @@ public class UserManagementService {
             AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
             SessionIndexService sessionIndexService,
             SecurityPolicyApplicationService securityPolicyApplicationService,
-            NotificationScenarioPublisher notificationScenarioPublisher
+            NotificationScenarioPublisher notificationScenarioPublisher,
+            TenantProfileFacade tenantProfileFacade
     ) {
         this.sysUserMapper = sysUserMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
         this.roleQueryFacade = roleQueryFacade;
+        this.deptQueryFacade = deptQueryFacade;
         this.passwordHasher = passwordHasher;
         this.userDirectoryService = userDirectoryService;
         this.catalogService = catalogService;
@@ -76,6 +85,7 @@ public class UserManagementService {
         this.sessionIndexService = sessionIndexService;
         this.securityPolicyApplicationService = securityPolicyApplicationService;
         this.notificationScenarioPublisher = notificationScenarioPublisher;
+        this.tenantProfileFacade = tenantProfileFacade;
     }
 
     @Transactional
@@ -85,7 +95,7 @@ public class UserManagementService {
         }
         validateDeptAccess(tenantId, request.deptId());
         validateRoleCodesRequired(request.roleCodes());
-        validatePassword(request.password());
+        validatePassword(request.password(), tenantId);
 
         SysUserEntity entity = new SysUserEntity();
         entity.setTenantId(tenantId);
@@ -112,14 +122,14 @@ public class UserManagementService {
 
     @Transactional
     public UserSummary create(CreateUserRequest request) {
-        return createUser(currentTenantId(), request, SecuritySupport.currentOperator());
+        return createUser(resolveTargetTenantId(request.tenantId()), request, SecuritySupport.currentOperator());
     }
 
     @Transactional
     public UserSummary update(Long userId, CreateUserRequest request) {
-        String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
-        SysUserEntity entity = getUser(userId, tenantId);
+        SysUserEntity entity = getUser(userId);
+        String tenantId = entity.getTenantId();
         validateDeptAccess(tenantId, request.deptId());
         validateSelfProtection(entity, request);
 
@@ -136,7 +146,7 @@ public class UserManagementService {
             entity.setEnabled(request.enabled() ? 1 : 0);
         }
         if (StringUtils.hasText(request.password())) {
-            validatePassword(request.password());
+            validatePassword(request.password(), tenantId);
             entity.setPasswordHash(passwordHasher.hash(request.password()));
             entity.setSessionVersion((entity.getSessionVersion() == null ? 1 : entity.getSessionVersion()) + 1);
             entity.setMustChangePassword(1);
@@ -158,9 +168,9 @@ public class UserManagementService {
 
     @Transactional
     public UserSummary assignRoles(Long userId, Set<String> roleCodes) {
-        String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
-        SysUserEntity entity = getUser(userId, tenantId);
+        SysUserEntity entity = getUser(userId);
+        String tenantId = entity.getTenantId();
         validateSelfRoleAssignment(entity, roleCodes);
         validateRoleCodesRequired(roleCodes);
         syncUserRoles(tenantId, userId, roleCodes);
@@ -169,32 +179,28 @@ public class UserManagementService {
     }
 
     public List<CatalogService.RoleView> listAssignedRoles(Long userId) {
-        String tenantId = currentTenantId();
-        getUser(userId, tenantId);
+        SysUserEntity entity = getUser(userId);
+        String tenantId = entity.getTenantId();
         List<Long> roleIds = sysUserRoleMapper.selectList(new LambdaQueryWrapper<SysUserRoleEntity>()
-                        .eq(SysUserRoleEntity::getTenantId, tenantId)
-                        .eq(SysUserRoleEntity::getUserId, userId))
+                .eq(SysUserRoleEntity::getTenantId, tenantId)
+                .eq(SysUserRoleEntity::getUserId, userId))
                 .stream()
                 .map(SysUserRoleEntity::getRoleId)
                 .toList();
         if (roleIds.isEmpty()) {
             return List.of();
         }
-        Map<Long, String> roleCodeMap = roleQueryFacade.loadRoleCodeMap(tenantId);
-        Set<String> roleCodes = roleIds.stream()
-                .filter(roleCodeMap::containsKey)
-                .map(roleCodeMap::get)
-                .collect(Collectors.toSet());
-        return catalogService.roles().stream()
-                .filter(role -> roleCodes.contains(role.code()))
+        Set<Long> assignedRoleIds = roleIds.stream().collect(Collectors.toCollection(LinkedHashSet::new));
+        return catalogService.tenantRoles(tenantId).stream()
+                .filter(role -> assignedRoleIds.contains(role.id()))
                 .toList();
     }
 
     @Transactional
     public void delete(Long userId) {
-        String tenantId = currentTenantId();
         String operator = SecuritySupport.currentOperator();
-        SysUserEntity entity = getUser(userId, tenantId);
+        SysUserEntity entity = getUser(userId);
+        String tenantId = entity.getTenantId();
         validateSelfDeletion(entity);
 
         sysUserRoleMapper.delete(new LambdaQueryWrapper<SysUserRoleEntity>()
@@ -232,7 +238,7 @@ public class UserManagementService {
     }
 
     private void validateRoleCodesRequired(Set<String> roleCodes) {
-        if (roleCodes == null || roleCodes.stream().filter(StringUtils::hasText).findAny().isEmpty()) {
+        if (normalizeRoleCodes(roleCodes).isEmpty()) {
             throw new BusinessException("用户至少需要分配一个角色");
         }
     }
@@ -251,7 +257,7 @@ public class UserManagementService {
         if (!isCurrentUser(entity) || roleCodes == null) {
             return;
         }
-        if (roleCodes.stream().filter(StringUtils::hasText).findAny().isEmpty()) {
+        if (normalizeRoleCodes(roleCodes).isEmpty()) {
             throw new BusinessException("不能移除当前登录用户的全部角色");
         }
     }
@@ -272,17 +278,18 @@ public class UserManagementService {
     }
 
     private void syncUserRoles(String tenantId, Long userId, Set<String> roleCodes) {
+        Set<String> normalizedRoleCodes = normalizeRoleCodes(roleCodes);
         sysUserRoleMapper.delete(new LambdaQueryWrapper<SysUserRoleEntity>()
                 .eq(SysUserRoleEntity::getTenantId, tenantId)
                 .eq(SysUserRoleEntity::getUserId, userId));
-        if (roleCodes == null || roleCodes.isEmpty()) {
+        if (normalizedRoleCodes.isEmpty()) {
             return;
         }
 
         var roles = roleQueryFacade.listAll(tenantId).stream()
-                .filter(r -> roleCodes.contains(r.getRoleCode()))
+                .filter(r -> normalizedRoleCodes.contains(r.getRoleCode()))
                 .toList();
-        if (roles.size() != roleCodes.size()) {
+        if (roles.size() != normalizedRoleCodes.size()) {
             throw new BusinessException("存在无效的角色编码");
         }
 
@@ -295,23 +302,49 @@ public class UserManagementService {
         }
     }
 
-    private SysUserEntity getUser(Long userId, String tenantId) {
-        SysUserEntity entity = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>()
-                .eq(SysUserEntity::getId, userId)
-                .eq(SysUserEntity::getTenantId, tenantId)
-                .eq(SysUserEntity::getDeleted, 0)
-                .last("limit 1"));
+    private Set<String> normalizeRoleCodes(Set<String> roleCodes) {
+        if (roleCodes == null || roleCodes.isEmpty()) {
+            return Set.of();
+        }
+        return roleCodes.stream()
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private SysUserEntity getUser(Long userId) {
+        boolean globalScope = dataScopeService.isPlatformSuperAdmin();
+        SysUserEntity entity;
+        if (globalScope) {
+            entity = InterceptorIgnoreHelper.execute(
+                    IgnoreStrategy.builder().tenantLine(true).build(),
+                    () -> sysUserMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>()
+                            .eq(SysUserEntity::getId, userId)
+                            .eq(SysUserEntity::getDeleted, 0)
+                            .last("limit 1"))
+            );
+        } else {
+            entity = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>()
+                    .eq(SysUserEntity::getId, userId)
+                    .eq(SysUserEntity::getTenantId, currentTenantId())
+                    .eq(SysUserEntity::getDeleted, 0)
+                    .last("limit 1"));
+        }
         if (entity == null) {
             throw new BusinessException("用户不存在");
         }
-        if (!dataScopeService.canAccessUser(tenantId, entity.getId())) {
+        if (!dataScopeService.canAccessUser(entity.getTenantId(), entity.getId())) {
             throw new BusinessException("无权访问该用户");
         }
         return entity;
     }
 
     private void validateDeptAccess(String tenantId, Long deptId) {
-        if (deptId != null && !dataScopeService.canAccessDept(tenantId, deptId)) {
+        if (deptId == null) {
+            return;
+        }
+        if (!dataScopeService.canAccessDept(tenantId, deptId)
+                || deptQueryFacade.countByIds(tenantId, List.of(deptId)) != 1) {
             throw new BusinessException("无权使用该部门");
         }
     }
@@ -321,20 +354,33 @@ public class UserManagementService {
     }
 
     private void validatePassword(String password) {
-        PasswordValidator.validate(password, securityPolicyApplicationService.currentTenantPolicy());
+        validatePassword(password, currentTenantId());
+    }
+
+    private void validatePassword(String password, String tenantId) {
+        PasswordValidator.validate(password, securityPolicyApplicationService.effectivePolicy(tenantId));
     }
 
     private UserSummary loadSummary(Long userId, String tenantId) {
         String previousTenantId = TenantContext.getTenantId();
+        boolean previousGlobalScope = TenantContext.isGlobalScope();
         try {
-            TenantContext.setTenantId(tenantId);
+            if (dataScopeService.isPlatformSuperAdmin()) {
+                TenantContext.setGlobalScope(tenantId);
+            } else {
+                TenantContext.setTenantId(tenantId);
+            }
             return userDirectoryService.listUsers().stream()
                     .filter(user -> user.id().equals(userId))
                     .findFirst()
                     .orElseThrow(() -> new BusinessException("用户不存在"));
         } finally {
             if (StringUtils.hasText(previousTenantId)) {
-                TenantContext.setTenantId(previousTenantId);
+                if (previousGlobalScope) {
+                    TenantContext.setGlobalScope(previousTenantId);
+                } else {
+                    TenantContext.setTenantId(previousTenantId);
+                }
             } else {
                 TenantContext.clear();
             }
@@ -344,5 +390,16 @@ public class UserManagementService {
     private String currentTenantId() {
         String tenantId = TenantContext.getTenantId();
         return StringUtils.hasText(tenantId) ? tenantId : "platform";
+    }
+
+    private String resolveTargetTenantId(String requestedTenantId) {
+        String currentTenantId = currentTenantId();
+        if (!dataScopeService.isPlatformSuperAdmin()) {
+            return currentTenantId;
+        }
+        String targetTenantId = StringUtils.hasText(requestedTenantId) ? requestedTenantId.trim() : currentTenantId;
+        tenantProfileFacade.findByTenantId(targetTenantId)
+                .orElseThrow(() -> new BusinessException("TENANT_NOT_FOUND", "租户不存在"));
+        return targetTenantId;
     }
 }

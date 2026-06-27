@@ -69,12 +69,20 @@
         v-loading="loading"
         :data="filteredDepartmentTree"
         stripe
-        row-key="id"
+        :row-key="departmentRowKey"
         :default-expand-all="expandAll"
         class="tree-table"
         :class="`table-density-${departmentTablePrefs.density}`"
         @header-dragend="onDepartmentHeaderDragEnd"
       >
+        <el-table-column
+          v-if="departmentTablePrefs.visibleColumnMap.tenantId"
+          column-key="tenantId"
+          prop="tenantId"
+          label="租户"
+          min-width="130"
+          :width="departmentTablePrefs.getColumnWidth('tenantId')"
+        />
         <el-table-column
           v-if="departmentTablePrefs.visibleColumnMap.name"
           column-key="name"
@@ -140,7 +148,7 @@
           min-width="130"
           :width="departmentTablePrefs.getColumnWidth('childCount')"
         >
-          <template #default="{ row }">{{ childCount(row.id) }}</template>
+          <template #default="{ row }">{{ childCount(row) }}</template>
         </el-table-column>
         <el-table-column
           v-if="departmentTablePrefs.visibleColumnMap.actions"
@@ -165,6 +173,7 @@
     <el-drawer v-model="detailVisible" title="部门详情" size="620px">
       <template v-if="detailDepartment">
         <el-descriptions :column="2" border class="drawer-section drawer-section--overview">
+          <el-descriptions-item label="租户">{{ detailDepartment.tenantId || '-' }}</el-descriptions-item>
           <el-descriptions-item label="部门名称">{{ detailDepartment.name }}</el-descriptions-item>
           <el-descriptions-item label="部门编码">{{ detailDepartment.code || '-' }}</el-descriptions-item>
           <el-descriptions-item label="部门 ID">{{ detailDepartment.id }}</el-descriptions-item>
@@ -174,7 +183,7 @@
           <el-descriptions-item label="负责人电话">{{ detailDepartment.leaderPhone || '-' }}</el-descriptions-item>
           <el-descriptions-item label="排序">{{ detailDepartment.orderNo ?? 0 }}</el-descriptions-item>
           <el-descriptions-item label="状态">{{ isDepartmentEnabled(detailDepartment) ? '启用' : '停用' }}</el-descriptions-item>
-          <el-descriptions-item label="直属子部门">{{ childCount(detailDepartment.id) }}</el-descriptions-item>
+          <el-descriptions-item label="直属子部门">{{ childCount(detailDepartment) }}</el-descriptions-item>
         </el-descriptions>
 
         <div class="detail-tip drawer-section drawer-section--guide">
@@ -189,6 +198,21 @@
 
     <el-dialog v-model="visible" :title="editingId ? '编辑部门' : '新增部门'" width="640px">
       <el-form ref="formRef" label-position="top" :model="form" :rules="deptRules">
+        <el-row v-if="isPlatformAdmin" :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="所属租户">
+              <el-select
+                v-model="form.tenantId"
+                :disabled="Boolean(editingId) || Boolean(form.parentId)"
+                filterable
+                style="width: 100%"
+                @change="handleFormTenantChange"
+              >
+                <el-option v-for="tenant in tenantOptions" :key="tenant.tenantId" :label="tenant.label" :value="tenant.tenantId" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
         <el-row :gutter="16">
           <el-col :span="12">
             <el-form-item label="部门名称" prop="deptName">
@@ -206,7 +230,7 @@
             <el-form-item label="父级部门">
               <el-tree-select
                 v-model="form.parentId"
-                :data="departmentTree"
+                :data="formDepartmentTree"
                 :props="{ label: 'name', value: 'id', children: 'children' }"
                 check-strictly
                 clearable
@@ -259,13 +283,18 @@ import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AdvancedSearch from '@/components/common/AdvancedSearch.vue'
 import type { FormInstance, FormRules } from 'element-plus'
-import { createDepartment, deleteDepartment, queryDepartments, updateDepartment } from '@/api/modules'
+import { createDepartment, deleteDepartment, queryDepartments, queryTenants, updateDepartment } from '@/api/modules'
 import { useTablePreferences } from '@/composables/useTablePreferences'
 import type { DepartmentView } from '@/types/dept'
+import type { TenantView } from '@/types/tenant'
+import { useAuthStore } from '@/stores/auth'
 
-type DepartmentTreeNode = DepartmentView & { children?: DepartmentTreeNode[] }
+type DepartmentTreeNode = DepartmentView & { key: string; children?: DepartmentTreeNode[] }
+type TenantOption = { tenantId: string; label: string }
 
 const departments = ref<DepartmentView[]>([])
+const tenantCatalog = ref<TenantView[]>([])
+const authStore = useAuthStore()
 const visible = ref(false)
 const detailVisible = ref(false)
 const editingId = ref<number | null>(null)
@@ -276,6 +305,7 @@ const keyword = ref('')
 const formRef = ref<FormInstance>()
 
 const departmentTablePrefs = useTablePreferences('table:departments', [
+  { key: 'tenantId', label: '租户', width: 130 },
   { key: 'name', label: '部门名称', width: 220 },
   { key: 'code', label: '部门编码', width: 160 },
   { key: 'leaderName', label: '负责人', width: 150 },
@@ -287,6 +317,7 @@ const departmentTablePrefs = useTablePreferences('table:departments', [
 ])
 
 const form = reactive({
+  tenantId: '',
   parentId: null as number | null,
   deptCode: '',
   deptName: '',
@@ -324,6 +355,9 @@ const deptRules = reactive<FormRules>({
 })
 
 const departmentTree = computed<DepartmentTreeNode[]>(() => buildTree(departments.value))
+const formDepartmentTree = computed<DepartmentTreeNode[]>(() => buildTree(
+  departments.value.filter((department) => department.tenantId === form.tenantId),
+))
 const filteredDepartmentTree = computed<DepartmentTreeNode[]>(() => {
   if (!keyword.value.trim()) {
     return departmentTree.value
@@ -334,15 +368,31 @@ const filteredDepartmentTree = computed<DepartmentTreeNode[]>(() => {
 const rootDepartmentCount = computed(() => departments.value.filter((item) => !item.parentId).length)
 const leaderBoundCount = computed(() => departments.value.filter((item) => Boolean(item.leaderName || item.leaderUserId)).length)
 const enabledDepartmentCount = computed(() => departments.value.filter((item) => isDepartmentEnabled(item)).length)
+const isPlatformAdmin = computed(() => Boolean(authStore.snapshot?.superAdmin))
+const tenantOptions = computed<TenantOption[]>(() => buildTenantOptions())
 
 void load()
 
 async function load() {
   loading.value = true
   try {
-    departments.value = await queryDepartments()
+    const [departmentList, tenantList] = await Promise.all([queryDepartments(), loadTenantCatalog()])
+    departments.value = departmentList
+    tenantCatalog.value = tenantList
   } finally {
     loading.value = false
+  }
+}
+
+async function loadTenantCatalog() {
+  if (!isPlatformAdmin.value) {
+    return [] as TenantView[]
+  }
+  try {
+    const page = await queryTenants({ page: 1, size: 500 }, { suppressErrorMessage: true })
+    return page.records
+  } catch {
+    return [] as TenantView[]
   }
 }
 
@@ -356,20 +406,21 @@ function resetSearch() {
 }
 
 function buildTree(source: DepartmentView[]) {
-  const map = new Map<number, DepartmentTreeNode>()
+  const map = new Map<string, DepartmentTreeNode>()
   const roots: DepartmentTreeNode[] = []
 
   source.forEach((department) => {
-    map.set(department.id, { ...department, children: [] })
+    map.set(departmentKey(department), { ...department, key: departmentKey(department), children: [] })
   })
 
   source.forEach((department) => {
-    const current = map.get(department.id)
+    const current = map.get(departmentKey(department))
     if (!current) {
       return
     }
-    if (department.parentId && map.has(department.parentId)) {
-      map.get(department.parentId)?.children?.push(current)
+    const parentKey = department.parentId ? `${department.tenantId || ''}:${department.parentId}` : ''
+    if (parentKey && map.has(parentKey)) {
+      map.get(parentKey)?.children?.push(current)
     } else {
       roots.push(current)
     }
@@ -393,7 +444,7 @@ function filterTreeByKeyword(nodes: DepartmentTreeNode[], normalizedKeyword: str
   const filtered: DepartmentTreeNode[] = []
   nodes.forEach((node) => {
     const children = node.children ? filterTreeByKeyword(node.children, normalizedKeyword) : []
-    const matched = [node.name, node.code || ''].some((value) => value.toLowerCase().includes(normalizedKeyword))
+    const matched = [node.tenantId || '', node.name, node.code || ''].some((value) => value.toLowerCase().includes(normalizedKeyword))
     if (matched || children.length > 0) {
       filtered.push({ ...node, children: children.length > 0 ? children : undefined })
     }
@@ -401,9 +452,57 @@ function filterTreeByKeyword(nodes: DepartmentTreeNode[], normalizedKeyword: str
   return filtered
 }
 
+function buildTenantOptions() {
+  const tenantMap = new Map<string, TenantOption>()
+  const addTenant = (tenantId?: string | null, name?: string | null) => {
+    if (!tenantId) {
+      return
+    }
+    tenantMap.set(tenantId, {
+      tenantId,
+      label: name ? `${name} (${tenantId})` : tenantId,
+    })
+  }
+  tenantCatalog.value.forEach((tenant) => addTenant(tenant.tenantId, tenant.name))
+  departments.value.forEach((department) => addTenant(department.tenantId))
+  addTenant(authStore.snapshot?.operatorTenantId || authStore.operatorTenantId || authStore.snapshot?.tenantId || authStore.tenantId)
+  return Array.from(tenantMap.values()).sort((left, right) => {
+    if (left.tenantId === 'platform') {
+      return -1
+    }
+    if (right.tenantId === 'platform') {
+      return 1
+    }
+    return left.tenantId.localeCompare(right.tenantId)
+  })
+}
+
+function defaultTenantId() {
+  return authStore.snapshot?.operatorTenantId
+    || authStore.operatorTenantId
+    || authStore.snapshot?.tenantId
+    || authStore.tenantId
+    || tenantOptions.value[0]?.tenantId
+    || 'platform'
+}
+
+function departmentKey(department: Pick<DepartmentView, 'tenantId' | 'id'>) {
+  return `${department.tenantId || ''}:${department.id}`
+}
+
+function departmentRowKey(row: DepartmentView) {
+  return departmentKey(row)
+}
+
+function handleFormTenantChange() {
+  form.parentId = null
+  form.leaderUserId = null
+}
+
 function openDepartment(row?: DepartmentView) {
   editingId.value = row?.id ?? null
   Object.assign(form, {
+    tenantId: row?.tenantId || defaultTenantId(),
     parentId: row?.parentId ?? null,
     deptCode: row?.code ?? '',
     deptName: row?.name ?? '',
@@ -424,6 +523,7 @@ function openDetail(row: DepartmentView) {
 function openChildDepartment(row: DepartmentView) {
   editingId.value = null
   Object.assign(form, {
+    tenantId: row.tenantId || defaultTenantId(),
     parentId: row.id,
     deptCode: '',
     deptName: '',
@@ -442,6 +542,7 @@ async function submit() {
   }
   await formRef.value.validate()
   const payload = {
+    tenantId: form.tenantId,
     parentId: form.parentId,
     deptCode: form.deptCode || null,
     deptName: form.deptName,
@@ -469,8 +570,8 @@ async function removeDepartment(id: number) {
   await load()
 }
 
-function childCount(id: number) {
-  return departments.value.filter((item) => item.parentId === id).length
+function childCount(department: DepartmentView) {
+  return departments.value.filter((item) => item.tenantId === department.tenantId && item.parentId === department.id).length
 }
 
 function isDepartmentEnabled(department: DepartmentView) {
