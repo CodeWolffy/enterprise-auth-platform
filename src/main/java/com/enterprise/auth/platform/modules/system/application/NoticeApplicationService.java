@@ -122,6 +122,12 @@ public class NoticeApplicationService {
         return toNoticeView(entity);
     }
 
+    public SystemViewModels.NoticeView noticeDetail(Long id) {
+        String tenantId = currentTenantId();
+        SysNoticeEntity entity = getNotice(id, tenantId);
+        return toNoticeView(entity);
+    }
+
     public String currentTenantId() {
         String tenantId = TenantContext.getTenantId();
         return StringUtils.hasText(tenantId) ? tenantId : "platform";

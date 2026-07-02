@@ -2,6 +2,7 @@ package com.enterprise.auth.platform.modules.system.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
+import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.common.authz.SecuritySupport;
 import com.enterprise.auth.platform.common.cache.CacheNames;
@@ -30,6 +31,13 @@ public class ConfigApplicationService {
     private static final String SORT_ASC = "asc";
     private static final String SORT_DESC = "desc";
     private static final String CONFIG_CATEGORY_PREFIX = "system.category.config.";
+    private static final int CONFIG_KEY_MAX_LENGTH = 128;
+    private static final int CONFIG_NAME_MAX_LENGTH = 128;
+    private static final int CONFIG_VALUE_MAX_LENGTH = 500;
+    private static final int CONFIG_TYPE_MAX_LENGTH = 32;
+    private static final int CONFIG_REMARK_MAX_LENGTH = 255;
+    private static final String CONFIG_TYPE_BUSINESS = "business";
+    private static final String CONFIG_TYPE_SYSTEM = "system";
 
     private final SysConfigMapper sysConfigMapper;
     private final SysCategoryRuleMapper sysCategoryRuleMapper;
@@ -49,6 +57,7 @@ public class ConfigApplicationService {
         SysConfigEntity entity = sysConfigMapper.selectOne(new LambdaQueryWrapper<SysConfigEntity>()
                 .eq(SysConfigEntity::getTenantId, tenantId)
                 .eq(SysConfigEntity::getConfigKey, configKey)
+                .eq(SysConfigEntity::getEnabled, true)
                 .eq(SysConfigEntity::getDeleted, 0)
                 .last("limit 1"));
         return entity == null ? Optional.empty() : Optional.ofNullable(entity.getConfigValue());
@@ -82,12 +91,11 @@ public class ConfigApplicationService {
     @CacheEvict(value = {CacheNames.SYSTEM_CONFIGS, CacheNames.SYSTEM_CATEGORIES_ALL, CacheNames.SYSTEM_CATEGORIES_TARGET, CacheNames.REGISTRATION_POLICY}, allEntries = true)
     public SystemViewModels.ConfigView createConfig(ConfigCrudRequest request) {
         String tenantId = currentTenantId();
-        String operator = SecuritySupport.currentOperator();
+        String configKey = normalizeCode(request.configKey(), "参数键不能为空", CONFIG_KEY_MAX_LENGTH, "参数键长度不能超过128个字符");
+        ensureConfigKeyUnique(tenantId, configKey, null);
         SysConfigEntity entity = new SysConfigEntity();
         entity.setTenantId(tenantId);
-        entity.setConfigKey(request.configKey());
-        entity.setConfigName(request.configName());
-        entity.setConfigValue(request.configValue());
+        applyConfigProfile(entity, request, configKey);
         sysConfigMapper.insert(entity);
         return toConfigView(entity);
     }
@@ -97,11 +105,24 @@ public class ConfigApplicationService {
     public SystemViewModels.ConfigView updateConfig(Long id, ConfigCrudRequest request) {
         String tenantId = currentTenantId();
         SysConfigEntity entity = getConfig(id, tenantId);
-        entity.setConfigKey(request.configKey());
-        entity.setConfigName(request.configName());
-        entity.setConfigValue(request.configValue());
+        String configKey = normalizeCode(request.configKey(), "参数键不能为空", CONFIG_KEY_MAX_LENGTH, "参数键长度不能超过128个字符");
+        ensureConfigKeyUnique(tenantId, configKey, id);
+        applyConfigProfile(entity, request, configKey);
         sysConfigMapper.updateById(entity);
         return toConfigView(entity);
+    }
+
+    public SystemViewModels.ConfigDetailView detail(Long id) {
+        String tenantId = currentTenantId();
+        SysConfigEntity entity = getConfig(id, tenantId);
+        return new SystemViewModels.ConfigDetailView(
+                toConfigView(entity),
+                Map.of(
+                        "tenantId", entity.getTenantId(),
+                        "category", deriveCategory(tenantId, entity.getConfigKey()),
+                        "keyPrefix", keyPrefix(entity.getConfigKey())
+                )
+        );
     }
 
     @Transactional
@@ -109,7 +130,28 @@ public class ConfigApplicationService {
     public void deleteConfig(Long id) {
         String tenantId = currentTenantId();
         SysConfigEntity entity = getConfig(id, tenantId);
+        if (Boolean.TRUE.equals(entity.getBuiltin())) {
+            throw new BusinessException("内置参数不允许删除");
+        }
+        releaseDeletedConfigIdentity(entity);
+        sysConfigMapper.updateById(entity);
         sysConfigMapper.deleteById(entity.getId());
+    }
+
+    @Transactional
+    @CacheEvict(value = {CacheNames.SYSTEM_CONFIGS, CacheNames.SYSTEM_CATEGORIES_ALL, CacheNames.SYSTEM_CATEGORIES_TARGET, CacheNames.REGISTRATION_POLICY}, allEntries = true)
+    public void deleteConfigs(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        for (Long id : ids.stream().filter(java.util.Objects::nonNull).distinct().toList()) {
+            deleteConfig(id);
+        }
+    }
+
+    @CacheEvict(value = {CacheNames.SYSTEM_CONFIGS, CacheNames.SYSTEM_CATEGORIES_ALL, CacheNames.SYSTEM_CATEGORIES_TARGET, CacheNames.REGISTRATION_POLICY}, allEntries = true)
+    public String refreshCache() {
+        return "OK";
     }
 
     public String currentTenantId() {
@@ -134,7 +176,13 @@ public class ConfigApplicationService {
                 deriveCategory(currentTenantId(), entity.getConfigKey()),
                 entity.getConfigName(),
                 entity.getConfigValue(),
-                entity.getCreatedBy()
+                normalizeConfigType(entity.getConfigType()),
+                Boolean.TRUE.equals(entity.getEnabled()),
+                Boolean.TRUE.equals(entity.getBuiltin()),
+                entity.getRemark(),
+                TimeSupport.toEpochMilli(entity.getUpdatedAt()),
+                entity.getCreatedBy(),
+                entity.getUpdatedBy()
         );
     }
 
@@ -153,7 +201,9 @@ public class ConfigApplicationService {
                         .or()
                         .like(SysConfigEntity::getConfigName, keyword)
                         .or()
-                        .like(SysConfigEntity::getConfigValue, keyword));
+                        .like(SysConfigEntity::getConfigValue, keyword)
+                        .or()
+                        .like(SysConfigEntity::getRemark, keyword));
         applyCategoryFilter(query, tenantId, category, SysConfigEntity::getConfigKey);
         applyCreatorScope(query, visibleCreators, SysConfigEntity::getCreatedBy);
         return query;
@@ -198,6 +248,88 @@ public class ConfigApplicationService {
             throw new BusinessException("无权访问该参数");
         }
         return entity;
+    }
+
+    private void applyConfigProfile(SysConfigEntity entity, ConfigCrudRequest request, String configKey) {
+        entity.setConfigKey(configKey);
+        entity.setConfigName(normalizeOptional(request.configName(), CONFIG_NAME_MAX_LENGTH, "参数名称长度不能超过128个字符"));
+        entity.setConfigValue(normalizeCode(request.configValue(), "参数值不能为空", CONFIG_VALUE_MAX_LENGTH, "参数值长度不能超过500个字符"));
+        entity.setConfigType(normalizeConfigType(request.configType()));
+        entity.setEnabled(request.enabled() == null || Boolean.TRUE.equals(request.enabled()));
+        entity.setBuiltin(Boolean.TRUE.equals(request.builtin()));
+        entity.setRemark(normalizeOptional(request.remark(), CONFIG_REMARK_MAX_LENGTH, "备注长度不能超过255个字符"));
+    }
+
+    private String normalizeConfigType(String value) {
+        String normalized = normalizeOptional(value, CONFIG_TYPE_MAX_LENGTH, "参数类型长度不能超过32个字符");
+        if (normalized == null) {
+            return CONFIG_TYPE_BUSINESS;
+        }
+        String lowerCase = normalized.toLowerCase(java.util.Locale.ROOT);
+        if (CONFIG_TYPE_BUSINESS.equals(lowerCase) || CONFIG_TYPE_SYSTEM.equals(lowerCase)) {
+            return lowerCase;
+        }
+        throw new BusinessException("VALIDATION_ERROR", "参数类型只能是 business 或 system");
+    }
+
+    private void ensureConfigKeyUnique(String tenantId, String configKey, Long selfId) {
+        Long count = sysConfigMapper.selectCount(new LambdaQueryWrapper<SysConfigEntity>()
+                .eq(SysConfigEntity::getTenantId, tenantId)
+                .eq(SysConfigEntity::getDeleted, 0)
+                .eq(SysConfigEntity::getConfigKey, configKey)
+                .ne(selfId != null, SysConfigEntity::getId, selfId == null ? -1L : selfId));
+        if (count != null && count > 0) {
+            throw new BusinessException("CONFLICT", "参数键已存在");
+        }
+    }
+
+    private void releaseDeletedConfigIdentity(SysConfigEntity entity) {
+        entity.setConfigKey(tombstone(entity.getConfigKey(), entity.getId(), CONFIG_KEY_MAX_LENGTH));
+    }
+
+    private String normalizeCode(String value, String requiredMessage, int maxLength, String lengthMessage) {
+        String normalized = blankToNull(value);
+        if (normalized == null) {
+            throw new BusinessException("VALIDATION_ERROR", requiredMessage);
+        }
+        if (normalized.length() > maxLength) {
+            throw new BusinessException("VALIDATION_ERROR", lengthMessage);
+        }
+        return normalized;
+    }
+
+    private String normalizeOptional(String value, int maxLength, String lengthMessage) {
+        String normalized = blankToNull(value);
+        if (normalized != null && normalized.length() > maxLength) {
+            throw new BusinessException("VALIDATION_ERROR", lengthMessage);
+        }
+        return normalized;
+    }
+
+    private String blankToNull(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private String tombstone(String value, Long id, int maxLength) {
+        String suffix = "#deleted#" + id;
+        String base = StringUtils.hasText(value) ? value.trim() : "deleted";
+        int keepLength = Math.max(0, maxLength - suffix.length());
+        if (base.length() > keepLength) {
+            base = base.substring(0, keepLength);
+        }
+        return base + suffix;
+    }
+
+    private String keyPrefix(String configKey) {
+        if (!StringUtils.hasText(configKey)) {
+            return "default";
+        }
+        String normalized = configKey.trim();
+        int dotIndex = normalized.indexOf('.');
+        int colonIndex = normalized.indexOf(':');
+        int underscoreIndex = normalized.indexOf('_');
+        int splitIndex = StreamUtil.minPositive(dotIndex, colonIndex, underscoreIndex);
+        return splitIndex > 0 ? normalized.substring(0, splitIndex) : normalized;
     }
 
     private String currentScopeCacheKey() {

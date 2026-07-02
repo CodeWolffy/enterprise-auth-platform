@@ -23,9 +23,9 @@ spring:
 app:
   cors:
     allowed-origins:
-      - http://127.0.0.1:5173
-      - http://localhost:5173
-      - http://*:5173
+      - http://127.0.0.1:5777
+      - http://localhost:5777
+      - http://*:5777
   security:
     session-ttl: 7d
     captcha-ttl: 1m

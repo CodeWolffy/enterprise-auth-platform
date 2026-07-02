@@ -42,14 +42,6 @@ public class AccountController {
     }
 
     @SysLog("更新当前账户头像")
-    @Operation(summary = "更新当前账户头像（兼容旧路径）")
-    @PutMapping(value = "/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ApiResponse<AccountProfileResponse> updateAvatar(
-            @Parameter(description = "头像文件") @RequestPart("file") MultipartFile file) {
-        return ApiResponse.ok(accountApplicationService.updateAvatar(file));
-    }
-
-    @SysLog("更新当前账户头像")
     @Operation(summary = "更新当前账户头像")
     @PutMapping(value = "/profile/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<AccountProfileResponse> updateProfileAvatar(

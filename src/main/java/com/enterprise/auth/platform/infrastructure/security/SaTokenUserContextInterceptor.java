@@ -47,6 +47,7 @@ public class SaTokenUserContextInterceptor implements HandlerInterceptor {
                         user.username(),
                         user.tenantId(),
                         String.valueOf(StpUtil.getTokenSession().get("clientIp")),
+                        String.valueOf(StpUtil.getTokenSession().get("loginLocation")),
                         String.valueOf(StpUtil.getTokenSession().get("device")),
                         sessionLong("issuedAt", lastAccessAt),
                         sessionLong("expiresAt", 0L)

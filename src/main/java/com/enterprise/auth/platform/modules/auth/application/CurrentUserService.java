@@ -49,10 +49,7 @@ public class CurrentUserService {
         UserAccount user = loadLoggedInUser()
                 .orElseThrow(() -> new BusinessException("UNAUTHORIZED", "User is not logged in"));
         SaSession tokenSession = StpUtil.getTokenSession();
-        String sessionTenantId = sessionString(tokenSession, "activeTenantId");
-        if (!StringUtils.hasText(sessionTenantId)) {
-            sessionTenantId = sessionString(tokenSession, "tenantId");
-        }
+        String sessionTenantId = requireSessionString(tokenSession, "activeTenantId");
         String effectiveTenantId = platformAdminSupport.resolveEffectiveTenant(user, sessionTenantId);
         if (!effectiveTenantId.equals(sessionString(tokenSession, "activeTenantId"))) {
             tokenSession.set("activeTenantId", effectiveTenantId);
@@ -71,7 +68,8 @@ public class CurrentUserService {
             }
             long userId = StpUtil.getLoginIdAsLong();
             SaSession tokenSession = StpUtil.getTokenSession();
-            String loginTenantId = sessionString(tokenSession, "tenantId");
+            String loginTenantId = requireSessionString(tokenSession, "tenantId");
+            requireSessionString(tokenSession, "activeTenantId");
             AuthenticationUser authenticationUser = runWithTenant(loginTenantId, () -> userAuthenticationFacadeProvider.getObject().findById(userId))
                     .orElseThrow(() -> {
                         kickoutCurrentToken();
@@ -84,7 +82,7 @@ public class CurrentUserService {
                 StpUtil.kickout(userId);
                 StpUtil.checkLogin();
             }
-            int tokenSessionVersion = sessionInt(tokenSession, "sessionVersion", effectiveUser.sessionVersion());
+            int tokenSessionVersion = sessionInt(tokenSession, "sessionVersion", -1);
             if (tokenSessionVersion != effectiveUser.sessionVersion()) {
                 kickoutCurrentToken();
                 StpUtil.checkLogin();
@@ -148,9 +146,6 @@ public class CurrentUserService {
             return false;
         }
         String activeTenantId = sessionString(tokenSession, "activeTenantId");
-        if (!StringUtils.hasText(activeTenantId)) {
-            activeTenantId = sessionString(tokenSession, "tenantId");
-        }
         return permissionsTenantId.equals(activeTenantId);
     }
 
@@ -194,5 +189,15 @@ public class CurrentUserService {
     private String sessionString(SaSession session, String key) {
         Object value = session.get(key);
         return value == null ? null : String.valueOf(value);
+    }
+
+    private String requireSessionString(SaSession session, String key) {
+        String value = sessionString(session, key);
+        if (StringUtils.hasText(value)) {
+            return value;
+        }
+        kickoutCurrentToken();
+        StpUtil.checkLogin();
+        throw new BusinessException("SESSION_INVALID", "Session is invalid");
     }
 }

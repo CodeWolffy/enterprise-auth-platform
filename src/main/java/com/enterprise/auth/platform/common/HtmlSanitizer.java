@@ -15,9 +15,10 @@ public final class HtmlSanitizer {
           .addTags(
               "h1", "h2", "h3", "h4", "h5", "h6",
               "pre", "code", "blockquote", "hr",
-              "table", "thead", "tbody", "tr", "th", "td", "br", "span",
+              "table", "thead", "tbody", "tr", "th", "td", "br", "span", "mark",
               "sup", "sub", "del", "s", "u", "em", "strong")
           .addAttributes("span", "style", "class")
+          .addAttributes("mark", "style", "class")
           .addAttributes("p", "style", "class")
           .addAttributes("div", "style", "class")
           .addAttributes("table", "style", "class")

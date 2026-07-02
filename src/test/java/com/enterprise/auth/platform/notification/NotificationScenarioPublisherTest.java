@@ -44,8 +44,8 @@ class NotificationScenarioPublisherTest {
 
         assertThat(publishedCommands).hasSize(1);
         NotificationPublishCommand command = publishedCommands.get(0);
-        assertThat(command.link()).isEqualTo("/platform/workflow/my-instances");
-        assertThat(command.actionPayload()).containsEntry("route", "/platform/workflow/my-instances");
+        assertThat(command.link()).isEqualTo("/workflow/instances");
+        assertThat(command.actionPayload()).containsEntry("route", "/workflow/instances");
     }
 
     @Test
@@ -54,7 +54,7 @@ class NotificationScenarioPublisherTest {
                 "tenant-a", 1L, "测试流程", "BK-002", 10L, 101L, "审批节点", "admin", true));
 
         assertThat(publishedCommands).hasSize(1);
-        assertThat(publishedCommands.get(0).link()).isEqualTo("/platform/workflow/my-instances");
+        assertThat(publishedCommands.get(0).link()).isEqualTo("/workflow/instances");
     }
 
     @Test
@@ -63,7 +63,7 @@ class NotificationScenarioPublisherTest {
                 "tenant-a", 1L, "测试流程", "BK-003", 10L, 100L, 102L, "审批节点", 20L, "user-b", "admin"));
 
         assertThat(publishedCommands).hasSize(1);
-        assertThat(publishedCommands.get(0).link()).isEqualTo("/platform/workflow/my-instances");
+        assertThat(publishedCommands.get(0).link()).isEqualTo("/workflow/instances");
     }
 
     @Test
@@ -72,7 +72,7 @@ class NotificationScenarioPublisherTest {
                 "tenant-a", 1L, "测试流程", "BK-004", Set.of(10L), Set.of(), "admin"));
 
         assertThat(publishedCommands).hasSize(1);
-        assertThat(publishedCommands.get(0).link()).isEqualTo("/platform/workflow/my-instances");
+        assertThat(publishedCommands.get(0).link()).isEqualTo("/workflow/instances");
     }
 
     @Test
@@ -81,7 +81,7 @@ class NotificationScenarioPublisherTest {
                 "tenant-a", 1L, "测试流程", "BK-005", Set.of(10L), Set.of(), "admin"));
 
         assertThat(publishedCommands).hasSize(1);
-        assertThat(publishedCommands.get(0).link()).isEqualTo("/platform/workflow/my-instances");
+        assertThat(publishedCommands.get(0).link()).isEqualTo("/workflow/instances");
     }
 
     @Test

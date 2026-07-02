@@ -138,7 +138,7 @@ class SystemControllerTest {
     }
 
     @Test
-    void reservedComponentStatusShouldRemainCompatible() throws Exception {
+    void reservedComponentStatusShouldReturnDisabledFlags() throws Exception {
         mockMvc.perform(get("/api/system/features")
                         .with(bearer(principal(Set.of("upms:system:get"))))
                         .header("X-Tenant-Id", "tenant-a"))
@@ -157,21 +157,21 @@ class SystemControllerTest {
                         .with(bearer(principal(Set.of("upms:sysdict:page"))))
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.records[?(@.dictCode=='" + VISIBLE_DICT_CODE + "')]").exists())
-                .andExpect(jsonPath("$.data.records[?(@.dictCode=='" + HIDDEN_DICT_CODE + "')]").doesNotExist());
+                .andExpect(jsonPath("$.data.records[?(@.dictType=='" + VISIBLE_DICT_CODE + "')]").exists())
+                .andExpect(jsonPath("$.data.records[?(@.dictType=='" + HIDDEN_DICT_CODE + "')]").doesNotExist());
     }
 
     @Test
-    void dictListShouldSupportSortByDictCode() throws Exception {
+    void dictListShouldSupportSortByDictType() throws Exception {
         mockMvc.perform(get("/api/system/dicts")
                         .with(bearer(principal(Set.of("upms:sysdict:page"))))
                         .header("X-Tenant-Id", "tenant-a")
-                        .param("sortBy", "dictCode")
+                        .param("sortBy", "dictType")
                         .param("sortDirection", "asc")
                         .param("page", "1")
                         .param("size", "10"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.records[0].dictCode").value(ALPHA_DICT_CODE));
+                .andExpect(jsonPath("$.data.records[0].dictType").value(ALPHA_DICT_CODE));
     }
 
     @Test
@@ -181,7 +181,7 @@ class SystemControllerTest {
                         .header("X-Tenant-Id", "tenant-a")
                         .param("category", "system"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.records[?(@.dictCode=='" + VISIBLE_DICT_CODE + "')]").exists())
+                .andExpect(jsonPath("$.data.records[?(@.dictType=='" + VISIBLE_DICT_CODE + "')]").exists())
                 .andExpect(jsonPath("$.data.records[0].category").value("system"));
     }
 
@@ -194,8 +194,7 @@ class SystemControllerTest {
                         .content("""
                                 {
                                   "dictType": "system_scope_hidden_ut",
-                                  "dictCode": "system_scope_hidden_ut",
-                                  "dictValue": "越权修改"
+                                  "description": "越权修改"
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
@@ -211,7 +210,7 @@ class SystemControllerTest {
                         .with(bearer(principal(Set.of("upms:sysdict:get"))))
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.dict.dictCode").value(VISIBLE_DICT_CODE))
+                .andExpect(jsonPath("$.data.dict.dictType").value(VISIBLE_DICT_CODE))
                 .andExpect(jsonPath("$.data.dict.valueCount").value(1))
                 .andExpect(jsonPath("$.data.values[0].dictLabel").value("可见字典值"))
                 .andExpect(jsonPath("$.data.values[0].dictValue").value(VISIBLE_DICT_VALUE))

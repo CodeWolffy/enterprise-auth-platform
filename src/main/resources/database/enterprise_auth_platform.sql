@@ -880,7 +880,8 @@ INSERT INTO `sys_tenant_package` (`id`, `tenant_id`, `package_code`, `package_na
 INSERT INTO `sys_dict` (`id`, `tenant_id`, `dict_type`, `dict_code`, `dict_value`, `description`, `enabled`, `remarks`, `created_by`, `updated_by`, `deleted`) VALUES
 (1, 'platform', 'sys_status', 'sys_status', '状态', '通用启停状态', 1, '平台全局字典', 'system', 'system', 0),
 (2, 'platform', 'menu_type', 'menu_type', '菜单类型', '菜单和按钮类型', 1, '平台全局字典', 'system', 'system', 0),
-(3, 'platform', 'tenant_status', 'tenant_status', '租户状态', '租户启停状态', 1, '平台全局字典', 'system', 'system', 0);
+(3, 'platform', 'tenant_status', 'tenant_status', '租户状态', '租户启停状态', 1, '平台全局字典', 'system', 'system', 0),
+(4, 'platform', 'tenant_package_app_key', 'tenant_package_app_key', '应用标识', '租户套餐应用标识', 1, '平台全局字典', 'system', 'system', 0);
 
 INSERT INTO `sys_dict_value` (`id`, `tenant_id`, `dict_id`, `dict_type`, `dict_label`, `dict_value`, `show_class`, `sort`, `enabled`, `remarks`, `created_by`, `updated_by`, `deleted`) VALUES
 (1, 'platform', 1, 'sys_status', '正常', '1', 'success', 1, 1, NULL, 'system', 'system', 0),
@@ -888,7 +889,12 @@ INSERT INTO `sys_dict_value` (`id`, `tenant_id`, `dict_id`, `dict_type`, `dict_l
 (3, 'platform', 2, 'menu_type', '菜单', '0', 'primary', 1, 1, NULL, 'system', 'system', 0),
 (4, 'platform', 2, 'menu_type', '按钮', '1', 'warning', 2, 1, NULL, 'system', 'system', 0),
 (5, 'platform', 3, 'tenant_status', '正常', '1', 'success', 1, 1, NULL, 'system', 'system', 0),
-(6, 'platform', 3, 'tenant_status', '停用', '0', 'danger', 2, 1, NULL, 'system', 'system', 0);
+(6, 'platform', 3, 'tenant_status', '停用', '0', 'danger', 2, 1, NULL, 'system', 'system', 0),
+(7, 'platform', 4, 'tenant_package_app_key', '基础底座', 'base', 'primary', 1, 1, NULL, 'system', 'system', 0),
+(8, 'platform', 4, 'tenant_package_app_key', '系统管理', 'system', 'primary', 2, 1, NULL, 'system', 'system', 0),
+(9, 'platform', 4, 'tenant_package_app_key', '平台管理', 'platform', 'primary', 3, 1, NULL, 'system', 'system', 0),
+(10, 'platform', 4, 'tenant_package_app_key', '工作流', 'workflow', 'primary', 4, 1, NULL, 'system', 'system', 0),
+(11, 'platform', 4, 'tenant_package_app_key', '开发工具', 'dev', 'primary', 5, 1, NULL, 'system', 'system', 0);
 
 INSERT INTO `sys_config` (`id`, `tenant_id`, `config_key`, `config_value`, `config_name`, `created_by`, `updated_by`, `deleted`) VALUES
 (1, 'platform', 'system.name', 'Enterprise Auth Platform', '系统名称', 'system', 'system', 0),

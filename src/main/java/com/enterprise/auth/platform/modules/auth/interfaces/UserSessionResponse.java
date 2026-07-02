@@ -9,6 +9,7 @@ public record UserSessionResponse(
         @Schema(description = "登录租户编码") String tenantId,
         @Schema(description = "当前活跃租户编码") String activeTenantId,
         @Schema(description = "客户端IP") String clientIp,
+        @Schema(description = "登录地址") String loginLocation,
         @Schema(description = "设备标识") String device,
         @Schema(description = "签发时间") Long issuedAt,
         @Schema(description = "过期时间") Long expiresAt,
@@ -18,17 +19,9 @@ public record UserSessionResponse(
 ) {
     public UserSessionResponse(
             String sessionId, String username, String tenantId, String clientIp,
-            String device, Long issuedAt, Long expiresAt, Long lastAccessAt, boolean active
+            String loginLocation, String device, Long issuedAt, Long expiresAt, Long lastAccessAt, boolean active
     ) {
-        this(sessionId, username, tenantId, tenantId, clientIp, device,
+        this(sessionId, username, tenantId, tenantId, clientIp, loginLocation, device,
                 issuedAt, expiresAt, lastAccessAt, active, false);
-    }
-
-    public UserSessionResponse(
-            String sessionId, String username, String tenantId, String clientIp,
-            String device, Long issuedAt, Long expiresAt, Long lastAccessAt, boolean active, boolean currentSession
-    ) {
-        this(sessionId, username, tenantId, tenantId, clientIp, device,
-                issuedAt, expiresAt, lastAccessAt, active, currentSession);
     }
 }

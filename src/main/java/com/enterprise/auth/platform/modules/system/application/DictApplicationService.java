@@ -155,9 +155,7 @@ public class DictApplicationService {
                 entity.getId(),
                 entity.getDictType(),
                 deriveCategory(tenantId, entity.getDictType()),
-                entity.getDictCode(),
-                entity.getDictValue(),
-                StringUtils.hasText(entity.getDescription()) ? entity.getDescription() : entity.getDictValue(),
+                entity.getDescription(),
                 entity.getEnabled() == null || entity.getEnabled() == 1,
                 entity.getRemarks(),
                 countValues(tenantId, entity.getId()),
@@ -180,10 +178,6 @@ public class DictApplicationService {
                 .eq(StringUtils.hasText(dictType), SysDictEntity::getDictType, dictType)
                 .and(StringUtils.hasText(keyword), wrapper -> wrapper
                         .like(SysDictEntity::getDictType, keyword)
-                        .or()
-                        .like(SysDictEntity::getDictCode, keyword)
-                        .or()
-                        .like(SysDictEntity::getDictValue, keyword)
                         .or()
                         .like(SysDictEntity::getDescription, keyword)
                         .or()
@@ -279,7 +273,7 @@ public class DictApplicationService {
 
     private void applyDictProfile(SysDictEntity entity, DictCrudRequest request, String dictType) {
         String description = normalizeOptional(
-                StringUtils.hasText(request.description()) ? request.description() : request.dictValue(),
+                request.description(),
                 DICT_VALUE_MAX_LENGTH,
                 "字典类型说明长度不能超过255个字符"
         );
@@ -354,9 +348,6 @@ public class DictApplicationService {
     private SFunction<SysDictEntity, ?> resolveDictSort(String sortBy) {
         if ("dictType".equalsIgnoreCase(sortBy)) {
             return SysDictEntity::getDictType;
-        }
-        if ("dictCode".equalsIgnoreCase(sortBy)) {
-            return SysDictEntity::getDictCode;
         }
         return SysDictEntity::getCreatedAt;
     }

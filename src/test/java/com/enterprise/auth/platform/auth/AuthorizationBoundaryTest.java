@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
@@ -26,6 +27,9 @@ class AuthorizationBoundaryTest {
 
     @Autowired
     private PasswordHasher passwordHasher;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Test
     void protectedApiShouldRequireLoginBeforePermissionCheck() throws Exception {
@@ -119,8 +123,7 @@ class AuthorizationBoundaryTest {
                         .content("""
                                 {
                                   "dictType": "auth_boundary",
-                                  "dictCode": "AUTH_BOUNDARY_DICT",
-                                  "dictValue": "Auth Boundary"
+                                  "description": "Auth Boundary"
                                 }
                                 """))
                 .andExpect(status().isForbidden())
@@ -188,6 +191,11 @@ class AuthorizationBoundaryTest {
     }
 
     private UserAccount principal(long userId, Set<String> roles, Set<String> permissions) {
+        Integer sessionVersion = jdbcTemplate.queryForObject(
+                "SELECT session_version FROM sys_user WHERE id = ?",
+                Integer.class,
+                userId
+        );
         return new UserAccount(
                 userId,
                 "platform",
@@ -198,7 +206,7 @@ class AuthorizationBoundaryTest {
                 permissions,
                 Set.of(),
                 DataScopeType.ALL,
-                1
+                sessionVersion == null ? 1 : sessionVersion
         );
     }
 }

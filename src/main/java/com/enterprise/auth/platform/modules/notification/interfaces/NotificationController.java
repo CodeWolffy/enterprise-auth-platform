@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "站内通知")
 @RestController
-@RequestMapping({"/api/notifications", "/api/account/notifications"})
+@RequestMapping("/api/notifications")
 public class NotificationController {
 
     private final NotificationInboxService notificationInboxService;

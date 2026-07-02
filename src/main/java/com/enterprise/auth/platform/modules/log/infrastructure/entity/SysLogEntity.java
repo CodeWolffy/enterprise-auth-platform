@@ -67,5 +67,5 @@ public class SysLogEntity extends Model<SysLogEntity> {
 
     @TableLogic(value = "0", delval = "1")
     @TableField(fill = FieldFill.INSERT)
-    private String delFlag;
+    private Integer deleted;
 }

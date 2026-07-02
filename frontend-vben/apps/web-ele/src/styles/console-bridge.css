@@ -1,0 +1,49 @@
+/* console-kit 变量桥接层：将管理后台 CSS 变量
+   映射到 vben shadcn/tailwind 设计体系 */
+
+
+/* ---- 卡片背景 ---- */
+/* --bg-card         -> vben: hsl(var(--card)) */
+/* --bg-card-muted   -> vben: hsl(var(--muted)) */
+/* 使用 calc 正确生成 hls 颜色值 */
+
+:root {
+  --bg-card: hsl(var(--card));
+  --bg-card-muted: hsl(var(--muted));
+}
+
+/* ---- 文本色 ---- */
+/* --text-main        -> vben: hsl(var(--foreground)) */
+/* --text-soft        -> vben: hsl(var(--muted-foreground)) */
+
+:root {
+  --text-main: hsl(var(--foreground));
+  --text-soft: hsl(var(--muted-foreground));
+}
+
+/* ---- 分割线 ---- */
+:root {
+  --line: hsl(var(--border));
+}
+
+/* ---- 强调色 (accent soft) ---- */
+:root {
+  --accent: hsl(var(--primary));
+  --accent-soft: hsl(var(--primary) / 0.1);
+}
+
+/* ---- 阴影 ---- */
+:root {
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+  --shadow-soft: 0 4px 12px 0 rgb(0 0 0 / 0.08);
+}
+
+/* ---- 卡片圆角 ---- */
+:root {
+  --radius-card: var(--radius);
+}
+
+/* ---- 字体 --- */
+:root {
+  --font-display: var(--font-family);
+}

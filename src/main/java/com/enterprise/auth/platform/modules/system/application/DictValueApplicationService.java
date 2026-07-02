@@ -2,6 +2,7 @@ package com.enterprise.auth.platform.modules.system.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.TimeSupport;
+import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.common.cache.CacheNames;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
@@ -27,10 +28,16 @@ public class DictValueApplicationService {
 
     private final SysDictValueMapper sysDictValueMapper;
     private final SysDictMapper sysDictMapper;
+    private final DataScopeService dataScopeService;
 
-    public DictValueApplicationService(SysDictValueMapper sysDictValueMapper, SysDictMapper sysDictMapper) {
+    public DictValueApplicationService(
+            SysDictValueMapper sysDictValueMapper,
+            SysDictMapper sysDictMapper,
+            DataScopeService dataScopeService
+    ) {
         this.sysDictValueMapper = sysDictValueMapper;
         this.sysDictMapper = sysDictMapper;
+        this.dataScopeService = dataScopeService;
     }
 
     @Cacheable(value = CacheNames.SYSTEM_DICTS, key = "'value:' + #dictType")
@@ -52,6 +59,10 @@ public class DictValueApplicationService {
     public List<SystemViewModels.DictValueView> listByDictId(Long dictId) {
         SysDictEntity dict = getDict(dictId);
         return listEntitiesByDictId(dict.getId()).stream().map(this::toValueView).toList();
+    }
+
+    public SystemViewModels.DictValueView detail(Long valueId) {
+        return toValueView(getValue(valueId));
     }
 
     @Transactional
@@ -117,6 +128,9 @@ public class DictValueApplicationService {
         if (entity == null) {
             throw new BusinessException("字典项不存在");
         }
+        if (!dataScopeService.canAccessCreatedBy(entity.getTenantId(), entity.getCreatedBy())) {
+            throw new BusinessException("无权访问该字典项");
+        }
         return entity;
     }
 
@@ -129,6 +143,7 @@ public class DictValueApplicationService {
         if (entity == null) {
             throw new BusinessException("字典值不存在");
         }
+        getDict(entity.getDictId());
         return entity;
     }
 

@@ -225,7 +225,7 @@ public class MenuService {
     @CacheEvict(value = CacheNames.MENU_TEMPLATE, allEntries = true)
     public MenuTreeNode create(CreateMenuRequest request) {
         requirePlatformTenant();
-        SysMenuEntity parent = request.parentId() == null ? null : getMenu(request.parentId());
+        SysMenuEntity parent = (request.parentId() == null || request.parentId() == 0L) ? null : getMenu(request.parentId());
         validateMenuShape(request.type(), parent, request.permission());
         validatePermission(request.type(), request.permission());
         validateUniqueKeys(null, request.permission(), request.path());
@@ -235,7 +235,7 @@ public class MenuService {
         applyMenuPayload(entity, request.type(), request.name(), request.permission(), request.path(),
                 request.component(), request.redirect(), request.icon(), request.sort(),
                 request.outerStatus(), request.applicationKey());
-        entity.setDelFlag("0");
+        entity.setDeleted(0);
 
         try {
             runWithPlatformTenant(() -> {
@@ -260,7 +260,8 @@ public class MenuService {
     public MenuTreeNode update(Long menuId, CreateMenuRequest request, boolean parentIdPresent) {
         requirePlatformTenant();
         SysMenuEntity entity = getMenu(menuId);
-        Long nextParentId = parentIdPresent ? request.parentId() : entity.getParentId();
+        Long rawParentId = parentIdPresent ? request.parentId() : entity.getParentId();
+        Long nextParentId = (rawParentId == null || rawParentId == 0L) ? null : rawParentId;
         CreateMenuRequest normalizedRequest = new CreateMenuRequest(
                 nextParentId,
                 request.type(),
@@ -336,7 +337,7 @@ public class MenuService {
             sort++;
             entity.setOuterStatus(0);
             entity.setApplicationKey(parent.getApplicationKey());
-            entity.setDelFlag("0");
+            entity.setDeleted(0);
             runWithPlatformTenant(() -> {
                 sysMenuMapper.insert(entity);
                 return null;
@@ -355,7 +356,7 @@ public class MenuService {
 
         long children = runWithPlatformTenant(() ->
                 sysMenuMapper.selectCount(new LambdaQueryWrapper<SysMenuEntity>()
-                        .eq(SysMenuEntity::getDelFlag, "0")
+                        .eq(SysMenuEntity::getDeleted, 0)
                         .eq(SysMenuEntity::getParentId, menuId)));
 
         if (children > 0) {
@@ -393,7 +394,7 @@ public class MenuService {
     public List<SysMenuEntity> listTemplateMenus() {
         return runWithPlatformTenant(() ->
                 sysMenuMapper.selectList(new LambdaQueryWrapper<SysMenuEntity>()
-                        .eq(SysMenuEntity::getDelFlag, "0")
+                        .eq(SysMenuEntity::getDeleted, 0)
                         .orderByAsc(SysMenuEntity::getSort)
                         .orderByAsc(SysMenuEntity::getId)));
     }
@@ -402,7 +403,7 @@ public class MenuService {
         SysMenuEntity entity = runWithPlatformTenant(() ->
                 sysMenuMapper.selectOne(new LambdaQueryWrapper<SysMenuEntity>()
                         .eq(SysMenuEntity::getId, menuId)
-                        .eq(SysMenuEntity::getDelFlag, "0")
+                        .eq(SysMenuEntity::getDeleted, 0)
                         .last("limit 1")));
         if (entity == null) {
             throw new BusinessException("菜单权限节点不存在");
@@ -444,7 +445,7 @@ public class MenuService {
 
     private int nextChildSort(Long menuId) {
         return runWithPlatformTenant(() -> sysMenuMapper.selectList(new LambdaQueryWrapper<SysMenuEntity>()
-                        .eq(SysMenuEntity::getDelFlag, "0")
+                        .eq(SysMenuEntity::getDeleted, 0)
                         .eq(SysMenuEntity::getParentId, menuId))
                 .stream()
                 .map(SysMenuEntity::getSort)
@@ -711,7 +712,7 @@ public class MenuService {
         entity.setSort(normalizedSort);
         entity.setOuterStatus(Boolean.TRUE.equals(outerStatus) ? 1 : 0);
         entity.setApplicationKey(applicationKey);
-        entity.setDelFlag("0");
+        entity.setDeleted(0);
     }
 
     private MenuType readMenuType(SysMenuEntity entity) {
@@ -731,7 +732,7 @@ public class MenuService {
     }
 
     private boolean isActive(SysMenuEntity entity) {
-        return entity.getDelFlag() == null || "0".equals(entity.getDelFlag());
+        return entity.getDeleted() == null || entity.getDeleted() == 0;
     }
 
     private boolean readOuterStatus(SysMenuEntity entity) {

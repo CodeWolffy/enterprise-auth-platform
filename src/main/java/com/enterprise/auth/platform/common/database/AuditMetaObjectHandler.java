@@ -24,11 +24,6 @@ public class AuditMetaObjectHandler implements MetaObjectHandler {
         if (deleted == null) {
             setFieldValByName("deleted", 0, metaObject);
         }
-
-        Object delFlag = getFieldValByName("delFlag", metaObject);
-        if (delFlag == null) {
-            setFieldValByName("delFlag", "0", metaObject);
-        }
     }
 
     @Override

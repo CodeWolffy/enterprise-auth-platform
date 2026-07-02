@@ -194,7 +194,7 @@ class DashboardStatsServiceP1Test {
 
     private void ensureAudit(String tenantId, String operator, String eventType) {
         jdbcTemplate.update(
-                "INSERT INTO sys_log(tenant_id, event_type, operator, payload_json, create_time, request_id, client_ip) VALUES(?,?,?,?,?,?,?)",
+                "INSERT INTO sys_log(tenant_id, event_type, operator, payload_json, created_at, request_id, client_ip) VALUES(?,?,?,?,?,?,?)",
                 tenantId,
                 eventType,
                 operator,
@@ -211,7 +211,7 @@ class DashboardStatsServiceP1Test {
         };
         if (loginStatus != null) {
             jdbcTemplate.update(
-                    "INSERT INTO sys_login_log(tenant_id, user_name, status, msg, ip_addr, create_time) VALUES(?,?,?,?,?,?)",
+                    "INSERT INTO sys_login_log(tenant_id, user_name, status, msg, ip_addr, created_at) VALUES(?,?,?,?,?,?)",
                     tenantId,
                     operator,
                     loginStatus,

@@ -3,6 +3,7 @@ package com.enterprise.auth.platform.modules.auth.application;
 import cloud.tianai.captcha.application.ImageCaptchaApplication;
 import cloud.tianai.captcha.application.vo.ImageCaptchaVO;
 import cloud.tianai.captcha.common.constant.CaptchaTypeConstant;
+import cloud.tianai.captcha.spring.autoconfiguration.SpringImageCaptchaProperties;
 import cloud.tianai.captcha.spring.plugins.secondary.SecondaryVerificationApplication;
 import cloud.tianai.captcha.validator.common.model.dto.ImageCaptchaTrack;
 import com.enterprise.auth.platform.modules.auth.interfaces.CaptchaVerifyRequest;
@@ -16,10 +17,12 @@ public class CaptchaService {
 
     private final ImageCaptchaApplication imageCaptchaApplication;
     private final ObjectMapper objectMapper;
+    private final SpringImageCaptchaProperties captchaProperties;
 
-    public CaptchaService(ImageCaptchaApplication imageCaptchaApplication, ObjectMapper objectMapper) {
+    public CaptchaService(ImageCaptchaApplication imageCaptchaApplication, ObjectMapper objectMapper, SpringImageCaptchaProperties captchaProperties) {
         this.imageCaptchaApplication = imageCaptchaApplication;
         this.objectMapper = objectMapper;
+        this.captchaProperties = captchaProperties;
     }
 
     public CaptchaChallenge create() {
@@ -35,13 +38,14 @@ public class CaptchaService {
         );
     }
 
-    public void verify(String captchaId, String captchaData) {
+    public CaptchaVerificationToken verify(String captchaId, String captchaData) {
         if (captchaId == null || captchaId.isBlank() || captchaData == null || captchaData.isBlank()) {
             throw new BusinessException("验证码参数不能为空");
         }
         try {
             ImageCaptchaTrack track = objectMapper.readValue(captchaData, ImageCaptchaTrack.class);
             validateTrack(new CaptchaVerifyRequest(captchaId, null, track));
+            return new CaptchaVerificationToken(captchaId);
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
@@ -49,16 +53,37 @@ public class CaptchaService {
         }
     }
 
-    public void secondaryVerify(String captchaId) {
-        if (captchaId == null || captchaId.isBlank()) {
+    public void secondaryVerify(String token) {
+        if (token == null || token.isBlank()) {
             throw new BusinessException("验证码参数不能为空");
         }
         if (imageCaptchaApplication instanceof SecondaryVerificationApplication secondaryApp) {
-            if (secondaryApp.secondaryVerification(captchaId)) {
+            if (secondaryApp.secondaryVerification(token)) {
                 return;
             }
         }
         throw new BusinessException("验证码未通过校验");
+    }
+
+    /**
+     * 验证二次验证码token是否存在，但不消耗它。
+     * 用于登录场景：先验证token有效性，密码验证失败时token仍可复用。
+     */
+    public boolean secondaryVerifyWithoutRemoval(String token) {
+        if (token == null || token.isBlank()) {
+            return false;
+        }
+        if (imageCaptchaApplication instanceof SecondaryVerificationApplication secondaryApp) {
+            try {
+                var cacheStore = secondaryApp.getCacheStore();
+                String keyPrefix = captchaProperties.getSecondary().getKeyPrefix();
+                String key = keyPrefix + ":" + token;
+                return cacheStore.getCache(key) != null;
+            } catch (Exception e) {
+                return false;
+            }
+        }
+        return false;
     }
 
     private SliderCaptchaResponse createSliderCaptcha() {
@@ -110,5 +135,8 @@ public class CaptchaService {
         Integer sliderImageWidth,
         Integer sliderImageHeight
     ) {
+    }
+
+    public record CaptchaVerificationToken(String token) {
     }
 }

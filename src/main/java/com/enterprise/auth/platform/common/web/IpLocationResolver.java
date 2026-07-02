@@ -100,29 +100,14 @@ public class IpLocationResolver {
     }
 
     private static boolean isPrivateOrLoopback(String ip) {
-        if (ip.equals("127.0.0.1") || ip.equals("0:0:0:0:0:0:0:1") || ip.equals("::1")) {
-            return true;
+        try {
+            java.net.InetAddress addr = java.net.InetAddress.getByName(ip);
+            return addr.isLoopbackAddress()
+                    || addr.isSiteLocalAddress()
+                    || addr.isLinkLocalAddress()
+                    || addr.isAnyLocalAddress();
+        } catch (java.net.UnknownHostException e) {
+            return false;
         }
-        if (ip.startsWith("10.")
-                || ip.startsWith("192.168.")
-                || ip.startsWith("172.16.")
-                || ip.startsWith("172.17.")
-                || ip.startsWith("172.18.")
-                || ip.startsWith("172.19.")
-                || ip.startsWith("172.20.")
-                || ip.startsWith("172.21.")
-                || ip.startsWith("172.22.")
-                || ip.startsWith("172.23.")
-                || ip.startsWith("172.24.")
-                || ip.startsWith("172.25.")
-                || ip.startsWith("172.26.")
-                || ip.startsWith("172.27.")
-                || ip.startsWith("172.28.")
-                || ip.startsWith("172.29.")
-                || ip.startsWith("172.30.")
-                || ip.startsWith("172.31.")) {
-            return true;
-        }
-        return false;
     }
 }

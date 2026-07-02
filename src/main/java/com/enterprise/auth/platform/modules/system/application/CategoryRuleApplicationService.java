@@ -164,11 +164,10 @@ public class CategoryRuleApplicationService {
         return sysDictMapper.selectList(new LambdaQueryWrapper<SysDictEntity>()
                         .eq(SysDictEntity::getTenantId, tenantId)
                         .eq(SysDictEntity::getDeleted, 0)
-                        .orderByAsc(SysDictEntity::getDictType)
-                        .orderByAsc(SysDictEntity::getDictCode))
+                        .orderByAsc(SysDictEntity::getDictType))
                 .stream()
                 .filter(item -> matchesAny(matchers, item.getDictType()))
-                .map(item -> item.getDictType() + " / " + item.getDictCode())
+                .map(SysDictEntity::getDictType)
                 .distinct()
                 .limit(5)
                 .toList();

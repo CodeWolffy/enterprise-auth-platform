@@ -16,8 +16,8 @@ import org.springframework.util.StringUtils;
 @Service
 public class NotificationScenarioPublisher {
 
-    private static final String WORKFLOW_TODO_LINK = "/platform/workflow/todo";
-    private static final String WORKFLOW_INSTANCE_LINK = "/platform/workflow/my-instances";
+    private static final String WORKFLOW_TODO_LINK = "/workflow/todo";
+    private static final String WORKFLOW_INSTANCE_LINK = "/workflow/instances";
     private static final String ACCOUNT_PROFILE_LINK = "/account/profile";
     private static final String SYSTEM_NOTICE_LINK = "/notices";
 

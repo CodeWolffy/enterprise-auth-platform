@@ -43,6 +43,7 @@ public class SessionIndexService {
             String username,
             String tenantId,
             String clientIp,
+            String loginLocation,
             String device,
             long issuedAt,
             long expiresAt
@@ -57,6 +58,7 @@ public class SessionIndexService {
                     valueOrEmpty(tenantId),
                     valueOrEmpty(tenantId),
                     valueOrEmpty(clientIp),
+                    valueOrEmpty(loginLocation),
                     valueOrEmpty(device),
                     issuedAt,
                     expiresAt,
@@ -68,17 +70,18 @@ public class SessionIndexService {
         }
         try {
             String sessionKey = sessionMetaKey(token);
-            Map<String, String> meta = Map.of(
-                    "sessionId", token,
-                    "userId", String.valueOf(userId),
-                    "username", valueOrEmpty(username),
-                    "tenantId", valueOrEmpty(tenantId),
-                    "activeTenantId", valueOrEmpty(tenantId),
-                    "clientIp", valueOrEmpty(clientIp),
-                    "device", valueOrEmpty(device),
-                    "issuedAt", String.valueOf(issuedAt),
-                    "expiresAt", String.valueOf(expiresAt),
-                    "lastAccessAt", String.valueOf(issuedAt)
+            Map<String, String> meta = Map.ofEntries(
+                    Map.entry("sessionId", token),
+                    Map.entry("userId", String.valueOf(userId)),
+                    Map.entry("username", valueOrEmpty(username)),
+                    Map.entry("tenantId", valueOrEmpty(tenantId)),
+                    Map.entry("activeTenantId", valueOrEmpty(tenantId)),
+                    Map.entry("clientIp", valueOrEmpty(clientIp)),
+                    Map.entry("loginLocation", valueOrEmpty(loginLocation)),
+                    Map.entry("device", valueOrEmpty(device)),
+                    Map.entry("issuedAt", String.valueOf(issuedAt)),
+                    Map.entry("expiresAt", String.valueOf(expiresAt)),
+                    Map.entry("lastAccessAt", String.valueOf(issuedAt))
             );
             redisTemplate.opsForHash().putAll(sessionKey, meta);
             redisTemplate.expire(sessionKey, indexTtl());
@@ -308,10 +311,7 @@ public class SessionIndexService {
         String username = stringValue(meta.get("username"));
         String tenantId = stringValue(meta.get("tenantId"));
         String activeTenantId = stringValue(meta.get("activeTenantId"));
-        if (!StringUtils.hasText(activeTenantId)) {
-            activeTenantId = tenantId;
-        }
-        if (userId == null || !StringUtils.hasText(username) || !StringUtils.hasText(tenantId)) {
+        if (userId == null || !StringUtils.hasText(username) || !StringUtils.hasText(tenantId) || !StringUtils.hasText(activeTenantId)) {
             remove(token);
             return Optional.empty();
         }
@@ -321,6 +321,7 @@ public class SessionIndexService {
                 tenantId,
                 activeTenantId,
                 stringValue(meta.get("clientIp")),
+                stringValue(meta.get("loginLocation")),
                 stringValue(meta.get("device")),
                 longValue(meta.get("issuedAt"), 0L),
                 longValue(meta.get("expiresAt"), 0L),
@@ -347,6 +348,7 @@ public class SessionIndexService {
                 session.tenantId(),
                 session.activeTenantId(),
                 session.clientIp(),
+                session.loginLocation(),
                 session.device(),
                 session.issuedAt(),
                 session.expiresAt(),
@@ -369,6 +371,7 @@ public class SessionIndexService {
                 session.tenantId(),
                 activeTenantId,
                 session.clientIp(),
+                session.loginLocation(),
                 session.device(),
                 session.issuedAt(),
                 session.expiresAt(),

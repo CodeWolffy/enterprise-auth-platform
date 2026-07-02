@@ -24,7 +24,7 @@ public class MenuTemplateMutationFacade {
         }
         String normalizedKey = key.trim();
         return withTenant(tenantId, () -> Optional.ofNullable(sysMenuMapper.selectOne(new LambdaQueryWrapper<SysMenuEntity>()
-                .eq(SysMenuEntity::getDelFlag, "0")
+                .eq(SysMenuEntity::getDeleted, 0)
                 .and(wrapper -> wrapper.eq(SysMenuEntity::getPath, normalizedKey).or().eq(SysMenuEntity::getPermission, normalizedKey))
                 .last("limit 1")))
                 .map(MenuTemplateNode::from));
@@ -37,7 +37,7 @@ public class MenuTemplateMutationFacade {
         String normalizedType = normalizeType(type);
         String normalizedKey = key.trim();
         return withTenant(tenantId, () -> Optional.ofNullable(sysMenuMapper.selectOne(new LambdaQueryWrapper<SysMenuEntity>()
-                .eq(SysMenuEntity::getDelFlag, "0")
+                .eq(SysMenuEntity::getDeleted, 0)
                 .eq(SysMenuEntity::getType, normalizedType)
                 .and(wrapper -> wrapper.eq(SysMenuEntity::getPath, normalizedKey).or().eq(SysMenuEntity::getPermission, normalizedKey))
                 .last("limit 1")))
@@ -49,7 +49,7 @@ public class MenuTemplateMutationFacade {
             return Optional.empty();
         }
         return withTenant(tenantId, () -> Optional.ofNullable(sysMenuMapper.selectById(menuId))
-                .filter(entity -> entity.getDelFlag() == null || "0".equals(entity.getDelFlag()))
+                .filter(entity -> entity.getDeleted() == null || entity.getDeleted() == 0)
                 .map(MenuTemplateNode::from));
     }
 
@@ -64,7 +64,7 @@ public class MenuTemplateMutationFacade {
         entity.setIcon(mutation.icon());
         entity.setSort(mutation.sort() == null ? 0 : mutation.sort());
         entity.setOuterStatus(0);
-        entity.setDelFlag("0");
+        entity.setDeleted(0);
         withTenant(mutation.tenantId(), () -> {
             sysMenuMapper.insert(entity);
             return null;

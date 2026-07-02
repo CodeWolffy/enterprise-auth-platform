@@ -16,6 +16,9 @@ public record UserSummary(
         @Schema(description = "是否启用") boolean enabled,
         @Schema(description = "角色编码集合") Set<String> roles,
         @Schema(description = "权限编码集合") Set<String> permissions,
-        @Schema(description = "数据权限范围") DataScopeType dataScopeType
+        @Schema(description = "数据权限范围") DataScopeType dataScopeType,
+        @Schema(description = "创建时间，epoch 毫秒") Long createdAt,
+        @Schema(description = "最后登录时间，epoch 毫秒") Long lastLoginAt,
+        @Schema(description = "最后登录 IP") String lastLoginIp
 ) {
 }

@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 菜单树构建工具，对齐 haorong-mall 的 TreeUtil.build() 模式。
+ * 菜单树构建工具，统一平铺菜单列表到前端树形结构的转换。
  * Service 层返回平铺列表，Controller 层调用本工具构建树。
  */
 public final class MenuTreeUtil {
@@ -30,7 +30,7 @@ public final class MenuTreeUtil {
 
     /**
      * 将平铺的 MenuTreeNode 列表构建为树。
-     * 对齐 haorong-mall: Controller 拿到平铺列表后 TreeUtil.build()。
+     * Controller 拿到平铺列表后统一构建树结构。
      */
     public static List<MenuTreeNode> buildTree(List<MenuTreeNode> flatNodes) {
         if (flatNodes == null || flatNodes.isEmpty()) {
@@ -63,7 +63,7 @@ public final class MenuTreeUtil {
 
     /**
      * MenuTreeNode → Hutool TreeNode，所有扩展字段放入 extra Map。
-     * 对齐 haorong-mall: extra 包含 icon、type、permission、path、component 等。
+     * extra 包含 icon、type、permission、path、component 等前端路由元信息。
      */
     private static TreeNode<Long> toTreeNode(MenuTreeNode node) {
         TreeNode<Long> tn = new TreeNode<>();

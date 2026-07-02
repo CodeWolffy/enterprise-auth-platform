@@ -220,11 +220,11 @@ class CodegenApplicationServiceP2Test {
         assertThat(generated.registeredResourceKeys())
                 .containsExactly("orderGen:page", "orderGen:get", "orderGen:add", "orderGen:edit", "orderGen:del");
         assertThat(jdbcTemplate.queryForList(
-                "SELECT permission FROM sys_menu WHERE del_flag = '0' AND type = '1' AND permission LIKE 'orderGen:%' ORDER BY sort",
+                "SELECT permission FROM sys_menu WHERE deleted = 0 AND type = '1' AND permission LIKE 'orderGen:%' ORDER BY sort",
                 String.class
         )).containsExactly("orderGen:page", "orderGen:get", "orderGen:add", "orderGen:edit", "orderGen:del");
         assertThat(jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM sys_menu WHERE del_flag = '0' AND type = '0' AND path = '/platform/generated/orderGen'",
+                "SELECT COUNT(*) FROM sys_menu WHERE deleted = 0 AND type = '0' AND path = '/platform/generated/orderGen'",
                 Long.class
         )).isEqualTo(1L);
     }

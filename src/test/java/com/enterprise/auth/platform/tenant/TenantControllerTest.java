@@ -166,6 +166,14 @@ class TenantControllerTest {
                 .andExpect(jsonPath("$.data.website").value("https://tenant.example.com"))
                 .andExpect(jsonPath("$.data.address").value("上海市浦东新区"));
 
+        mockMvc.perform(get("/api/tenants/{tenantId}", LINKAGE_TENANT_ID)
+                        .with(bearer(principal("upms:systenant:get"), "platform"))
+                        .header("X-Tenant-Id", "platform"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.tenantId").value(LINKAGE_TENANT_ID))
+                .andExpect(jsonPath("$.data.name").value("租户资料字段测试"))
+                .andExpect(jsonPath("$.data.packageName").value(LINKAGE_PACKAGE_NAME));
+
         mockMvc.perform(put("/api/tenants/{tenantId}", LINKAGE_TENANT_ID)
                         .with(bearer(principal("upms:systenant:edit"), "platform"))
                         .header("X-Tenant-Id", "platform")
@@ -320,7 +328,7 @@ class TenantControllerTest {
 
     private Long seedMenu(String appKey) {
         jdbcTemplate.update(
-                "INSERT INTO sys_menu(parent_id, name, permission, path, component, sort, type, application_key, del_flag) VALUES(NULL, ?, NULL, ?, ?, 1, '0', ?, '0')",
+                "INSERT INTO sys_menu(parent_id, name, permission, path, component, sort, type, application_key, deleted) VALUES(NULL, ?, NULL, ?, ?, 1, '0', ?, 0)",
                 "测试菜单-" + appKey,
                 "/test/" + appKey,
                 "TestView",

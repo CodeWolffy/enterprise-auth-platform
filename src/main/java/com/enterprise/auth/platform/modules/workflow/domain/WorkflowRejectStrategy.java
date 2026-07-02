@@ -15,11 +15,11 @@ public enum WorkflowRejectStrategy {
             return END;
         }
         return switch (value.trim().toUpperCase()) {
-            case "END", "REJECT_END" -> END;
-            case "PREVIOUS", "BACK_PREVIOUS", "TO_PREVIOUS" -> PREVIOUS;
-            case "RESTART", "START", "TO_START" -> RESTART;
-            case "TO_STEP", "SPECIFIED", "SPECIFIED_STEP" -> TO_STEP;
-            case "TO_STARTER", "STARTER", "APPLICANT", "TO_APPLICANT" -> TO_STARTER;
+            case "END" -> END;
+            case "PREVIOUS" -> PREVIOUS;
+            case "RESTART" -> RESTART;
+            case "TO_STEP" -> TO_STEP;
+            case "TO_STARTER" -> TO_STARTER;
             default -> END;
         };
     }

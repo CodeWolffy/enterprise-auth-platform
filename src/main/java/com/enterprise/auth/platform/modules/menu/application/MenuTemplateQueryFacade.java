@@ -18,7 +18,7 @@ public class MenuTemplateQueryFacade {
 
     public List<MenuTemplateItem> listActiveTemplateMenus() {
         return TenantContext.runWithTenant("platform", () -> sysMenuMapper.selectList(new LambdaQueryWrapper<SysMenuEntity>()
-                        .eq(SysMenuEntity::getDelFlag, "0")
+                        .eq(SysMenuEntity::getDeleted, 0)
                         .orderByAsc(SysMenuEntity::getSort)
                         .orderByAsc(SysMenuEntity::getId)))
                 .stream()

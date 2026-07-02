@@ -75,7 +75,7 @@ class DatabaseUserRepositoryRolePayloadTest {
         List<Long> menuIds = jdbcTemplate.queryForList(
                 """
                 SELECT id FROM sys_menu
-                WHERE del_flag = '0'
+                WHERE deleted = 0
                   AND type = '1'
                   AND permission IN ('upms:sysuser:get', 'upms:operationlog:get')
                 """,
@@ -84,7 +84,7 @@ class DatabaseUserRepositoryRolePayloadTest {
         for (Long menuId : menuIds) {
             jdbcTemplate.update(
                     """
-                    INSERT IGNORE INTO sys_role_menu (tenant_id, role_id, menu_id, create_time)
+                    INSERT IGNORE INTO sys_role_menu (tenant_id, role_id, menu_id, created_at)
                     VALUES (?, ?, ?, NOW())
                     """,
                     TENANT_ID,

@@ -61,12 +61,21 @@ public class TenantController {
     @SaCheckPermission(PermissionCodes.SYSTENANT_PAGE)
     public ApiResponse<PageResult<CatalogService.TenantView>> list(
             @Parameter(description = "按租户编码或名称搜索关键词") @RequestParam(required = false) String keyword,
-            @Parameter(description = "是否平台级租户") @RequestParam(required = false) Boolean platformLevel,
+            @Parameter(description = "是否平台级租户，支持 true/false 或 PLATFORM/BUSINESS") @RequestParam(required = false) String platformLevel,
             @Parameter(description = "租户状态：1 启用，0 禁用") @RequestParam(required = false) Integer tenantStatus,
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "每页大小") @RequestParam(defaultValue = "10") int size
     ) {
-        return ApiResponse.ok(platformScope(() -> tenantDirectoryApplicationService.page(keyword, platformLevel, tenantStatus, page, size)));
+        return ApiResponse.ok(platformScope(() -> tenantDirectoryApplicationService.page(keyword, parsePlatformLevel(platformLevel), tenantStatus, page, size)));
+    }
+
+    @Operation(summary = "租户详情")
+    @GetMapping("/{tenantId}")
+    @SaCheckPermission(PermissionCodes.SYSTENANT_GET)
+    public ApiResponse<CatalogService.TenantView> detail(
+            @Parameter(description = "租户编码") @PathVariable String tenantId
+    ) {
+        return ApiResponse.ok(tenantDirectoryApplicationService.detail(tenantId));
     }
 
     @Operation(summary = "租户变更历史")
@@ -199,5 +208,19 @@ public class TenantController {
                 .sorted()
                 .map(String::valueOf)
                 .toList());
+    }
+
+    private Boolean parsePlatformLevel(String platformLevel) {
+        if (platformLevel == null || platformLevel.isBlank()) {
+            return null;
+        }
+        String normalized = platformLevel.trim();
+        if ("PLATFORM".equalsIgnoreCase(normalized)) {
+            return true;
+        }
+        if ("BUSINESS".equalsIgnoreCase(normalized)) {
+            return false;
+        }
+        return Boolean.valueOf(normalized);
     }
 }

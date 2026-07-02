@@ -153,15 +153,6 @@ class NotificationControllerTest {
     }
 
     @Test
-    void legacyAccountNotificationPathShouldRemainCompatible() throws Exception {
-        mockMvc.perform(get("/api/account/notifications/unread-count")
-                        .with(bearer(principal(TENANT_A, USER_A), TENANT_A))
-                        .header("X-Tenant-Id", TENANT_A))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value(1));
-    }
-
-    @Test
     void streamShouldReturnSseErrorWhenTicketIsMissing() throws Exception {
         MvcResult result = mockMvc.perform(get("/api/notifications/stream")
                         .accept(MediaType.TEXT_EVENT_STREAM))

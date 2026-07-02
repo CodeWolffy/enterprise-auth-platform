@@ -149,7 +149,7 @@ app:
     captcha-ttl: 1m
     password-reset:
       token-ttl: 10m
-      frontend-url: ${APP_PASSWORD_RESET_FRONTEND_URL:http://localhost:5173/reset-password}
+      frontend-url: ${APP_PASSWORD_RESET_FRONTEND_URL:http://localhost:5777/reset-password}
       username-window-minutes: ${APP_PASSWORD_RESET_USERNAME_WINDOW_MINUTES:15}
       username-max-requests: ${APP_PASSWORD_RESET_USERNAME_MAX_REQUESTS:3}
       ip-window-minutes: ${APP_PASSWORD_RESET_IP_WINDOW_MINUTES:15}

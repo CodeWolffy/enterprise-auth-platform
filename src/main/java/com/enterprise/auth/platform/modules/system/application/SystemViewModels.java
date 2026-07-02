@@ -3,6 +3,7 @@ package com.enterprise.auth.platform.modules.system.application;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.io.Serializable;
 import java.util.List;
+import java.util.Map;
 
 public final class SystemViewModels {
 
@@ -14,8 +15,6 @@ public final class SystemViewModels {
             @Schema(description = "字典 ID") Long id,
             @Schema(description = "字典类型") String dictType,
             @Schema(description = "字典分类") String category,
-            @Schema(description = "兼容字段：字典编码") String dictCode,
-            @Schema(description = "兼容字段：字典值") String dictValue,
             @Schema(description = "字典类型说明") String description,
             @Schema(description = "是否启用") boolean enabled,
             @Schema(description = "备注") String remarks,
@@ -57,7 +56,21 @@ public final class SystemViewModels {
             @Schema(description = "参数分类") String category,
             @Schema(description = "参数名称") String configName,
             @Schema(description = "参数值") String configValue,
-            @Schema(description = "创建人") String createdBy
+            @Schema(description = "参数类型") String configType,
+            @Schema(description = "是否启用") boolean enabled,
+            @Schema(description = "是否内置") boolean builtin,
+            @Schema(description = "备注") String remark,
+            @Schema(description = "更新时间") Long updatedAt,
+            @Schema(description = "创建人") String createdBy,
+            @Schema(description = "更新人") String updatedBy
+    ) implements Serializable {
+        private static final long serialVersionUID = 1L;
+    }
+
+    @Schema(description = "参数详情视图")
+    public record ConfigDetailView(
+            @Schema(description = "参数基础信息") ConfigView config,
+            @Schema(description = "派生元信息") Map<String, String> metadata
     ) implements Serializable {
         private static final long serialVersionUID = 1L;
     }

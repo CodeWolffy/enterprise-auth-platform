@@ -113,6 +113,7 @@ class AuthControllerSessionFlowTest {
                 180
         ));
         doAnswer(invocation -> null).when(captchaService).secondaryVerify(anyString());
+        when(captchaService.secondaryVerifyWithoutRemoval(anyString())).thenReturn(true);
         clearAuthState();
     }
 
@@ -482,7 +483,6 @@ class AuthControllerSessionFlowTest {
     void auditPayloadShouldIncludeEffectiveTenantContext() throws Exception {
         String token = extractToken(loginAsAdmin());
         String requestId = "tenant-context-audit-ut";
-        String dictCode = "tenant_context_audit_ut";
         jdbcTemplate.update("DELETE FROM sys_dict WHERE tenant_id = ? AND dict_type = ?", TENANT_A, "tenant_context_audit");
         jdbcTemplate.update("DELETE FROM sys_audit_log WHERE request_id = ?", requestId);
 
@@ -499,10 +499,9 @@ class AuthControllerSessionFlowTest {
                         .content("""
                                 {
                                   "dictType": "tenant_context_audit",
-                                  "dictCode": "%s",
-                                  "dictValue": "Tenant Context Audit"
+                                  "description": "Tenant Context Audit"
                                 }
-                                """.formatted(dictCode)))
+                                """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"));
 

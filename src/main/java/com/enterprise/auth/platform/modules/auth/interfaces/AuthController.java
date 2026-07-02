@@ -80,12 +80,11 @@ public class AuthController {
         return ApiResponse.ok(captchaService.create());
     }
 
-    @Operation(summary = "校验滑块验证码")
+    @Operation(summary = "校验滑块验证码，成功后返回登录阶段二次校验所需的令牌")
     @RateLimit(key = "captcha-verify", strategy = RateLimit.Strategy.IP)
     @PostMapping("/captcha/verify")
-    public ApiResponse<Void> verifyCaptcha(@Valid @RequestBody CaptchaVerifyRequest request) {
-        captchaService.verify(request.captchaId(), request.captchaCode());
-        return ApiResponse.ok();
+    public ApiResponse<CaptchaService.CaptchaVerificationToken> verifyCaptcha(@Valid @RequestBody CaptchaVerifyRequest request) {
+        return ApiResponse.ok(captchaService.verify(request.captchaId(), request.captchaCode()));
     }
 
     @Operation(summary = "获取注册默认配置")
@@ -151,6 +150,12 @@ public class AuthController {
     @GetMapping("/me")
     public ApiResponse<PermissionSnapshotResponse> me() {
         return ApiResponse.ok(permissionSnapshotApplicationService.build(currentUser()));
+    }
+
+    @Operation(summary = "获取当前用户可切换租户列表")
+    @GetMapping("/tenants/switchable")
+    public ApiResponse<List<TenantSwitchApplicationService.SwitchableTenantView>> switchableTenants() {
+        return ApiResponse.ok(tenantSwitchApplicationService.switchableTenants(currentUser()));
     }
 
     @SysLog("切换租户")

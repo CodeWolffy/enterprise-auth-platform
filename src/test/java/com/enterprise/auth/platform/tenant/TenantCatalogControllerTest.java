@@ -160,7 +160,7 @@ class TenantCatalogControllerTest {
 
     private Long seedMenu(String appKey) {
         jdbcTemplate.update(
-                "INSERT INTO sys_menu(parent_id, name, permission, path, component, sort, type, application_key, del_flag) VALUES(NULL, ?, NULL, ?, ?, 1, '0', ?, '0')",
+                "INSERT INTO sys_menu(parent_id, name, permission, path, component, sort, type, application_key, deleted) VALUES(NULL, ?, NULL, ?, ?, 1, '0', ?, 0)",
                 "测试菜单-" + appKey,
                 "/test/" + appKey,
                 "TestView",

@@ -1,0 +1,219 @@
+/* 精简 console-kit：为 vben 提供管理后台 UI 类
+ * vben 项目自身的布局使用 shadcn/tailwind，此文件仅补充管理页面（面板/表格/统计卡）布局。
+ * 变量由 console-bridge.css 桥接。 */
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* ====== 面板 ====== */
+
+.panel-stack {
+  display: grid;
+  gap: 20px;
+}
+
+.dashboard-panel {
+  padding: 22px;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dashboard-panel:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-soft);
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.panel-head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.panel-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ====== 统计卡片 ====== */
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.stat-card {
+  padding: 22px;
+  display: grid;
+  gap: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-soft);
+}
+
+.stat-card strong {
+  font-size: 36px;
+  line-height: 1;
+}
+
+.muted-line {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-soft);
+}
+
+.muted-inline {
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+/* ====== 表区域 ====== */
+
+.table-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 12px 0 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg-card-muted);
+}
+
+.footer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+/* ====== 抽屉区域 ====== */
+
+.drawer-section {
+  margin-bottom: 18px;
+}
+
+.sortable-chosen,
+.sortable-ghost {
+  opacity: 0.7;
+}
+
+.detail-block {
+  margin-top: 16px;
+}
+
+/* ====== 表单 ====== */
+
+.toolbar-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg-card-muted);
+}
+
+.toolbar-inline .el-form-item {
+  margin-bottom: 0;
+}
+
+.toolbar-inline .el-input,
+.toolbar-inline .el-select,
+.toolbar-inline .el-date-editor {
+  min-width: 180px;
+}
+
+/* ====== JSON 预览 ====== */
+
+.json-pre {
+  margin: 0;
+  max-height: 320px;
+  overflow: auto;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(15, 23, 42, 0.96);
+  color: #f8fafc;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ====== Element Plus 表格单元格压缩 ====== */
+
+.el-table .el-table__cell {
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+
+/* ====== 响应式 ====== */
+
+@media (max-width: 1200px) {
+  .dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 860px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .panel-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .toolbar-inline .el-input,
+  .toolbar-inline .el-select,
+  .toolbar-inline .el-date-editor {
+    width: 100% !important;
+    min-width: 0;
+    max-width: none;
+  }
+}

@@ -148,14 +148,10 @@ public class SaTokenPermissionProvider implements StpInterface {
                 .map(session -> {
                     String sessionTenantId = sessionString(session, "activeTenantId");
                     if (!StringUtils.hasText(sessionTenantId)) {
-                        sessionTenantId = sessionString(session, "tenantId");
+                        return "";
                     }
                     UserAccount account = toUserAccount(user);
-                    String effectiveTenantId = platformAdminSupport.resolveEffectiveTenant(account, sessionTenantId);
-                    if (!effectiveTenantId.equals(sessionString(session, "activeTenantId"))) {
-                        session.set("activeTenantId", effectiveTenantId);
-                    }
-                    return effectiveTenantId;
+                    return platformAdminSupport.resolveEffectiveTenant(account, sessionTenantId);
                 })
                 .orElseGet(user::tenantId);
     }

@@ -1,27 +1,72 @@
 /target/
+**/target/
 /.idea/
+**/.idea/
 /.trae
 /.m2repo
 /.DS_Store
+**/.DS_Store
 /.vscode/
+**/.vscode/
 /*.iml
+**/*.iml
 /.mvn/wrapper/maven-wrapper.jar
 /.mvn/wrapper/maven-wrapper.properties
 /.flattened-pom.xml
 Thumbs.db
+**/Thumbs.db
 /data/
 /deploy
 /node_modules
-/.claude
+**/node_modules/
 .env
 .env.*
 *.local
+**/*.local
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-/src/main/resources/application-local.yml
-/src/test/resources/application.yml
-/haorong-mall-master
+**/logs/
+**/*.log
+
+# Build outputs and caches
+**/dist/
+**/dist-ssr/
+**/dist.zip
+**/dist.tar
+**/dist.war
+**/.turbo/
+**/.cache/
+**/.temp/
+**/.vite/
+**/.nitro/
+**/.output/
+**/coverage/
+**/.eslintcache
+**/.stylelintcache
+*.tsbuildinfo
+
+# Test and visual artifacts
+**/test-results/
+**/playwright-report/
 /frontend/e2e/visual-baseline.spec.ts-snapshots/
 /frontend/screenshots/
+/frontend-legacy/screenshots/
+
+# Local assistant/runtime state
+/.claude
+/.cursor/
+
+# Local application config
+/src/main/resources/application-local.yml
+/src/test/resources/application.yml
+
+# Archived legacy frontend kept locally for migration reference
+/frontend-legacy/
+
+# Imported Vben upstream repository metadata not used by this repository
+/frontend-vben/.github/
+/frontend-vben/.changeset/
+/frontend-vben/.gitpod.yml
+/frontend-vben/*.code-workspace

@@ -37,19 +37,20 @@ public class SysMenuEntity {
     private Integer outerStatus;
 
     @TableLogic(value = "0", delval = "1")
-    private String delFlag;
+    @TableField(fill = FieldFill.INSERT)
+    private Integer deleted;
 
     private String applicationKey;
 
-    @TableField(value = "create_by", fill = FieldFill.INSERT)
-    private String createBy;
+    @TableField(fill = FieldFill.INSERT)
+    private String createdBy;
 
-    @TableField(value = "update_by", fill = FieldFill.INSERT_UPDATE)
-    private String updateBy;
+    @TableField(fill = FieldFill.INSERT_UPDATE)
+    private String updatedBy;
 
-    @TableField(value = "create_time", fill = FieldFill.INSERT)
-    private LocalDateTime createTime;
+    @TableField(fill = FieldFill.INSERT)
+    private LocalDateTime createdAt;
 
-    @TableField(value = "update_time", fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updateTime;
+    @TableField(fill = FieldFill.INSERT_UPDATE)
+    private LocalDateTime updatedAt;
 }

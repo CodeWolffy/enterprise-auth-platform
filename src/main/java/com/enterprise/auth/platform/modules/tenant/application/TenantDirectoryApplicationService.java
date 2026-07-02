@@ -23,4 +23,8 @@ public class TenantDirectoryApplicationService {
     ) {
         return tenantManagementService.page(keyword, platformLevel, tenantStatus, page, size);
     }
+
+    public CatalogService.TenantView detail(String tenantId) {
+        return tenantManagementService.detail(tenantId);
+    }
 }

@@ -19,6 +19,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -139,10 +140,10 @@ public class SystemController {
     public ApiResponse<PageResult<SystemViewModels.DictView>> dicts(
             @Parameter(description = "字典类型") @RequestParam(required = false) String dictType,
             @Parameter(description = "字典分类，按字典类型前缀匹配") @RequestParam(required = false) String category,
-            @Parameter(description = "关键字，匹配字典编码或字典值") @RequestParam(required = false) String keyword,
+            @Parameter(description = "关键字，匹配字典类型、说明或备注") @RequestParam(required = false) String keyword,
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") int size,
-            @Parameter(description = "排序字段：createdAt、dictType、dictCode") @RequestParam(required = false) String sortBy,
+            @Parameter(description = "排序字段：createdAt、dictType") @RequestParam(required = false) String sortBy,
             @Parameter(description = "排序方向：asc 或 desc") @RequestParam(required = false) String sortDirection
     ) {
         return ApiResponse.ok(dictApplicationService.dicts(dictType, category, keyword, page, size, sortBy, sortDirection));
@@ -212,6 +213,15 @@ public class SystemController {
         return ApiResponse.ok(dictValueApplicationService.create(id, request));
     }
 
+    @Operation(summary = "查询字典值详情")
+    @GetMapping("/dict-values/{valueId}")
+    @SaCheckPermission(PermissionCodes.SYSDICT_GET)
+    public ApiResponse<SystemViewModels.DictValueView> dictValueDetail(
+            @Parameter(description = "字典值 ID") @PathVariable Long valueId
+    ) {
+        return ApiResponse.ok(dictValueApplicationService.detail(valueId));
+    }
+
     @SysLog("修改字典值")
     @Operation(summary = "修改字典值")
     @PutMapping("/dict-values/{valueId}")
@@ -241,7 +251,7 @@ public class SystemController {
     }
 
     @Operation(summary = "分页查询参数列表")
-    @GetMapping("/configs")
+    @GetMapping("/configs/page")
     @SaCheckPermission(PermissionCodes.SYSCONFIG_PAGE)
     public ApiResponse<PageResult<SystemViewModels.ConfigView>> configs(
             @Parameter(description = "参数分类，按参数键前缀匹配") @RequestParam(required = false) String category,
@@ -252,6 +262,13 @@ public class SystemController {
             @Parameter(description = "排序方向：asc 或 desc") @RequestParam(required = false) String sortDirection
     ) {
         return ApiResponse.ok(configApplicationService.configs(category, keyword, page, size, sortBy, sortDirection));
+    }
+
+    @Operation(summary = "查询参数详情")
+    @GetMapping("/configs/{id}")
+    @SaCheckPermission(PermissionCodes.SYSCONFIG_GET)
+    public ApiResponse<SystemViewModels.ConfigDetailView> configDetail(@Parameter(description = "参数 ID") @PathVariable Long id) {
+        return ApiResponse.ok(configApplicationService.detail(id));
     }
 
     @SysLog("新增参数")
@@ -282,6 +299,29 @@ public class SystemController {
         return ApiResponse.ok();
     }
 
+    @SysLog("批量删除参数")
+    @Operation(summary = "批量删除参数")
+    @DeleteMapping("/configs")
+    @SaCheckPermission(PermissionCodes.SYSCONFIG_DEL)
+    public ApiResponse<Void> deleteConfigs(@Parameter(description = "参数 ID，逗号分隔") @RequestParam String ids) {
+        List<Long> parsedIds = new ArrayList<>();
+        for (String id : ids.split(",")) {
+            if (!id.isBlank()) {
+                parsedIds.add(Long.parseLong(id.trim()));
+            }
+        }
+        configApplicationService.deleteConfigs(parsedIds);
+        return ApiResponse.ok();
+    }
+
+    @SysLog("刷新参数缓存")
+    @Operation(summary = "刷新参数缓存")
+    @DeleteMapping("/configs/cache")
+    @SaCheckPermission(PermissionCodes.SYSCONFIG_EDIT)
+    public ApiResponse<String> evictConfigCache() {
+        return ApiResponse.ok(configApplicationService.refreshCache());
+    }
+
     @Operation(summary = "分页查询公告列表")
     @GetMapping("/notices")
     @SaCheckPermission(PermissionCodes.SYSNOTICE_PAGE)
@@ -295,6 +335,13 @@ public class SystemController {
             @Parameter(description = "排序方向：asc 或 desc") @RequestParam(required = false) String sortDirection
     ) {
         return ApiResponse.ok(noticeApplicationService.notices(published, workflowStatus, keyword, page, size, sortBy, sortDirection));
+    }
+
+    @Operation(summary = "查询公告详情")
+    @GetMapping("/notices/{id}")
+    @SaCheckPermission(PermissionCodes.SYSNOTICE_GET)
+    public ApiResponse<SystemViewModels.NoticeView> noticeDetail(@Parameter(description = "公告 ID") @PathVariable Long id) {
+        return ApiResponse.ok(noticeApplicationService.noticeDetail(id));
     }
 
     @Operation(summary = "查询已发布公告详情")

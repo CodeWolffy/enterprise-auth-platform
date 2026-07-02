@@ -19,6 +19,10 @@ public class SysConfigEntity {
     private String configKey;
     private String configName;
     private String configValue;
+    private String configType;
+    private Boolean enabled;
+    private Boolean builtin;
+    private String remark;
     @TableField(fill = FieldFill.INSERT)
     private String createdBy;
     @TableField(fill = FieldFill.INSERT_UPDATE)

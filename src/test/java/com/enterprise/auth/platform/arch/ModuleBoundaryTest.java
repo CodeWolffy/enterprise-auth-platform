@@ -23,16 +23,16 @@ class ModuleBoundaryTest {
     );
 
     @Test
-    void legacyFlatPackagesAreFullyMigrated() {
-        List<String> legacyPackages = List.of("controller", "service", "dao", "dto");
+    void flatPackagesAreFullyMigrated() {
+        List<String> flatPackages = List.of("controller", "service", "dao", "dto");
 
-        List<String> remaining = legacyPackages.stream()
+        List<String> remaining = flatPackages.stream()
                 .map(SOURCE_ROOT::resolve)
                 .filter(Files::exists)
                 .map(Path::toString)
                 .toList();
 
-        assertTrue(remaining.isEmpty(), () -> "Legacy flat packages should be removed: " + String.join(", ", remaining));
+        assertTrue(remaining.isEmpty(), () -> "Flat packages should be removed: " + String.join(", ", remaining));
     }
 
     @Test

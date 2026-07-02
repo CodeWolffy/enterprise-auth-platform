@@ -253,7 +253,7 @@ class ResourceAuthorizationControllerTest {
         Long menuId = createTempMenu();
         Long roleId = createTempRole("tenant-a");
         jdbcTemplate.update(
-                "INSERT INTO sys_role_menu(tenant_id, role_id, menu_id, create_time) VALUES(?, ?, ?, NOW())",
+                "INSERT INTO sys_role_menu(tenant_id, role_id, menu_id, created_at) VALUES(?, ?, ?, NOW())",
                 "tenant-a",
                 roleId,
                 menuId
@@ -403,7 +403,7 @@ class ResourceAuthorizationControllerTest {
 
     private List<Long> childButtonIdsUnder(Long parentId) {
         return jdbcTemplate.queryForList(
-                "SELECT id FROM sys_menu WHERE parent_id = ? AND type = '1' AND del_flag = '0' ORDER BY id",
+                "SELECT id FROM sys_menu WHERE parent_id = ? AND type = '1' AND deleted = 0 ORDER BY id",
                 Long.class,
                 parentId
         );
@@ -424,8 +424,8 @@ class ResourceAuthorizationControllerTest {
                 """
                 INSERT INTO sys_menu (
                     parent_id, name, permission, path, component, icon, sort, type,
-                    outer_status, application_key, del_flag
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, '0', 0, ?, '0')
+                    outer_status, application_key, deleted
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, '0', 0, ?, 0)
                 """,
                 20L,
                 "UT 批量按钮菜单",

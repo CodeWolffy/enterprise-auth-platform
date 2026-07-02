@@ -17,10 +17,10 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 class CorsSecurityRegressionTest {
 
-    private static final String ALLOWED_ORIGIN = "http://127.0.0.1:5173";
-    private static final String LOCALHOST_ORIGIN = "http://localhost:5173";
-    private static final String LAN_ORIGIN = "http://192.168.1.9:5173";
-    private static final String VIRTUAL_NETWORK_ORIGIN = "http://198.18.0.1:5173";
+    private static final String ALLOWED_ORIGIN = "http://127.0.0.1:5777";
+    private static final String LOCALHOST_ORIGIN = "http://localhost:5777";
+    private static final String LAN_ORIGIN = "http://192.168.1.9:5777";
+    private static final String VIRTUAL_NETWORK_ORIGIN = "http://198.18.0.1:5777";
 
     @Autowired
     private MockMvc mockMvc;

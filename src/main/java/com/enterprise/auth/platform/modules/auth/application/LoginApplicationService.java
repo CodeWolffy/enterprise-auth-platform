@@ -72,7 +72,10 @@ public class LoginApplicationService {
     }
 
     public TokenSessionResponse login(LoginRequest request, HttpServletRequest servletRequest) {
-        captchaService.secondaryVerify(request.captchaId());
+        // 先验证验证码token是否存在（不消耗），确保用户已完成滑块验证
+        if (!captchaService.secondaryVerifyWithoutRemoval(request.captchaId())) {
+            throw new BusinessException("CAPTCHA_INVALID", "验证码未通过校验或已过期");
+        }
         String tenantId = resolveLoginTenantId(request);
         tenantProfileFacade.ensureTenantAccessible(tenantId);
         String clientIp = clientIpResolver.resolve(servletRequest);
@@ -102,6 +105,9 @@ public class LoginApplicationService {
                 throw new BusinessException("USER_DISABLED", "用户已禁用");
             }
 
+            // 密码验证成功后，才真正消耗验证码token（防止重放攻击）
+            captchaService.secondaryVerify(request.captchaId());
+
             loginAttemptService.clearFailures(tenantId, request.username());
             long timeoutSeconds = securityProperties.sessionTtl().toSeconds();
             String device = StringUtils.hasText(request.device()) ? request.device() : "unknown";
@@ -121,6 +127,7 @@ public class LoginApplicationService {
             tokenSession.set("passwordChangeRequired", passwordChangeState.required());
             tokenSession.set("passwordChangeReason", passwordChangeState.reason());
             tokenSession.set("clientIp", clientIp);
+            tokenSession.set("loginLocation", location);
             tokenSession.set("device", device);
             tokenSession.set("issuedAt", now.toEpochMilli());
             tokenSession.set("expiresAt", expiresAt.toEpochMilli());
@@ -130,6 +137,7 @@ public class LoginApplicationService {
                     user.username(),
                     user.tenantId(),
                     clientIp,
+                    location,
                     device,
                     now.toEpochMilli(),
                     expiresAt.toEpochMilli()

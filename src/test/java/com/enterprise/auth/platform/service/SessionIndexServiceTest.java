@@ -30,7 +30,7 @@ class SessionIndexServiceTest {
         when(redisTemplate.opsForZSet()).thenReturn(zSetOps);
         SessionIndexService service = new SessionIndexService(redisTemplate, securityProperties());
 
-        service.register("token-1", 100L, "admin", "platform", "127.0.0.1", "browser", 1000L, 2000L);
+        service.register("token-1", 100L, "admin", "platform", "127.0.0.1", "内网IP", "browser", 1000L, 2000L);
 
         verify(hashOps).putAll(eq("eap:test:v1:session:meta:token-1"), argThat(meta -> {
             assertThat(meta).isInstanceOf(Map.class);

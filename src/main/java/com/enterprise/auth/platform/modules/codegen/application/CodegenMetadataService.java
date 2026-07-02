@@ -41,7 +41,7 @@ public class CodegenMetadataService {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<DataSourceView> dataSources() {
         ensureLocalDataSource();
         return jdbcTemplate.query("""

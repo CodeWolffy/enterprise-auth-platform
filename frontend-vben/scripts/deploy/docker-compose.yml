@@ -1,0 +1,15 @@
+services:
+  enterprise-auth-platform-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: enterprise-auth-platform-ui
+    ports:
+      - "80:80"
+    restart: unless-stopped
+    networks:
+      - enterprise-auth-platform-net
+
+networks:
+  enterprise-auth-platform-net:
+    external: true

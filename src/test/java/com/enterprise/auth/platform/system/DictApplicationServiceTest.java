@@ -27,7 +27,7 @@ class DictApplicationServiceTest {
         TenantContext.setTenantId("platform");
         String dictType = "demo_" + System.nanoTime();
         SystemViewModels.DictView created = dictApplicationService.createDict(
-                new DictCrudRequest(dictType, null, "演示字典")
+                new DictCrudRequest(dictType, "演示字典", true, null)
         );
 
         assertThat(dictApplicationService.dicts(null, null, null, 1, 50, "createdAt", "asc").records())

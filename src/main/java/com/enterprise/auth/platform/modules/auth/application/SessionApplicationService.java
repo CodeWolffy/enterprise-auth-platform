@@ -72,7 +72,11 @@ public class SessionApplicationService {
 
     public void forceOffline(UserAccount currentUser, String sessionId) {
         Long targetUserId = resolveLoginId(sessionId);
-        String targetTenantId = sessionAttribute(sessionId, "tenantId", currentUser.tenantId());
+        String targetTenantId = sessionAttribute(sessionId, "tenantId");
+        if (!StringUtils.hasText(targetTenantId)) {
+            sessionIndexService.remove(sessionId);
+            throw new BusinessException("SESSION_INVALID", "会话元数据不完整");
+        }
         Map<String, Object> payload = sessionAuditPayload(sessionId);
         boolean sameOwner = currentUser.id().equals(targetUserId);
         boolean canManage = currentUser.permissions().contains(PermissionCodes.SESSION_KICK);
@@ -90,7 +94,7 @@ public class SessionApplicationService {
 
     private List<UserSessionResponse> ownSessions(UserAccount currentUser, String currentToken) {
         return StpUtil.getTokenValueListByLoginId(currentUser.id()).stream()
-                .map(token -> safeSessionResponse(token, currentUser, currentToken))
+                .map(token -> safeSessionResponse(token, currentToken))
                 .flatMap(Optional::stream)
                 .filter(UserSessionResponse::active)
                 .sorted((a, b) -> Long.compare(b.lastAccessAt(), a.lastAccessAt()))
@@ -151,9 +155,9 @@ public class SessionApplicationService {
         return currentUser.tenantId().equals(session.tenantId());
     }
 
-    private Optional<UserSessionResponse> safeSessionResponse(String token, UserAccount fallbackUser, String currentToken) {
+    private Optional<UserSessionResponse> safeSessionResponse(String token, String currentToken) {
         try {
-            return Optional.of(toSessionResponse(token, fallbackUser, currentToken));
+            return Optional.of(toSessionResponse(token, currentToken));
         } catch (Exception e) {
             log.debug("构建会话列表时跳过无效会话。token={}，error={}", token, e.getMessage());
             sessionIndexService.remove(token);
@@ -181,6 +185,7 @@ public class SessionApplicationService {
                 session.tenantId(),
                 session.activeTenantId(),
                 session.clientIp(),
+                session.loginLocation(),
                 session.device(),
                 session.issuedAt(),
                 session.expiresAt(),
@@ -197,6 +202,7 @@ public class SessionApplicationService {
                 session.tenantId(),
                 session.activeTenantId(),
                 session.clientIp(),
+                session.loginLocation(),
                 session.device(),
                 session.issuedAt(),
                 session.expiresAt(),
@@ -215,7 +221,7 @@ public class SessionApplicationService {
         }
     }
 
-    private UserSessionResponse toSessionResponse(String token, UserAccount fallbackUser, String currentToken) {
+    private UserSessionResponse toSessionResponse(String token, String currentToken) {
         SaSession tokenSession = StpUtil.getTokenSessionByToken(token);
         long issuedAt = sessionLong(tokenSession, "issuedAt", 0L);
         long expiresAt = sessionLong(tokenSession, "expiresAt", 0L);
@@ -223,10 +229,11 @@ public class SessionApplicationService {
         boolean currentSession = token.equals(currentToken);
         return new UserSessionResponse(
                 token,
-                sessionString(tokenSession, "username", fallbackUser.username()),
-                sessionString(tokenSession, "tenantId", fallbackUser.tenantId()),
-                sessionString(tokenSession, "activeTenantId", sessionString(tokenSession, "tenantId", fallbackUser.tenantId())),
+                requireSessionString(tokenSession, "username"),
+                requireSessionString(tokenSession, "tenantId"),
+                requireSessionString(tokenSession, "activeTenantId"),
                 sessionString(tokenSession, "clientIp", ""),
+                sessionString(tokenSession, "loginLocation", ""),
                 sessionString(tokenSession, "device", "unknown"),
                 issuedAt,
                 expiresAt,
@@ -244,13 +251,21 @@ public class SessionApplicationService {
         return Long.parseLong(String.valueOf(loginId));
     }
 
-    private String sessionAttribute(String token, String key, String fallback) {
-        return sessionString(StpUtil.getTokenSessionByToken(token), key, fallback);
+    private String sessionAttribute(String token, String key) {
+        return sessionString(StpUtil.getTokenSessionByToken(token), key, "");
     }
 
     private String sessionString(SaSession session, String key, String fallback) {
         Object value = session.get(key);
         return value == null ? fallback : String.valueOf(value);
+    }
+
+    private String requireSessionString(SaSession session, String key) {
+        String value = sessionString(session, key, "");
+        if (StringUtils.hasText(value)) {
+            return value;
+        }
+        throw new BusinessException("SESSION_INVALID", "会话元数据不完整");
     }
 
     private Map<String, Object> sessionAuditPayload(String sessionId) {

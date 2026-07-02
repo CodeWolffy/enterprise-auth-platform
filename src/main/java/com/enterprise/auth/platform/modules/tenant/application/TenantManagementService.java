@@ -229,6 +229,11 @@ public class TenantManagementService {
         return PageResult.of(total, safePage, safeSize, records);
     }
 
+    public CatalogService.TenantView detail(String tenantId) {
+        ensureTenantReadable(tenantId);
+        return withPlatformTenant(() -> catalogService.tenant(tenantId));
+    }
+
     private boolean existsTenant(String tenantId) {
         return sysTenantMapper.selectCount(new LambdaQueryWrapper<SysTenantEntity>()
                 .eq(SysTenantEntity::getTenantId, tenantId)

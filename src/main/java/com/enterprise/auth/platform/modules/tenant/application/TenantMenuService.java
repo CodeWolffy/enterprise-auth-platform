@@ -62,7 +62,7 @@ public class TenantMenuService {
 
     /**
      * 为指定租户分配菜单（全量替换，先删后批量插入）。
-     * 对齐 haorong-mall saveTenantMenu 的语义：传入的 menuIds 即为该租户的全部菜单。
+     * 保存租户菜单授权：传入的 menuIds 即为该租户的全部菜单。
      */
     @Transactional
     public void saveTenantMenu(String tenantId, Set<Long> menuIds) {
