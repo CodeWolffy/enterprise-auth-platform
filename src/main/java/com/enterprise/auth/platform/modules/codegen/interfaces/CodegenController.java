@@ -53,7 +53,7 @@ public class CodegenController {
 
     @Operation(summary = "查询代码生成数据源")
     @GetMapping("/datasources")
-    @SaCheckPermission(PermissionCodes.CODEGEN_PAGE)
+    @SaCheckPermission(PermissionCodes.CODEGEN_DATASOURCE_PAGE)
     public ApiResponse<java.util.List<CodegenMetadataDtos.DataSourceView>> dataSources() {
         return ApiResponse.ok(metadataService.dataSources());
     }
@@ -61,7 +61,7 @@ public class CodegenController {
     @SysLog("新增代码生成数据源")
     @Operation(summary = "新增代码生成数据源")
     @PostMapping("/datasources")
-    @SaCheckPermission(PermissionCodes.CODEGEN_ADD)
+    @SaCheckPermission(PermissionCodes.CODEGEN_DATASOURCE_ADD)
     public ApiResponse<CodegenMetadataDtos.DataSourceView> createDataSource(@RequestBody CodegenMetadataDtos.DataSourceRequest request) {
         return ApiResponse.ok(metadataService.createDataSource(request));
     }
@@ -69,7 +69,7 @@ public class CodegenController {
     @SysLog("修改代码生成数据源")
     @Operation(summary = "修改代码生成数据源")
     @PutMapping("/datasources/{id}")
-    @SaCheckPermission(PermissionCodes.CODEGEN_EDIT)
+    @SaCheckPermission(PermissionCodes.CODEGEN_DATASOURCE_EDIT)
     public ApiResponse<CodegenMetadataDtos.DataSourceView> updateDataSource(@PathVariable Long id, @RequestBody CodegenMetadataDtos.DataSourceRequest request) {
         return ApiResponse.ok(metadataService.updateDataSource(id, request));
     }
@@ -77,7 +77,7 @@ public class CodegenController {
     @SysLog("删除代码生成数据源")
     @Operation(summary = "删除代码生成数据源")
     @DeleteMapping("/datasources/{id}")
-    @SaCheckPermission(PermissionCodes.CODEGEN_DEL)
+    @SaCheckPermission(PermissionCodes.CODEGEN_DATASOURCE_DEL)
     public ApiResponse<Void> deleteDataSource(@PathVariable Long id) {
         metadataService.deleteDataSource(id);
         return ApiResponse.ok();
@@ -86,7 +86,7 @@ public class CodegenController {
     @SysLog("确认外部代码生成数据源授权")
     @Operation(summary = "确认外部代码生成数据源授权")
     @PostMapping("/datasources/{id}/authorize")
-    @SaCheckPermission(PermissionCodes.CODEGEN_EDIT)
+    @SaCheckPermission(PermissionCodes.CODEGEN_DATASOURCE_EDIT)
     public ApiResponse<CodegenMetadataDtos.DataSourceView> authorizeDataSource(
             @PathVariable Long id,
             @RequestBody(required = false) CodegenMetadataDtos.DataSourceAuthorizationRequest request
@@ -97,14 +97,14 @@ public class CodegenController {
     @SysLog("测试代码生成数据源连接")
     @Operation(summary = "测试代码生成数据源连接")
     @PostMapping("/datasources/{id}/test")
-    @SaCheckPermission(PermissionCodes.CODEGEN_GET)
+    @SaCheckPermission(PermissionCodes.CODEGEN_DATASOURCE_GET)
     public ApiResponse<CodegenMetadataDtos.ConnectionTestResult> testDataSource(@PathVariable Long id) {
         return ApiResponse.ok(metadataService.testConnection(id));
     }
 
     @Operation(summary = "查询数据源可导入数据表")
     @GetMapping("/datasources/{id}/tables")
-    @SaCheckPermission(PermissionCodes.CODEGEN_PAGE)
+    @SaCheckPermission(PermissionCodes.CODEGEN_TABLE_PAGE)
     public ApiResponse<PageResult<CodegenTableView>> dataSourceTables(
             @PathVariable Long id,
             @RequestParam(required = false) String keyword,
@@ -117,14 +117,14 @@ public class CodegenController {
     @SysLog("导入代码生成表配置")
     @Operation(summary = "导入代码生成表配置")
     @PostMapping("/tables/import")
-    @SaCheckPermission(PermissionCodes.CODEGEN_ADD)
+    @SaCheckPermission(PermissionCodes.CODEGEN_TABLE_ADD)
     public ApiResponse<java.util.List<CodegenMetadataDtos.ImportedTableView>> importTables(@RequestBody CodegenMetadataDtos.ImportTableRequest request) {
         return ApiResponse.ok(metadataService.importTables(request));
     }
 
     @Operation(summary = "分页查询已导入表配置")
     @GetMapping("/imported-tables")
-    @SaCheckPermission(PermissionCodes.CODEGEN_PAGE)
+    @SaCheckPermission(PermissionCodes.CODEGEN_TABLE_PAGE)
     public ApiResponse<PageResult<CodegenMetadataDtos.ImportedTableView>> importedTables(
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "1") int page,
@@ -135,7 +135,7 @@ public class CodegenController {
 
     @Operation(summary = "查询导入表字段配置")
     @GetMapping("/imported-tables/{tableId}")
-    @SaCheckPermission(PermissionCodes.CODEGEN_GET)
+    @SaCheckPermission(PermissionCodes.CODEGEN_TABLE_GET)
     public ApiResponse<CodegenMetadataDtos.TableConfigDetailView> tableConfig(@PathVariable Long tableId) {
         return ApiResponse.ok(metadataService.tableConfig(tableId));
     }
@@ -143,7 +143,7 @@ public class CodegenController {
     @SysLog("保存导入表字段配置")
     @Operation(summary = "保存导入表字段配置")
     @PutMapping("/imported-tables/{tableId}/columns")
-    @SaCheckPermission(PermissionCodes.CODEGEN_EDIT)
+    @SaCheckPermission(PermissionCodes.CODEGEN_TABLE_EDIT)
     public ApiResponse<CodegenMetadataDtos.TableConfigDetailView> updateColumns(
             @PathVariable Long tableId,
             @RequestBody CodegenMetadataDtos.UpdateColumnsRequest request
@@ -151,9 +151,18 @@ public class CodegenController {
         return ApiResponse.ok(metadataService.updateColumns(tableId, request));
     }
 
+    @SysLog("删除导入表配置")
+    @Operation(summary = "删除导入表配置")
+    @DeleteMapping("/imported-tables/{tableId}")
+    @SaCheckPermission(PermissionCodes.CODEGEN_TABLE_DEL)
+    public ApiResponse<Void> deleteImportedTable(@PathVariable Long tableId) {
+        metadataService.deleteImportedTable(tableId);
+        return ApiResponse.ok();
+    }
+
     @Operation(summary = "分页查询可生成数据表")
     @GetMapping("/tables")
-    @SaCheckPermission(PermissionCodes.CODEGEN_PAGE)
+    @SaCheckPermission(PermissionCodes.CODEGEN_TABLE_PAGE)
     public ApiResponse<PageResult<CodegenTableView>> tables(
             @Parameter(description = "关键字，匹配表名或表注释") @RequestParam(required = false) String keyword,
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
@@ -164,7 +173,7 @@ public class CodegenController {
 
     @Operation(summary = "查询数据表字段")
     @GetMapping("/tables/{tableName}")
-    @SaCheckPermission(PermissionCodes.CODEGEN_GET)
+    @SaCheckPermission(PermissionCodes.CODEGEN_TABLE_GET)
     public ApiResponse<CodegenTableDetailView> table(@Parameter(description = "表名") @PathVariable String tableName) {
         return ApiResponse.ok(codegenApplicationService.table(tableName));
     }
@@ -172,7 +181,7 @@ public class CodegenController {
     @SysLog("预览生成结果")
     @Operation(summary = "预览生成结果")
     @PostMapping("/preview")
-    @SaCheckPermission(PermissionCodes.CODEGEN_GET)
+    @SaCheckPermission(PermissionCodes.CODEGEN_TABLE_GET)
     public ApiResponse<CodegenPreviewResult> preview(@Valid @RequestBody CodegenRequest request) {
         return ApiResponse.ok(codegenApplicationService.preview(request.toCommand()));
     }
@@ -180,7 +189,7 @@ public class CodegenController {
     @SysLog("生成代码到隔离目录")
     @Operation(summary = "生成代码到隔离目录")
     @PostMapping("/generate")
-    @SaCheckPermission(PermissionCodes.CODEGEN_ADD)
+    @SaCheckPermission(PermissionCodes.CODEGEN_TABLE_DOWNLOAD)
     public ApiResponse<CodegenGenerateResult> generate(@Valid @RequestBody CodegenRequest request) {
         return ApiResponse.ok(codegenApplicationService.generate(request.toCommand()));
     }
@@ -188,7 +197,7 @@ public class CodegenController {
     @SysLog("下载生成产物（ZIP 包）")
     @Operation(summary = "下载生成产物（ZIP 包）")
     @PostMapping("/download")
-    @SaCheckPermission(PermissionCodes.CODEGEN_DOWNLOAD)
+    @SaCheckPermission(PermissionCodes.CODEGEN_TABLE_DOWNLOAD)
     public ResponseEntity<byte[]> download(@Valid @RequestBody CodegenRequest request) {
         CodegenArtifactDownload artifact = codegenApplicationService.download(request.toCommand());
         MediaType mediaType = MediaType.parseMediaType(artifact.contentType());

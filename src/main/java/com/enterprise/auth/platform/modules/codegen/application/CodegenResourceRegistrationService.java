@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.modules.codegen.application;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
@@ -7,8 +8,11 @@ import com.enterprise.auth.platform.modules.menu.application.MenuTemplateMutatio
 import com.enterprise.auth.platform.modules.menu.application.MenuTemplateMutationFacade.MenuTemplateMutation;
 import com.enterprise.auth.platform.modules.menu.application.MenuTemplateMutationFacade.MenuTemplateNode;
 import com.enterprise.auth.platform.modules.role.application.RoleMenuMutationFacade;
+import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantMenuEntity;
+import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantMenuMapper;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -32,38 +36,43 @@ public class CodegenResourceRegistrationService {
 
     private final MenuTemplateMutationFacade menuTemplateMutationFacade;
     private final RoleMenuMutationFacade roleMenuMutationFacade;
+    private final SysTenantMenuMapper sysTenantMenuMapper;
     private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
     private final TenantProperties tenantProperties;
 
     public CodegenResourceRegistrationService(
             MenuTemplateMutationFacade menuTemplateMutationFacade,
             RoleMenuMutationFacade roleMenuMutationFacade,
+            SysTenantMenuMapper sysTenantMenuMapper,
             AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
             TenantProperties tenantProperties
     ) {
         this.menuTemplateMutationFacade = menuTemplateMutationFacade;
         this.roleMenuMutationFacade = roleMenuMutationFacade;
+        this.sysTenantMenuMapper = sysTenantMenuMapper;
         this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
         this.tenantProperties = tenantProperties;
     }
 
     @Transactional
-    public List<String> register(String moduleName, String title) {
+    public List<String> register(String tableName, String moduleName, String title) {
         String safeModule = moduleName == null ? "" : moduleName.trim();
         if (!safeModule.matches("^[A-Za-z][A-Za-z0-9_]*$")) {
             throw new BusinessException("VALIDATION_ERROR", "moduleName 格式不合法");
         }
         String templateTenantId = platformTenantId();
         String grantTenantId = activeTenantId();
-        Long menuId = ensureMenuWithParents(templateTenantId, safeModule, title);
+        Long menuId = ensureMenuWithParents(templateTenantId, tableName, safeModule, title);
         List<Long> actionIds = ensureActions(templateTenantId, menuId, safeModule, title);
 
         List<String> grantKeys = GENERATED_ACTIONS.stream()
                 .map(action -> safeModule + ":" + action.code())
                 .toList();
-        List<Long> assignedMenuIds = new ArrayList<>();
-        assignedMenuIds.add(menuId);
-        assignedMenuIds.addAll(actionIds);
+        List<Long> directMenuIds = new ArrayList<>();
+        directMenuIds.add(menuId);
+        directMenuIds.addAll(actionIds);
+        Set<Long> assignedMenuIds = expandWithAncestors(directMenuIds);
+        assignToTenant(grantTenantId, assignedMenuIds);
         assignToAdminRole(grantTenantId, assignedMenuIds);
         permissionSnapshotInvalidationService.invalidateAll();
         return grantKeys;
@@ -78,9 +87,9 @@ public class CodegenResourceRegistrationService {
         return StringUtils.hasText(tenantProperties.platformTenantId()) ? tenantProperties.platformTenantId() : "platform";
     }
 
-    private Long ensureMenuWithParents(String tenantId, String moduleName, String title) {
+    private Long ensureMenuWithParents(String tenantId, String tableName, String moduleName, String title) {
         ensureParentMenu(tenantId);
-        return ensureMenu(tenantId, moduleName, title);
+        return ensureMenu(tenantId, tableName, moduleName, title);
     }
 
     private void ensureParentMenu(String tenantId) {
@@ -95,7 +104,7 @@ public class CodegenResourceRegistrationService {
                 "已生成模块",
                 null,
                 GENERATED_MENU_PARENT_PATH,
-                "Layout",
+                null,
                 "Files",
                 75
         ));
@@ -128,7 +137,7 @@ public class CodegenResourceRegistrationService {
         ));
     }
 
-    private Long ensureMenu(String tenantId, String moduleName, String title) {
+    private Long ensureMenu(String tenantId, String tableName, String moduleName, String title) {
         String path = GENERATED_MENU_PARENT_PATH + "/" + moduleName;
         MenuTemplateNode existing = menuTemplateMutationFacade.findByKey(tenantId, path).orElse(null);
         if (existing != null) {
@@ -143,7 +152,7 @@ public class CodegenResourceRegistrationService {
                 (StringUtils.hasText(title) ? title : moduleName) + "（生成产物）",
                 null,
                 path,
-                "CodegenView",
+                generatedComponent(tableName, title, moduleName),
                 "Files",
                 100
         ));
@@ -152,7 +161,7 @@ public class CodegenResourceRegistrationService {
     private record GeneratedAction(String code, String label, int sort) {
     }
 
-    private void assignToAdminRole(String tenantId, List<Long> menuIds) {
+    private Set<Long> expandWithAncestors(Collection<Long> menuIds) {
         Map<Long, MenuTemplateNode> knownNodes = new LinkedHashMap<>();
         for (Long menuId : menuIds) {
             menuTemplateMutationFacade.findById(platformTenantId(), menuId).ifPresent(node -> knownNodes.put(node.id(), node));
@@ -172,6 +181,50 @@ public class CodegenResourceRegistrationService {
             }
             expandedMenuIds.add(node.id());
         }
-        roleMenuMutationFacade.assignMenuIdsToRoleCode(tenantId, "ADMIN", expandedMenuIds);
+        return expandedMenuIds;
+    }
+
+    private void assignToTenant(String tenantId, Collection<Long> menuIds) {
+        if (!StringUtils.hasText(tenantId) || menuIds == null || menuIds.isEmpty()) {
+            return;
+        }
+        TenantContext.runWithTenant(tenantId, () -> {
+            for (Long menuId : menuIds) {
+                if (menuId == null) {
+                    continue;
+                }
+                Long existing = sysTenantMenuMapper.selectCount(new LambdaQueryWrapper<SysTenantMenuEntity>()
+                        .eq(SysTenantMenuEntity::getTenantId, tenantId)
+                        .eq(SysTenantMenuEntity::getMenuId, menuId));
+                if (existing != null && existing > 0) {
+                    continue;
+                }
+                SysTenantMenuEntity relation = new SysTenantMenuEntity();
+                relation.setTenantId(tenantId);
+                relation.setMenuId(menuId);
+                sysTenantMenuMapper.insert(relation);
+            }
+            return null;
+        });
+    }
+
+    private void assignToAdminRole(String tenantId, Collection<Long> menuIds) {
+        roleMenuMutationFacade.assignMenuIdsToRoleCode(tenantId, "ADMIN", menuIds);
+    }
+
+    private String generatedComponent(String tableName, String title, String moduleName) {
+        String kebabName = toKebab(StringUtils.hasText(title) ? title : moduleName);
+        String prefix = StringUtils.hasText(tableName) && tableName.trim().startsWith("sys_") ? "upms/" : "";
+        return prefix + kebabName + "/index";
+    }
+
+    private String toKebab(String value) {
+        String source = StringUtils.hasText(value) ? value.trim() : "generated";
+        String kebab = source
+                .replaceAll("([a-z0-9])([A-Z])", "$1-$2")
+                .replaceAll("([A-Z]+)([A-Z][a-z])", "$1-$2")
+                .replace('_', '-')
+                .toLowerCase();
+        return kebab.replaceAll("[^a-z0-9-]", "-").replaceAll("-+", "-").replaceAll("^-|-$", "");
     }
 }

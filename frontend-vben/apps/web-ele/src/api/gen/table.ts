@@ -66,6 +66,16 @@ export async function saveTableColumns(
   );
 }
 
+/**
+ * 删除导入表配置
+ * 后端：DELETE /api/codegen/imported-tables/{tableId}
+ */
+export async function deleteImportedTable(tableId: number) {
+  return requestClient.delete(`/codegen/imported-tables/${tableId}`, {
+    headers: { isSwitchTenant: false },
+  });
+}
+
 // ==================== 原始表查询（白名单） ====================
 
 /**

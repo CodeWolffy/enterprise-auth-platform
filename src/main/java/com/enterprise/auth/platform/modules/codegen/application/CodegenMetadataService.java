@@ -285,6 +285,23 @@ public class CodegenMetadataService {
         return tableConfig(tableId);
     }
 
+    @Transactional
+    public void deleteImportedTable(Long tableId) {
+        if (tableId == null) {
+            throw new BusinessException("VALIDATION_ERROR", "表配置 ID 不能为空");
+        }
+        int updated = jdbcTemplate.update("""
+                        UPDATE codegen_table
+                        SET deleted = 1, updated_by = 'system'
+                        WHERE tenant_id = ? AND id = ? AND deleted = 0
+                        """,
+                currentTenantId(),
+                tableId);
+        if (updated == 0) {
+            throw new BusinessException("NOT_FOUND", "表配置不存在");
+        }
+    }
+
     public Map<String, CodegenColumnView> importedColumnOverrides(String tableName) {
         String tenantId = currentTenantId();
         List<Long> tableIds = jdbcTemplate.queryForList("""

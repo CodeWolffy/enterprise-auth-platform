@@ -30,6 +30,7 @@ import {
 
 import { getDataSources, type DataSourceView } from '#/api/codegen';
 import {
+  deleteImportedTable,
   getDataSourceTables,
   getImportedTables,
   getTableConfig,
@@ -204,8 +205,17 @@ async function deleteImported(row: ImportedRow) {
   } catch {
     return;
   }
-  // 后端没有直接删除导入表的 API，暂通过逻辑标记实现
-  ElMessage.info('删除功能需通过后端扩展');
+  loading.value = true;
+  try {
+    await deleteImportedTable(row.id);
+    ElMessage.success(`表「${row.tableName}」的导入配置已删除`);
+    if (importedTables.value.length === 1 && importPage.value > 1) {
+      importPage.value -= 1;
+    }
+    await loadImportedTables();
+  } finally {
+    loading.value = false;
+  }
 }
 
 function handleDsChange() {
@@ -384,6 +394,7 @@ loadDataSources();
                   link
                   type="danger"
                   :icon="Delete"
+                  v-access:code="'gen:gen-table:del'"
                   @click="deleteImported(asImportedRow(scope.row))"
                 >
                   删除

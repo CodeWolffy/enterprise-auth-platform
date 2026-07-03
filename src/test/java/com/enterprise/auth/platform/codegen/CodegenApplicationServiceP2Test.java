@@ -102,7 +102,7 @@ class CodegenApplicationServiceP2Test {
                 false
         ));
 
-        assertThat(preview.files()).hasSize(10);
+        assertThat(preview.files()).hasSize(11);
         assertThat(preview.generatedRoot()).isEqualTo("SERVER_MANAGED");
         assertThat(preview.toString()).doesNotContain(OUTPUT_ROOT.toAbsolutePath().normalize().toString());
         assertThat(preview.files())
@@ -112,7 +112,10 @@ class CodegenApplicationServiceP2Test {
                         "backend/src/main/java/com/enterprise/auth/platform/generated/modules/orderGen/interfaces/OrderGenCreateRequest.java",
                         "backend/src/main/java/com/enterprise/auth/platform/generated/modules/orderGen/interfaces/OrderGenUpdateRequest.java",
                         "backend/src/main/java/com/enterprise/auth/platform/generated/modules/orderGen/interfaces/OrderGenQueryRequest.java",
-                        "frontend/src/views/generated/OrderGenView.vue"
+                        "frontend-vben/apps/web-ele/src/api/order-gen.ts",
+                        "frontend-vben/apps/web-ele/src/types/orderGen.ts",
+                        "frontend-vben/apps/web-ele/src/views/order-gen/index.vue",
+                        "frontend-vben/apps/web-ele/src/views/order-gen/form.vue"
                 );
         assertThat(fileContent(preview, "OrderGenEntity.java"))
                 .contains("@TableName(\"" + TABLE_NAME + "\")")
@@ -148,19 +151,27 @@ class CodegenApplicationServiceP2Test {
                 .contains("@PostMapping")
                 .contains("@PutMapping(\"/{id}\")")
                 .contains("@DeleteMapping(\"/{id}\")")
-                .contains("@SaCheckPermission(\"orderGen:page\")")
-                .contains("@SaCheckPermission(\"orderGen:get\")")
-                .contains("@SaCheckPermission(\"orderGen:add\")")
-                .contains("@SaCheckPermission(\"orderGen:edit\")")
-                .contains("@SaCheckPermission(\"orderGen:del\")");
-        assertThat(fileContent(preview, "frontend/src/api/modules/orderGen.ts"))
+                .contains("@SaCheckPermission(\"upms:ordergen:page\")")
+                .contains("@SaCheckPermission(\"upms:ordergen:get\")")
+                .contains("@SaCheckPermission(\"upms:ordergen:add\")")
+                .contains("@SaCheckPermission(\"upms:ordergen:edit\")")
+                .contains("@SaCheckPermission(\"upms:ordergen:del\")");
+        assertThat(fileContent(preview, "frontend-vben/apps/web-ele/src/api/order-gen.ts"))
                 .contains("createOrderGen")
                 .contains("updateOrderGen")
                 .contains("deleteOrderGen");
-        assertThat(fileContent(preview, "frontend/src/views/generated/OrderGenView.vue"))
+        assertThat(fileContent(preview, "frontend-vben/apps/web-ele/src/types/orderGen.ts"))
+                .contains("export interface OrderGenView")
+                .contains("export interface OrderGenCreateRequest")
+                .contains("export interface OrderGenUpdateRequest")
+                .contains("export interface OrderGenQueryParams");
+        assertThat(fileContent(preview, "frontend-vben/apps/web-ele/src/views/order-gen/index.vue"))
                 .contains("openForm")
-                .contains("submit")
                 .contains("remove(row)");
+        assertThat(fileContent(preview, "frontend-vben/apps/web-ele/src/views/order-gen/form.vue"))
+                .contains("submitForm")
+                .contains("createOrderGen")
+                .contains("updateOrderGen");
     }
 
     @Test
@@ -193,7 +204,7 @@ class CodegenApplicationServiceP2Test {
 
         var generated = codegenApplicationService.generate(command);
 
-        assertThat(generated.files()).hasSize(10);
+        assertThat(generated.files()).hasSize(11);
         assertThat(generated.outputRoot()).isEqualTo("SERVER_MANAGED");
         assertThat(generated.toString()).doesNotContain(OUTPUT_ROOT.toAbsolutePath().normalize().toString());
         assertThat(OUTPUT_ROOT.resolve("backend/src/main/java/com/enterprise/auth/platform/generated/modules/orderGen/infrastructure/entity/OrderGenEntity.java"))
@@ -226,6 +237,19 @@ class CodegenApplicationServiceP2Test {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM sys_menu WHERE deleted = 0 AND type = '0' AND path = '/platform/generated/orderGen'",
                 Long.class
+        )).isEqualTo(1L);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT component FROM sys_menu WHERE deleted = 0 AND type = '0' AND path = '/platform/generated/orderGen'",
+                String.class
+        )).isEqualTo("order-gen/index");
+        Long generatedMenuId = jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_menu WHERE deleted = 0 AND type = '0' AND path = '/platform/generated/orderGen'",
+                Long.class
+        );
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_tenant_menu WHERE tenant_id = 'platform' AND menu_id = ?",
+                Long.class,
+                generatedMenuId
         )).isEqualTo(1L);
     }
 
@@ -409,7 +433,7 @@ class CodegenApplicationServiceP2Test {
                 .contains("entity.setAmount(request.amount());")
                 .doesNotContain("StringUtils.hasText(keyword)");
 
-        assertThat(fileContent(preview, "frontend/src/types/orderGen.ts"))
+        assertThat(fileContent(preview, "frontend-vben/apps/web-ele/src/types/orderGen.ts"))
                 .contains("bizOrderNo: string")
                 .contains("enabled: boolean")
                 .contains("export interface OrderGenCreateRequest")
@@ -419,28 +443,54 @@ class CodegenApplicationServiceP2Test {
                 .contains("createdAtStart?: string | null")
                 .contains("createdAtEnd?: string | null");
 
-        var view = fileContent(preview, "frontend/src/views/generated/OrderGenView.vue");
+        var view = fileContent(preview, "frontend-vben/apps/web-ele/src/views/order-gen/index.vue");
         assertThat(view)
                 .contains("<el-table-column prop=\"bizOrderNo\"")
                 .contains("<el-table-column prop=\"enabled\"")
                 .doesNotContain("<el-table-column prop=\"amount\"")
                 .contains("<el-input v-model=\"query.bizOrderNo\"")
                 .contains("<el-date-picker v-model=\"query.createdAtStart\"")
-                .doesNotContain("v-model=\"query.amount\"")
+                .doesNotContain("v-model=\"query.amount\"");
+
+        var form = fileContent(preview, "frontend-vben/apps/web-ele/src/views/order-gen/form.vue");
+        assertThat(form)
                 .contains("v-if=\"editingId === null\" label=\"业务订单号\"")
                 .contains("v-if=\"editingId !== null\" label=\"下单金额\"")
-                .contains("const createRules = reactive<FormRules>({")
+                .contains("rules: {")
                 .contains("bizOrderNo: [{ required: true")
-                .contains("const updateRules = reactive<FormRules>({")
+                .contains("const { form, rules } = toRefs(state)")
+                .contains("function buildPayload()")
                 .doesNotContain("dictApi");
-        assertThat(view.substring(view.indexOf("function toCreatePayload"), view.indexOf("function toUpdatePayload")))
-                .contains("bizOrderNo: form.bizOrderNo")
-                .contains("enabled: form.enabled")
-                .doesNotContain("amount");
-        assertThat(view.substring(view.indexOf("function toUpdatePayload")))
-                .contains("amount: form.amount")
-                .contains("enabled: form.enabled")
-                .doesNotContain("bizOrderNo: form.bizOrderNo");
+        assertThat(form.substring(form.indexOf("function buildPayload"), form.indexOf("const submitForm")))
+                .contains("...state.form");
+        assertThat(form.substring(form.indexOf("function toForm")))
+                .contains("bizOrderNo: row?.bizOrderNo")
+                .contains("enabled: row?.enabled")
+                .contains("amount: row?.amount");
+    }
+
+    @Test
+    void shouldSoftDeleteImportedTableConfig() {
+        var dataSource = codegenMetadataService.dataSources().stream()
+                .filter(item -> "LOCAL".equals(item.jdbcUrl()))
+                .findFirst()
+                .orElseThrow();
+        var imported = codegenMetadataService.importTables(new CodegenMetadataDtos.ImportTableRequest(
+                dataSource.id(),
+                List.of(TABLE_NAME),
+                "com.enterprise.auth.platform.generated",
+                "tester"
+        ));
+        Long tableId = imported.get(0).id();
+
+        codegenMetadataService.deleteImportedTable(tableId);
+
+        assertThat(codegenMetadataService.importedTables(TABLE_NAME, 1, 20).records())
+                .extracting("id")
+                .doesNotContain(tableId);
+        assertThatThrownBy(() -> codegenMetadataService.tableConfig(tableId))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("表配置不存在");
     }
 
     @Test
@@ -473,9 +523,47 @@ class CodegenApplicationServiceP2Test {
     }
 
     private void cleanupGeneratedMenus() {
+        jdbcTemplate.update("DELETE FROM sys_tenant_menu WHERE menu_id IN (SELECT id FROM sys_menu WHERE path = ? OR permission LIKE ?)",
+                "/platform/generated/orderGen", "orderGen:%");
         jdbcTemplate.update("DELETE FROM sys_role_menu WHERE menu_id IN (SELECT id FROM sys_menu WHERE path = ? OR permission LIKE ?)",
                 "/platform/generated/orderGen", "orderGen:%");
         jdbcTemplate.update("DELETE FROM sys_menu WHERE path = ? OR permission LIKE ?", "/platform/generated/orderGen", "orderGen:%");
+        jdbcTemplate.update("""
+                DELETE FROM sys_tenant_menu
+                WHERE menu_id IN (
+                    SELECT parent.id
+                    FROM sys_menu parent
+                    LEFT JOIN sys_menu child
+                      ON child.parent_id = parent.id
+                     AND child.deleted = 0
+                    WHERE parent.path = '/platform/generated'
+                      AND parent.deleted = 0
+                      AND child.id IS NULL
+                )
+                """);
+        jdbcTemplate.update("""
+                DELETE FROM sys_role_menu
+                WHERE menu_id IN (
+                    SELECT parent.id
+                    FROM sys_menu parent
+                    LEFT JOIN sys_menu child
+                      ON child.parent_id = parent.id
+                     AND child.deleted = 0
+                    WHERE parent.path = '/platform/generated'
+                      AND parent.deleted = 0
+                      AND child.id IS NULL
+                )
+                """);
+        jdbcTemplate.update("""
+                DELETE parent
+                FROM sys_menu parent
+                LEFT JOIN sys_menu child
+                  ON child.parent_id = parent.id
+                 AND child.deleted = 0
+                WHERE parent.path = '/platform/generated'
+                  AND parent.deleted = 0
+                  AND child.id IS NULL
+                """);
     }
 
     private void cleanupOutput() throws IOException {

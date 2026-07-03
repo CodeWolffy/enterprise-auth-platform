@@ -113,6 +113,18 @@ public final class PermissionCodes {
     public static final String CODEGEN_DEL = "upms:codegen:del";
     public static final String CODEGEN_DOWNLOAD = "upms:codegen:download";
 
+    public static final String CODEGEN_DATASOURCE_PAGE = "gen:datasource:page";
+    public static final String CODEGEN_DATASOURCE_GET = "gen:datasource:get";
+    public static final String CODEGEN_DATASOURCE_ADD = "gen:datasource:add";
+    public static final String CODEGEN_DATASOURCE_EDIT = "gen:datasource:edit";
+    public static final String CODEGEN_DATASOURCE_DEL = "gen:datasource:del";
+    public static final String CODEGEN_TABLE_PAGE = "gen:gen-table:page";
+    public static final String CODEGEN_TABLE_GET = "gen:gen-table:get";
+    public static final String CODEGEN_TABLE_ADD = "gen:gen-table:add";
+    public static final String CODEGEN_TABLE_EDIT = "gen:gen-table:edit";
+    public static final String CODEGEN_TABLE_DEL = "gen:gen-table:del";
+    public static final String CODEGEN_TABLE_DOWNLOAD = "gen:gen-table:download";
+
     public static final String SYSMENU_PAGE = "upms:sysmenu:page";
     public static final String SYSMENU_GET = "upms:sysmenu:get";
     public static final String SYSMENU_ADD = "upms:sysmenu:add";
@@ -210,6 +222,17 @@ public final class PermissionCodes {
             CODEGEN_EDIT,
             CODEGEN_DEL,
             CODEGEN_DOWNLOAD,
+            CODEGEN_DATASOURCE_PAGE,
+            CODEGEN_DATASOURCE_GET,
+            CODEGEN_DATASOURCE_ADD,
+            CODEGEN_DATASOURCE_EDIT,
+            CODEGEN_DATASOURCE_DEL,
+            CODEGEN_TABLE_PAGE,
+            CODEGEN_TABLE_GET,
+            CODEGEN_TABLE_ADD,
+            CODEGEN_TABLE_EDIT,
+            CODEGEN_TABLE_DEL,
+            CODEGEN_TABLE_DOWNLOAD,
             SYSMENU_PAGE,
             SYSMENU_GET,
             SYSMENU_ADD,
@@ -307,6 +330,17 @@ public final class PermissionCodes {
             new PermissionDescriptor(CODEGEN_EDIT, "代码生成修改", "codegen"),
             new PermissionDescriptor(CODEGEN_DEL, "代码生成删除", "codegen"),
             new PermissionDescriptor(CODEGEN_DOWNLOAD, "代码生成下载", "codegen"),
+            new PermissionDescriptor(CODEGEN_DATASOURCE_PAGE, "数据源列表", "codegen-datasource"),
+            new PermissionDescriptor(CODEGEN_DATASOURCE_GET, "数据源查询", "codegen-datasource"),
+            new PermissionDescriptor(CODEGEN_DATASOURCE_ADD, "数据源新增", "codegen-datasource"),
+            new PermissionDescriptor(CODEGEN_DATASOURCE_EDIT, "数据源修改", "codegen-datasource"),
+            new PermissionDescriptor(CODEGEN_DATASOURCE_DEL, "数据源删除", "codegen-datasource"),
+            new PermissionDescriptor(CODEGEN_TABLE_PAGE, "数据表列表", "codegen-table"),
+            new PermissionDescriptor(CODEGEN_TABLE_GET, "数据表查询", "codegen-table"),
+            new PermissionDescriptor(CODEGEN_TABLE_ADD, "数据表导入", "codegen-table"),
+            new PermissionDescriptor(CODEGEN_TABLE_EDIT, "数据表修改", "codegen-table"),
+            new PermissionDescriptor(CODEGEN_TABLE_DEL, "数据表删除", "codegen-table"),
+            new PermissionDescriptor(CODEGEN_TABLE_DOWNLOAD, "代码生成下载", "codegen-table"),
             new PermissionDescriptor(SYSMENU_PAGE, "菜单管理列表", "sysmenu"),
             new PermissionDescriptor(SYSMENU_GET, "菜单管理查询", "sysmenu"),
             new PermissionDescriptor(SYSMENU_ADD, "菜单管理新增", "sysmenu"),

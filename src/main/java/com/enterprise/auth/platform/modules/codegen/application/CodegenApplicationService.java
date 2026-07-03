@@ -132,7 +132,7 @@ public class CodegenApplicationService {
             }
         }
         List<String> registered = command.autoRegister()
-                ? registrationService.register(preview.moduleName(), preview.className())
+                ? registrationService.register(preview.tableName(), preview.moduleName(), preview.className())
                 : List.of();
         return new CodegenGenerateResult(preview.tableName(), preview.moduleName(), SERVER_MANAGED_OUTPUT_ROOT, written, registered);
     }
@@ -332,6 +332,7 @@ public class CodegenApplicationService {
         if (includeFrontend) {
             String frontendModulePath = model.tableName().startsWith("sys_") ? "upms/" + model.kebabName() : model.kebabName();
             files.add(new CodegenFilePreview("frontend-vben/apps/web-ele/src/api/" + frontendModulePath + ".ts", "typescript", renderWithTemplate("typescript", frontendModulePath + ".ts", renderApi(model), templateVariables(model))));
+            files.add(new CodegenFilePreview("frontend-vben/apps/web-ele/src/types/" + model.moduleName() + ".ts", "typescript", renderWithTemplate("typescript", model.moduleName() + ".ts", renderTypes(model), templateVariables(model))));
             files.add(new CodegenFilePreview("frontend-vben/apps/web-ele/src/views/" + frontendModulePath + "/index.vue", "vue", renderWithTemplate("vue", model.className() + "Index.vue", renderIndexView(model), templateVariables(model))));
             files.add(new CodegenFilePreview("frontend-vben/apps/web-ele/src/views/" + frontendModulePath + "/form.vue", "vue", renderWithTemplate("vue", model.className() + "Form.vue", renderFormView(model), templateVariables(model))));
         }
@@ -757,7 +758,7 @@ public class CodegenApplicationService {
                 + "  </div>\n"
                 + "</template>\n\n"
                 + "<script setup lang=\"ts\">\n"
-                + "import { reactive, ref } from 'vue'\n"
+                + "import { reactive, ref, toRefs } from 'vue'\n"
                 + "import { ElMessage, ElMessageBox } from 'element-plus'\n"
                 + "import type { FormInstance, FormRules } from 'element-plus'\n"
                 + "import AdvancedSearch from '@/components/common/AdvancedSearch.vue'\n"
@@ -991,6 +992,7 @@ public class CodegenApplicationService {
                 + "  form: defaultForm(),\n"
                 + "  rules: " + renderTsRules(model.insertColumns()) + " as FormRules,\n"
                 + "})\n"
+                + "const { form, rules } = toRefs(state)\n"
                 + "const dialog = ref(false)\n"
                 + "const loading = ref(false)\n"
                 + "const formRef = ref()\n"
@@ -1034,11 +1036,7 @@ public class CodegenApplicationService {
                 + "  })\n"
                 + "}\n\n"
                 + "function toForm(row?: " + model.className() + "View): " + model.className() + "CreateRequest & " + model.className() + "UpdateRequest {\n"
-                + "  return {\n"
-                + "    ...({\n"
                 + renderTsToForm(model)
-                + "    } as " + model.className() + "CreateRequest & " + model.className() + "UpdateRequest)\n"
-                + "  }\n"
                 + "}\n"
                 + "</script>\n";
     }
