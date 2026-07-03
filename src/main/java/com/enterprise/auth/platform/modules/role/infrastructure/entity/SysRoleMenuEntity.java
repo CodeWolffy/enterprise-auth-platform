@@ -6,7 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @TableName("sys_role_menu")
 @Data
@@ -18,5 +18,5 @@ public class SysRoleMenuEntity {
     private Long roleId;
     private Long menuId;
     @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 }

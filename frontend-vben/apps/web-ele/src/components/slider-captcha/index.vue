@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { CaptchaTrackPayload } from './types';
+import type { CaptchaStatus, CaptchaTrackPayload } from './types';
 
 import { computed, onUnmounted, ref, watch } from 'vue';
 
@@ -10,7 +10,7 @@ const props = defineProps<{
   sliderHeight?: number;
   sliderImage: string;
   sliderWidth?: number;
-  verifying?: boolean;
+  status?: CaptchaStatus;
 }>();
 
 const emit = defineEmits<{
@@ -20,12 +20,13 @@ const emit = defineEmits<{
 
 const loaded = ref(false);
 const sliderLeft = ref(0);
+const dragging = ref(false);
 const backgroundRef = ref<HTMLElement | null>(null);
 const trackRef = ref<HTMLElement | null>(null);
 const sliderRef = ref<HTMLElement | null>(null);
 
-const TRACK_HANDLE_SIZE = 36;
-const TRACK_HANDLE_INSET = 2;
+const TRACK_HANDLE_SIZE = 40;
+const TRACK_HANDLE_INSET = 3;
 const TRACK_HANDLE_TRAVEL_OFFSET = TRACK_HANDLE_SIZE + TRACK_HANDLE_INSET * 2;
 const MIN_TRACK_POINTS = 18;
 const MAX_TRACK_POINTS = 80;
@@ -37,6 +38,24 @@ let lastTrackY = 0;
 let track: Array<{ t: number; x: number; y: number }> = [];
 let startTime = 0;
 let verifyEmitted = false;
+
+const statusValue = computed<CaptchaStatus>(() => props.status ?? 'ready');
+const isVerifying = computed(() => statusValue.value === 'verifying');
+const isSuccess = computed(() => statusValue.value === 'success');
+const isError = computed(() => statusValue.value === 'error');
+// 校验中 / 已出结果时锁定拖动
+const locked = computed(
+  () => isVerifying.value || isSuccess.value || isError.value,
+);
+
+const hintText = computed(() =>
+  isVerifying.value ? '正在校验…' : '向右拖动滑块完成拼图',
+);
+
+// 结果横幅文案（覆盖在拼图上，成功绿 / 失败红）
+const bannerText = computed(() =>
+  isSuccess.value ? '验证通过' : '验证失败，请重试',
+);
 
 const sliderDisplayWidth = computed(() => {
   const renderedBgWidth = backgroundRef.value?.clientWidth || 0;
@@ -114,6 +133,7 @@ const sliderProgress = computed(() => {
 function resetSlider() {
   sliderLeft.value = 0;
   isDragging = false;
+  dragging.value = false;
   startX = 0;
   startY = 0;
   lastTrackY = 0;
@@ -135,12 +155,13 @@ watch(
 );
 
 function startDrag(event: MouseEvent | TouchEvent) {
-  if (!loaded.value || props.verifying) {
+  if (!loaded.value || locked.value) {
     return;
   }
 
   const point = getPointerPoint(event);
   isDragging = true;
+  dragging.value = true;
   startX = point.x;
   startY = point.y;
   lastTrackY = 0;
@@ -185,6 +206,7 @@ function endDrag() {
   }
 
   isDragging = false;
+  dragging.value = false;
   const stopTime = Date.now();
 
   document.removeEventListener('mousemove', onDrag);
@@ -328,14 +350,17 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="slider-captcha" :class="{ loading: !loaded }">
+  <div
+    class="slider-captcha"
+    :class="[`is-${statusValue}`, { loading: !loaded, dragging }]"
+  >
     <div v-if="!loaded" class="captcha-loading">
       <span class="captcha-loading__spinner"></span>
       <span>加载中</span>
     </div>
     <div v-else class="captcha-container">
       <div ref="backgroundRef" class="captcha-image" :style="backgroundStyle">
-        <img :src="backgroundImage" alt="" />
+        <img class="captcha-image__bg" :src="backgroundImage" alt="" />
         <div ref="sliderRef" class="captcha-slider" :style="sliderOverlayStyle">
           <img :src="sliderImage" alt="" />
         </div>
@@ -347,11 +372,13 @@ onUnmounted(() => {
         >
           <svg
             fill="none"
-            height="14"
+            height="15"
             stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
             stroke-width="2"
             viewBox="0 0 24 24"
-            width="14"
+            width="15"
           >
             <path d="M1 4v6h6M23 20v-6h-6" />
             <path
@@ -359,15 +386,60 @@ onUnmounted(() => {
             />
           </svg>
         </button>
+
+        <!-- 结果横幅：成功/失败时覆盖在拼图底部 -->
+        <Transition name="captcha-banner">
+          <div
+            v-if="isSuccess || isError"
+            class="captcha-banner"
+            :class="isSuccess ? 'is-success' : 'is-error'"
+          >
+            <svg
+              v-if="isSuccess"
+              fill="none"
+              height="14"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2.5"
+              viewBox="0 0 24 24"
+              width="14"
+            >
+              <path d="M4 12.5 9 17.5 20 6.5" />
+            </svg>
+            <svg
+              v-else
+              fill="none"
+              height="14"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2.5"
+              viewBox="0 0 24 24"
+              width="14"
+            >
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+            <span>{{ bannerText }}</span>
+          </div>
+        </Transition>
       </div>
 
       <div
         ref="trackRef"
         class="captcha-track"
-        :class="{ 'is-verifying': verifying }"
+        :class="{
+          'is-verifying': isVerifying,
+          'is-success': isSuccess,
+          'is-error': isError,
+          'is-ready': statusValue === 'ready',
+        }"
         data-testid="captcha-track"
       >
         <div class="captcha-track__fill" :style="sliderTrackFillStyle"></div>
+        <span v-if="!isSuccess && !isError" class="captcha-track__label">{{
+          hintText
+        }}</span>
         <div
           class="captcha-track__handle"
           data-testid="captcha-handle"
@@ -375,18 +447,19 @@ onUnmounted(() => {
           :aria-valuemin="0"
           :aria-valuemax="100"
           :aria-valuenow="sliderProgress"
-          :aria-label="verifying ? '校验中' : '拖动滑块完成验证'"
+          :aria-label="hintText"
           :style="sliderButtonStyle"
           @mousedown="startDrag"
           @touchstart.prevent="startDrag"
         >
+          <!-- 校验中 -->
           <svg
-            v-if="verifying"
+            v-if="isVerifying"
             class="captcha-track__spinner"
             fill="none"
-            height="14"
+            height="16"
             viewBox="0 0 24 24"
-            width="14"
+            width="16"
           >
             <circle
               cx="12"
@@ -398,30 +471,106 @@ onUnmounted(() => {
               stroke-width="2.5"
             />
           </svg>
+          <!-- 成功 -->
+          <svg
+            v-else-if="isSuccess"
+            fill="none"
+            height="16"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2.5"
+            viewBox="0 0 24 24"
+            width="16"
+          >
+            <path d="M4 12.5 9 17.5 20 6.5" />
+          </svg>
+          <!-- 失败 -->
+          <svg
+            v-else-if="isError"
+            fill="none"
+            height="16"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2.5"
+            viewBox="0 0 24 24"
+            width="16"
+          >
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+          <!-- 待拖动：双箭头 -->
           <svg
             v-else
+            class="captcha-track__chevron"
             fill="none"
-            height="14"
+            height="16"
             stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
             stroke-width="2"
             viewBox="0 0 24 24"
-            width="14"
+            width="16"
           >
-            <path d="M5 12h14M12 5l7 7-7 7" />
+            <path d="M6 6l5 6-5 6M13 6l5 6-5 6" />
           </svg>
         </div>
-        <span class="captcha-track__label">
-          {{ verifying ? '校验中...' : '拖动滑块完成验证' }}
-        </span>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-@keyframes spin {
+@keyframes captcha-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* 提示文字微光扫过（主流滑块验证码的呼吸提示效果） */
+@keyframes captcha-shimmer {
+  0% {
+    background-position: 160% 0;
+  }
+
+  100% {
+    background-position: -60% 0;
+  }
+}
+
+@keyframes captcha-chevron {
+  0%,
+  100% {
+    transform: translateX(-1px);
+    opacity: 0.75;
+  }
+
+  50% {
+    transform: translateX(2px);
+    opacity: 1;
+  }
+}
+
+@keyframes captcha-shake {
+  10%,
+  90% {
+    transform: translateX(-1px);
+  }
+
+  20%,
+  80% {
+    transform: translateX(2px);
+  }
+
+  30%,
+  50%,
+  70% {
+    transform: translateX(-4px);
+  }
+
+  40%,
+  60% {
+    transform: translateX(4px);
   }
 }
 
@@ -442,34 +591,37 @@ onUnmounted(() => {
   font-size: 13px;
   color: var(--el-text-color-secondary);
   background: var(--el-fill-color-light);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: var(--el-border-radius-base);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 10px;
 }
 
 .captcha-loading__spinner {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border: 2px solid var(--el-border-color);
   border-top-color: var(--el-color-primary);
   border-radius: 50%;
-  animation: spin 0.7s linear infinite;
+  animation: captcha-spin 0.7s linear infinite;
 }
 
 .captcha-container {
   width: 100%;
 }
 
+/* ---------- 拼图图片 ---------- */
 .captcha-image {
   position: relative;
   width: 100%;
   aspect-ratio: 14 / 10;
   overflow: hidden;
   background: var(--el-fill-color-light);
-  border: 1px solid var(--el-border-color-light);
-  border-radius: var(--el-border-radius-base);
+  border-radius: 10px;
+  box-shadow:
+    0 6px 18px rgb(0 0 0 / 10%),
+    0 0 0 1px var(--el-border-color-lighter) inset;
 }
 
-.captcha-image > img {
+.captcha-image__bg {
   display: block;
   width: 100%;
   height: 100%;
@@ -481,8 +633,15 @@ onUnmounted(() => {
   top: 0;
   z-index: 1;
   height: 100%;
-  cursor: move;
+  cursor: grab;
   user-select: none;
+  filter: drop-shadow(0 0 4px rgb(0 0 0 / 35%));
+  transition: filter 0.2s ease;
+}
+
+.dragging .captcha-slider {
+  cursor: grabbing;
+  filter: drop-shadow(0 0 7px rgb(0 0 0 / 45%));
 }
 
 .captcha-slider img {
@@ -499,42 +658,58 @@ onUnmounted(() => {
   z-index: 2;
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   padding: 0;
   color: var(--el-text-color-regular);
   cursor: pointer;
-  background: rgb(255 255 255 / 90%);
-  border: 1px solid var(--el-border-color);
-  border-radius: var(--el-border-radius-small);
+  background: rgb(255 255 255 / 82%);
+  border: none;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 16%);
+  backdrop-filter: blur(4px);
   transition:
     color 0.2s ease,
-    background 0.2s ease;
+    background 0.2s ease,
+    transform 0.35s ease;
 }
 
 .captcha-refresh:hover {
   color: var(--el-color-primary);
-  background: var(--el-color-primary-light-9);
+  background: rgb(255 255 255 / 96%);
+  transform: rotate(-90deg);
 }
 
+.captcha-refresh:active {
+  transform: rotate(-180deg);
+}
+
+/* ---------- 滑轨 ---------- */
 .captcha-track {
   position: relative;
   display: flex;
   align-items: center;
-  height: 40px;
-  margin-top: 12px;
+  height: 46px;
+  margin-top: 16px;
   overflow: hidden;
   background: var(--el-fill-color-light);
-  border: 1px solid var(--el-border-color);
-  border-radius: var(--el-border-radius-base);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 10px;
+  box-shadow: inset 0 1px 3px rgb(0 0 0 / 5%);
+  transition: border-color 0.2s ease;
 }
 
 .captcha-track__fill {
   position: absolute;
   inset: 0 auto 0 0;
   z-index: 0;
-  background: var(--el-color-primary-light-9);
-  border-radius: var(--el-border-radius-base) 0 0 var(--el-border-radius-base);
+  background: linear-gradient(
+    90deg,
+    var(--el-color-primary-light-3),
+    var(--el-color-primary)
+  );
+  opacity: 0.9;
+  transition: background 0.25s ease;
 }
 
 .captcha-track__label {
@@ -542,50 +717,158 @@ onUnmounted(() => {
   right: 0;
   left: 0;
   z-index: 1;
-  font-size: 12px;
+  padding-left: 20px;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--el-text-color-secondary);
   text-align: center;
+  letter-spacing: 0.5px;
   pointer-events: none;
   user-select: none;
 }
 
+/* 待拖动状态：文字微光扫过 */
+.captcha-track.is-ready .captcha-track__label {
+  color: transparent;
+  background: linear-gradient(
+    100deg,
+    var(--el-text-color-secondary) 0%,
+    var(--el-text-color-secondary) 38%,
+    var(--el-text-color-primary) 50%,
+    var(--el-text-color-secondary) 62%,
+    var(--el-text-color-secondary) 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: captcha-shimmer 2.8s linear infinite;
+}
+
 .captcha-track__handle {
   position: absolute;
-  top: 2px;
-  left: 2px;
+  top: 3px;
+  left: 3px;
   z-index: 2;
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
-  color: var(--el-color-white);
-  cursor: pointer;
-  background: var(--el-color-primary);
-  border-radius: calc(var(--el-border-radius-base) - 2px);
-  transition: background 0.2s ease;
+  width: 40px;
+  height: 40px;
+  color: var(--el-color-primary);
+  cursor: grab;
+  background: var(--el-bg-color, #fff);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 18%);
+  transition:
+    color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .captcha-track__handle:hover {
-  background: var(--el-color-primary-light-3);
+  box-shadow: 0 3px 12px rgb(0 0 0 / 26%);
 }
 
-.captcha-track__handle:active {
-  background: var(--el-color-primary-dark-2);
+.dragging .captcha-track__handle {
+  cursor: grabbing;
+  box-shadow: 0 3px 14px rgb(0 0 0 / 30%);
+}
+
+.captcha-track__chevron {
+  animation: captcha-chevron 1.4s ease-in-out infinite;
 }
 
 .captcha-track__spinner {
-  animation: spin 0.7s linear infinite;
+  color: var(--el-color-primary);
+  animation: captcha-spin 0.7s linear infinite;
 }
 
+/* ---------- 校验中 ---------- */
 .captcha-track.is-verifying {
   pointer-events: none;
 }
 
 .captcha-track.is-verifying .captcha-track__label {
+  padding-left: 20px;
   color: var(--el-color-primary);
 }
 
-.captcha-track.is-verifying .captcha-track__handle {
-  background: var(--el-color-primary-light-5);
+/* ---------- 成功 ---------- */
+.captcha-track.is-success {
+  pointer-events: none;
+  border-color: var(--el-color-success);
+}
+
+.captcha-track.is-success .captcha-track__fill {
+  background: linear-gradient(
+    90deg,
+    var(--el-color-success-light-3),
+    var(--el-color-success)
+  );
+  opacity: 1;
+}
+
+.captcha-track.is-success .captcha-track__handle {
+  color: var(--el-color-white);
+  background: var(--el-color-success);
+}
+
+/* ---------- 失败 ---------- */
+.captcha-track.is-error {
+  pointer-events: none;
+  border-color: var(--el-color-danger);
+  animation: captcha-shake 0.5s ease;
+}
+
+.captcha-track.is-error .captcha-track__fill {
+  background: linear-gradient(
+    90deg,
+    var(--el-color-danger-light-3),
+    var(--el-color-danger)
+  );
+  opacity: 1;
+}
+
+.captcha-track.is-error .captcha-track__handle {
+  color: var(--el-color-white);
+  background: var(--el-color-danger);
+}
+
+/* ---------- 结果横幅 ---------- */
+.captcha-banner {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 3;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-color-white);
+  letter-spacing: 0.5px;
+}
+
+.captcha-banner.is-success {
+  background: color-mix(in srgb, var(--el-color-success) 90%, transparent);
+}
+
+.captcha-banner.is-error {
+  background: color-mix(in srgb, var(--el-color-danger) 90%, transparent);
+}
+
+.captcha-banner-enter-active,
+.captcha-banner-leave-active {
+  transition:
+    transform 0.3s ease,
+    opacity 0.3s ease;
+}
+
+.captcha-banner-enter-from,
+.captcha-banner-leave-to {
+  opacity: 0;
+  transform: translateY(100%);
 }
 </style>

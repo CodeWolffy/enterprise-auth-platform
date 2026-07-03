@@ -231,7 +231,7 @@ public class TenantCatalogManagementService {
                 entity.getOrderNo(),
                 entity.getPackageDesc(),
                 normalizeStatus(entity.getStatus()),
-                TimeSupport.toEpochMilli(entity.getUpdatedAt() == null ? entity.getCreatedAt() : entity.getUpdatedAt()),
+                entity.getUpdatedAt() == null ? entity.getCreatedAt() : entity.getUpdatedAt(),
                 referencedTenantCount,
                 referencedTenantIds
         );
@@ -273,7 +273,7 @@ public class TenantCatalogManagementService {
             @Schema(description = "展示排序") Integer orderNo,
             @Schema(description = "套餐说明") String packageDesc,
             @Schema(description = "状态：0 正常，1 停用") String status,
-            @Schema(description = "更新时间") Long updatedAt,
+            @Schema(description = "更新时间，ISO-8601 UTC") java.time.Instant updatedAt,
             @Schema(description = "引用该套餐的租户数量") int referencedTenantCount,
             @Schema(description = "引用该套餐的租户示例（最多 5 条）") List<String> referencedTenantIds
     ) {

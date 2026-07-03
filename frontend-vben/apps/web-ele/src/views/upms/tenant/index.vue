@@ -203,10 +203,7 @@ const resetHistoryQuery = () => {
   loadHistory();
 };
 
-const formatHistoryTime = (epochMs?: number | null) => {
-  if (!epochMs) return '-';
-  return new Date(epochMs).toLocaleString();
-};
+const formatHistoryTime = (value?: string | null) => formatDateTime(value);
 
 const initPage = async () => {
   loading.value = true;

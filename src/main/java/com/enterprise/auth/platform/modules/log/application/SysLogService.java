@@ -9,7 +9,7 @@ import com.enterprise.auth.platform.modules.log.infrastructure.mapper.SysLogMapp
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Service
 public class SysLogService {
@@ -21,7 +21,7 @@ public class SysLogService {
     }
 
     public PageResult<SysLogEntity> page(String tenantId, String eventType, String operator, String requestId,
-                                         String clientIp, LocalDateTime from, LocalDateTime to, int page, int size) {
+                                         String clientIp, Instant from, Instant to, int page, int size) {
         int safePage = Math.max(page, 1);
         int safeSize = Math.min(Math.max(size, 1), 200);
         String effectiveTenantId = effectiveTenantId(tenantId);
@@ -38,7 +38,7 @@ public class SysLogService {
         return PageResult.of(result.getTotal(), safePage, safeSize, result.getRecords());
     }
 
-    public long count(String tenantId, String eventType, String operator, LocalDateTime from, LocalDateTime to) {
+    public long count(String tenantId, String eventType, String operator, Instant from, Instant to) {
         String effectiveTenantId = effectiveTenantId(tenantId);
         LambdaQueryWrapper<SysLogEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.like(StringUtils.hasText(effectiveTenantId), SysLogEntity::getTenantId, effectiveTenantId)

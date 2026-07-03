@@ -6,6 +6,7 @@ import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.common.authz.SecuritySupport;
 import com.enterprise.auth.platform.common.cache.CacheNames;
 import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.common.context.TimeZoneContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysCategoryRuleEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysConfigEntity;
@@ -203,11 +204,12 @@ public class CategoryRuleApplicationService {
     }
 
     private List<SystemViewModels.CategoryTrendPoint> buildCategoryTrend(List<SystemViewModels.CategoryAuditView> audits) {
-        java.time.LocalDate today = TimeSupport.utcToday();
+        java.time.ZoneId zone = TimeZoneContext.getZone();
+        java.time.LocalDate today = TimeSupport.today(zone);
         Map<java.time.LocalDate, Long> counts = audits.stream()
                 .filter(item -> item.occurredAt() != null)
                 .collect(java.util.stream.Collectors.groupingBy(
-                        item -> Instant.ofEpochMilli(item.occurredAt()).atZone(TimeSupport.UTC).toLocalDate(),
+                        item -> item.occurredAt().atZone(zone).toLocalDate(),
                         LinkedHashMap::new,
                         java.util.stream.Collectors.counting()
                 ));

@@ -68,7 +68,7 @@ class AuthControllerSessionFlowTest {
     private String previousPasswordHash;
     private Integer previousSessionVersion;
     private Integer previousMustChangePassword;
-    private java.time.LocalDateTime previousPasswordUpdatedAt;
+    private java.time.Instant previousPasswordUpdatedAt;
 
     @BeforeEach
     void setUp() {
@@ -90,14 +90,13 @@ class AuthControllerSessionFlowTest {
                 "platform",
                 "admin"
         );
-        previousPasswordUpdatedAt = jdbcTemplate.queryForObject(
+        previousPasswordUpdatedAt = queryInstant(
                 "SELECT password_updated_at FROM sys_user WHERE tenant_id = ? AND username = ? AND deleted = 0",
-                java.time.LocalDateTime.class,
                 "platform",
                 "admin"
         );
         jdbcTemplate.update(
-                "UPDATE sys_user SET password_hash = ?, must_change_password = 0, password_updated_at = NOW() WHERE tenant_id = ? AND username = ? AND deleted = 0",
+                "UPDATE sys_user SET password_hash = ?, must_change_password = 0, password_updated_at = UTC_TIMESTAMP(3) WHERE tenant_id = ? AND username = ? AND deleted = 0",
                 passwordHasher.hash(ADMIN_PASSWORD),
                 "platform",
                 "admin"
@@ -139,7 +138,7 @@ class AuthControllerSessionFlowTest {
             jdbcTemplate.update(
                     "UPDATE sys_user SET must_change_password = ?, password_updated_at = ? WHERE tenant_id = ? AND username = ? AND deleted = 0",
                     previousMustChangePassword,
-                    previousPasswordUpdatedAt,
+                    timestamp(previousPasswordUpdatedAt),
                     "platform",
                     "admin"
             );
@@ -159,6 +158,17 @@ class AuthControllerSessionFlowTest {
                 localDao.deleteObject(key);
             }
         }
+    }
+
+    private java.time.Instant queryInstant(String sql, Object... args) {
+        return jdbcTemplate.queryForObject(sql, (rs, rowNum) -> {
+            java.sql.Timestamp timestamp = rs.getTimestamp(1);
+            return timestamp == null ? null : timestamp.toInstant();
+        }, args);
+    }
+
+    private java.sql.Timestamp timestamp(java.time.Instant instant) {
+        return instant == null ? null : java.sql.Timestamp.from(instant);
     }
 
     @Test
@@ -279,32 +289,30 @@ class AuthControllerSessionFlowTest {
     @Test
     void loginShouldRejectTenantOutsideAuthorizationWindow() throws Exception {
         ensureTenantUser();
-        java.time.LocalDateTime previousAuthBeginAt = jdbcTemplate.queryForObject(
+        java.time.Instant previousAuthBeginAt = queryInstant(
                 "SELECT auth_begin_at FROM sys_tenant WHERE tenant_id = ? AND deleted = 0",
-                java.time.LocalDateTime.class,
                 TENANT_A
         );
-        java.time.LocalDateTime previousExpireAt = jdbcTemplate.queryForObject(
+        java.time.Instant previousExpireAt = queryInstant(
                 "SELECT expire_at FROM sys_tenant WHERE tenant_id = ? AND deleted = 0",
-                java.time.LocalDateTime.class,
                 TENANT_A
         );
         try {
-            jdbcTemplate.update("UPDATE sys_tenant SET auth_begin_at = DATE_ADD(NOW(), INTERVAL 1 DAY), expire_at = DATE_ADD(NOW(), INTERVAL 30 DAY) WHERE tenant_id = ? AND deleted = 0", TENANT_A);
+            jdbcTemplate.update("UPDATE sys_tenant SET auth_begin_at = DATE_ADD(UTC_TIMESTAMP(3), INTERVAL 1 DAY), expire_at = DATE_ADD(UTC_TIMESTAMP(3), INTERVAL 30 DAY) WHERE tenant_id = ? AND deleted = 0", TENANT_A);
             mockMvc.perform(post("/api/auth/login")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(loginPayload(TENANT_USER, TENANT_USER_PASSWORD, TENANT_A)))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.code").value("TENANT_DISABLED"));
 
-            jdbcTemplate.update("UPDATE sys_tenant SET auth_begin_at = DATE_SUB(NOW(), INTERVAL 30 DAY), expire_at = DATE_SUB(NOW(), INTERVAL 1 DAY) WHERE tenant_id = ? AND deleted = 0", TENANT_A);
+            jdbcTemplate.update("UPDATE sys_tenant SET auth_begin_at = DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 30 DAY), expire_at = DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 1 DAY) WHERE tenant_id = ? AND deleted = 0", TENANT_A);
             mockMvc.perform(post("/api/auth/login")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(loginPayload(TENANT_USER, TENANT_USER_PASSWORD, TENANT_A)))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.code").value("TENANT_DISABLED"));
         } finally {
-            jdbcTemplate.update("UPDATE sys_tenant SET auth_begin_at = ?, expire_at = ? WHERE tenant_id = ? AND deleted = 0", previousAuthBeginAt, previousExpireAt, TENANT_A);
+            jdbcTemplate.update("UPDATE sys_tenant SET auth_begin_at = ?, expire_at = ? WHERE tenant_id = ? AND deleted = 0", timestamp(previousAuthBeginAt), timestamp(previousExpireAt), TENANT_A);
         }
     }
 

@@ -6,7 +6,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @TableName("sys_tenant_change_log")
 @Data
@@ -23,5 +23,5 @@ public class SysTenantChangeLogEntity {
     @TableField(fill = FieldFill.INSERT)
     private String operator;
     @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime occurredAt;
+    private Instant occurredAt;
 }

@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.modules.workflow.application;
 
+import java.time.Instant;
 import java.util.Set;
 
 public record WorkflowTaskView(
@@ -15,8 +16,8 @@ public record WorkflowTaskView(
         Long assigneeUserId,
         String assigneeUsername,
         String comment,
-        Long createdAt,
-        Long completedAt,
+        Instant createdAt,
+        Instant completedAt,
         boolean actionable,
         int urgeCount
 ) {

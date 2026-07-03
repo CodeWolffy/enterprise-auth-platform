@@ -19,7 +19,7 @@ public record UserAccount(
         int sessionVersion,
         String avatarFileKey,
         boolean mustChangePassword,
-        java.time.LocalDateTime passwordUpdatedAt
+        java.time.Instant passwordUpdatedAt
 ) {
 
     public UserAccount(

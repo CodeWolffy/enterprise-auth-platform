@@ -109,7 +109,7 @@ public class AccountApplicationService {
             user.setPasswordHash(passwordHasher.hash(request.newPassword()));
             user.setSessionVersion(nextSessionVersion);
             user.setMustChangePassword(0);
-            user.setPasswordUpdatedAt(TimeSupport.utcNowDateTime());
+            user.setPasswordUpdatedAt(TimeSupport.now());
             user.setUpdatedBy(user.getUsername());
             sysUserMapper.updateById(user);
 

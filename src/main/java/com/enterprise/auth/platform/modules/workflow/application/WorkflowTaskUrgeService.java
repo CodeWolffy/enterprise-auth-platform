@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.common.context.TimeZoneContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
@@ -20,7 +21,8 @@ import com.enterprise.auth.platform.modules.workflow.infrastructure.mapper.WfTas
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.time.LocalDateTime;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -92,7 +94,7 @@ public class WorkflowTaskUrgeService {
         entity.setUrgedByUserId(user.id());
         entity.setUrgedByUsername(user.username());
         entity.setComment(StringUtils.hasText(command.comment()) ? command.comment().trim() : null);
-        entity.setUrgedAt(TimeSupport.utcNowDateTime());
+        entity.setUrgedAt(TimeSupport.now());
         urgeMapper.insert(entity);
 
         Set<String> targets = urgeTargets(task);
@@ -175,13 +177,13 @@ public class WorkflowTaskUrgeService {
     }
 
     private void enforceUrgeFrequency(String tenantId, Long taskId, Long userId) {
-        LocalDateTime now = TimeSupport.utcNowDateTime();
+        Instant now = TimeSupport.now();
         Long recentCount = urgeMapper.selectCount(new LambdaQueryWrapper<WfTaskUrgeEntity>()
                 .eq(WfTaskUrgeEntity::getTenantId, tenantId)
                 .eq(WfTaskUrgeEntity::getTaskId, taskId)
                 .eq(WfTaskUrgeEntity::getUrgedByUserId, userId)
                 .eq(WfTaskUrgeEntity::getDeleted, 0)
-                .ge(WfTaskUrgeEntity::getUrgedAt, now.minusMinutes(SAME_TASK_COOLDOWN_MINUTES)));
+                .ge(WfTaskUrgeEntity::getUrgedAt, now.minus(Duration.ofMinutes(SAME_TASK_COOLDOWN_MINUTES))));
         if (recentCount != null && recentCount > 0) {
             throw new BusinessException("RATE_LIMITED", "催办过于频繁，请稍后再试");
         }
@@ -190,7 +192,7 @@ public class WorkflowTaskUrgeService {
                 .eq(WfTaskUrgeEntity::getTaskId, taskId)
                 .eq(WfTaskUrgeEntity::getUrgedByUserId, userId)
                 .eq(WfTaskUrgeEntity::getDeleted, 0)
-                .ge(WfTaskUrgeEntity::getUrgedAt, now.minusDays(1)));
+                .ge(WfTaskUrgeEntity::getUrgedAt, TimeSupport.startOfDay(TimeSupport.today(TimeZoneContext.getZone()), TimeZoneContext.getZone())));
         if (dailyCount != null && dailyCount >= DAILY_TASK_LIMIT) {
             throw new BusinessException("RATE_LIMITED", "该任务今日催办次数已达上限");
         }

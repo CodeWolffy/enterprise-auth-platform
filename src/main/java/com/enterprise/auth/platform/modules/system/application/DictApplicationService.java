@@ -159,7 +159,7 @@ public class DictApplicationService {
                 entity.getEnabled() == null || entity.getEnabled() == 1,
                 entity.getRemarks(),
                 countValues(tenantId, entity.getId()),
-                TimeSupport.toEpochMilli(entity.getUpdatedAt()),
+                entity.getUpdatedAt(),
                 entity.getCreatedBy()
         );
     }
@@ -260,7 +260,7 @@ public class DictApplicationService {
                 value.getShowClass(),
                 value.getEnabled() != null && value.getEnabled() == 1,
                 value.getRemarks(),
-                TimeSupport.toEpochMilli(value.getUpdatedAt())
+                value.getUpdatedAt()
         );
     }
 

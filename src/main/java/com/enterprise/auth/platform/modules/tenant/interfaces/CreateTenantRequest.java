@@ -2,6 +2,7 @@ package com.enterprise.auth.platform.modules.tenant.interfaces;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import java.time.Instant;
 
 @Schema(description = "新增租户请求")
 public record CreateTenantRequest(
@@ -9,8 +10,8 @@ public record CreateTenantRequest(
         @Schema(description = "租户名称", requiredMode = Schema.RequiredMode.REQUIRED) @NotBlank String tenantName,
         @Schema(description = "是否平台级租户") boolean platformLevel,
         @Schema(description = "租户状态，1 启用，0 禁用") Integer tenantStatus,
-        @Schema(description = "授权开始时间") Long authBeginAt,
-        @Schema(description = "授权结束时间") Long expireAt,
+        @Schema(description = "授权开始时间，ISO-8601 UTC") Instant authBeginAt,
+        @Schema(description = "授权结束时间，ISO-8601 UTC") Instant expireAt,
         @Schema(description = "套餐编码") String packageCode,
         @Schema(description = "套餐名称") String packageName,
         @Schema(description = "Logo 地址") String logoUrl,

@@ -96,10 +96,10 @@
 import { computed, reactive, ref } from 'vue';
 import type { TagProps } from 'element-plus';
 import { ElButton, ElDescriptions, ElDescriptionsItem, ElDrawer, ElEmpty, ElPagination, ElTable, ElTableColumn, ElTag } from 'element-plus';
-import dayjs from 'dayjs';
 import { queryWorkflowDoneTasks } from '#/api/modules';
 import type { PageResult } from '#/types/api';
 import type { WorkflowTaskView } from '#/types/workflow';
+import { formatDateTime as formatInstantDateTime } from '#/utils/datetime';
 
 const loading = ref(false);
 const detailVisible = ref(false);
@@ -159,8 +159,8 @@ function taskStatusTag(status: string): TagProps['type'] {
   return 'info';
 }
 
-function formatDateTime(value?: number | null) {
-  return value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-';
+function formatDateTime(value?: string | null) {
+  return formatInstantDateTime(value);
 }
 </script>
 

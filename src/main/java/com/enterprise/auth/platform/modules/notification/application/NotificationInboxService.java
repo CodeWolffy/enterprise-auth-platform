@@ -10,7 +10,7 @@ import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.notification.infrastructure.entity.SysUserNotificationEntity;
 import com.enterprise.auth.platform.modules.notification.infrastructure.mapper.SysUserNotificationMapper;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -66,7 +66,7 @@ public class NotificationInboxService {
             throw new BusinessException("NOT_FOUND", "站内通知不存在");
         }
         if (entity.getReadAt() == null) {
-            entity.setReadAt(TimeSupport.utcNowDateTime());
+            entity.setReadAt(TimeSupport.now());
             notificationMapper.updateById(entity);
         }
         return NotificationView.from(entity);
@@ -76,7 +76,7 @@ public class NotificationInboxService {
     public long markAllRead() {
         UserAccount user = currentUserService.requireCurrentUser();
         String tenantId = currentTenantId(user);
-        LocalDateTime now = TimeSupport.utcNowDateTime();
+        Instant now = TimeSupport.now();
         return notificationMapper.update(null, visibleMineUpdateWrapper(tenantId, user.id(), now)
                 .isNull(SysUserNotificationEntity::getReadAt)
                 .set(SysUserNotificationEntity::getReadAt, now));
@@ -91,7 +91,7 @@ public class NotificationInboxService {
     }
 
     private LambdaQueryWrapper<SysUserNotificationEntity> visibleMineWrapper(String tenantId, Long userId, Boolean read) {
-        LocalDateTime now = TimeSupport.utcNowDateTime();
+        Instant now = TimeSupport.now();
         LambdaQueryWrapper<SysUserNotificationEntity> wrapper = baseMineWrapper(tenantId, userId)
                 .and(query -> query.isNull(SysUserNotificationEntity::getExpiresAt)
                         .or()
@@ -106,7 +106,7 @@ public class NotificationInboxService {
         return wrapper;
     }
 
-    private LambdaUpdateWrapper<SysUserNotificationEntity> visibleMineUpdateWrapper(String tenantId, Long userId, LocalDateTime now) {
+    private LambdaUpdateWrapper<SysUserNotificationEntity> visibleMineUpdateWrapper(String tenantId, Long userId, Instant now) {
         return new LambdaUpdateWrapper<SysUserNotificationEntity>()
                 .eq(SysUserNotificationEntity::getTenantId, tenantId)
                 .eq(SysUserNotificationEntity::getRecipientUserId, userId)

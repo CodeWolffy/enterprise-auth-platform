@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.modules.dashboard.interfaces;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.Instant;
 import java.util.List;
 
 @Schema(description = "仪表盘统计结果")
@@ -48,7 +49,7 @@ public record DashboardStatsResponse(
             @Schema(description = "操作人") String operator,
             @Schema(description = "租户 ID") String tenantId,
             @Schema(description = "客户端 IP") String clientIp,
-            @Schema(description = "发生时间，epoch 毫秒") Long occurredAt
+            @Schema(description = "发生时间，ISO-8601 UTC") Instant occurredAt
     ) {
     }
 }

@@ -7,7 +7,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @TableName("sys_tenant")
 @Data
@@ -19,8 +19,8 @@ public class SysTenantEntity {
     private String tenantName;
     private Integer platformLevel;
     private Integer tenantStatus;
-    private LocalDateTime authBeginAt;
-    private LocalDateTime expireAt;
+    private Instant authBeginAt;
+    private Instant expireAt;
     private String packageCode;
     private String logoUrl;
     private String contactName;
@@ -36,7 +36,7 @@ public class SysTenantEntity {
     @TableLogic
     private Integer deleted;
     @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
     @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 }

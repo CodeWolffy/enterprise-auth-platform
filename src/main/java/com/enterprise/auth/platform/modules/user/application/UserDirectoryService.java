@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.plugins.IgnoreStrategy;
 import com.baomidou.mybatisplus.core.plugins.InterceptorIgnoreHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.role.application.RoleQueryFacade;
@@ -16,7 +15,6 @@ import com.enterprise.auth.platform.modules.role.application.RoleGrantQueryFacad
 import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.modules.user.interfaces.UserSummary;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -145,8 +143,8 @@ public class UserDirectoryService {
                         roleCodesByUserId.getOrDefault(user.getId(), Set.of()),
                         permissionsByUserId.getOrDefault(user.getId(), Set.of()),
                         DataScopeType.SELF,
-                        epochMillis(user.getCreatedAt()),
-                        epochMillis(user.getLastLoginAt()),
+                        user.getCreatedAt(),
+                        user.getLastLoginAt(),
                         user.getLastLoginIp()
                 ))
                 .toList();
@@ -204,10 +202,6 @@ public class UserDirectoryService {
     private String currentTenantId() {
         String tenantId = TenantContext.getTenantId();
         return StringUtils.hasText(tenantId) ? tenantId : "platform";
-    }
-
-    private Long epochMillis(LocalDateTime value) {
-        return TimeSupport.toEpochMilli(value);
     }
 
     private boolean isGlobalScope() {

@@ -6,7 +6,7 @@ import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
 import com.enterprise.auth.platform.modules.user.infrastructure.repository.UserRepository;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -78,7 +78,7 @@ public class UserAuthenticationFacade {
         if (entity == null || (entity.getDeleted() != null && entity.getDeleted() == 1)) {
             return;
         }
-        entity.setLastLoginAt(TimeSupport.utcNowDateTime());
+        entity.setLastLoginAt(TimeSupport.now());
         entity.setLastLoginIp(clientIp);
         entity.setUpdatedBy(entity.getUsername());
         sysUserMapper.updateById(entity);

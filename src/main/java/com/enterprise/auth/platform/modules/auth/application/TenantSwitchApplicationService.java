@@ -14,7 +14,7 @@ import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.auth.interfaces.PermissionSnapshotResponse;
 import com.enterprise.auth.platform.modules.tenant.application.TenantProfileFacade;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantEntity;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -104,7 +104,7 @@ public class TenantSwitchApplicationService {
         }
         final String activeTenantId = resolvedActiveTenantId;
         String originTenantId = currentUser.tenantId();
-        LocalDateTime now = TimeSupport.utcNowDateTime();
+        Instant now = TimeSupport.now();
 
         if (!platformAdminSupport.isPlatformSuperAdmin(currentUser)) {
             return tenantProfileFacade.findByTenantId(originTenantId)
@@ -136,7 +136,7 @@ public class TenantSwitchApplicationService {
             TenantProfileFacade.TenantRecord tenant,
             String activeTenantId,
             String originTenantId,
-            LocalDateTime now
+            Instant now
     ) {
         String disabledReason = disabledReason(tenant, now);
         return new SwitchableTenantView(
@@ -170,7 +170,7 @@ public class TenantSwitchApplicationService {
         );
     }
 
-    private String disabledReason(TenantProfileFacade.TenantRecord tenant, LocalDateTime now) {
+    private String disabledReason(TenantProfileFacade.TenantRecord tenant, Instant now) {
         if (tenant.tenantStatus() == null || tenant.tenantStatus() != 1) {
             return "租户已停用";
         }

@@ -378,8 +378,9 @@ function getPreviewContent() {
                       <ElOption label="Integer" value="Integer" />
                       <ElOption label="Double" value="Double" />
                       <ElOption label="BigDecimal" value="java.math.BigDecimal" />
-                      <ElOption label="LocalDateTime" value="java.time.LocalDateTime" />
+                      <ElOption label="Instant" value="java.time.Instant" />
                       <ElOption label="LocalDate" value="java.time.LocalDate" />
+                      <ElOption label="LocalTime" value="java.time.LocalTime" />
                       <ElOption label="Boolean" value="Boolean" />
                     </ElSelect>
                   </template>

@@ -253,8 +253,8 @@ class FileControllerP1Test {
                 PLATFORM_TENANT_ID,
                 entity.getId(),
                 roleId,
-                java.time.LocalDateTime.now(),
-                java.time.LocalDateTime.now()
+                java.sql.Timestamp.from(java.time.Instant.now()),
+                java.sql.Timestamp.from(java.time.Instant.now())
         );
         return entity.getId();
     }

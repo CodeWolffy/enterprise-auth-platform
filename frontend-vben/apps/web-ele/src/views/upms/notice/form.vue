@@ -19,7 +19,7 @@ import {
 
 import { upload as uploadFile } from '#/api/upms/file';
 import { addObj, editObj, getById } from '#/api/upms/notice';
-import { formatDateTime } from '#/utils/datetime';
+import { formatDateTime, toInstantIso } from '#/utils/datetime';
 
 const emit = defineEmits(['initPage']);
 
@@ -91,12 +91,6 @@ const uploadNoticeImage = async (file: File) => {
   return response.url || `/api/files/public/${response.fileKey}`;
 };
 
-const toEpochMilli = (value: string) => {
-  const normalized = value.replace(' ', 'T');
-  const timestamp = new Date(normalized).getTime();
-  return Number.isFinite(timestamp) ? timestamp : undefined;
-};
-
 const submitForm = async (formEl: FormInstance | undefined) => {
   if (!formEl) return;
   await formEl.validate((valid) => {
@@ -108,7 +102,7 @@ const submitForm = async (formEl: FormInstance | undefined) => {
         published: state.form.published,
       };
       if (state.form.publishTime) {
-        const publishTime = toEpochMilli(state.form.publishTime);
+        const publishTime = toInstantIso(state.form.publishTime);
         if (publishTime) {
           payload.publishTime = publishTime;
         }

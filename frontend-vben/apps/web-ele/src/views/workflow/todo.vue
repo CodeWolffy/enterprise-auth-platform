@@ -167,11 +167,11 @@
 import { computed, nextTick, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import type { TagProps } from 'element-plus';
-import dayjs from 'dayjs';
 import { ElAlert, ElBadge, ElButton, ElDescriptions, ElDescriptionsItem, ElDialog, ElDrawer, ElEmpty, ElForm, ElFormItem, ElInput, ElInputNumber, ElMessage, ElPagination, ElTable, ElTableColumn, ElTag } from 'element-plus';
 import { approveWorkflowTask, listWorkflowTaskUrges, queryWorkflowTodoTasks, rejectWorkflowTask, transferWorkflowTask, urgeWorkflowTask } from '#/api/modules';
 import type { PageResult } from '#/types/api';
 import type { WorkflowTaskUrgeView, WorkflowTaskView } from '#/types/workflow';
+import { formatDateTime as formatInstantDateTime } from '#/utils/datetime';
 
 const route = useRoute();
 const loading = ref(false);
@@ -381,8 +381,8 @@ function taskStatusTag(status: string): TagProps['type'] {
   return 'info';
 }
 
-function formatDateTime(value?: number | null) {
-  return value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-';
+function formatDateTime(value?: string | null) {
+  return formatInstantDateTime(value);
 }
 </script>
 

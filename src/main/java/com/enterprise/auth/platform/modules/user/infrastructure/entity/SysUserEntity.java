@@ -7,7 +7,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @TableName("sys_user")
 @Data
@@ -32,11 +32,11 @@ public class SysUserEntity {
     private String updatedBy;
     @TableLogic
     private Integer deleted;
-    private LocalDateTime lastLoginAt;
+    private Instant lastLoginAt;
     private String lastLoginIp;
-    private LocalDateTime passwordUpdatedAt;
+    private Instant passwordUpdatedAt;
     @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
     @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 }

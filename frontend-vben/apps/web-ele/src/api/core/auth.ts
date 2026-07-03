@@ -23,7 +23,7 @@ export namespace AuthApi {
   export interface LoginResult {
     tokenValue: string;
     tenantId?: string;
-    expiresAt?: number;
+    expiresAt?: string;
     passwordChangeRequired?: boolean;
     passwordChangeReason?: string;
   }

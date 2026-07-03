@@ -1,4 +1,5 @@
 import { requestClient } from '#/api/request';
+import { toInstantIso } from '#/utils/datetime';
 
 /**
  * 获取租户列表（扁平列表，用于租户切换器）
@@ -113,17 +114,18 @@ export async function saveTenantMenu(data: { tenantId: string; menuIds: number[]
 
 /**
  * 获取租户变更历史（分页）
- * 后端：GET /api/tenants/{tenantId}/history?changeType&fieldKey&operator&fromEpochMs&toEpochMs&page&size
+ * 后端：GET /api/tenants/{tenantId}/history?changeType&fieldKey&operator&from&to&page&size
  */
 export async function getTenantHistory(tenantId: string, query: any) {
-  const { page, size, changeType, fieldKey, operator, fromEpochMs, toEpochMs } = query ?? {};
+  const { page, size, changeType, fieldKey, operator, from, to, dateRange } = query ?? {};
+  const [rangeStart, rangeEnd] = Array.isArray(dateRange) ? dateRange : [];
   return requestClient.get(`/tenants/${tenantId}/history`, {
     params: {
       changeType,
       fieldKey,
       operator,
-      fromEpochMs,
-      toEpochMs,
+      from: toInstantIso(from ?? rangeStart),
+      to: toInstantIso(to ?? rangeEnd),
       page: page ?? 1,
       size: size ?? 10,
     },

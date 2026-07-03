@@ -7,13 +7,10 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.extension.activerecord.Model;
-import com.enterprise.auth.platform.common.TimeSupport;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -53,17 +50,7 @@ public class SysLogEntity extends Model<SysLogEntity> {
     private String createdBy;
 
     @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createdAt;
-
-    @JsonIgnore
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    @JsonProperty("createdAt")
-    public Long getCreatedAtEpochMs() {
-        return TimeSupport.toEpochMilli(createdAt);
-    }
+    private Instant createdAt;
 
     @TableLogic(value = "0", delval = "1")
     @TableField(fill = FieldFill.INSERT)

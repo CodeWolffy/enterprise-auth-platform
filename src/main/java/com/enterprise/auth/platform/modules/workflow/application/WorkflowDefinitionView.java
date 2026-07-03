@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.modules.workflow.application;
 
+import java.time.Instant;
 import java.util.Map;
 
 public record WorkflowDefinitionView(
@@ -11,7 +12,7 @@ public record WorkflowDefinitionView(
         String status,
         java.util.List<WorkflowStepView> steps,
         String remark,
-        Long createdAt,
-        Long updatedAt
+        Instant createdAt,
+        Instant updatedAt
 ) {
 }

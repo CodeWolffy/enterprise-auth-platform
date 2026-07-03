@@ -370,7 +370,6 @@ public class CodegenApplicationService {
         builder.append("import com.baomidou.mybatisplus.annotation.TableId;\n");
         builder.append("import com.baomidou.mybatisplus.annotation.TableLogic;\n");
         builder.append("import com.baomidou.mybatisplus.annotation.TableName;\n");
-        builder.append("import java.time.LocalDateTime;\n");
         builder.append("import lombok.Data;\n\n");
         builder.append("@Data\n@TableName(\"").append(model.tableName()).append("\")\n");
         builder.append("public class ").append(model.className()).append("Entity {\n\n");
@@ -1136,7 +1135,7 @@ public class CodegenApplicationService {
             return "          <el-input-number v-model=\"" + modelPath + "\" :min=\"0\" controls-position=\"right\" style=\"width: 100%\" />\n";
         }
         if ("datetime".equals(htmlType)) {
-            return "          <el-date-picker v-model=\"" + modelPath + "\" type=\"datetime\" value-format=\"YYYY-MM-DDTHH:mm:ss\" placeholder=\"" + escapeVue(placeholder) + "\" style=\"width: 100%\" />\n";
+            return renderTemporalControl(modelPath, placeholder, column);
         }
         if ("boolean".equals(column.tsType())) {
             return "          <el-switch v-model=\"" + modelPath + "\" />\n";
@@ -1145,7 +1144,7 @@ public class CodegenApplicationService {
             return "          <el-input-number v-model=\"" + modelPath + "\" :min=\"0\" controls-position=\"right\" style=\"width: 100%\" />\n";
         }
         if (isTemporal(column)) {
-            return "          <el-date-picker v-model=\"" + modelPath + "\" type=\"datetime\" value-format=\"YYYY-MM-DDTHH:mm:ss\" placeholder=\"" + escapeVue(placeholder) + "\" style=\"width: 100%\" />\n";
+            return renderTemporalControl(modelPath, placeholder, column);
         }
         if (column.columnType() != null && column.columnType().toLowerCase(Locale.ROOT).contains("text")) {
             return "          <el-input v-model=\"" + modelPath + "\" type=\"textarea\" :rows=\"4\" placeholder=\"" + escapeVue(placeholder) + "\" clearable />\n";
@@ -1354,6 +1353,14 @@ public class CodegenApplicationService {
         };
     }
 
+    private String renderTemporalControl(String modelPath, String placeholder, CodegenColumnView column) {
+        return switch (column.dataType().toLowerCase(Locale.ROOT)) {
+            case "date" -> "          <el-date-picker v-model=\"" + modelPath + "\" type=\"date\" value-format=\"YYYY-MM-DD\" placeholder=\"" + escapeVue(placeholder) + "\" style=\"width: 100%\" />\n";
+            case "time" -> "          <el-time-picker v-model=\"" + modelPath + "\" value-format=\"HH:mm:ss\" placeholder=\"" + escapeVue(placeholder) + "\" style=\"width: 100%\" />\n";
+            default -> "          <el-date-picker v-model=\"" + modelPath + "\" type=\"datetime\" value-format=\"YYYY-MM-DDTHH:mm:ssZ\" placeholder=\"" + escapeVue(placeholder) + "\" style=\"width: 100%\" />\n";
+        };
+    }
+
     private String tsDefaultValue(CodegenColumnView column) {
         if ("boolean".equals(column.tsType())) {
             return "false";
@@ -1413,8 +1420,8 @@ public class CodegenApplicationService {
                 nullableLong(rs, "table_rows"),
                 nullableLong(rs, "data_length"),
                 nullableLong(rs, "index_length"),
-                nullableInstantMillis(rs, "create_time"),
-                nullableInstantMillis(rs, "update_time")
+                nullableInstant(rs, "create_time"),
+                nullableInstant(rs, "update_time")
         );
     }
 
@@ -1443,13 +1450,12 @@ public class CodegenApplicationService {
         return rs.wasNull() ? null : value;
     }
 
-    private Long nullableInstantMillis(ResultSet rs, String column) throws SQLException {
+    private Instant nullableInstant(ResultSet rs, String column) throws SQLException {
         var timestamp = rs.getTimestamp(column);
         if (timestamp == null) {
             return null;
         }
-        Instant instant = timestamp.toInstant();
-        return instant.toEpochMilli();
+        return timestamp.toInstant();
     }
 
     private String backendPath(CodegenModel model, String layer, String fileName) {
@@ -1541,7 +1547,9 @@ public class CodegenApplicationService {
             case "int", "integer", "smallint", "tinyint", "mediumint" -> "Integer";
             case "decimal", "numeric" -> "java.math.BigDecimal";
             case "float", "double" -> "Double";
-            case "datetime", "timestamp", "date", "time" -> "LocalDateTime";
+            case "datetime", "timestamp" -> "java.time.Instant";
+            case "date" -> "java.time.LocalDate";
+            case "time" -> "java.time.LocalTime";
             case "bit", "boolean" -> "Boolean";
             default -> "String";
         };

@@ -149,10 +149,10 @@ import { computed, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import type { FormInstance, FormRules, TagProps } from 'element-plus';
 import { ElButton, ElDescriptions, ElDescriptionsItem, ElDialog, ElDrawer, ElEmpty, ElForm, ElFormItem, ElInput, ElMessage, ElMessageBox, ElOption, ElPagination, ElSelect, ElTable, ElTableColumn, ElTag } from 'element-plus';
-import dayjs from 'dayjs';
 import { createWorkflowDefinition, deployWorkflowDefinition, disableWorkflowDefinition, queryWorkflowDefinitions } from '#/api/modules';
 import type { PageResult } from '#/types/api';
 import type { WorkflowDefinitionRequest, WorkflowDefinitionView, WorkflowStepInput, WorkflowStepView } from '#/types/workflow';
+import { formatDateTime as formatInstantDateTime } from '#/utils/datetime';
 
 const router = useRouter();
 const loading = ref(false);
@@ -385,8 +385,8 @@ function formatCandidates(step: WorkflowStepView) {
   return [users, groups].filter(Boolean).join('；') || '未配置候选范围';
 }
 
-function formatDateTime(value?: number | null) {
-  return value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-';
+function formatDateTime(value?: string | null) {
+  return formatInstantDateTime(value);
 }
 
 function definitionStatusText(status: string) {

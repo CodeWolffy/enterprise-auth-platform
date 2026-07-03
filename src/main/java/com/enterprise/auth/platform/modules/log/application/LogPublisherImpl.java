@@ -64,7 +64,7 @@ public class LogPublisherImpl implements LogPublisher {
         entity.setTenantId(StringUtils.hasText(event.tenantId()) ? event.tenantId() : "platform");
         entity.setEventType(event.type());
         entity.setOperator(event.operator());
-        entity.setCreatedAt(TimeSupport.utcNowDateTime());
+        entity.setCreatedAt(TimeSupport.now());
         entity.setCreatedBy(event.operator());
         entity.setRequestId(event.requestId());
         entity.setClientIp(clientIp);
@@ -91,7 +91,7 @@ public class LogPublisherImpl implements LogPublisher {
         entity.setBrowser(event.browser());
         entity.setOs(event.os());
         entity.setCreatedBy(event.operator());
-        entity.setCreatedAt(TimeSupport.utcNowDateTime());
+        entity.setCreatedAt(TimeSupport.now());
         sysLoginLogMapper.insert(entity);
     }
 

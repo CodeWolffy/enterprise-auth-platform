@@ -2,6 +2,7 @@ package com.enterprise.auth.platform.modules.auth.application;
 
 import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
+import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
@@ -12,6 +13,7 @@ import com.enterprise.auth.platform.modules.auth.interfaces.UserSessionResponse;
 import com.enterprise.auth.platform.modules.auth.application.SessionIndexService;
 import com.enterprise.auth.platform.modules.auth.application.SessionIndexService.Page;
 import com.enterprise.auth.platform.modules.notification.application.NotificationScenarioPublisher;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,7 +99,7 @@ public class SessionApplicationService {
                 .map(token -> safeSessionResponse(token, currentToken))
                 .flatMap(Optional::stream)
                 .filter(UserSessionResponse::active)
-                .sorted((a, b) -> Long.compare(b.lastAccessAt(), a.lastAccessAt()))
+                .sorted((a, b) -> Long.compare(instantEpoch(b.lastAccessAt()), instantEpoch(a.lastAccessAt())))
                 .toList();
     }
 
@@ -124,7 +126,7 @@ public class SessionApplicationService {
                     }
                 })
                 .filter(UserSessionResponse::active)
-                .sorted((a, b) -> Long.compare(b.lastAccessAt(), a.lastAccessAt()))
+                .sorted((a, b) -> Long.compare(instantEpoch(b.lastAccessAt()), instantEpoch(a.lastAccessAt())))
                 .limit(effectiveSize)
                 .toList();
         boolean hasCurrentSession = sessions.stream().anyMatch(UserSessionResponse::currentSession);
@@ -140,7 +142,7 @@ public class SessionApplicationService {
                         ))
                         .values()
                         .stream()
-                        .sorted((a, b) -> Long.compare(b.lastAccessAt(), a.lastAccessAt()))
+                        .sorted((a, b) -> Long.compare(instantEpoch(b.lastAccessAt()), instantEpoch(a.lastAccessAt())))
                         .limit(effectiveSize)
                         .toList();
             }
@@ -221,6 +223,10 @@ public class SessionApplicationService {
         }
     }
 
+    private long instantEpoch(Instant instant) {
+        return instant == null ? 0L : instant.toEpochMilli();
+    }
+
     private UserSessionResponse toSessionResponse(String token, String currentToken) {
         SaSession tokenSession = StpUtil.getTokenSessionByToken(token);
         long issuedAt = sessionLong(tokenSession, "issuedAt", 0L);
@@ -235,9 +241,9 @@ public class SessionApplicationService {
                 sessionString(tokenSession, "clientIp", ""),
                 sessionString(tokenSession, "loginLocation", ""),
                 sessionString(tokenSession, "device", "unknown"),
-                issuedAt,
-                expiresAt,
-                lastAccessAt,
+                TimeSupport.fromEpochMilli(issuedAt),
+                TimeSupport.fromEpochMilli(expiresAt),
+                TimeSupport.fromEpochMilli(lastAccessAt),
                 StpUtil.stpLogic.getLoginIdByToken(token) != null,
                 currentSession
         );

@@ -16,6 +16,7 @@ import { useAccessStore } from '@vben/stores';
 import { ElMessage } from 'element-plus';
 
 import { useAuthStore } from '#/store';
+import { getClientTimeZone } from '#/utils/datetime';
 
 const { apiURL } = useAppConfig(import.meta.env, import.meta.env.PROD);
 
@@ -199,6 +200,7 @@ function createRequestClient(baseURL: string, options?: RequestClientOptions) {
         headers.Authorization = `Bearer ${token}`;
       }
       headers['Accept-Language'] = preferences.app.locale;
+      headers['X-Time-Zone'] = getClientTimeZone();
       return config;
     },
   });

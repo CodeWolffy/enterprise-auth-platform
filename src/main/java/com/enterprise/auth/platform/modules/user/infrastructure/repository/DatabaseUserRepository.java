@@ -95,7 +95,7 @@ public class DatabaseUserRepository implements UserRepository {
         }
         entity.setSessionVersion((entity.getSessionVersion() == null ? 1 : entity.getSessionVersion()) + 1);
         entity.setUpdatedBy(entity.getUsername());
-        entity.setPasswordUpdatedAt(TimeSupport.utcNowDateTime());
+        entity.setPasswordUpdatedAt(TimeSupport.now());
         sysUserMapper.updateById(entity);
         permissionSnapshotInvalidationService.invalidateUser(entity.getId(), entity.getTenantId(), entity.getUsername());
     }

@@ -1,7 +1,10 @@
 <script lang="ts" setup>
 import type { VbenFormSchema } from '@vben/common-ui';
 
-import type { CaptchaTrackPayload } from '#/components/slider-captcha/types';
+import type {
+  CaptchaStatus,
+  CaptchaTrackPayload,
+} from '#/components/slider-captcha/types';
 
 import { computed, reactive, ref } from 'vue';
 
@@ -29,7 +32,7 @@ const loginUser = reactive({
 
 const captchaDialogVisible = ref(false);
 const captchaLoading = ref(false);
-const captchaVerifying = ref(false);
+const captchaStatus = ref<CaptchaStatus>('ready');
 const captcha = reactive({
   background: '',
   slider: '',
@@ -69,6 +72,10 @@ function toDataUrl(image: string | undefined, mime: string) {
   return image.startsWith('data:') ? image : `data:${mime};base64,${image}`;
 }
 
+function delay(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 async function reloadCaptcha() {
   captchaLoading.value = true;
   try {
@@ -102,19 +109,25 @@ async function handleSubmit(val: Record<string, any>) {
 // 滑块拖动完成 -> 校验轨迹 -> 登录
 async function handleVerify(trackPayload: CaptchaTrackPayload) {
   const code = JSON.stringify(trackPayload);
-  captchaVerifying.value = true;
+  captchaStatus.value = 'verifying';
   try {
     const verification = await verifyCaptchaApi(loginUser.captchaId, code);
     loginUser.captchaCode = verification.token;
   } catch {
+    // 校验失败：红色反馈后自动换一张
     loginUser.captchaCode = '';
+    captchaStatus.value = 'error';
+    await delay(700);
     await reloadCaptcha();
-    captchaVerifying.value = false;
+    captchaStatus.value = 'ready';
     return;
   }
 
+  // 校验通过：短暂展示成功态再关闭弹窗
+  captchaStatus.value = 'success';
+  await delay(420);
   captchaDialogVisible.value = false;
-  captchaVerifying.value = false;
+  captchaStatus.value = 'ready';
 
   await doLogin();
 }
@@ -158,7 +171,7 @@ async function doLogin() {
       destroy-on-close
       title="安全验证"
       :close-on-click-modal="false"
-      :show-close="!captchaVerifying"
+      :show-close="captchaStatus === 'ready' || captchaStatus === 'error'"
       width="min(420px, calc(100vw - 32px))"
     >
       <div class="captcha-dialog__body">
@@ -171,7 +184,7 @@ async function doLogin() {
           :slider-height="captcha.sliderHeight"
           :slider-image="captcha.slider"
           :slider-width="captcha.sliderWidth"
-          :verifying="captchaVerifying"
+          :status="captchaStatus"
           @refresh="reloadCaptcha"
           @verify="handleVerify"
         />

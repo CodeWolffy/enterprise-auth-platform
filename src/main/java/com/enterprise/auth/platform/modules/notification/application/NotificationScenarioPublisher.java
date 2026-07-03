@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.modules.notification.application;
 
 import com.enterprise.auth.platform.common.TimeSupport;
+import com.enterprise.auth.platform.common.context.TimeZoneContext;
 import com.enterprise.auth.platform.modules.user.application.UserAuthenticationFacade;
 import com.enterprise.auth.platform.modules.user.application.UserQueryFacade;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
@@ -136,7 +137,7 @@ public class NotificationScenarioPublisher {
                 "账号已被临时锁定",
                 "你的账号因连续登录失败被临时锁定。\n来源 IP：" + fallback(clientIp, "未知"),
                 "ERROR",
-                "ACCOUNT_LOCKED:" + tenantId + ":" + user.getId() + ":" + TimeSupport.utcNowDateTime().toLocalDate(),
+                "ACCOUNT_LOCKED:" + tenantId + ":" + user.getId() + ":" + TimeSupport.toLocalDate(TimeSupport.now(), TimeZoneContext.getZone()),
                 Map.of("clientIp", fallback(clientIp, "")),
                 username
         );
@@ -150,7 +151,7 @@ public class NotificationScenarioPublisher {
                 "收到密码重置请求",
                 "你的账号收到一次密码重置请求。\n来源 IP：" + fallback(clientIp, "未知") + "\n如果不是你本人操作，请尽快联系管理员。",
                 "WARNING",
-                "PASSWORD_RESET_REQUESTED:" + userId + ":" + TimeSupport.utcNowDateTime(),
+                "PASSWORD_RESET_REQUESTED:" + userId + ":" + TimeSupport.now(),
                 Map.of("clientIp", fallback(clientIp, "")),
                 username
         );
@@ -164,7 +165,7 @@ public class NotificationScenarioPublisher {
                 "密码已重置",
                 "你的账号密码已通过重置流程更新，旧会话已失效。",
                 "SUCCESS",
-                "PASSWORD_RESET_COMPLETED:" + userId + ":" + TimeSupport.utcNowDateTime(),
+                "PASSWORD_RESET_COMPLETED:" + userId + ":" + TimeSupport.now(),
                 Map.of(),
                 username
         );
@@ -178,7 +179,7 @@ public class NotificationScenarioPublisher {
                 "密码已修改",
                 "你的账号密码已成功修改。若非本人操作，请立即联系管理员。",
                 "SUCCESS",
-                "PASSWORD_CHANGED:" + userId + ":" + TimeSupport.utcNowDateTime(),
+                "PASSWORD_CHANGED:" + userId + ":" + TimeSupport.now(),
                 Map.of(),
                 username
         );
@@ -192,7 +193,7 @@ public class NotificationScenarioPublisher {
                 "管理员已重置你的密码",
                 "管理员 " + fallback(operator, "系统") + " 已重置你的账号密码，请按要求重新登录并修改密码。",
                 "WARNING",
-                "ADMIN_PASSWORD_RESET:" + userId + ":" + TimeSupport.utcNowDateTime(),
+                "ADMIN_PASSWORD_RESET:" + userId + ":" + TimeSupport.now(),
                 Map.of("operator", fallback(operator, "")),
                 operator
         );
@@ -206,7 +207,7 @@ public class NotificationScenarioPublisher {
                 "账号已被禁用",
                 "管理员 " + fallback(operator, "系统") + " 已禁用你的账号，当前在线会话将失效。",
                 "ERROR",
-                "ACCOUNT_DISABLED:" + userId + ":" + TimeSupport.utcNowDateTime(),
+                "ACCOUNT_DISABLED:" + userId + ":" + TimeSupport.now(),
                 Map.of("operator", fallback(operator, "")),
                 operator
         );
@@ -220,7 +221,7 @@ public class NotificationScenarioPublisher {
                 "登录会话已被强制下线",
                 "你的一个登录会话已被 " + fallback(operator, "管理员") + " 强制下线。",
                 "WARNING",
-                "SESSION_FORCED_OFFLINE:" + userId + ":" + payloadValue(payload, "sessionId", TimeSupport.utcNowDateTime().toString()),
+                "SESSION_FORCED_OFFLINE:" + userId + ":" + payloadValue(payload, "sessionId", TimeSupport.now().toString()),
                 payload == null ? Map.of() : payload,
                 operator
         );

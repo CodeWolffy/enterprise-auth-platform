@@ -181,11 +181,11 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue';
 import type { FormInstance, FormRules, TagProps } from 'element-plus';
-import dayjs from 'dayjs';
 import { ElButton, ElDescriptions, ElDescriptionsItem, ElDialog, ElDrawer, ElEmpty, ElForm, ElFormItem, ElInput, ElMessage, ElMessageBox, ElOption, ElPagination, ElSelect, ElTable, ElTableColumn, ElTag } from 'element-plus';
 import { listWorkflowInstanceUrges, queryMyWorkflowInstances, queryWorkflowDefinitions, startWorkflowInstance, terminateWorkflowInstance, withdrawWorkflowInstance } from '#/api/modules';
 import type { PageResult } from '#/types/api';
 import type { WorkflowDefinitionView, WorkflowInstanceView, WorkflowStartRequest, WorkflowTaskUrgeView } from '#/types/workflow';
+import { formatDateTime as formatInstantDateTime } from '#/utils/datetime';
 
 const loading = ref(false);
 const definitionLoading = ref(false);
@@ -394,8 +394,8 @@ function instanceStatusTag(status: string): TagProps['type'] {
   return 'info';
 }
 
-function formatDateTime(value?: number | null) {
-  return value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-';
+function formatDateTime(value?: string | null) {
+  return formatInstantDateTime(value);
 }
 </script>
 

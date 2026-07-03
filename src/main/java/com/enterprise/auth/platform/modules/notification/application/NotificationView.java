@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.modules.notification.application;
 
-import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.modules.notification.infrastructure.entity.SysUserNotificationEntity;
+import java.time.Instant;
 
 public record NotificationView(
         Long id,
@@ -17,9 +17,9 @@ public record NotificationView(
         String actionPayload,
         String metadata,
         boolean read,
-        Long readAt,
-        Long expiresAt,
-        Long createdAt
+        Instant readAt,
+        Instant expiresAt,
+        Instant createdAt
 ) {
     static NotificationView from(SysUserNotificationEntity entity) {
         return new NotificationView(
@@ -36,9 +36,9 @@ public record NotificationView(
                 entity.getActionPayloadJson(),
                 entity.getMetadataJson(),
                 entity.getReadAt() != null,
-                TimeSupport.toEpochMilli(entity.getReadAt()),
-                TimeSupport.toEpochMilli(entity.getExpiresAt()),
-                TimeSupport.toEpochMilli(entity.getCreatedAt())
+                entity.getReadAt(),
+                entity.getExpiresAt(),
+                entity.getCreatedAt()
         );
     }
 }

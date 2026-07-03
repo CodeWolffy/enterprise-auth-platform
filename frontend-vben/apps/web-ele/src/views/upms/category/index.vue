@@ -36,6 +36,7 @@ import { CanvasRenderer } from 'echarts/renderers';
 
 import { delObj, getAnalysis, getOptions } from '#/api/upms/category';
 import { invokeWhenComponentReady } from '#/utils/component-ready';
+import { formatDateTime } from '#/utils/datetime';
 import { useTablePreferences } from '@vben/hooks';
 import type { CategoryAnalysis, CategoryOption } from '#/types/system';
 
@@ -441,7 +442,7 @@ initPage();
               <ElTableColumn prop="operator" label="操作人" min-width="120" />
               <ElTableColumn label="发生时间" min-width="180">
                 <template #default="{ row }">
-                  {{ row.occurredAt ? new Date(row.occurredAt).toLocaleString() : '-' }}
+                  {{ formatDateTime(row.occurredAt) }}
                 </template>
               </ElTableColumn>
               <ElTableColumn label="审计负载" min-width="260">

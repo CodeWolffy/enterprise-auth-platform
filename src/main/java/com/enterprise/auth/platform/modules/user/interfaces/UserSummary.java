@@ -2,6 +2,7 @@ package com.enterprise.auth.platform.modules.user.interfaces;
 
 import com.enterprise.auth.platform.common.authz.DataScopeType;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.Instant;
 import java.util.Set;
 
 @Schema(description = "用户列表项")
@@ -17,8 +18,8 @@ public record UserSummary(
         @Schema(description = "角色编码集合") Set<String> roles,
         @Schema(description = "权限编码集合") Set<String> permissions,
         @Schema(description = "数据权限范围") DataScopeType dataScopeType,
-        @Schema(description = "创建时间，epoch 毫秒") Long createdAt,
-        @Schema(description = "最后登录时间，epoch 毫秒") Long lastLoginAt,
+        @Schema(description = "创建时间，ISO-8601 UTC") Instant createdAt,
+        @Schema(description = "最后登录时间，ISO-8601 UTC") Instant lastLoginAt,
         @Schema(description = "最后登录 IP") String lastLoginIp
 ) {
 }

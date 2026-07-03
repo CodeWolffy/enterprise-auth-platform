@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import type { FormInstance } from 'element-plus';
 
-import type { CaptchaTrackPayload } from '#/components/slider-captcha/types';
+import type {
+  CaptchaStatus,
+  CaptchaTrackPayload,
+} from '#/components/slider-captcha/types';
 
 import { onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -94,7 +97,7 @@ const state = reactive({
 // 滑块验证码状态
 const captchaDialogVisible = ref(false);
 const captchaLoading = ref(false);
-const captchaVerifying = ref(false);
+const captchaStatus = ref<CaptchaStatus>('ready');
 const captchaVerified = ref(false);
 // 二次校验通过后返回的 token，注册接口以此作为 captchaId 下发
 const captchaToken = ref('');
@@ -111,6 +114,10 @@ const captcha = reactive({
 function toDataUrl(image: string | undefined, mime: string) {
   if (!image) return '';
   return image.startsWith('data:') ? image : `data:${mime};base64,${image}`;
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 async function reloadCaptcha() {
@@ -138,18 +145,24 @@ async function openCaptchaDialog() {
 
 async function handleVerify(trackPayload: CaptchaTrackPayload) {
   const code = JSON.stringify(trackPayload);
-  captchaVerifying.value = true;
+  captchaStatus.value = 'verifying';
   try {
     const verification = await verifyCaptchaApi(currentCaptchaId, code);
     captchaToken.value = verification.token;
     captchaVerified.value = true;
+    // 校验通过：短暂展示成功态再关闭弹窗
+    captchaStatus.value = 'success';
+    await delay(420);
     captchaDialogVisible.value = false;
+    captchaStatus.value = 'ready';
   } catch {
+    // 校验失败：红色反馈后自动换一张
     captchaVerified.value = false;
     captchaToken.value = '';
+    captchaStatus.value = 'error';
+    await delay(700);
     await reloadCaptcha();
-  } finally {
-    captchaVerifying.value = false;
+    captchaStatus.value = 'ready';
   }
 }
 
@@ -312,6 +325,7 @@ onMounted(() => {
       align-center
       :close-on-click-modal="false"
       destroy-on-close
+      :show-close="captchaStatus === 'ready' || captchaStatus === 'error'"
       title="安全验证"
       width="min(420px, calc(100vw - 32px))"
     >
@@ -325,7 +339,7 @@ onMounted(() => {
           :slider-height="captcha.sliderHeight"
           :slider-image="captcha.slider"
           :slider-width="captcha.sliderWidth"
-          :verifying="captchaVerifying"
+          :status="captchaStatus"
           @refresh="reloadCaptcha"
           @verify="handleVerify"
         />

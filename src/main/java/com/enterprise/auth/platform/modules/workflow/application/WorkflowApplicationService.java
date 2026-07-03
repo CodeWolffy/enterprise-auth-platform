@@ -26,7 +26,7 @@ import com.enterprise.auth.platform.modules.workflow.infrastructure.mapper.WfTas
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -175,7 +175,7 @@ public class WorkflowApplicationService {
         instance.setStarterUsername(user.username());
         instance.setCurrentStepIndex(0);
         instance.setVariablesSnapshotJson(toJson(snapshotVariables(command.variables())));
-        instance.setStartedAt(TimeSupport.utcNowDateTime());
+        instance.setStartedAt(TimeSupport.now());
         try {
             instanceMapper.insert(instance);
         } catch (DuplicateKeyException e) {
@@ -234,7 +234,7 @@ public class WorkflowApplicationService {
         task.setAssigneeUserId(user.id());
         task.setAssigneeUsername(user.username());
         task.setComment(normalizeText(command.comment()));
-        task.setCompletedAt(TimeSupport.utcNowDateTime());
+        task.setCompletedAt(TimeSupport.now());
         completePendingTask(task);
 
         WorkflowTaskView nextTask = null;
@@ -242,7 +242,7 @@ public class WorkflowApplicationService {
         int nextStepIndex = task.getStepIndex() < 0 ? 0 : task.getStepIndex() + 1;
         if (nextStepIndex >= steps.size()) {
             instance.setStatus(WorkflowInstanceStatus.APPROVED.name());
-            instance.setEndedAt(TimeSupport.utcNowDateTime());
+            instance.setEndedAt(TimeSupport.now());
         } else {
             instance.setCurrentStepIndex(nextStepIndex);
             nextTaskEntity = createPendingTask(tenantId, instance, definition, steps.get(nextStepIndex), nextStepIndex);
@@ -274,14 +274,14 @@ public class WorkflowApplicationService {
         task.setAssigneeUserId(user.id());
         task.setAssigneeUsername(user.username());
         task.setComment(normalizeText(command.comment()));
-        task.setCompletedAt(TimeSupport.utcNowDateTime());
+        task.setCompletedAt(TimeSupport.now());
         completePendingTask(task);
 
         WorkflowTaskView nextTask = null;
         WfTaskEntity nextTaskEntity = null;
         if (nextStepIndex == -1) {
             instance.setStatus(WorkflowInstanceStatus.REJECTED.name());
-            instance.setEndedAt(TimeSupport.utcNowDateTime());
+            instance.setEndedAt(TimeSupport.now());
         } else if (nextStepIndex == -2) {
             instance.setCurrentStepIndex(-1);
             nextTaskEntity = createStarterReworkTask(tenantId, instance, definition, currentStep);
@@ -345,7 +345,7 @@ public class WorkflowApplicationService {
             throw new BusinessException("不能转签给自己");
         }
 
-        LocalDateTime now = TimeSupport.utcNowDateTime();
+        Instant now = TimeSupport.now();
         task.setStatus(WorkflowTaskStatus.TRANSFERRED.name());
         task.setAssigneeUserId(user.id());
         task.setAssigneeUsername(user.username());
@@ -383,7 +383,7 @@ public class WorkflowApplicationService {
         WorkflowNotificationRecipients recipients = pendingTaskRecipients(tenantId, instance.getId());
         cancelPendingTasks(tenantId, instance.getId(), WorkflowTaskStatus.CANCELLED, "发起人撤回");
         instance.setStatus(WorkflowInstanceStatus.WITHDRAWN.name());
-        instance.setEndedAt(TimeSupport.utcNowDateTime());
+        instance.setEndedAt(TimeSupport.now());
         instanceMapper.updateById(instance);
         publishWorkflowInstanceClosed(tenantId, instance, recipients, user.id(), user.username(), true);
         return toInstanceView(instance);
@@ -397,7 +397,7 @@ public class WorkflowApplicationService {
         WorkflowNotificationRecipients recipients = pendingTaskRecipients(tenantId, instance.getId());
         cancelPendingTasks(tenantId, instance.getId(), WorkflowTaskStatus.CANCELLED, normalizeText(command.comment()));
         instance.setStatus(WorkflowInstanceStatus.TERMINATED.name());
-        instance.setEndedAt(TimeSupport.utcNowDateTime());
+        instance.setEndedAt(TimeSupport.now());
         instanceMapper.updateById(instance);
         publishWorkflowInstanceClosed(tenantId, instance, recipients, user.id(), user.username(), false);
         return toInstanceView(instance);
@@ -624,7 +624,7 @@ public class WorkflowApplicationService {
                 .eq(WfTaskEntity::getDeleted, 0)
                 .set(WfTaskEntity::getStatus, status.name())
                 .set(WfTaskEntity::getComment, comment)
-                .set(WfTaskEntity::getCompletedAt, TimeSupport.utcNowDateTime()));
+                .set(WfTaskEntity::getCompletedAt, TimeSupport.now()));
         if (updated <= 0) {
             throw new BusinessException("CONFLICT", "流程待办状态已变化，请刷新后重试");
         }
@@ -894,8 +894,8 @@ public class WorkflowApplicationService {
                 entity.getStatus(),
                 stepViews,
                 entity.getRemark(),
-                TimeSupport.toEpochMilli(entity.getCreatedAt()),
-                TimeSupport.toEpochMilli(entity.getUpdatedAt())
+                entity.getCreatedAt(),
+                entity.getUpdatedAt()
         );
     }
 
@@ -913,8 +913,8 @@ public class WorkflowApplicationService {
                 entity.getStarterUsername(),
                 entity.getCurrentStepIndex(),
                 readMap(entity.getVariablesSnapshotJson()),
-                TimeSupport.toEpochMilli(entity.getStartedAt()),
-                TimeSupport.toEpochMilli(entity.getEndedAt())
+                entity.getStartedAt(),
+                entity.getEndedAt()
         );
     }
 
@@ -933,8 +933,8 @@ public class WorkflowApplicationService {
                 entity.getAssigneeUserId(),
                 entity.getAssigneeUsername(),
                 entity.getComment(),
-                TimeSupport.toEpochMilli(entity.getCreatedAt()),
-                TimeSupport.toEpochMilli(entity.getCompletedAt()),
+                entity.getCreatedAt(),
+                entity.getCompletedAt(),
                 WorkflowTaskStatus.PENDING.name().equals(entity.getStatus()) && isActionable(entity, user),
                 urgeCount
         );

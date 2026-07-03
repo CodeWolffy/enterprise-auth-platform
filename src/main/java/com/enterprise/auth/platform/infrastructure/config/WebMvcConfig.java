@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.infrastructure.config;
 
 import com.enterprise.auth.platform.common.web.RateLimitInterceptor;
+import com.enterprise.auth.platform.common.web.TimeZoneInterceptor;
 import com.enterprise.auth.platform.infrastructure.security.SaTokenUserContextInterceptor;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Configuration;
@@ -33,21 +34,26 @@ public class WebMvcConfig implements WebMvcConfigurer {
     );
 
     private final ObjectProvider<RateLimitInterceptor> rateLimitInterceptor;
+    private final TimeZoneInterceptor timeZoneInterceptor;
     private final SaTokenUserContextInterceptor userContextInterceptor;
     private final CorsProperties corsProperties;
 
     public WebMvcConfig(
             ObjectProvider<RateLimitInterceptor> rateLimitInterceptor,
+            TimeZoneInterceptor timeZoneInterceptor,
             SaTokenUserContextInterceptor userContextInterceptor,
             CorsProperties corsProperties
     ) {
         this.rateLimitInterceptor = rateLimitInterceptor;
+        this.timeZoneInterceptor = timeZoneInterceptor;
         this.userContextInterceptor = userContextInterceptor;
         this.corsProperties = corsProperties;
     }
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(timeZoneInterceptor)
+                .addPathPatterns("/api/**");
         registry.addInterceptor(new cn.dev33.satoken.interceptor.SaInterceptor(handle -> {
                     if (!"OPTIONS".equalsIgnoreCase(cn.dev33.satoken.context.SaHolder.getRequest().getMethod())) {
                         cn.dev33.satoken.stp.StpUtil.checkLogin();
@@ -71,8 +77,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addMapping("/api/**")
                 .allowedOriginPatterns(allowedOrigins.toArray(String[]::new))
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
-                .allowedHeaders("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin", "X-Tenant-Id")
-                .exposedHeaders("Authorization", "X-Request-Id")
+                .allowedHeaders("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin", "X-Tenant-Id", "X-Time-Zone")
+                .exposedHeaders("Authorization", "X-Request-Id", "X-Time-Zone")
                 .allowCredentials(true)
                 .maxAge(3600);
     }

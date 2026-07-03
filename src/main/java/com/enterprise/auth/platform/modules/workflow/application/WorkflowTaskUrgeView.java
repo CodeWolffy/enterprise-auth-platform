@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.modules.workflow.application;
 
-import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfTaskUrgeEntity;
+import java.time.Instant;
 import java.util.Set;
 
 public record WorkflowTaskUrgeView(
@@ -11,7 +11,7 @@ public record WorkflowTaskUrgeView(
         Long urgedByUserId,
         String urgedByUsername,
         String comment,
-        Long urgedAt,
+        Instant urgedAt,
         Set<String> targetUsernames
 ) {
     public static WorkflowTaskUrgeView from(WfTaskUrgeEntity entity, Set<String> targetUsernames) {
@@ -22,7 +22,7 @@ public record WorkflowTaskUrgeView(
                 entity.getUrgedByUserId(),
                 entity.getUrgedByUsername(),
                 entity.getComment(),
-                TimeSupport.toEpochMilli(entity.getUrgedAt()),
+                entity.getUrgedAt(),
                 targetUsernames
         );
     }

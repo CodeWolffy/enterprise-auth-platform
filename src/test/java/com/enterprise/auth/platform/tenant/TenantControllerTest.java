@@ -41,7 +41,6 @@ class TenantControllerTest {
     private static final String LINKAGE_PACKAGE_NAME = "租户联动测试套餐";
     private static final String APP_KEY = "tenant-menu-ut";
     private static final String OTHER_APP_KEY = "tenant-menu-ut-other";
-    private static final long SEVEN_DAYS_MS = 7L * 24 * 3600 * 1000;
 
     @Autowired
     private MockMvc mockMvc;
@@ -118,20 +117,22 @@ class TenantControllerTest {
     }
 
     @Test
-    void tenantHistoryShouldRejectLocalDateTimeWithoutTimezone() throws Exception {
+    void tenantHistoryShouldRejectTimezoneLessRangeParameters() throws Exception {
         mockMvc.perform(get("/api/tenants/{tenantId}/history", HISTORY_TENANT_ID)
                         .with(bearer(principal("upms:systenant:get"), HISTORY_TENANT_ID))
                         .header("X-Tenant-Id", HISTORY_TENANT_ID)
-                        .param("fromEpochMs", "2026-03-01T00:00:00")
-                        .param("toEpochMs", "2026-03-31T23:59:59"))
+                        .param("from", "2026-03-01T00:00:00")
+                        .param("to", "2026-03-31T23:59:59"))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void tenantProfileFieldsShouldBePersistedAndReturned() throws Exception {
         seedLinkagePackage(APP_KEY);
-        long authBeginAt = (System.currentTimeMillis() / 1000) * 1000;
-        long expireAt = authBeginAt + 30L * 24 * 3600 * 1000;
+        java.time.Instant authBeginInstant = java.time.Instant.now()
+                .truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        String authBeginAt = authBeginInstant.toString();
+        String expireAt = authBeginInstant.plus(java.time.Duration.ofDays(30)).toString();
 
         mockMvc.perform(post("/api/tenants")
                         .with(bearer(principal("upms:systenant:add"), "platform"))
@@ -143,8 +144,8 @@ class TenantControllerTest {
                                   "tenantName": "租户资料字段测试",
                                   "platformLevel": false,
                                   "tenantStatus": 1,
-                                  "authBeginAt": %d,
-                                  "expireAt": %d,
+                                  "authBeginAt": "%s",
+                                  "expireAt": "%s",
                                   "packageCode": "tenant-package-linkage-ut",
                                   "logoUrl": "https://cdn.example.com/logo.png",
                                   "contactName": "张三",
@@ -184,8 +185,8 @@ class TenantControllerTest {
                                   "tenantName": "租户资料字段测试更新",
                                   "platformLevel": false,
                                   "tenantStatus": 1,
-                                  "authBeginAt": %d,
-                                  "expireAt": %d,
+                                  "authBeginAt": "%s",
+                                  "expireAt": "%s",
                                   "packageCode": "tenant-package-linkage-ut",
                                   "logoUrl": "https://cdn.example.com/logo-updated.png",
                                   "contactName": "李四",

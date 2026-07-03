@@ -15,6 +15,7 @@ import {
 
 import { getStats } from '#/api/dashboard';
 import { useAuthStore } from '#/store/auth';
+import { formatDateTime, formatRelativeTime } from '#/utils/datetime';
 import * as echarts from 'echarts/core';
 import { LineChart } from 'echarts/charts';
 import {
@@ -46,7 +47,7 @@ const stats = ref({
   todayRiskEventCount: 0,
   dailyTrend: [] as Array<{ date: string; loginCount: number; operationCount: number; loginFailedCount: number }>,
   serviceHealth: [] as Array<{ code: string; name: string; status: string; message: string }>,
-  recentAuditEvents: [] as Array<{ eventType: string; operator: string; tenantId: string; clientIp: string; occurredAt: number }>,
+  recentAuditEvents: [] as Array<{ eventType: string; operator: string; tenantId: string; clientIp: string; occurredAt: string }>,
 });
 
 const authStore = useAuthStore();
@@ -107,23 +108,7 @@ const healthTagType = (status: string) => {
   return map[status] || 'info';
 };
 
-const formatTimestamp = (timestamp: number) => {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-
-  if (minutes < 1) return '刚刚';
-  if (minutes < 60) return `${minutes}分钟前`;
-  if (hours < 24) return `${hours}小时前`;
-  return date.toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-};
+const formatTimestamp = (timestamp?: string | null) => formatRelativeTime(timestamp);
 
 const renderTrendChart = () => {
   if (!chartRef.value || !stats.value.dailyTrend.length) {
@@ -323,7 +308,7 @@ onMounted(() => {
               <el-table-column label="精确时间">
                 <template #default="{ row }">
                   <span style="color: #c0c4cc; font-size: 12px;">
-                    {{ new Date(row.occurredAt).toLocaleString('zh-CN') }}
+                    {{ formatDateTime(row.occurredAt) }}
                   </span>
                 </template>
               </el-table-column>

@@ -199,7 +199,7 @@ class DashboardStatsServiceP1Test {
                 eventType,
                 operator,
                 "{}",
-                TimeSupport.utcNowDateTime(),
+                java.sql.Timestamp.from(TimeSupport.now()),
                 "p1db-" + operator + "-" + eventType,
                 "127.0.0.1"
         );
@@ -217,7 +217,7 @@ class DashboardStatsServiceP1Test {
                     loginStatus,
                     eventType,
                     "127.0.0.1",
-                    TimeSupport.utcNowDateTime()
+                    java.sql.Timestamp.from(TimeSupport.now())
             );
         }
     }

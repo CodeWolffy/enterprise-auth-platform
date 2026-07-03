@@ -5,6 +5,7 @@ import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.common.context.TimeZoneContext;
 import com.enterprise.auth.platform.modules.dashboard.interfaces.DashboardStatsResponse.DailyTrendPoint;
 import com.enterprise.auth.platform.modules.dashboard.interfaces.DashboardStatsResponse.RecentAuditEvent;
 import com.enterprise.auth.platform.modules.log.infrastructure.entity.SysLogEntity;
@@ -14,8 +15,10 @@ import com.enterprise.auth.platform.modules.log.infrastructure.mapper.SysLoginLo
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
@@ -40,20 +43,20 @@ public class LogStatsFacade {
     public long countOperationLogs(String tenantId, boolean platformScope, Optional<Set<String>> visibleUsernames, boolean recentOnly) {
         LambdaQueryWrapper<SysLogEntity> wrapper = logScope(tenantId, platformScope, visibleUsernames);
         if (recentOnly) {
-            wrapper.ge(SysLogEntity::getCreatedAt, TimeSupport.utcNowDateTime().minusDays(1));
+            wrapper.ge(SysLogEntity::getCreatedAt, TimeSupport.now().minus(Duration.ofDays(1)));
         }
         return sysLogMapper.selectCount(wrapper);
     }
 
     public long countOperationLogs(String tenantId, boolean platformScope, Optional<Set<String>> visibleUsernames,
-                                    LocalDateTime fromInclusive, LocalDateTime toExclusive) {
+                                    Instant fromInclusive, Instant toExclusive) {
         LambdaQueryWrapper<SysLogEntity> wrapper = logScope(tenantId, platformScope, visibleUsernames);
         applyTimeRange(wrapper, fromInclusive, toExclusive);
         return sysLogMapper.selectCount(wrapper);
     }
 
     public long countOperationLogs(String tenantId, boolean platformScope, Optional<Set<String>> visibleUsernames,
-                                    String eventType, LocalDateTime fromInclusive, LocalDateTime toExclusive) {
+                                    String eventType, Instant fromInclusive, Instant toExclusive) {
         LambdaQueryWrapper<SysLogEntity> wrapper = logScope(tenantId, platformScope, visibleUsernames)
                 .eq(SysLogEntity::getEventType, eventType);
         applyTimeRange(wrapper, fromInclusive, toExclusive);
@@ -61,7 +64,7 @@ public class LogStatsFacade {
     }
 
     public long countOperationLogs(String tenantId, boolean platformScope, Optional<Set<String>> visibleUsernames,
-                                    Set<String> eventTypes, LocalDateTime fromInclusive, LocalDateTime toExclusive) {
+                                    Set<String> eventTypes, Instant fromInclusive, Instant toExclusive) {
         LambdaQueryWrapper<SysLogEntity> wrapper = logScope(tenantId, platformScope, visibleUsernames)
                 .in(SysLogEntity::getEventType, eventTypes);
         applyTimeRange(wrapper, fromInclusive, toExclusive);
@@ -69,14 +72,14 @@ public class LogStatsFacade {
     }
 
     public long countLoginLogs(String tenantId, boolean platformScope, Optional<Set<String>> visibleUsernames,
-                                LocalDateTime fromInclusive, LocalDateTime toExclusive) {
+                                Instant fromInclusive, Instant toExclusive) {
         LambdaQueryWrapper<SysLoginLogEntity> wrapper = loginScope(tenantId, platformScope, visibleUsernames);
         applyLoginTimeRange(wrapper, fromInclusive, toExclusive);
         return sysLoginLogMapper.selectCount(wrapper);
     }
 
     public long countLoginLogs(String tenantId, boolean platformScope, Optional<Set<String>> visibleUsernames,
-                                String status, LocalDateTime fromInclusive, LocalDateTime toExclusive) {
+                                String status, Instant fromInclusive, Instant toExclusive) {
         LambdaQueryWrapper<SysLoginLogEntity> wrapper = loginScope(tenantId, platformScope, visibleUsernames)
                 .eq(SysLoginLogEntity::getStatus, status);
         applyLoginTimeRange(wrapper, fromInclusive, toExclusive);
@@ -84,13 +87,14 @@ public class LogStatsFacade {
     }
 
     public List<DailyTrendPoint> dailyTrend(String tenantId, boolean platformScope, Optional<Set<String>> visibleUsernames) {
-        LocalDate startDate = TimeSupport.utcNowDateTime().toLocalDate().minusDays(6);
+        ZoneId zone = TimeZoneContext.getZone();
+        LocalDate startDate = TimeSupport.today(zone).minusDays(6);
         DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE;
         return java.util.stream.IntStream.range(0, 7)
                 .mapToObj(offset -> {
                     LocalDate date = startDate.plusDays(offset);
-                    LocalDateTime from = date.atStartOfDay();
-                    LocalDateTime to = date.plusDays(1).atStartOfDay();
+                    Instant from = TimeSupport.startOfDay(date, zone);
+                    Instant to = TimeSupport.startOfDay(date.plusDays(1), zone);
                     return new DailyTrendPoint(
                             formatter.format(date),
                             countLoginLogs(tenantId, platformScope, visibleUsernames, "SUCCESS", from, to),
@@ -111,7 +115,7 @@ public class LogStatsFacade {
                         entity.getOperator(),
                         entity.getTenantId(),
                         entity.getClientIp(),
-                        entity.getCreatedAt() != null ? TimeSupport.toEpochMilli(entity.getCreatedAt()) : null
+                        entity.getCreatedAt()
                 ))
                 .toList();
     }
@@ -140,7 +144,7 @@ public class LogStatsFacade {
         return wrapper;
     }
 
-    private void applyTimeRange(LambdaQueryWrapper<SysLogEntity> wrapper, LocalDateTime fromInclusive, LocalDateTime toExclusive) {
+    private void applyTimeRange(LambdaQueryWrapper<SysLogEntity> wrapper, Instant fromInclusive, Instant toExclusive) {
         if (fromInclusive != null) {
             wrapper.ge(SysLogEntity::getCreatedAt, fromInclusive);
         }
@@ -149,7 +153,7 @@ public class LogStatsFacade {
         }
     }
 
-    private void applyLoginTimeRange(LambdaQueryWrapper<SysLoginLogEntity> wrapper, LocalDateTime fromInclusive, LocalDateTime toExclusive) {
+    private void applyLoginTimeRange(LambdaQueryWrapper<SysLoginLogEntity> wrapper, Instant fromInclusive, Instant toExclusive) {
         if (fromInclusive != null) {
             wrapper.ge(SysLoginLogEntity::getCreatedAt, fromInclusive);
         }

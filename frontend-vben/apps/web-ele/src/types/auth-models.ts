@@ -29,7 +29,7 @@ export interface MenuItem {
 export interface TokenSessionResponse {
   tenantId: string;
   token: string;
-  expiresAt: number;
+  expiresAt: string;
   passwordChangeRequired?: boolean;
   passwordChangeReason?: 'FORCE_CHANGE' | 'PASSWORD_EXPIRED' | string | null;
 }
@@ -42,9 +42,9 @@ export interface UserSessionView {
   clientIp?: string | null;
   loginLocation?: string | null;
   device?: string | null;
-  issuedAt?: number | null;
-  expiresAt?: number | null;
-  lastAccessAt?: number | null;
+  issuedAt?: string | null;
+  expiresAt?: string | null;
+  lastAccessAt?: string | null;
   active: boolean;
   currentSession?: boolean;
 }
@@ -89,4 +89,3 @@ export interface RegisterOptionsResponse {
   defaultTenantId: string;
   defaultRoleCodes: string[];
 }
-

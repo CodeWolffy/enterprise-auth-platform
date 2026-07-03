@@ -86,8 +86,8 @@ public class TenantManagementService {
         entity.setTenantName(request.tenantName());
         entity.setPlatformLevel(request.platformLevel() ? 1 : 0);
         entity.setTenantStatus(request.tenantStatus() == null ? 1 : request.tenantStatus());
-        entity.setAuthBeginAt(TimeSupport.localDateTimeFromEpochMilli(request.authBeginAt()));
-        entity.setExpireAt(TimeSupport.localDateTimeFromEpochMilli(request.expireAt()));
+        entity.setAuthBeginAt(request.authBeginAt());
+        entity.setExpireAt(request.expireAt());
         entity.setPackageCode(request.packageCode());
         entity.setLogoUrl(trimToNull(request.logoUrl()));
         entity.setContactName(trimToNull(request.contactName()));
@@ -124,8 +124,8 @@ public class TenantManagementService {
         SysTenantEntity entity = getTenant(tenantId);
         String oldTenantName = entity.getTenantName();
         Integer oldTenantStatus = entity.getTenantStatus();
-        java.time.LocalDateTime oldAuthBeginAt = entity.getAuthBeginAt();
-        java.time.LocalDateTime oldExpireAt = entity.getExpireAt();
+        java.time.Instant oldAuthBeginAt = entity.getAuthBeginAt();
+        java.time.Instant oldExpireAt = entity.getExpireAt();
         String oldLogoUrl = entity.getLogoUrl();
         String oldContactName = entity.getContactName();
         String oldContactPhone = entity.getContactPhone();
@@ -138,8 +138,8 @@ public class TenantManagementService {
         if (request.tenantStatus() != null) {
             entity.setTenantStatus(request.tenantStatus());
         }
-        entity.setAuthBeginAt(TimeSupport.localDateTimeFromEpochMilli(request.authBeginAt()));
-        entity.setExpireAt(TimeSupport.localDateTimeFromEpochMilli(request.expireAt()));
+        entity.setAuthBeginAt(request.authBeginAt());
+        entity.setExpireAt(request.expireAt());
         entity.setPackageCode(request.packageCode());
         entity.setLogoUrl(trimToNull(request.logoUrl()));
         entity.setContactName(trimToNull(request.contactName()));
@@ -302,8 +302,8 @@ public class TenantManagementService {
                 tenant.getTenantName(),
                 tenant.getPlatformLevel() != null && tenant.getPlatformLevel() == 1,
                 tenant.getTenantStatus(),
-                TimeSupport.toEpochMilli(tenant.getAuthBeginAt()),
-                TimeSupport.toEpochMilli(tenant.getExpireAt()),
+                tenant.getAuthBeginAt(),
+                tenant.getExpireAt(),
                 profile.packageCode(),
                 profile.packageName(),
                 tenant.getLogoUrl(),
@@ -381,7 +381,7 @@ public class TenantManagementService {
             @Schema(description = "变更摘要") String summary,
             @Schema(description = "影响说明") String impactSummary,
             @Schema(description = "操作人") String operator,
-            @Schema(description = "变更时间") Long occurredAt
+            @Schema(description = "变更时间，ISO-8601 UTC") java.time.Instant occurredAt
     ) {
     }
 

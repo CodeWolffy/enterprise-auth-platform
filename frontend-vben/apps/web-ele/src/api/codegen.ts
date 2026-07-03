@@ -12,10 +12,10 @@ export interface DataSourceView {
   enabled: boolean;
   external: boolean;
   externalAuthorized: boolean;
-  authorizedAt?: number | null;
+  authorizedAt?: string | null;
   authorizationNote?: string | null;
-  createdAt?: number | null;
-  updatedAt?: number | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 }
 
 export async function getDataSources() {

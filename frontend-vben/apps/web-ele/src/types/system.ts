@@ -60,7 +60,7 @@ export interface CategoryOption {
 export interface CategoryAuditView {
   eventType: string;
   operator: string;
-  occurredAt?: number | null;
+  occurredAt?: string | null;
   payloadJson: string;
 }
 
@@ -74,4 +74,3 @@ export interface CategoryAnalysis {
   recentAudits: CategoryAuditView[];
   trend: { date: string; count: number }[];
 }
-

@@ -393,7 +393,7 @@ public class FileApplicationService {
                 entity.getVisibility(),
                 entity.getTenantId(),
                 entity.getOwnerUserId(),
-                TimeSupport.toEpochMilli(entity.getCreatedAt()),
+                entity.getCreatedAt(),
                 FileVisibility.from(entity.getVisibility()) == FileVisibility.PUBLIC ? publicUrl(entity) : null
         );
     }
@@ -446,7 +446,7 @@ public class FileApplicationService {
 
     private String buildObjectKey(String tenantId, String fileKey, String originalFilename) {
         String extension = safeExtension(originalFilename);
-        return String.join("/", "tenant", tenantId, PATH_DATE.format(TimeSupport.utcNowDateTime()), fileKey + extension);
+        return String.join("/", "tenant", tenantId, PATH_DATE.format(TimeSupport.now()), fileKey + extension);
     }
 
     private String safeExtension(String originalFilename) {

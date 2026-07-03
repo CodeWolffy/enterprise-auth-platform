@@ -1,16 +1,26 @@
 /**
- * 统一时间格式化工具
- * 后端返回的时间字段均为 epoch 毫秒数 (Long)，需要在前端统一格式化。
+ * 统一时间工具。
+ * 后端公开 API 使用 ISO-8601 Instant 字符串，业务时区通过 X-Time-Zone 传递。
  */
 
-const formatterCache = new Map<string, Intl.DateTimeFormat>();
+export type InstantValue = Date | null | string | undefined;
 
-function getFormatter(timeZone?: string): Intl.DateTimeFormat {
-  const key = timeZone || 'local';
+const DEFAULT_TIME_ZONE = 'Asia/Shanghai';
+const formatterCache = new Map<string, Intl.DateTimeFormat>();
+const zonedIsoPattern = /(z|[+-]\d{2}:?\d{2})$/i;
+const localDateTimePattern =
+  /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/;
+
+export function getClientTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || DEFAULT_TIME_ZONE;
+}
+
+function getFormatter(timeZone = getClientTimeZone()): Intl.DateTimeFormat {
+  const key = timeZone || DEFAULT_TIME_ZONE;
   let formatter = formatterCache.get(key);
   if (!formatter) {
     formatter = new Intl.DateTimeFormat('zh-CN', {
-      timeZone,
+      timeZone: key,
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -29,70 +39,82 @@ function normalizeParts(parts: Intl.DateTimeFormatPart[]): string {
   return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}:${values.second}`;
 }
 
-/**
- * 将 epoch 毫秒时间戳格式化为 yyyy-MM-dd HH:mm:ss
- * @param value epoch 毫秒数或 Date 或 ISO 字符串
- * @param placeholder 无效时的占位符
- * @param timeZone 可选时区
- */
-export function formatDateTime(
-  value?: number | string | Date | null,
-  placeholder = '-',
-  timeZone?: string,
-): string {
-  if (value == null || value === '') {
-    return placeholder;
-  }
-  // 数字类型直接当 epoch ms
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value) || value <= 0) {
-      return placeholder;
-    }
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return placeholder;
-    }
-    return normalizeParts(getFormatter(timeZone).formatToParts(date));
-  }
-  // 字符串：尝试解析
-  if (typeof value === 'string') {
-    // 可能是 ISO 字符串
-    const timestamp = Date.parse(value);
-    if (Number.isFinite(timestamp)) {
-      return normalizeParts(getFormatter(timeZone).formatToParts(new Date(timestamp)));
-    }
-    return placeholder;
-  }
-  // Date 对象
+function validDate(date: Date): boolean {
+  return Number.isFinite(date.getTime());
+}
+
+function parseInstant(value: InstantValue): Date | null {
+  if (!value) return null;
   if (value instanceof Date) {
-    const ts = value.getTime();
-    if (!Number.isFinite(ts)) {
-      return placeholder;
-    }
-    return normalizeParts(getFormatter(timeZone).formatToParts(value));
+    return validDate(value) ? value : null;
   }
-  return placeholder;
+  const trimmed = value.trim();
+  if (!trimmed || !zonedIsoPattern.test(trimmed)) {
+    return null;
+  }
+  const date = new Date(trimmed);
+  return validDate(date) ? date : null;
+}
+
+function parseLocalCalendarDateTime(value: string): Date | null {
+  const match = localDateTimePattern.exec(value.trim());
+  if (!match) return null;
+  const [, year, month, day, hour, minute, second = '0', millis = '0'] = match;
+  const date = new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second),
+    Number(millis.padEnd(3, '0')),
+  );
+  return validDate(date) ? date : null;
 }
 
 /**
- * 格式化为日期部分 yyyy-MM-dd
+ * Element Plus 日期选择器等本地日历输入转 UTC Instant ISO 字符串。
  */
-export function formatDate(
-  value?: number | string | Date | null,
+export function toInstantIso(value: InstantValue): string | undefined {
+  if (!value) return undefined;
+  if (value instanceof Date) {
+    return validDate(value) ? value.toISOString() : undefined;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const zoned = parseInstant(trimmed);
+  if (zoned) return zoned.toISOString();
+  const local = parseLocalCalendarDateTime(trimmed);
+  return local ? local.toISOString() : undefined;
+}
+
+/**
+ * 将 ISO Instant 格式化为 yyyy-MM-dd HH:mm:ss。
+ */
+export function formatDateTime(
+  value?: InstantValue,
   placeholder = '-',
+  timeZone = getClientTimeZone(),
 ): string {
+  const date = parseInstant(value);
+  return date ? normalizeParts(getFormatter(timeZone).formatToParts(date)) : placeholder;
+}
+
+/**
+ * 格式化为日期部分 yyyy-MM-dd。
+ */
+export function formatDate(value?: InstantValue, placeholder = '-'): string {
   const formatted = formatDateTime(value, placeholder);
   return formatted === placeholder ? placeholder : formatted.substring(0, 10);
 }
 
 /**
- * 相对时间（如 "3分钟前"）
+ * 相对时间（如 "3分钟前"）。
  */
-export function formatRelativeTime(value?: number | string | Date | null): string {
-  if (value == null) return '-';
-  const timestamp = typeof value === 'number' ? value : Date.parse(String(value));
-  if (!Number.isFinite(timestamp)) return '-';
-  const diff = Date.now() - timestamp;
+export function formatRelativeTime(value?: InstantValue): string {
+  const date = parseInstant(value);
+  if (!date) return '-';
+  const diff = Date.now() - date.getTime();
   const minutes = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);

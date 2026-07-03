@@ -53,7 +53,7 @@ public class TenantProfileFacade {
         if (tenant.getTenantStatus() == null || tenant.getTenantStatus() != 1) {
             throw new BusinessException("TENANT_DISABLED", "租户已停用");
         }
-        java.time.LocalDateTime now = TimeSupport.utcNowDateTime();
+        java.time.Instant now = TimeSupport.now();
         if (tenant.getAuthBeginAt() != null && tenant.getAuthBeginAt().isAfter(now)) {
             throw new BusinessException("TENANT_DISABLED", "租户授权尚未生效");
         }
@@ -102,7 +102,7 @@ public class TenantProfileFacade {
     }
 
     public record TenantRecord(String tenantId, String tenantName, Integer platformLevel, Integer tenantStatus,
-                               java.time.LocalDateTime authBeginAt, java.time.LocalDateTime expireAt,
+                               java.time.Instant authBeginAt, java.time.Instant expireAt,
                                String logoUrl, String contactName, String contactPhone, String contactEmail,
                                String website, String address,
                                String lifecycleNote, String packageCode) {}

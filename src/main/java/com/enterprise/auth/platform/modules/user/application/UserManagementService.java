@@ -108,7 +108,7 @@ public class UserManagementService {
         entity.setEnabled(Boolean.FALSE.equals(request.enabled()) ? 0 : 1);
         entity.setSessionVersion(1);
         entity.setMustChangePassword(1);
-        entity.setPasswordUpdatedAt(TimeSupport.utcNowDateTime());
+        entity.setPasswordUpdatedAt(TimeSupport.now());
         try {
             sysUserMapper.insert(entity);
         } catch (DuplicateKeyException ex) {
@@ -150,7 +150,7 @@ public class UserManagementService {
             entity.setPasswordHash(passwordHasher.hash(request.password()));
             entity.setSessionVersion((entity.getSessionVersion() == null ? 1 : entity.getSessionVersion()) + 1);
             entity.setMustChangePassword(1);
-            entity.setPasswordUpdatedAt(TimeSupport.utcNowDateTime());
+            entity.setPasswordUpdatedAt(TimeSupport.now());
             invalidateSessions = true;
             passwordResetByAdmin = true;
         }

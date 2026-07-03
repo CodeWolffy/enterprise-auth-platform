@@ -2,6 +2,7 @@ package com.enterprise.auth.platform.modules.system.application;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.io.Serializable;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -19,7 +20,7 @@ public final class SystemViewModels {
             @Schema(description = "是否启用") boolean enabled,
             @Schema(description = "备注") String remarks,
             @Schema(description = "字典值数量") Long valueCount,
-            @Schema(description = "更新时间") Long updatedAt,
+            @Schema(description = "更新时间，ISO-8601 UTC") Instant updatedAt,
             @Schema(description = "创建人") String createdBy
     ) implements Serializable {
         private static final long serialVersionUID = 1L;
@@ -44,7 +45,7 @@ public final class SystemViewModels {
             @Schema(description = "回显样式") String showClass,
             @Schema(description = "是否启用") boolean enabled,
             @Schema(description = "备注") String remarks,
-            @Schema(description = "更新时间") Long updatedAt
+            @Schema(description = "更新时间，ISO-8601 UTC") Instant updatedAt
     ) implements Serializable {
         private static final long serialVersionUID = 1L;
     }
@@ -60,7 +61,7 @@ public final class SystemViewModels {
             @Schema(description = "是否启用") boolean enabled,
             @Schema(description = "是否内置") boolean builtin,
             @Schema(description = "备注") String remark,
-            @Schema(description = "更新时间") Long updatedAt,
+            @Schema(description = "更新时间，ISO-8601 UTC") Instant updatedAt,
             @Schema(description = "创建人") String createdBy,
             @Schema(description = "更新人") String updatedBy
     ) implements Serializable {
@@ -81,7 +82,7 @@ public final class SystemViewModels {
             @Schema(description = "公告标题") String noticeTitle,
             @Schema(description = "公告内容") String noticeContent,
             @Schema(description = "是否发布") boolean published,
-            @Schema(description = "发布时间") Long publishTime,
+            @Schema(description = "发布时间，ISO-8601 UTC") Instant publishTime,
             @Schema(description = "工作流状态") String workflowStatus,
             @Schema(description = "创建人") String createdBy
     ) implements Serializable {
@@ -134,7 +135,7 @@ public final class SystemViewModels {
     public record CategoryAuditView(
             @Schema(description = "事件类型") String eventType,
             @Schema(description = "操作人") String operator,
-            @Schema(description = "发生时间") Long occurredAt,
+            @Schema(description = "发生时间，ISO-8601 UTC") Instant occurredAt,
             @Schema(description = "审计负载") String payloadJson
     ) implements Serializable {
         private static final long serialVersionUID = 1L;

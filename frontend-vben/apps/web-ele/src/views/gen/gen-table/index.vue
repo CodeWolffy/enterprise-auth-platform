@@ -40,8 +40,8 @@ import {
 
 const router = useRouter();
 
-type TableRow = { tableName: string; tableComment: string; engine?: string; tableRows?: number; createdAt?: number; updatedAt?: number };
-type ImportedRow = { id: number; dataSourceId: number; tableName: string; tableComment: string; className: string; packageName: string; moduleName: string; businessName: string; functionName: string; functionAuthor: string; columnCount: number; updatedAt?: number };
+type TableRow = { tableName: string; tableComment: string; engine?: string; tableRows?: number; createdAt?: string; updatedAt?: string };
+type ImportedRow = { id: number; dataSourceId: number; tableName: string; tableComment: string; className: string; packageName: string; moduleName: string; businessName: string; functionName: string; functionAuthor: string; columnCount: number; updatedAt?: string };
 type ColumnRow = { id: number; columnName: string; columnComment: string; columnType: string; dataType: string; javaType: string; javaField: string; primaryKey: boolean; required: boolean; insert: boolean; edit: boolean; list: boolean; query: boolean; queryType: string; htmlType: string; dictType: string; sort: number };
 
 const activeTab = ref('source');
@@ -447,8 +447,9 @@ loadDataSources();
                 <ElOption label="Integer" value="Integer" />
                 <ElOption label="Double" value="Double" />
                 <ElOption label="BigDecimal" value="java.math.BigDecimal" />
-                <ElOption label="LocalDateTime" value="java.time.LocalDateTime" />
+                <ElOption label="Instant" value="java.time.Instant" />
                 <ElOption label="LocalDate" value="java.time.LocalDate" />
+                <ElOption label="LocalTime" value="java.time.LocalTime" />
               </ElSelect>
             </template>
           </ElTableColumn>

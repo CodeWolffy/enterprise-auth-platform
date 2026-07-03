@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -86,8 +87,8 @@ public class TenantController {
             @Parameter(description = "变更类型") @RequestParam(required = false) String changeType,
             @Parameter(description = "字段键") @RequestParam(required = false) String fieldKey,
             @Parameter(description = "操作人") @RequestParam(required = false) String operator,
-            @Parameter(description = "起始时间（Unix 毫秒时间戳，包含）") @RequestParam(required = false) Long fromEpochMs,
-            @Parameter(description = "结束时间（Unix 毫秒时间戳，不包含）") @RequestParam(required = false) Long toEpochMs,
+            @Parameter(description = "起始时间（ISO-8601，包含）") @RequestParam(required = false) Instant from,
+            @Parameter(description = "结束时间（ISO-8601，不包含）") @RequestParam(required = false) Instant to,
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "每页大小") @RequestParam(defaultValue = "10") int size
     ) {
@@ -96,8 +97,8 @@ public class TenantController {
                 changeType,
                 fieldKey,
                 operator,
-                fromEpochMs,
-                toEpochMs,
+                from,
+                to,
                 page,
                 size
         )));
@@ -111,16 +112,16 @@ public class TenantController {
             @Parameter(description = "变更类型") @RequestParam(required = false) String changeType,
             @Parameter(description = "字段键") @RequestParam(required = false) String fieldKey,
             @Parameter(description = "操作人") @RequestParam(required = false) String operator,
-            @Parameter(description = "起始时间（Unix 毫秒时间戳，包含）") @RequestParam(required = false) Long fromEpochMs,
-            @Parameter(description = "结束时间（Unix 毫秒时间戳，不包含）") @RequestParam(required = false) Long toEpochMs
+            @Parameter(description = "起始时间（ISO-8601，包含）") @RequestParam(required = false) Instant from,
+            @Parameter(description = "结束时间（ISO-8601，不包含）") @RequestParam(required = false) Instant to
     ) {
         return ApiResponse.ok(platformScope(() -> tenantChangeLogApplicationService.historySummary(
                 tenantId,
                 changeType,
                 fieldKey,
                 operator,
-                fromEpochMs,
-                toEpochMs
+                from,
+                to
         )));
     }
 

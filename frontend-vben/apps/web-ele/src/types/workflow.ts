@@ -29,8 +29,8 @@ export interface WorkflowDefinitionView {
   status: WorkflowDefinitionStatus;
   steps: WorkflowStepView[];
   remark?: string | null;
-  createdAt?: number | null;
-  updatedAt?: number | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 }
 
 export interface WorkflowDefinitionRequest {
@@ -66,8 +66,8 @@ export interface WorkflowInstanceView {
   starterUsername: string;
   currentStepIndex: number;
   variablesSnapshot: Record<string, unknown>;
-  startedAt?: number | null;
-  endedAt?: number | null;
+  startedAt?: string | null;
+  endedAt?: string | null;
 }
 
 export interface WorkflowInstanceQueryParams {
@@ -89,8 +89,8 @@ export interface WorkflowTaskView {
   assigneeUserId?: number | null;
   assigneeUsername?: string | null;
   comment?: string | null;
-  createdAt?: number | null;
-  completedAt?: number | null;
+  createdAt?: string | null;
+  completedAt?: string | null;
   actionable: boolean;
   urgeCount: number;
 }
@@ -123,7 +123,7 @@ export interface WorkflowTaskUrgeView {
   urgedByUserId: number;
   urgedByUsername: string;
   comment?: string | null;
-  urgedAt?: number | null;
+  urgedAt?: string | null;
   targetUsernames: string[];
 }
 

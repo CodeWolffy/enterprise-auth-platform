@@ -80,7 +80,7 @@ public class NoticeApplicationService {
         entity.setNoticeTitle(request.noticeTitle());
         entity.setNoticeContent(HtmlSanitizer.clean(request.noticeContent()));
         entity.setPublished(Boolean.TRUE.equals(request.published()) ? 1 : 0);
-        entity.setPublishTime(TimeSupport.localDateTimeFromEpochMilli(request.publishTime()));
+        entity.setPublishTime(request.publishTime());
         sysNoticeMapper.insert(entity);
         publishNoticeNotificationIfActive(entity, operator, false);
         return toNoticeView(entity);
@@ -95,7 +95,7 @@ public class NoticeApplicationService {
         entity.setNoticeTitle(request.noticeTitle());
         entity.setNoticeContent(HtmlSanitizer.clean(request.noticeContent()));
         entity.setPublished(Boolean.TRUE.equals(request.published()) ? 1 : 0);
-        entity.setPublishTime(TimeSupport.localDateTimeFromEpochMilli(request.publishTime()));
+        entity.setPublishTime(request.publishTime());
         sysNoticeMapper.updateById(entity);
         publishNoticeNotificationIfActive(entity, SecuritySupport.currentOperator(), wasActivePublished);
         return toNoticeView(entity);
@@ -149,7 +149,7 @@ public class NoticeApplicationService {
                 entity.getNoticeTitle(),
                 entity.getNoticeContent(),
                 entity.getPublished() != null && entity.getPublished() == 1,
-                TimeSupport.toEpochMilli(entity.getPublishTime()),
+                entity.getPublishTime(),
                 workflowStatus(entity),
                 entity.getCreatedBy()
         );
@@ -176,12 +176,12 @@ public class NoticeApplicationService {
         } else if ("SCHEDULED".equalsIgnoreCase(workflowStatus)) {
             query.eq(SysNoticeEntity::getPublished, 1)
                     .isNotNull(SysNoticeEntity::getPublishTime)
-                    .gt(SysNoticeEntity::getPublishTime, TimeSupport.utcNowDateTime());
+                    .gt(SysNoticeEntity::getPublishTime, TimeSupport.now());
         } else if ("PUBLISHED".equalsIgnoreCase(workflowStatus)) {
             query.eq(SysNoticeEntity::getPublished, 1)
                     .and(wrapper -> wrapper.isNull(SysNoticeEntity::getPublishTime)
                             .or()
-                            .le(SysNoticeEntity::getPublishTime, TimeSupport.utcNowDateTime()));
+                            .le(SysNoticeEntity::getPublishTime, TimeSupport.now()));
         }
         applyCreatorScope(query, visibleCreators, SysNoticeEntity::getCreatedBy);
         return query;
@@ -251,7 +251,7 @@ public class NoticeApplicationService {
         if (entity == null || entity.getPublished() == null || entity.getPublished() != 1) {
             return false;
         }
-        return entity.getPublishTime() == null || !entity.getPublishTime().isAfter(TimeSupport.utcNowDateTime());
+        return entity.getPublishTime() == null || !entity.getPublishTime().isAfter(TimeSupport.now());
     }
 
     private SFunction<SysNoticeEntity, ?> resolveNoticeSort(String sortBy) {
@@ -275,7 +275,7 @@ public class NoticeApplicationService {
         if (!published) {
             return "DRAFT";
         }
-        if (entity.getPublishTime() != null && entity.getPublishTime().isAfter(TimeSupport.utcNowDateTime())) {
+        if (entity.getPublishTime() != null && entity.getPublishTime().isAfter(TimeSupport.now())) {
             return "SCHEDULED";
         }
         return "PUBLISHED";

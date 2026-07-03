@@ -384,7 +384,9 @@ class SystemControllerTest {
         jdbcTemplate.update("DELETE FROM sys_user_role WHERE tenant_id = ? AND user_id = ?", "tenant-a", userId);
         jdbcTemplate.update(
                 "INSERT INTO sys_user_role(tenant_id, user_id, role_id, created_at, updated_at) VALUES(?,?,?,?,?)",
-                "tenant-a", userId, roleId, java.time.LocalDateTime.now(), java.time.LocalDateTime.now()
+                "tenant-a", userId, roleId,
+                java.sql.Timestamp.from(java.time.Instant.now()),
+                java.sql.Timestamp.from(java.time.Instant.now())
         );
     }
 

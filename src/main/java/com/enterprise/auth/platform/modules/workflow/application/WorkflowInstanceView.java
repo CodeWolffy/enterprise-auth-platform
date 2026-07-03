@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.modules.workflow.application;
 
+import java.time.Instant;
 import java.util.Map;
 
 public record WorkflowInstanceView(
@@ -15,7 +16,7 @@ public record WorkflowInstanceView(
         String starterUsername,
         Integer currentStepIndex,
         Map<String, Object> variablesSnapshot,
-        Long startedAt,
-        Long endedAt
+        Instant startedAt,
+        Instant endedAt
 ) {
 }

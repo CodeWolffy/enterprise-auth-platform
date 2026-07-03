@@ -15,8 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.Instant;
 
 @Tag(name = "登录日志")
 @RestController
@@ -37,13 +36,11 @@ public class SysLoginLogController {
             @RequestParam(required = false) String userName,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String clientIp,
-            @RequestParam(required = false) Long fromEpochMs,
-            @RequestParam(required = false) Long toEpochMs,
+            @RequestParam(required = false) Instant from,
+            @RequestParam(required = false) Instant to,
             @RequestParam(defaultValue = "1") @Min(1) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(200) int size
     ) {
-        LocalDateTime from = fromEpochMs != null ? LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(fromEpochMs), ZoneId.of("UTC")) : null;
-        LocalDateTime to = toEpochMs != null ? LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(toEpochMs), ZoneId.of("UTC")) : null;
         return ApiResponse.ok(sysLoginLogService.page(tenantId, userName, status, clientIp, from, to, page, size));
     }
 }

@@ -1,6 +1,6 @@
 package com.enterprise.auth.platform.modules.system.interfaces;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record MailChannelResponse(
         Long id,
@@ -17,7 +17,7 @@ public record MailChannelResponse(
         boolean passwordConfigured,
         boolean inherited,
         String sourceTenantId,
-        LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        Instant createdAt,
+        Instant updatedAt
 ) {
 }

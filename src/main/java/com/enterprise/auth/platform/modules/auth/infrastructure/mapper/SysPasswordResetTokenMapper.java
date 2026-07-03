@@ -3,7 +3,7 @@ package com.enterprise.auth.platform.modules.auth.infrastructure.mapper;
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.enterprise.auth.platform.modules.auth.infrastructure.entity.SysPasswordResetTokenEntity;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -43,5 +43,5 @@ public interface SysPasswordResetTokenMapper extends BaseMapper<SysPasswordReset
               AND used_at IS NULL
               AND revoked_at IS NULL
             """)
-    int revokeIfActive(@Param("id") Long id, @Param("revokedAt") LocalDateTime revokedAt, @Param("updatedBy") String updatedBy);
+    int revokeIfActive(@Param("id") Long id, @Param("revokedAt") Instant revokedAt, @Param("updatedBy") String updatedBy);
 }

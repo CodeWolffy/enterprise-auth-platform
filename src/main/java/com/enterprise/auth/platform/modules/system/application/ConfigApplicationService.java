@@ -180,7 +180,7 @@ public class ConfigApplicationService {
                 Boolean.TRUE.equals(entity.getEnabled()),
                 Boolean.TRUE.equals(entity.getBuiltin()),
                 entity.getRemark(),
-                TimeSupport.toEpochMilli(entity.getUpdatedAt()),
+                entity.getUpdatedAt(),
                 entity.getCreatedBy(),
                 entity.getUpdatedBy()
         );

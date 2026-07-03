@@ -43,7 +43,7 @@ public class UserBootstrapFacade {
         entity.setEnabled(1);
         entity.setSessionVersion(1);
         entity.setMustChangePassword(request.mustChangePassword());
-        entity.setPasswordUpdatedAt(TimeSupport.utcNowDateTime());
+        entity.setPasswordUpdatedAt(TimeSupport.now());
         sysUserMapper.insert(entity);
         return new AdminUserResult(entity.getId(), entity.getUsername());
     }

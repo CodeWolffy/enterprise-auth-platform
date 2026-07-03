@@ -1,6 +1,6 @@
 package com.enterprise.auth.platform.modules.notification.application;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
@@ -23,7 +23,7 @@ public record NotificationPublishCommand(
         Map<String, Object> actionPayload,
         Map<String, Object> metadata,
         String dedupKey,
-        LocalDateTime expiresAt,
+        Instant expiresAt,
         String createdBy
 ) {
     public NotificationPublishCommand {

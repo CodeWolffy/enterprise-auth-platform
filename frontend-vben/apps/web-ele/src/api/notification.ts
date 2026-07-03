@@ -16,9 +16,9 @@ export interface NotificationView {
   actionPayload?: string | null;
   metadata?: string | null;
   read: boolean;
-  readAt?: number | null;
-  expiresAt?: number | null;
-  createdAt?: number | null;
+  readAt?: string | null;
+  expiresAt?: string | null;
+  createdAt?: string | null;
 }
 
 export interface NotificationQueryParams {
@@ -29,7 +29,7 @@ export interface NotificationQueryParams {
 
 export interface NotificationStreamTicket {
   ticket: string;
-  expiresAt: number;
+  expiresAt: string;
 }
 
 export async function queryNotifications(params?: NotificationQueryParams) {

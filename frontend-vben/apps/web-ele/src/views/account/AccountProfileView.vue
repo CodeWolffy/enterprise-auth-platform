@@ -36,6 +36,7 @@ import {
 import { forceOffline, querySessions } from '#/api/auth-session';
 import { useAuthStore } from '#/store/auth';
 import type { UserSessionView } from '#/types/auth-models';
+import { formatDateTime } from '#/utils/datetime';
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -389,15 +390,11 @@ async function offlineOtherSessions() {
 }
 
 function formatProfileDate(value?: string | null, placeholder = '-') {
-  if (!value) return placeholder;
-  const timestamp = Date.parse(value);
-  if (!Number.isFinite(timestamp)) return value;
-  return new Date(timestamp).toLocaleString();
+  return formatDateTime(value, placeholder);
 }
 
-function formatSessionTime(epochMs?: number | null) {
-  if (!epochMs) return '-';
-  return new Date(epochMs).toLocaleString();
+function formatSessionTime(value?: string | null) {
+  return formatDateTime(value);
 }
 
 function formatDevice(raw?: string | null) {

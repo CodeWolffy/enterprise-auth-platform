@@ -20,7 +20,7 @@ import com.enterprise.auth.platform.common.web.ClientIpResolver;
 import com.enterprise.auth.platform.common.web.IpLocationResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
@@ -149,7 +149,7 @@ public class LoginApplicationService {
             return new TokenSessionResponse(
                     user.tenantId(),
                     tokenValue,
-                    TimeSupport.toEpochMilli(expiresAt),
+                    expiresAt,
                     passwordChangeState.required(),
                     passwordChangeState.reason()
             );
@@ -183,8 +183,8 @@ public class LoginApplicationService {
         }
         int passwordExpireDays = securityPolicyApplicationService.effectivePolicy(user.tenantId()).passwordExpireDays();
         if (passwordExpireDays > 0 && user.passwordUpdatedAt() != null) {
-            LocalDateTime expiresAt = user.passwordUpdatedAt().plus(passwordExpireDays, ChronoUnit.DAYS);
-            if (!expiresAt.isAfter(TimeSupport.utcNowDateTime())) {
+            Instant expiresAt = user.passwordUpdatedAt().plus(passwordExpireDays, ChronoUnit.DAYS);
+            if (!expiresAt.isAfter(TimeSupport.now())) {
                 logPublisher.publish(new LoginLogEvent(user.username(), user.tenantId(), "FAILED", "密码已过期",
                         clientIp, location, browser, os));
                 return new PasswordChangeState(true, "PASSWORD_EXPIRED");

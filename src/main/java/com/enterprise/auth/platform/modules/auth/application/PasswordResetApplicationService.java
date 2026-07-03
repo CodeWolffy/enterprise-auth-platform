@@ -25,7 +25,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.time.LocalDateTime;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
@@ -133,7 +134,7 @@ public class PasswordResetApplicationService {
         revokeActiveTokens(user.getTenantId(), user.getId());
 
         String rawToken = newToken();
-        LocalDateTime now = TimeSupport.utcNowDateTime();
+        Instant now = TimeSupport.now();
         SecurityProperties.PasswordReset config = securityProperties.resolvedPasswordReset();
         SysPasswordResetTokenEntity entity = new SysPasswordResetTokenEntity();
         entity.setTenantId(user.getTenantId());
@@ -175,7 +176,7 @@ public class PasswordResetApplicationService {
         }
         SysUserEntity user = userAuthenticationFacade.findActiveEntityById(token.getTenantId(), token.getUserId()).orElse(null);
         if (user == null || (user.getDeleted() != null && user.getDeleted() == 1) || user.getEnabled() == null || user.getEnabled() != 1) {
-            tokenMapper.revokeIfActive(token.getId(), TimeSupport.utcNowDateTime(), "password-reset");
+            tokenMapper.revokeIfActive(token.getId(), TimeSupport.now(), "password-reset");
             logPublisher.publish("PASSWORD_RESET_FAILED", token.getUsername(), token.getTenantId(), Map.of("reason", "user_unavailable"));
             throw new BusinessException("PASSWORD_RESET_TOKEN_INVALID", "重置链接无效、已使用或已过期");
         }
@@ -185,7 +186,7 @@ public class PasswordResetApplicationService {
             throw new BusinessException("PASSWORD_REUSED", "新密码不能与当前密码相同");
         }
 
-        LocalDateTime now = TimeSupport.utcNowDateTime();
+        Instant now = TimeSupport.now();
         int nextSessionVersion = (user.getSessionVersion() == null ? 1 : user.getSessionVersion()) + 1;
         user.setPasswordHash(passwordHasher.hash(request.newPassword()));
         user.setSessionVersion(nextSessionVersion);
@@ -232,17 +233,17 @@ public class PasswordResetApplicationService {
     private void enforceRequestFrequency(SysUserEntity user, String username, String clientIp) {
         withTenant(user.getTenantId(), () -> {
             SecurityProperties.PasswordReset config = securityProperties.resolvedPasswordReset();
-            LocalDateTime now = TimeSupport.utcNowDateTime();
+            Instant now = TimeSupport.now();
             long usernameCount = tokenMapper.selectCount(new LambdaQueryWrapper<SysPasswordResetTokenEntity>()
                     .eq(SysPasswordResetTokenEntity::getTenantId, user.getTenantId())
                     .eq(SysPasswordResetTokenEntity::getUsername, username)
-                    .ge(SysPasswordResetTokenEntity::getCreatedAt, now.minusMinutes(config.usernameWindowMinutes())));
+                    .ge(SysPasswordResetTokenEntity::getCreatedAt, now.minus(Duration.ofMinutes(config.usernameWindowMinutes()))));
             if (usernameCount >= config.usernameMaxRequests()) {
                 throw new BusinessException("RATE_LIMITED", "请求过于频繁，请稍后再试");
             }
             long ipCount = tokenMapper.selectCount(new LambdaQueryWrapper<SysPasswordResetTokenEntity>()
                     .eq(SysPasswordResetTokenEntity::getRequestIp, clientIp)
-                    .ge(SysPasswordResetTokenEntity::getCreatedAt, now.minusMinutes(config.ipWindowMinutes())));
+                    .ge(SysPasswordResetTokenEntity::getCreatedAt, now.minus(Duration.ofMinutes(config.ipWindowMinutes()))));
             if (ipCount >= config.ipMaxRequests()) {
                 throw new BusinessException("RATE_LIMITED", "请求过于频繁，请稍后再试");
             }
@@ -252,7 +253,7 @@ public class PasswordResetApplicationService {
 
     private void revokeActiveTokens(String tenantId, Long userId) {
         withTenant(tenantId, () -> {
-            LocalDateTime now = TimeSupport.utcNowDateTime();
+            Instant now = TimeSupport.now();
             tokenMapper.selectList(new LambdaQueryWrapper<SysPasswordResetTokenEntity>()
                             .eq(SysPasswordResetTokenEntity::getTenantId, tenantId)
                             .eq(SysPasswordResetTokenEntity::getUserId, userId)
@@ -285,7 +286,7 @@ public class PasswordResetApplicationService {
         if (token == null || token.getUsedAt() != null || token.getRevokedAt() != null) {
             return null;
         }
-        if (token.getExpiresAt() == null || !token.getExpiresAt().isAfter(TimeSupport.utcNowDateTime())) {
+        if (token.getExpiresAt() == null || !token.getExpiresAt().isAfter(TimeSupport.now())) {
             return null;
         }
         return token;

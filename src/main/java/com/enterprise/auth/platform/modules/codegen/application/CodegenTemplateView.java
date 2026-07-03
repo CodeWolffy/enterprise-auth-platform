@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.modules.codegen.application;
 
-import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.modules.codegen.infrastructure.entity.CodegenTemplateEntity;
+import java.time.Instant;
 import java.util.List;
 
 public record CodegenTemplateView(
@@ -13,8 +13,8 @@ public record CodegenTemplateView(
         String content,
         String description,
         boolean builtin,
-        Long createdAt,
-        Long updatedAt
+        Instant createdAt,
+        Instant updatedAt
 ) {
     public static CodegenTemplateView from(CodegenTemplateEntity entity) {
         return new CodegenTemplateView(
@@ -26,8 +26,8 @@ public record CodegenTemplateView(
                 entity.getContent(),
                 entity.getDescription(),
                 entity.getBuiltin() != null && entity.getBuiltin() == 1,
-                TimeSupport.toEpochMilli(entity.getCreatedAt()),
-                TimeSupport.toEpochMilli(entity.getUpdatedAt())
+                entity.getCreatedAt(),
+                entity.getUpdatedAt()
         );
     }
 

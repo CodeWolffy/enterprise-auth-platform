@@ -26,6 +26,7 @@ import {
 
 import type { NotificationView } from '#/api/notification';
 import { useNotifications } from '#/composables/useNotifications';
+import { formatRelativeTime } from '#/utils/datetime';
 
 const {
   notificationsVisible,
@@ -93,22 +94,6 @@ function notificationScenarioLabel(scenarioCode?: string | null) {
     SYSTEM_NOTICE_PUBLISHED: '系统公告',
   };
   return scenarioCode ? labels[scenarioCode] || scenarioCode : '通知';
-}
-
-function formatRelativeTime(epochMs?: number | null) {
-  if (!epochMs) return '';
-  const now = Date.now();
-  const diff = now - epochMs;
-  const minute = 60 * 1000;
-  const hour = 60 * minute;
-  const day = 24 * hour;
-  if (diff < minute) return '刚刚';
-  if (diff < hour) return `${Math.floor(diff / minute)} 分钟前`;
-  if (diff < day) return `${Math.floor(diff / hour)} 小时前`;
-  if (diff < 7 * day) return `${Math.floor(diff / day)} 天前`;
-  const date = new Date(epochMs);
-  const pad = (value: number) => `${value}`.padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
 
 function handleNotificationClick(notification: NotificationView) {

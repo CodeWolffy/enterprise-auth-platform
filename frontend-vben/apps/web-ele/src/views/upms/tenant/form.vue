@@ -22,7 +22,7 @@ import {
 import { addObj, editObj, getById } from '#/api/upms/tenant';
 import { getList } from '#/api/upms/tenant-package';
 import { useDict } from '#/utils/dict';
-import { formatDateTime } from '#/utils/datetime';
+import { formatDateTime, toInstantIso } from '#/utils/datetime';
 
 const emit = defineEmits(['initPage']);
 
@@ -213,12 +213,6 @@ const resetForm = (formEl?: FormInstance) => {
   formEl?.resetFields();
 };
 
-const parseDateTime = (value?: string) => {
-  if (!value) return null;
-  const timestamp = Date.parse(value.replace(' ', 'T'));
-  return Number.isFinite(timestamp) ? timestamp : null;
-};
-
 const buildPayload = () => {
   const [authBeginAt, expireAt] = state.form.datatimes ?? [];
   return {
@@ -226,8 +220,8 @@ const buildPayload = () => {
     tenantName: state.form.tenantName,
     platformLevel: state.form.platformLevel === 'PLATFORM',
     tenantStatus: Number(state.form.status),
-    authBeginAt: parseDateTime(authBeginAt),
-    expireAt: parseDateTime(expireAt),
+    authBeginAt: toInstantIso(authBeginAt) ?? null,
+    expireAt: toInstantIso(expireAt) ?? null,
     packageCode: state.form.packageCode,
     logoUrl: state.form.logoUrl,
     contactName: state.form.contactName,

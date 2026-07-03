@@ -3,8 +3,8 @@ export interface TenantView {
   name: string;
   platformLevel?: boolean;
   tenantStatus?: number;
-  authBeginAt?: number | null;
-  expireAt?: number | null;
+  authBeginAt?: string | null;
+  expireAt?: string | null;
   packageCode?: string | null;
   packageName?: string | null;
   logoUrl?: string | null;
@@ -48,7 +48,7 @@ export interface TenantPackageView {
   orderNo?: number | null;
   packageDesc?: string | null;
   status: '0' | '1';
-  updatedAt?: number | null;
+  updatedAt?: string | null;
   referencedTenantCount?: number;
   referencedTenantIds?: string[];
 }

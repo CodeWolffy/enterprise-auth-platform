@@ -420,8 +420,8 @@ class CodegenApplicationServiceP2Test {
         assertThat(fileContent(preview, "OrderGenQueryRequest.java"))
                 .contains("public record OrderGenQueryRequest")
                 .contains("String bizOrderNo")
-                .contains("java.time.LocalDateTime createdAtStart")
-                .contains("java.time.LocalDateTime createdAtEnd")
+                .contains("java.time.Instant createdAtStart")
+                .contains("java.time.Instant createdAtEnd")
                 .doesNotContain("amount")
                 .doesNotContain("enabled");
 

@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -70,7 +71,7 @@ public class NotificationStreamTicketService {
             String ticketValue = newTicketValue();
             StreamTicket ticket = new StreamTicket(ticketValue, token, tenantId, userId, expiresAt);
             if (store(ticket)) {
-                return new StreamTicketResponse(ticketValue, expiresAt);
+                return new StreamTicketResponse(ticketValue, Instant.ofEpochMilli(expiresAt));
             }
         }
         throw new BusinessException(
@@ -188,6 +189,6 @@ public class NotificationStreamTicketService {
     public record StreamTicket(String ticket, String token, String tenantId, Long userId, long expiresAt) {
     }
 
-    public record StreamTicketResponse(String ticket, long expiresAt) {
+    public record StreamTicketResponse(String ticket, Instant expiresAt) {
     }
 }

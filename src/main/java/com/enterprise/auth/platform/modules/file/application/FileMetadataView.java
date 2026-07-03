@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.modules.file.application;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.Instant;
 
 @Schema(description = "文件元数据")
 public record FileMetadataView(
@@ -12,7 +13,7 @@ public record FileMetadataView(
         @Schema(description = "可见性") String visibility,
         @Schema(description = "所属租户") String tenantId,
         @Schema(description = "所有者用户 ID") Long ownerUserId,
-        @Schema(description = "创建时间，epoch ms") Long createdAt,
+        @Schema(description = "创建时间，ISO-8601 UTC") Instant createdAt,
         @Schema(description = "可直接访问的展示 URL") String url
 ) {
 }

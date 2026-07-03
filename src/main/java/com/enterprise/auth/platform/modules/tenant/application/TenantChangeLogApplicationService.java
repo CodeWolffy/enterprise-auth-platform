@@ -6,6 +6,7 @@ import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTena
 import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantChangeLogMapper;
 import com.enterprise.auth.platform.common.web.PageResult;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
@@ -30,8 +31,8 @@ public class TenantChangeLogApplicationService {
             String changeType,
             String fieldKey,
             String operator,
-            Long fromEpochMs,
-            Long toEpochMs,
+            Instant from,
+            Instant to,
             int page,
             int size
     ) {
@@ -39,7 +40,7 @@ public class TenantChangeLogApplicationService {
         int safePage = Math.max(page, 1);
         int safeSize = Math.max(size, 1);
         LambdaQueryWrapper<SysTenantChangeLogEntity> query = buildHistoryQuery(
-                tenantId, changeType, fieldKey, operator, fromEpochMs, toEpochMs
+                tenantId, changeType, fieldKey, operator, from, to
         ).orderByDesc(SysTenantChangeLogEntity::getOccurredAt)
                 .orderByDesc(SysTenantChangeLogEntity::getId);
         long total = sysTenantChangeLogMapper.selectCount(query);
@@ -59,12 +60,12 @@ public class TenantChangeLogApplicationService {
             String changeType,
             String fieldKey,
             String operator,
-            Long fromEpochMs,
-            Long toEpochMs
+            Instant from,
+            Instant to
     ) {
         tenantAccessPolicy.ensureTenantReadable(tenantId);
         List<SysTenantChangeLogEntity> records = sysTenantChangeLogMapper.selectList(
-                buildHistoryQuery(tenantId, changeType, fieldKey, operator, fromEpochMs, toEpochMs)
+                buildHistoryQuery(tenantId, changeType, fieldKey, operator, from, to)
                         .orderByDesc(SysTenantChangeLogEntity::getOccurredAt)
                         .orderByDesc(SysTenantChangeLogEntity::getId)
         );
@@ -126,7 +127,7 @@ public class TenantChangeLogApplicationService {
         entity.setNewValue(trimToNull(newValue));
         entity.setSummary(summary);
         entity.setOperator(operator);
-        entity.setOccurredAt(TimeSupport.utcNowDateTime());
+        entity.setOccurredAt(TimeSupport.now());
         sysTenantChangeLogMapper.insert(entity);
     }
 
@@ -135,18 +136,16 @@ public class TenantChangeLogApplicationService {
             String changeType,
             String fieldKey,
             String operator,
-            Long fromEpochMs,
-            Long toEpochMs
+            Instant from,
+            Instant to
     ) {
         return new LambdaQueryWrapper<SysTenantChangeLogEntity>()
                 .eq(SysTenantChangeLogEntity::getTenantId, tenantId)
                 .eq(StringUtils.hasText(changeType), SysTenantChangeLogEntity::getChangeType, changeType)
                 .eq(StringUtils.hasText(fieldKey), SysTenantChangeLogEntity::getFieldKey, fieldKey)
                 .like(StringUtils.hasText(operator), SysTenantChangeLogEntity::getOperator, operator)
-                .ge(fromEpochMs != null, SysTenantChangeLogEntity::getOccurredAt,
-                        fromEpochMs == null ? null : TimeSupport.localDateTimeFromEpochMilli(fromEpochMs))
-                .lt(toEpochMs != null, SysTenantChangeLogEntity::getOccurredAt,
-                        toEpochMs == null ? null : TimeSupport.localDateTimeFromEpochMilli(toEpochMs));
+                .ge(from != null, SysTenantChangeLogEntity::getOccurredAt, from)
+                .lt(to != null, SysTenantChangeLogEntity::getOccurredAt, to);
     }
 
     private TenantChangeView toChangeView(SysTenantChangeLogEntity item) {
@@ -160,7 +159,7 @@ public class TenantChangeLogApplicationService {
                 item.getSummary(),
                 buildImpactSummary(item),
                 item.getOperator(),
-                TimeSupport.toEpochMilli(item.getOccurredAt())
+                item.getOccurredAt()
         );
     }
 
@@ -203,7 +202,7 @@ public class TenantChangeLogApplicationService {
             @Schema(description = "变更摘要") String summary,
             @Schema(description = "影响说明") String impactSummary,
             @Schema(description = "操作人") String operator,
-            @Schema(description = "变更时间") Long occurredAt
+            @Schema(description = "变更时间，ISO-8601 UTC") Instant occurredAt
     ) {
     }
 

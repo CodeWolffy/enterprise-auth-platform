@@ -1,8 +1,6 @@
 package com.enterprise.auth.platform.common.web;
 
-import com.enterprise.auth.platform.common.TimeSupport;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import org.springframework.core.convert.converter.Converter;
@@ -31,12 +29,6 @@ public class StringToInstantConverter implements Converter<String, Instant> {
             // 回退到以下处理
         }
 
-        String normalized = text.replace(' ', 'T');
-        try {
-            LocalDateTime localDateTime = LocalDateTime.parse(normalized);
-            return TimeSupport.toInstant(localDateTime);
-        } catch (DateTimeParseException ex) {
-            throw new IllegalArgumentException("无效的日期时间格式：" + source, ex);
-        }
+        throw new IllegalArgumentException("日期时间必须包含时区偏移，例如 2026-07-03T10:00:00+08:00 或 2026-07-03T02:00:00Z：" + source);
     }
 }

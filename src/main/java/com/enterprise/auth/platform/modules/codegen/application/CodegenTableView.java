@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.modules.codegen.application;
 
+import java.time.Instant;
 import java.util.List;
 
 public record CodegenTableView(
@@ -9,7 +10,7 @@ public record CodegenTableView(
         Long tableRows,
         Long dataLength,
         Long indexLength,
-        Long createdAt,
-        Long updatedAt
+        Instant createdAt,
+        Instant updatedAt
 ) {
 }

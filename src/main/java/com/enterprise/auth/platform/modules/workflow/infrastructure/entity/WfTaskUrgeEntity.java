@@ -6,7 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import lombok.Data;
 
 @TableName("wf_task_urge")
@@ -21,7 +21,7 @@ public class WfTaskUrgeEntity {
     private Long urgedByUserId;
     private String urgedByUsername;
     private String comment;
-    private LocalDateTime urgedAt;
+    private Instant urgedAt;
     @TableField(fill = FieldFill.INSERT)
     private String createdBy;
     @TableField(fill = FieldFill.INSERT_UPDATE)
@@ -29,7 +29,7 @@ public class WfTaskUrgeEntity {
     @TableLogic
     private Integer deleted;
     @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
     @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 }

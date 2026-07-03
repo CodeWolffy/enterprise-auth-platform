@@ -1,6 +1,6 @@
 package com.enterprise.auth.platform.modules.user.interfaces;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record AccountProfileResponse(
         Long id,
@@ -13,10 +13,10 @@ public record AccountProfileResponse(
         String avatarUrl,
         boolean enabled,
         boolean mustChangePassword,
-        LocalDateTime passwordUpdatedAt,
-        LocalDateTime lastLoginAt,
+        Instant passwordUpdatedAt,
+        Instant lastLoginAt,
         String lastLoginIp,
-        LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        Instant createdAt,
+        Instant updatedAt
 ) {
 }

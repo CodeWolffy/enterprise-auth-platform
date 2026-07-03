@@ -1,8 +1,10 @@
 package com.enterprise.auth.platform.modules.auth.application;
 
+import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.modules.auth.interfaces.UserSessionResponse;
 import com.enterprise.auth.platform.modules.auth.infrastructure.SecurityProperties;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
@@ -60,9 +62,9 @@ public class SessionIndexService {
                     valueOrEmpty(clientIp),
                     valueOrEmpty(loginLocation),
                     valueOrEmpty(device),
-                    issuedAt,
-                    expiresAt,
-                    issuedAt,
+                    TimeSupport.fromEpochMilli(issuedAt),
+                    TimeSupport.fromEpochMilli(expiresAt),
+                    TimeSupport.fromEpochMilli(issuedAt),
                     true,
                     false
             ), userId));
@@ -323,9 +325,9 @@ public class SessionIndexService {
                 stringValue(meta.get("clientIp")),
                 stringValue(meta.get("loginLocation")),
                 stringValue(meta.get("device")),
-                longValue(meta.get("issuedAt"), 0L),
-                longValue(meta.get("expiresAt"), 0L),
-                longValue(meta.get("lastAccessAt"), 0L),
+                TimeSupport.fromEpochMilli(longValue(meta.get("issuedAt"), 0L)),
+                TimeSupport.fromEpochMilli(longValue(meta.get("expiresAt"), 0L)),
+                TimeSupport.fromEpochMilli(longValue(meta.get("lastAccessAt"), 0L)),
                 true,
                 false
         );
@@ -352,7 +354,7 @@ public class SessionIndexService {
                 session.device(),
                 session.issuedAt(),
                 session.expiresAt(),
-                lastAccessAt,
+                TimeSupport.fromEpochMilli(lastAccessAt),
                 session.active(),
                 session.currentSession()
         ), existing.userId()));
@@ -386,7 +388,7 @@ public class SessionIndexService {
         int effectiveSize = Math.max(size, 0);
         long start = (long) effectivePage * effectiveSize;
         List<IndexedSession> sessions = localSessions.values().stream()
-                .sorted(Comparator.comparingLong((IndexedSession session) -> session.response().lastAccessAt()).reversed())
+                .sorted(Comparator.comparingLong((IndexedSession session) -> instantEpoch(session.response().lastAccessAt())).reversed())
                 .skip(start)
                 .limit(effectiveSize)
                 .toList();
@@ -399,13 +401,17 @@ public class SessionIndexService {
         long start = (long) effectivePage * effectiveSize;
         List<IndexedSession> matched = localSessions.values().stream()
                 .filter(session -> userId.equals(session.userId()))
-                .sorted(Comparator.comparingLong((IndexedSession session) -> session.response().lastAccessAt()).reversed())
+                .sorted(Comparator.comparingLong((IndexedSession session) -> instantEpoch(session.response().lastAccessAt())).reversed())
                 .toList();
         List<IndexedSession> sessions = matched.stream()
                 .skip(start)
                 .limit(effectiveSize)
                 .toList();
         return new Page(matched.size(), sessions);
+    }
+
+    private long instantEpoch(Instant instant) {
+        return instant == null ? 0L : instant.toEpochMilli();
     }
 
     private Duration indexTtl() {

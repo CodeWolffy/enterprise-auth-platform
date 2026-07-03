@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.modules.codegen.application;
 
+import java.time.Instant;
 import java.util.List;
 
 public final class CodegenMetadataDtos {
@@ -18,10 +19,10 @@ public final class CodegenMetadataDtos {
             boolean enabled,
             boolean external,
             boolean externalAuthorized,
-            Long authorizedAt,
+            Instant authorizedAt,
             String authorizationNote,
-            Long createdAt,
-            Long updatedAt
+            Instant createdAt,
+            Instant updatedAt
     ) {
     }
 
@@ -69,7 +70,7 @@ public final class CodegenMetadataDtos {
             String functionName,
             String functionAuthor,
             Integer columnCount,
-            Long updatedAt
+            Instant updatedAt
     ) {
     }
 

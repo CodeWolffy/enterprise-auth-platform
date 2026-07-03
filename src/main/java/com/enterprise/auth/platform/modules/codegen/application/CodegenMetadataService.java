@@ -95,7 +95,7 @@ public class CodegenMetadataService {
                 request.port(),
                 Boolean.FALSE.equals(request.enabled()) ? 0 : 1,
                 isLocalJdbcUrl(request.jdbcUrl()) ? 1 : resetAuthorization ? 0 : existing.externalAuthorized() ? 1 : 0,
-                isLocalJdbcUrl(request.jdbcUrl()) ? java.sql.Timestamp.from(Instant.now()) : resetAuthorization ? null : timestampFromMillis(existing.authorizedAt()),
+                isLocalJdbcUrl(request.jdbcUrl()) ? java.sql.Timestamp.from(Instant.now()) : resetAuthorization ? null : timestampFromInstant(existing.authorizedAt()),
                 isLocalJdbcUrl(request.jdbcUrl()) ? "当前应用库默认授权" : resetAuthorization ? "外部数据源地址已变更，需重新显式授权" : existing.authorizationNote(),
                 currentTenantId(),
                 id);
@@ -519,21 +519,20 @@ public class CodegenMetadataService {
         return LOCAL_JDBC_URL.equalsIgnoreCase(jdbcUrl == null ? null : jdbcUrl.trim());
     }
 
-    private java.sql.Timestamp timestampFromMillis(Long epochMillis) {
-        return epochMillis == null ? null : java.sql.Timestamp.from(Instant.ofEpochMilli(epochMillis));
+    private java.sql.Timestamp timestampFromInstant(Instant instant) {
+        return instant == null ? null : java.sql.Timestamp.from(instant);
     }
 
     private String trimToNull(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
     }
 
-    private Long nullableInstantMillis(ResultSet rs, String column) throws SQLException {
+    private Instant nullableInstant(ResultSet rs, String column) throws SQLException {
         var timestamp = rs.getTimestamp(column);
         if (timestamp == null) {
             return null;
         }
-        Instant instant = timestamp.toInstant();
-        return instant.toEpochMilli();
+        return timestamp.toInstant();
     }
 
     private Long nullableLong(ResultSet rs, String column) throws SQLException {
@@ -549,8 +548,8 @@ public class CodegenMetadataService {
                 nullableLong(rs, "table_rows"),
                 nullableLong(rs, "data_length"),
                 nullableLong(rs, "index_length"),
-                nullableInstantMillis(rs, "create_time"),
-                nullableInstantMillis(rs, "update_time")
+                nullableInstant(rs, "create_time"),
+                nullableInstant(rs, "update_time")
         );
     }
 
@@ -588,10 +587,10 @@ public class CodegenMetadataService {
                 rs.getInt("enabled") == 1,
                 external,
                 !external || rs.getInt("external_authorized") == 1,
-                nullableInstantMillis(rs, "authorized_at"),
+                nullableInstant(rs, "authorized_at"),
                 rs.getString("authorization_note"),
-                nullableInstantMillis(rs, "created_at"),
-                nullableInstantMillis(rs, "updated_at")
+                nullableInstant(rs, "created_at"),
+                nullableInstant(rs, "updated_at")
         );
     }
 
@@ -608,7 +607,7 @@ public class CodegenMetadataService {
                 rs.getString("function_name"),
                 rs.getString("function_author"),
                 rs.getInt("column_count"),
-                nullableInstantMillis(rs, "updated_at")
+                nullableInstant(rs, "updated_at")
         );
     }
 
@@ -654,7 +653,7 @@ public class CodegenMetadataService {
             case "int", "integer", "smallint", "tinyint" -> "Integer";
             case "decimal", "numeric" -> "java.math.BigDecimal";
             case "double", "float" -> "Double";
-            case "datetime", "timestamp" -> "java.time.LocalDateTime";
+            case "datetime", "timestamp" -> "java.time.Instant";
             case "date" -> "java.time.LocalDate";
             case "time" -> "java.time.LocalTime";
             default -> "String";

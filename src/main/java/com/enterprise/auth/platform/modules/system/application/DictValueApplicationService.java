@@ -176,7 +176,7 @@ public class DictValueApplicationService {
                 value.getShowClass(),
                 value.getEnabled() != null && value.getEnabled() == 1,
                 value.getRemarks(),
-                TimeSupport.toEpochMilli(value.getUpdatedAt())
+                value.getUpdatedAt()
         );
     }
 
