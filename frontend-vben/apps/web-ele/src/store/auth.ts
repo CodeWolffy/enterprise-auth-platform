@@ -27,6 +27,12 @@ export const useAuthStore = defineStore('auth', () => {
   const loginLoading = ref(false);
   const snapshot = ref<null | PermissionSnapshot>(null);
   const passwordChangeRequired = ref(false);
+  let tenantSwitchRequestId = 0;
+
+  function invalidateTenantSwitchRequests() {
+    tenantSwitchRequestId += 1;
+  }
+
   const tenantId = computed(() => {
     return (
       snapshot.value?.tenantId ?? (userStore.userInfo as any)?.tenantId ?? ''
@@ -63,7 +69,10 @@ export const useAuthStore = defineStore('auth', () => {
     } as unknown as UserInfo;
   }
 
-  function applySnapshot(me: PermissionSnapshot, requiresPasswordChange = false) {
+  function applySnapshot(
+    me: PermissionSnapshot,
+    requiresPasswordChange = false,
+  ) {
     snapshot.value = me;
     passwordChangeRequired.value = requiresPasswordChange;
     const userInfo = toUserInfo(me);
@@ -86,7 +95,8 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       loginLoading.value = true;
       // 后端为明文密码 + 服务端 BCrypt 校验，前端不做 AES 加密
-      const { passwordChangeRequired: requiresPasswordChange, tokenValue } = await loginApi(params);
+      const { passwordChangeRequired: requiresPasswordChange, tokenValue } =
+        await loginApi(params);
 
       // 如果成功获取到 accessToken
       if (tokenValue) {
@@ -122,7 +132,9 @@ export const useAuthStore = defineStore('auth', () => {
       userInfo,
     };
   }
+
   async function logout(redirect: boolean = true) {
+    invalidateTenantSwitchRequests();
     try {
       await logoutApi();
     } catch {
@@ -154,7 +166,15 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function switchTenant(tenantId: string) {
+    // 生成唯一请求 ID，防止并发切换时旧响应覆盖新状态
+    const requestId = ++tenantSwitchRequestId;
     const me = await switchTenantApi(tenantId);
+
+    // 丢弃过期请求结果
+    if (requestId !== tenantSwitchRequestId) {
+      return { snapshot: null, userInfo: null };
+    }
+
     const userInfo = applySnapshot(me);
     accessStore.setAccessMenus([]);
     accessStore.setAccessRoutes([]);
@@ -167,6 +187,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function $reset() {
+    invalidateTenantSwitchRequests();
     loginLoading.value = false;
     snapshot.value = null;
     passwordChangeRequired.value = false;

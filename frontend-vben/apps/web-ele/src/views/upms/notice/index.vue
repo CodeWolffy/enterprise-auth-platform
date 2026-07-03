@@ -1,7 +1,14 @@
 <script lang="ts" setup>
 import { defineAsyncComponent, reactive, ref } from 'vue';
 
-import { Delete, Document, Edit, Plus, Refresh, Search } from '@element-plus/icons-vue';
+import {
+  Delete,
+  Document,
+  Edit,
+  Plus,
+  Refresh,
+  Search,
+} from '@element-plus/icons-vue';
 import {
   ElButton,
   ElDrawer,
@@ -18,13 +25,16 @@ import {
 } from 'element-plus';
 
 import { delObj, getById, getPage } from '#/api/upms/notice';
+import RichTextViewer from '#/components/rich-text-viewer/index.vue';
 import { invokeWhenComponentReady } from '#/utils/component-ready';
 import { formatDateTime } from '#/utils/datetime';
 
-const RightToolbar = defineAsyncComponent(() =>
-  import('#/components/right-toolbar/index.vue'),
+const RightToolbar = defineAsyncComponent(
+  () => import('#/components/right-toolbar/index.vue'),
 );
-const Pagination = defineAsyncComponent(() => import('#/components/pagination/index.vue'));
+const Pagination = defineAsyncComponent(
+  () => import('#/components/pagination/index.vue'),
+);
 
 const Form = defineAsyncComponent(() => import('./form.vue'));
 
@@ -83,8 +93,8 @@ const viewDetail = async (row: any) => {
   try {
     detailData.value = await getById(row.id);
     detailDrawer.value = true;
-  } catch (e: any) {
-    ElMessage.error(e?.message || '加载详情失败');
+  } catch (error: any) {
+    ElMessage.error(error?.message || '加载详情失败');
   }
 };
 
@@ -151,7 +161,12 @@ const resetQuery = () => {
       <!-- 工具栏 -->
       <div class="hx-table-toolbar">
         <div>
-          <ElButton type="primary" @click="add" :icon="Plus" v-access:code="'upms:sysnotice:add'">
+          <ElButton
+            type="primary"
+            @click="add"
+            :icon="Plus"
+            v-access:code="'upms:sysnotice:add'"
+          >
             新增
           </ElButton>
         </div>
@@ -166,10 +181,21 @@ const resetQuery = () => {
       <!-- 列表 -->
       <ElTable v-loading="loading" :data="state.tableData" border>
         <ElTableColumn prop="noticeTitle" label="公告标题" />
-        <ElTableColumn prop="workflowStatus" label="状态" width="100" align="center">
+        <ElTableColumn
+          prop="workflowStatus"
+          label="状态"
+          width="100"
+          align="center"
+        >
           <template #default="scope">
             <ElTag
-              :type="scope.row.workflowStatus === 'PUBLISHED' ? 'success' : scope.row.workflowStatus === 'SCHEDULED' ? 'warning' : 'info'"
+              :type="
+                scope.row.workflowStatus === 'PUBLISHED'
+                  ? 'success'
+                  : scope.row.workflowStatus === 'SCHEDULED'
+                    ? 'warning'
+                    : 'info'
+              "
             >
               {{
                 scope.row.workflowStatus === 'PUBLISHED'
@@ -228,14 +254,36 @@ const resetQuery = () => {
 
       <!-- 详情抽屉 -->
       <ElDrawer v-model="detailDrawer" title="公告详情" size="600px">
-        <div v-if="detailData" style="padding: 0 16px;">
-          <h2 style="margin: 0 0 16px 0; font-size: 20px;">{{ detailData.noticeTitle }}</h2>
-          <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #e5e7eb; color: #64748b; font-size: 13px;">
-            <div>发布状态: <ElTag :type="detailData.published ? 'success' : 'info'" size="small">{{ detailData.published ? '已发布' : '草稿' }}</ElTag></div>
-            <div style="margin-top: 4px;">发布时间: {{ formatDateTime(detailData.publishTime) }}</div>
-            <div style="margin-top: 4px;">创建人: {{ detailData.createdBy || '-' }}</div>
+        <div v-if="detailData" style="padding: 0 16px">
+          <h2 style="margin: 0 0 16px 0; font-size: 20px">
+            {{ detailData.noticeTitle }}
+          </h2>
+          <div
+            style="
+              margin-bottom: 16px;
+              padding-bottom: 16px;
+              border-bottom: 1px solid #e5e7eb;
+              color: #64748b;
+              font-size: 13px;
+            "
+          >
+            <div>
+              发布状态:
+              <ElTag
+                :type="detailData.published ? 'success' : 'info'"
+                size="small"
+              >
+                {{ detailData.published ? '已发布' : '草稿' }}
+              </ElTag>
+            </div>
+            <div style="margin-top: 4px">
+              发布时间: {{ formatDateTime(detailData.publishTime) }}
+            </div>
+            <div style="margin-top: 4px">
+              创建人: {{ detailData.createdBy || '-' }}
+            </div>
           </div>
-          <div v-html="detailData.noticeContent" style="line-height: 1.8; word-break: break-word;"></div>
+          <RichTextViewer :content="detailData.noticeContent" />
         </div>
       </ElDrawer>
     </div>

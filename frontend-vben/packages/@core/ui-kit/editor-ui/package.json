@@ -52,7 +52,8 @@
     "@tiptap/extension-underline": "^2.1.13",
     "@tiptap/starter-kit": "^2.1.13",
     "@tiptap/vue-3": "^2.1.13",
-    "@vueuse/core": "catalog:"
+    "@vueuse/core": "catalog:",
+    "vue": "catalog:"
   },
   "devDependencies": {
     "@vben-core/typings": "workspace:*"

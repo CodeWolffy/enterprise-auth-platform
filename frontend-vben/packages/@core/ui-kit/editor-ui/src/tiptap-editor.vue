@@ -3,7 +3,6 @@ import type { Editor } from '@tiptap/vue-3';
 
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
-import { BubbleMenu, EditorContent, useEditor } from '@tiptap/vue-3';
 import Color from '@tiptap/extension-color';
 import Highlight from '@tiptap/extension-highlight';
 import Image from '@tiptap/extension-image';
@@ -17,32 +16,38 @@ import TextAlign from '@tiptap/extension-text-align';
 import { TextStyle } from '@tiptap/extension-text-style';
 import Underline from '@tiptap/extension-underline';
 import StarterKit from '@tiptap/starter-kit';
+import { BubbleMenu, EditorContent, useEditor } from '@tiptap/vue-3';
 
 interface Props {
-  /** 编辑器内容 HTML */
-  modelValue?: string;
+  /** 允许上传的图片 MIME 类型 */
+  allowedImageTypes?: string[];
   /** 是否禁用 */
   disabled?: boolean;
-  /** 占位符文本 */
-  placeholder?: string;
   /** 编辑区固定高度 */
   height?: number | string;
+  /** 图片最大体积，单位 byte */
+  maxImageSize?: number;
   /** 编辑区最小高度 */
   minHeight?: number | string;
-  /** 编辑器宽度 */
-  width?: number | string;
+  /** 编辑器内容 HTML */
+  modelValue?: string;
+  /** 占位符文本 */
+  placeholder?: string;
   /** 是否显示工具栏 */
   showToolbar?: boolean;
   /** 上传图片适配器，返回可访问 URL */
   uploadImage?: (file: File) => Promise<string>;
-  /** 允许上传的图片 MIME 类型 */
-  allowedImageTypes?: string[];
-  /** 图片最大体积，单位 byte */
-  maxImageSize?: number;
+  /** 编辑器宽度 */
+  width?: number | string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  allowedImageTypes: () => ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+  allowedImageTypes: () => [
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+  ],
   disabled: false,
   height: '400px',
   maxImageSize: 5 * 1024 * 1024,
@@ -54,12 +59,7 @@ const props = withDefaults(defineProps<Props>(), {
   width: '100%',
 });
 
-const emit = defineEmits([
-  'update:modelValue',
-  'change',
-  'created',
-  'error',
-]);
+const emit = defineEmits(['update:modelValue', 'change', 'created', 'error']);
 
 const editorRef = useEditor({
   content: props.modelValue,
@@ -159,7 +159,9 @@ const editorStyle = computed(() => ({
 }));
 
 const contentStyle = computed(() => ({
-  height: normalizeSize(fullscreen.value ? 'calc(100vh - 112px)' : props.height),
+  height: normalizeSize(
+    fullscreen.value ? 'calc(100vh - 112px)' : props.height,
+  ),
   minHeight: normalizeSize(props.minHeight),
 }));
 
@@ -224,23 +226,29 @@ function setBlockType(type: string) {
   if (!chain) return;
 
   switch (type) {
-    case 'heading1':
-      chain.setHeading({ level: 1 }).run();
-      break;
-    case 'heading2':
-      chain.setHeading({ level: 2 }).run();
-      break;
-    case 'heading3':
-      chain.setHeading({ level: 3 }).run();
-      break;
-    case 'blockquote':
+    case 'blockquote': {
       chain.toggleBlockquote().run();
       break;
-    case 'codeBlock':
+    }
+    case 'codeBlock': {
       chain.toggleCodeBlock().run();
       break;
-    default:
+    }
+    case 'heading1': {
+      chain.setHeading({ level: 1 }).run();
+      break;
+    }
+    case 'heading2': {
+      chain.setHeading({ level: 2 }).run();
+      break;
+    }
+    case 'heading3': {
+      chain.setHeading({ level: 3 }).run();
+      break;
+    }
+    default: {
       chain.setParagraph().run();
+    }
   }
 }
 
@@ -279,13 +287,17 @@ function confirmLink() {
     unsetLink();
     return;
   }
-  runCommand((editor) => editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run());
+  runCommand((editor) =>
+    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run(),
+  );
   linkUrl.value = '';
   showLinkPanel.value = false;
 }
 
 function unsetLink() {
-  runCommand((editor) => editor.chain().focus().extendMarkRange('link').unsetLink().run());
+  runCommand((editor) =>
+    editor.chain().focus().extendMarkRange('link').unsetLink().run(),
+  );
   linkUrl.value = '';
   showLinkPanel.value = false;
 }
@@ -293,7 +305,9 @@ function unsetLink() {
 function confirmImageUrl() {
   const url = imageUrl.value.trim();
   if (!url) return;
-  runCommand((editor) => editor.chain().focus().setImage({ alt: '', src: url }).run());
+  runCommand((editor) =>
+    editor.chain().focus().setImage({ alt: '', src: url }).run(),
+  );
   imageUrl.value = '';
   showImagePanel.value = false;
 }
@@ -326,7 +340,9 @@ async function uploadSelectedImage(event: Event) {
       showError('图片上传后未返回可访问地址');
       return;
     }
-    runCommand((editor) => editor.chain().focus().setImage({ alt: file.name, src: url }).run());
+    runCommand((editor) =>
+      editor.chain().focus().setImage({ alt: file.name, src: url }).run(),
+    );
     showImagePanel.value = false;
   } catch (error: any) {
     showError(error?.message || '图片上传失败');
@@ -338,7 +354,13 @@ async function uploadSelectedImage(event: Event) {
 function confirmTable() {
   const rows = Math.max(1, Math.min(20, Number(tableRows.value) || 3));
   const cols = Math.max(1, Math.min(20, Number(tableCols.value) || 3));
-  runCommand((editor) => editor.chain().focus().insertTable({ cols, rows, withHeaderRow: true }).run());
+  runCommand((editor) =>
+    editor
+      .chain()
+      .focus()
+      .insertTable({ cols, rows, withHeaderRow: true })
+      .run(),
+  );
   showTablePanel.value = false;
 }
 
@@ -383,99 +405,419 @@ defineExpose({
         <option value="codeBlock">代码块</option>
       </select>
 
-      <div class="toolbar-divider" />
+      <div class="toolbar-divider"></div>
 
       <div class="tiptap-toolbar__group">
-        <button :class="{ 'is-active': editorRef?.isActive('bold') }" title="粗体" type="button" @click="runCommand((editor) => editor.chain().focus().toggleBold().run())">B</button>
-        <button :class="{ 'is-active': editorRef?.isActive('italic') }" title="斜体" type="button" @click="runCommand((editor) => editor.chain().focus().toggleItalic().run())">I</button>
-        <button :class="{ 'is-active': editorRef?.isActive('underline') }" title="下划线" type="button" @click="runCommand((editor) => editor.chain().focus().toggleUnderline().run())">U</button>
-        <button :class="{ 'is-active': editorRef?.isActive('strike') }" title="删除线" type="button" @click="runCommand((editor) => editor.chain().focus().toggleStrike().run())">S</button>
+        <button
+          :class="{ 'is-active': editorRef?.isActive('bold') }"
+          title="粗体"
+          type="button"
+          @click="
+            runCommand((editor) => editor.chain().focus().toggleBold().run())
+          "
+        >
+          B
+        </button>
+        <button
+          :class="{ 'is-active': editorRef?.isActive('italic') }"
+          title="斜体"
+          type="button"
+          @click="
+            runCommand((editor) => editor.chain().focus().toggleItalic().run())
+          "
+        >
+          I
+        </button>
+        <button
+          :class="{ 'is-active': editorRef?.isActive('underline') }"
+          title="下划线"
+          type="button"
+          @click="
+            runCommand((editor) =>
+              editor.chain().focus().toggleUnderline().run(),
+            )
+          "
+        >
+          U
+        </button>
+        <button
+          :class="{ 'is-active': editorRef?.isActive('strike') }"
+          title="删除线"
+          type="button"
+          @click="
+            runCommand((editor) => editor.chain().focus().toggleStrike().run())
+          "
+        >
+          S
+        </button>
       </div>
 
-      <div class="toolbar-divider" />
+      <div class="toolbar-divider"></div>
 
       <div class="tiptap-toolbar__group">
-        <button :class="{ 'is-active': editorRef?.isActive({ textAlign: 'left' }) }" title="左对齐" type="button" @click="runCommand((editor) => editor.chain().focus().setTextAlign('left').run())">左</button>
-        <button :class="{ 'is-active': editorRef?.isActive({ textAlign: 'center' }) }" title="居中" type="button" @click="runCommand((editor) => editor.chain().focus().setTextAlign('center').run())">中</button>
-        <button :class="{ 'is-active': editorRef?.isActive({ textAlign: 'right' }) }" title="右对齐" type="button" @click="runCommand((editor) => editor.chain().focus().setTextAlign('right').run())">右</button>
-        <button :class="{ 'is-active': editorRef?.isActive({ textAlign: 'justify' }) }" title="两端对齐" type="button" @click="runCommand((editor) => editor.chain().focus().setTextAlign('justify').run())">齐</button>
+        <button
+          :class="{ 'is-active': editorRef?.isActive({ textAlign: 'left' }) }"
+          title="左对齐"
+          type="button"
+          @click="
+            runCommand((editor) =>
+              editor.chain().focus().setTextAlign('left').run(),
+            )
+          "
+        >
+          左
+        </button>
+        <button
+          :class="{ 'is-active': editorRef?.isActive({ textAlign: 'center' }) }"
+          title="居中"
+          type="button"
+          @click="
+            runCommand((editor) =>
+              editor.chain().focus().setTextAlign('center').run(),
+            )
+          "
+        >
+          中
+        </button>
+        <button
+          :class="{ 'is-active': editorRef?.isActive({ textAlign: 'right' }) }"
+          title="右对齐"
+          type="button"
+          @click="
+            runCommand((editor) =>
+              editor.chain().focus().setTextAlign('right').run(),
+            )
+          "
+        >
+          右
+        </button>
+        <button
+          :class="{
+            'is-active': editorRef?.isActive({ textAlign: 'justify' }),
+          }"
+          title="两端对齐"
+          type="button"
+          @click="
+            runCommand((editor) =>
+              editor.chain().focus().setTextAlign('justify').run(),
+            )
+          "
+        >
+          齐
+        </button>
       </div>
 
-      <div class="toolbar-divider" />
+      <div class="toolbar-divider"></div>
 
       <div class="tiptap-toolbar__group">
-        <button :class="{ 'is-active': editorRef?.isActive('bulletList') }" title="无序列表" type="button" @click="runCommand((editor) => editor.chain().focus().toggleBulletList().run())">•</button>
-        <button :class="{ 'is-active': editorRef?.isActive('orderedList') }" title="有序列表" type="button" @click="runCommand((editor) => editor.chain().focus().toggleOrderedList().run())">1.</button>
+        <button
+          :class="{ 'is-active': editorRef?.isActive('bulletList') }"
+          title="无序列表"
+          type="button"
+          @click="
+            runCommand((editor) =>
+              editor.chain().focus().toggleBulletList().run(),
+            )
+          "
+        >
+          •
+        </button>
+        <button
+          :class="{ 'is-active': editorRef?.isActive('orderedList') }"
+          title="有序列表"
+          type="button"
+          @click="
+            runCommand((editor) =>
+              editor.chain().focus().toggleOrderedList().run(),
+            )
+          "
+        >
+          1.
+        </button>
       </div>
 
-      <div class="toolbar-divider" />
+      <div class="toolbar-divider"></div>
 
       <div class="tiptap-toolbar__group">
         <div class="color-picker-wrapper">
-          <button class="color-btn" title="文字颜色" type="button" @click="showColorPanel = !showColorPanel; showHighlightPanel = false">
+          <button
+            class="color-btn"
+            title="文字颜色"
+            type="button"
+            @click="
+              showColorPanel = !showColorPanel;
+              showHighlightPanel = false;
+            "
+          >
             A
-            <span class="color-underline" :style="{ backgroundColor: editorRef?.getAttributes('textStyle').color || '#3b82f6' }" />
+            <span
+              class="color-underline"
+              :style="{
+                backgroundColor:
+                  editorRef?.getAttributes('textStyle').color || '#3b82f6',
+              }"
+            ></span>
           </button>
           <div v-if="showColorPanel" class="color-panel">
-            <button v-for="color in colorPalette" :key="color" class="color-swatch" :style="{ backgroundColor: color }" type="button" @click="setTextColor(color)" />
+            <button
+              v-for="color in colorPalette"
+              :key="color"
+              class="color-swatch"
+              :style="{ backgroundColor: color }"
+              type="button"
+              @click="setTextColor(color)"
+            ></button>
           </div>
         </div>
         <div class="color-picker-wrapper">
-          <button class="highlight-btn" title="文本高亮" type="button" @click="showHighlightPanel = !showHighlightPanel; showColorPanel = false">H</button>
+          <button
+            class="highlight-btn"
+            title="文本高亮"
+            type="button"
+            @click="
+              showHighlightPanel = !showHighlightPanel;
+              showColorPanel = false;
+            "
+          >
+            H
+          </button>
           <div v-if="showHighlightPanel" class="color-panel">
-            <button v-for="color in highlightPalette" :key="color" class="color-swatch" :style="{ backgroundColor: color === 'transparent' ? '#fff' : color }" type="button" @click="setHighlightColor(color)">
-              <span v-if="color === 'transparent'" class="transparent-line" />
+            <button
+              v-for="color in highlightPalette"
+              :key="color"
+              class="color-swatch"
+              :style="{
+                backgroundColor: color === 'transparent' ? '#fff' : color,
+              }"
+              type="button"
+              @click="setHighlightColor(color)"
+            >
+              <span
+                v-if="color === 'transparent'"
+                class="transparent-line"
+              ></span>
             </button>
           </div>
         </div>
       </div>
 
-      <div class="toolbar-divider" />
+      <div class="toolbar-divider"></div>
 
       <div class="tiptap-toolbar__group">
-        <button :class="{ 'is-active': editorRef?.isActive('link') }" title="链接" type="button" @click="openLinkPanel">链接</button>
+        <button
+          :class="{ 'is-active': editorRef?.isActive('link') }"
+          title="链接"
+          type="button"
+          @click="openLinkPanel"
+        >
+          链接
+        </button>
         <button title="移除链接" type="button" @click="unsetLink">断链</button>
-        <button title="图片" type="button" @click="showImagePanel = true; closeFloatingPanels()">图片</button>
-        <button :class="{ 'is-active': editorRef?.isActive('table') }" title="表格" type="button" @click="showTablePanel = true; closeFloatingPanels()">表格</button>
+        <button
+          title="图片"
+          type="button"
+          @click="
+            showImagePanel = true;
+            closeFloatingPanels();
+          "
+        >
+          图片
+        </button>
+        <button
+          :class="{ 'is-active': editorRef?.isActive('table') }"
+          title="表格"
+          type="button"
+          @click="
+            showTablePanel = true;
+            closeFloatingPanels();
+          "
+        >
+          表格
+        </button>
       </div>
 
-      <div v-if="editorRef?.isActive('table')" class="tiptap-toolbar__group tiptap-toolbar__group--table">
-        <button title="前插列" type="button" @click="runCommand((editor) => editor.chain().focus().addColumnBefore().run())">前列</button>
-        <button title="后插列" type="button" @click="runCommand((editor) => editor.chain().focus().addColumnAfter().run())">后列</button>
-        <button title="删列" type="button" @click="runCommand((editor) => editor.chain().focus().deleteColumn().run())">删列</button>
-        <button title="前插行" type="button" @click="runCommand((editor) => editor.chain().focus().addRowBefore().run())">前行</button>
-        <button title="后插行" type="button" @click="runCommand((editor) => editor.chain().focus().addRowAfter().run())">后行</button>
-        <button title="删行" type="button" @click="runCommand((editor) => editor.chain().focus().deleteRow().run())">删行</button>
-        <button title="删表" type="button" @click="runCommand((editor) => editor.chain().focus().deleteTable().run())">删表</button>
+      <div
+        v-if="editorRef?.isActive('table')"
+        class="tiptap-toolbar__group tiptap-toolbar__group--table"
+      >
+        <button
+          title="前插列"
+          type="button"
+          @click="
+            runCommand((editor) =>
+              editor.chain().focus().addColumnBefore().run(),
+            )
+          "
+        >
+          前列
+        </button>
+        <button
+          title="后插列"
+          type="button"
+          @click="
+            runCommand((editor) =>
+              editor.chain().focus().addColumnAfter().run(),
+            )
+          "
+        >
+          后列
+        </button>
+        <button
+          title="删列"
+          type="button"
+          @click="
+            runCommand((editor) => editor.chain().focus().deleteColumn().run())
+          "
+        >
+          删列
+        </button>
+        <button
+          title="前插行"
+          type="button"
+          @click="
+            runCommand((editor) => editor.chain().focus().addRowBefore().run())
+          "
+        >
+          前行
+        </button>
+        <button
+          title="后插行"
+          type="button"
+          @click="
+            runCommand((editor) => editor.chain().focus().addRowAfter().run())
+          "
+        >
+          后行
+        </button>
+        <button
+          title="删行"
+          type="button"
+          @click="
+            runCommand((editor) => editor.chain().focus().deleteRow().run())
+          "
+        >
+          删行
+        </button>
+        <button
+          title="删表"
+          type="button"
+          @click="
+            runCommand((editor) => editor.chain().focus().deleteTable().run())
+          "
+        >
+          删表
+        </button>
       </div>
 
-      <div class="toolbar-divider" />
+      <div class="toolbar-divider"></div>
 
       <div class="tiptap-toolbar__group">
-        <button title="清除格式" type="button" @click="runCommand((editor) => editor.chain().focus().unsetAllMarks().clearNodes().run())">清格</button>
-        <button title="分割线" type="button" @click="runCommand((editor) => editor.chain().focus().setHorizontalRule().run())">分割</button>
-        <button title="撤销" type="button" @click="runCommand((editor) => editor.chain().focus().undo().run())">撤销</button>
-        <button title="重做" type="button" @click="runCommand((editor) => editor.chain().focus().redo().run())">重做</button>
+        <button
+          title="清除格式"
+          type="button"
+          @click="
+            runCommand((editor) =>
+              editor.chain().focus().unsetAllMarks().clearNodes().run(),
+            )
+          "
+        >
+          清格
+        </button>
+        <button
+          title="分割线"
+          type="button"
+          @click="
+            runCommand((editor) =>
+              editor.chain().focus().setHorizontalRule().run(),
+            )
+          "
+        >
+          分割
+        </button>
+        <button
+          title="撤销"
+          type="button"
+          @click="runCommand((editor) => editor.chain().focus().undo().run())"
+        >
+          撤销
+        </button>
+        <button
+          title="重做"
+          type="button"
+          @click="runCommand((editor) => editor.chain().focus().redo().run())"
+        >
+          重做
+        </button>
       </div>
 
-      <div class="toolbar-divider" />
+      <div class="toolbar-divider"></div>
 
       <div class="tiptap-toolbar__group">
-        <button :class="{ 'is-active': sourceMode }" title="源码模式" type="button" @click="toggleSourceMode">源码</button>
-        <button :class="{ 'is-active': fullscreen }" title="全屏" type="button" @click="toggleFullscreen">{{ fullscreen ? '还原' : '全屏' }}</button>
+        <button
+          :class="{ 'is-active': sourceMode }"
+          title="源码模式"
+          type="button"
+          @click="toggleSourceMode"
+        >
+          源码
+        </button>
+        <button
+          :class="{ 'is-active': fullscreen }"
+          title="全屏"
+          type="button"
+          @click="toggleFullscreen"
+        >
+          {{ fullscreen ? '还原' : '全屏' }}
+        </button>
       </div>
     </div>
 
-    <BubbleMenu v-if="editorRef && !sourceMode" :editor="editorRef" :tippy-options="{ duration: 120 }" class="tiptap-bubble-menu">
-      <button :class="{ 'is-active': editorRef.isActive('bold') }" type="button" @click="runCommand((editor) => editor.chain().focus().toggleBold().run())">B</button>
-      <button :class="{ 'is-active': editorRef.isActive('italic') }" type="button" @click="runCommand((editor) => editor.chain().focus().toggleItalic().run())">I</button>
-      <button :class="{ 'is-active': editorRef.isActive('link') }" type="button" @click="openLinkPanel">链接</button>
+    <BubbleMenu
+      v-if="showToolbar && editorRef && !sourceMode"
+      :editor="editorRef"
+      :tippy-options="{ duration: 120 }"
+      class="tiptap-bubble-menu"
+    >
+      <button
+        :class="{ 'is-active': editorRef.isActive('bold') }"
+        type="button"
+        @click="
+          runCommand((editor) => editor.chain().focus().toggleBold().run())
+        "
+      >
+        B
+      </button>
+      <button
+        :class="{ 'is-active': editorRef.isActive('italic') }"
+        type="button"
+        @click="
+          runCommand((editor) => editor.chain().focus().toggleItalic().run())
+        "
+      >
+        I
+      </button>
+      <button
+        :class="{ 'is-active': editorRef.isActive('link') }"
+        type="button"
+        @click="openLinkPanel"
+      >
+        链接
+      </button>
     </BubbleMenu>
 
-    <div v-if="showLinkPanel" class="editor-modal" @click.self="showLinkPanel = false">
+    <div
+      v-if="showLinkPanel"
+      class="editor-modal"
+      @click.self="showLinkPanel = false"
+    >
       <div class="editor-modal__content">
         <h3>插入链接</h3>
-        <input v-model="linkUrl" class="editor-modal__input" placeholder="https://example.com" @keyup.enter="confirmLink">
+        <input
+          v-model="linkUrl"
+          class="editor-modal__input"
+          placeholder="https://example.com"
+          @keyup.enter="confirmLink"
+        />
         <div class="editor-modal__actions">
           <button type="button" @click="showLinkPanel = false">取消</button>
           <button type="button" @click="unsetLink">移除链接</button>
@@ -484,26 +826,57 @@ defineExpose({
       </div>
     </div>
 
-    <div v-if="showImagePanel" class="editor-modal" @click.self="showImagePanel = false">
+    <div
+      v-if="showImagePanel"
+      class="editor-modal"
+      @click.self="showImagePanel = false"
+    >
       <div class="editor-modal__content">
         <h3>插入图片</h3>
-        <input v-model="imageUrl" class="editor-modal__input" placeholder="图片 URL" @keyup.enter="confirmImageUrl">
-        <input ref="imageFileInputRef" accept="image/*" class="editor-file-input" type="file" @change="uploadSelectedImage">
+        <input
+          v-model="imageUrl"
+          class="editor-modal__input"
+          placeholder="图片 URL"
+          @keyup.enter="confirmImageUrl"
+        />
+        <input
+          ref="imageFileInputRef"
+          accept="image/*"
+          class="editor-file-input"
+          type="file"
+          @change="uploadSelectedImage"
+        />
         <div class="editor-modal__actions editor-modal__actions--split">
           <button type="button" @click="showImagePanel = false">取消</button>
-          <span class="editor-modal__spacer" />
-          <button :disabled="uploadingImage" type="button" @click="selectImageFile">{{ uploadingImage ? '上传中...' : '上传图片' }}</button>
+          <span class="editor-modal__spacer"></span>
+          <button
+            :disabled="uploadingImage"
+            type="button"
+            @click="selectImageFile"
+          >
+            {{ uploadingImage ? '上传中...' : '上传图片' }}
+          </button>
           <button type="button" @click="confirmImageUrl">使用 URL</button>
         </div>
       </div>
     </div>
 
-    <div v-if="showTablePanel" class="editor-modal" @click.self="showTablePanel = false">
+    <div
+      v-if="showTablePanel"
+      class="editor-modal"
+      @click.self="showTablePanel = false"
+    >
       <div class="editor-modal__content">
         <h3>插入表格</h3>
         <div class="editor-form-row">
-          <label>行数 <input v-model.number="tableRows" max="20" min="1" type="number"></label>
-          <label>列数 <input v-model.number="tableCols" max="20" min="1" type="number"></label>
+          <label>
+            行数
+            <input v-model.number="tableRows" max="20" min="1" type="number" />
+          </label>
+          <label>
+            列数
+            <input v-model.number="tableCols" max="20" min="1" type="number" />
+          </label>
         </div>
         <div class="editor-modal__actions">
           <button type="button" @click="showTablePanel = false">取消</button>
@@ -518,7 +891,7 @@ defineExpose({
       class="tiptap-editor__source"
       :style="contentStyle"
       spellcheck="false"
-    />
+    ></textarea>
     <EditorContent
       v-else
       :editor="editorRef"
@@ -812,7 +1185,8 @@ defineExpose({
   line-height: 1.75;
 }
 
-.tiptap-editor__content :deep(.ProseMirror p.is-editor-empty:first-child::before) {
+.tiptap-editor__content
+  :deep(.ProseMirror p.is-editor-empty:first-child::before) {
   content: attr(data-placeholder);
   float: left;
   height: 0;
@@ -910,7 +1284,8 @@ defineExpose({
   pointer-events: none;
 }
 
-.tiptap-editor__content :deep(.ProseMirror .tiptap-table .column-resize-handle) {
+.tiptap-editor__content
+  :deep(.ProseMirror .tiptap-table .column-resize-handle) {
   position: absolute;
   top: 0;
   right: -2px;

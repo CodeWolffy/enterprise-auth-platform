@@ -1,9 +1,7 @@
 <script lang="ts" setup>
 import type { FormInstance } from 'element-plus';
 
-import { reactive, ref } from 'vue';
-
-import { TiptapEditor } from '@vben-core/editor-ui';
+import { nextTick, reactive, ref } from 'vue';
 
 import {
   ElButton,
@@ -19,9 +17,23 @@ import {
 
 import { upload as uploadFile } from '#/api/upms/file';
 import { addObj, editObj, getById } from '#/api/upms/notice';
+import RichTextEditor from '#/components/rich-text-editor/index.vue';
 import { formatDateTime, toInstantIso } from '#/utils/datetime';
+import { hasMeaningfulRichText, sanitizeRichText } from '#/utils/rich-text';
 
 const emit = defineEmits(['initPage']);
+
+function validateNoticeContent(
+  _rule: unknown,
+  value: string,
+  callback: (error?: Error) => void,
+) {
+  if (!hasMeaningfulRichText(value)) {
+    callback(new Error('请输入公告内容'));
+    return;
+  }
+  callback();
+}
 
 const state = reactive({
   form: {
@@ -35,15 +47,20 @@ const state = reactive({
     noticeTitle: [
       { required: true, message: '请输入公告标题', trigger: 'change' },
     ],
-    noticeContent: [
-      { required: true, message: '请输入公告内容', trigger: 'change' },
-    ],
+    noticeContent: [{ trigger: 'change', validator: validateNoticeContent }],
   },
 });
 
 const dialog = ref(false);
 const loading = ref(false);
 const formRef = ref();
+const contentEditorRef = ref<InstanceType<typeof RichTextEditor> | null>(null);
+
+const syncEditorContent = () => {
+  const html = contentEditorRef.value?.getHTML?.() ?? state.form.noticeContent;
+  state.form.noticeContent = html;
+  return html;
+};
 
 const initForm = (row?: any) => {
   if (row && row.id) {
@@ -93,12 +110,15 @@ const uploadNoticeImage = async (file: File) => {
 
 const submitForm = async (formEl: FormInstance | undefined) => {
   if (!formEl) return;
+  syncEditorContent();
+  await nextTick();
   await formEl.validate((valid) => {
     if (valid) {
+      const noticeContent = syncEditorContent();
       loading.value = true;
       const payload: any = {
         noticeTitle: state.form.noticeTitle,
-        noticeContent: state.form.noticeContent,
+        noticeContent: sanitizeRichText(noticeContent),
         published: state.form.published,
       };
       if (state.form.publishTime) {
@@ -160,15 +180,21 @@ defineExpose({
       :rules="state.rules"
     >
       <ElFormItem label="公告标题" prop="noticeTitle">
-        <ElInput v-model="state.form.noticeTitle" show-word-limit maxlength="200" />
+        <ElInput
+          v-model="state.form.noticeTitle"
+          show-word-limit
+          maxlength="200"
+        />
       </ElFormItem>
       <ElFormItem label="公告内容" prop="noticeContent">
-        <TiptapEditor
+        <RichTextEditor
+          :key="state.form.id || 'new'"
+          ref="contentEditorRef"
           v-model="state.form.noticeContent"
-          :min-height="360"
           :height="420"
+          :min-height="280"
           :upload-image="uploadNoticeImage"
-          @error="ElMessage.error"
+          placeholder="请输入公告内容，支持图文混排"
         />
       </ElFormItem>
       <ElFormItem label="发布时间" prop="publishTime">
@@ -191,7 +217,11 @@ defineExpose({
     <template #footer>
       <span class="dialog-footer">
         <ElButton @click="handleClose">关 闭</ElButton>
-        <ElButton type="primary" @click="submitForm(formRef)" :loading="loading">
+        <ElButton
+          type="primary"
+          @click="submitForm(formRef)"
+          :loading="loading"
+        >
           确 认
         </ElButton>
       </span>

@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import type { NoticeView } from '#/types/system';
+
 import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { getPublishedNotice } from '#/api/system';
-import type { NoticeView } from '#/types/system';
+import RichTextViewer from '#/components/rich-text-viewer/index.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -43,7 +45,7 @@ const goBack = () => {
             </div>
             <h1>{{ notice.noticeTitle }}</h1>
           </header>
-          <div class="notice-rich-content" v-html="notice.noticeContent"></div>
+          <RichTextViewer :content="notice.noticeContent" />
         </section>
 
         <el-empty v-else description="公告不存在或尚未发布" />
@@ -93,20 +95,5 @@ const goBack = () => {
     gap: 16px;
     color: var(--el-text-color-secondary);
   }
-
-  .notice-rich-content {
-    line-height: 1.8;
-    font-size: 15px;
-
-    :deep(img) {
-      max-width: 100%;
-      height: auto;
-    }
-
-    :deep(a) {
-      color: var(--el-color-primary);
-    }
-  }
 }
 </style>
-
