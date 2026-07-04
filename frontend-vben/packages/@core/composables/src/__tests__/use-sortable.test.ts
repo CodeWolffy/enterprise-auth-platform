@@ -4,14 +4,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useSortable } from '../use-sortable';
 
+const sortableCreateMock = vi.hoisted(() => vi.fn());
+
+vi.mock('sortablejs/modular/sortable.complete.esm.js', () => ({
+  default: {
+    create: sortableCreateMock,
+  },
+}));
+
 describe('useSortable', () => {
   beforeEach(() => {
-    vi.mock('sortablejs/modular/sortable.complete.esm.js', () => ({
-      default: {
-        create: vi.fn(),
-      },
-    }));
+    sortableCreateMock.mockClear();
   });
+
   it('should call Sortable.create with the correct options', async () => {
     // Create a mock element
     const mockElement = document.createElement('div') as HTMLDivElement;

@@ -1,6 +1,8 @@
 <script lang="ts" setup>
 import { defineAsyncComponent, reactive, ref } from 'vue';
 
+import { Page } from '@vben/common-ui';
+
 import { Delete, Edit, Plus, Refresh, Search } from '@element-plus/icons-vue';
 import {
   ElButton,
@@ -111,8 +113,8 @@ initPage();
 </script>
 
 <template>
-  <div class="hx-layout-container">
-    <div class="hx-layout-container-auto hx-layout-container-view">
+  <Page auto-content-height>
+    <div class="config-page">
       <ElForm
         v-show="showSearch"
         ref="queryRef"
@@ -242,5 +244,22 @@ initPage();
         @pagination="initPage"
       />
     </div>
-  </div>
+  </Page>
 </template>
+
+<style lang="scss" scoped>
+.config-page {
+  box-sizing: border-box;
+  min-height: 100%;
+  padding: 8px;
+  background: hsl(var(--card));
+  border-radius: 8px;
+}
+
+.hx-table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+</style>

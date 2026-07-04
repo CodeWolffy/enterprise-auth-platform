@@ -79,7 +79,7 @@ const listen = computed(() => {
     />
 
     <!-- 触发打开抽屉的按钮(可覆盖) -->
-    <slot>
+    <slot :open="() => drawerApi.open()">
       <VbenButton
         v-if="props.showButton"
         :title="$t('preferences.title')"

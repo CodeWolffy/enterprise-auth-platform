@@ -76,7 +76,6 @@ const props = withDefaults(defineProps<Props>(), {
   description: '',
   enableShortcutKey: true,
   menus: () => [],
-  showShortcutKey: true,
   tagText: '',
   text: '',
   trigger: 'click',

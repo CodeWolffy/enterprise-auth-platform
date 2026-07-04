@@ -156,6 +156,9 @@ const avatarName = computed(() => {
     'U';
   return source.trim().charAt(0).toUpperCase();
 });
+const passwordFormUsername = computed(
+  () => profile.value?.username || authStore.snapshot?.username || '',
+);
 const roleTags = computed(() => authStore.snapshot?.roles ?? []);
 const activeSessionCount = computed(
   () => sessionsList.value.filter((session) => session.active).length,
@@ -725,6 +728,15 @@ onMounted(() => {
             label-position="top"
             @submit.prevent
           >
+            <input
+              class="password-form-username"
+              autocomplete="username"
+              name="username"
+              readonly
+              tabindex="-1"
+              type="text"
+              :value="passwordFormUsername"
+            />
             <ElFormItem label="原密码" prop="oldPassword">
               <ElInput
                 v-model="passwordForm.oldPassword"
@@ -1147,6 +1159,18 @@ h1 {
 
 .inline-alert {
   margin-bottom: 18px;
+}
+
+.password-form-username {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .password-strength {

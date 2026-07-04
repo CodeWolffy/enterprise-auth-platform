@@ -1,29 +1,14 @@
 <script setup lang="ts">
-import type { Component } from 'vue';
-
 import type { NotificationView } from '#/api/notification';
 
 import { computed } from 'vue';
 
+import { Bell, CircleCheckBig, MailCheck } from '@vben/icons';
+
 import {
-  Bell,
-  Check,
-  CircleCloseFilled,
-  Close,
-  Delete,
-  InfoFilled,
-  Refresh,
-  SuccessFilled,
-  WarningFilled,
-} from '@element-plus/icons-vue';
-import {
-  ElBadge,
   ElButton,
-  ElDrawer,
   ElEmpty,
-  ElIcon,
-  ElPagination,
-  ElTag,
+  ElPopover,
   ElTooltip,
 } from 'element-plus';
 
@@ -38,10 +23,8 @@ const {
   notificationReadFilter,
   notificationPage,
   loadUnreadNotificationCount,
-  openNotifications,
   loadNotifications,
   changeNotificationReadFilter,
-  handleNotificationPageChange,
   markNotificationRead,
   markAllNotificationsReadAction,
   clearReadNotificationsAction,
@@ -56,54 +39,31 @@ defineExpose({
   closeSseSubscription,
 });
 
-const filterOptions = computed(() => [
-  { label: '全部', value: 'all' as const, count: 0 },
-  {
-    label: '未读',
-    value: 'unread' as const,
-    count: unreadNotificationCount.value,
-  },
-]);
-
-const panelSummaryText = computed(() => {
+const notificationTotalText = computed(() => {
   if (notificationReadFilter.value === 'unread') {
     return `未读 ${notificationPage.value.total} 条`;
   }
-  return `共 ${notificationPage.value.total} 条`;
+  return notificationPage.value.total > 0
+    ? `共 ${notificationPage.value.total} 条`
+    : '';
 });
 
-function notificationLevelKey(level?: null | string) {
-  if (level === 'SUCCESS') return 'success';
-  if (level === 'WARNING') return 'warning';
-  if (level === 'ERROR') return 'error';
-  return 'info';
+function notificationAvatarClass(notification: NotificationView) {
+  if (notification.level === 'ERROR') return 'is-error';
+  if (notification.level === 'WARNING') return 'is-warning';
+  if (notification.level === 'SUCCESS') return 'is-success';
+  return 'is-info';
 }
 
-function notificationLevelIcon(level?: null | string): Component {
-  if (level === 'SUCCESS') return SuccessFilled;
-  if (level === 'WARNING') return WarningFilled;
-  if (level === 'ERROR') return CircleCloseFilled;
-  return InfoFilled;
+function notificationAvatarText(notification: NotificationView) {
+  if (notification.scenarioCode === 'SYSTEM_NOTICE_PUBLISHED') {
+    return 'VB';
+  }
+  return notification.title?.trim().slice(0, 1).toUpperCase() || 'VB';
 }
 
-function notificationScenarioLabel(scenarioCode?: null | string) {
-  const labels: Record<string, string> = {
-    WORKFLOW_TODO_CREATED: '新待办',
-    WORKFLOW_TASK_APPROVED: '审批通过',
-    WORKFLOW_TASK_REJECTED: '审批驳回',
-    WORKFLOW_TASK_TRANSFERRED: '转签',
-    WORKFLOW_INSTANCE_WITHDRAWN: '已撤回',
-    WORKFLOW_INSTANCE_TERMINATED: '已终止',
-    ACCOUNT_LOCKED: '账号锁定',
-    PASSWORD_RESET_REQUESTED: '重置请求',
-    PASSWORD_RESET_COMPLETED: '重置完成',
-    PASSWORD_CHANGED: '密码修改',
-    ADMIN_PASSWORD_RESET: '管理员重置',
-    ACCOUNT_DISABLED: '账号禁用',
-    SESSION_FORCED_OFFLINE: '强制下线',
-    SYSTEM_NOTICE_PUBLISHED: '系统公告',
-  };
-  return scenarioCode ? labels[scenarioCode] || scenarioCode : '通知';
+function handlePopoverShow() {
+  void loadNotifications(1);
 }
 
 function handleNotificationClick(notification: NotificationView) {
@@ -113,528 +73,393 @@ function handleNotificationClick(notification: NotificationView) {
     markNotificationRead(notification);
   }
 }
+
+async function handleViewAllMessages() {
+  if (notificationReadFilter.value !== 'all') {
+    await changeNotificationReadFilter('all');
+    return;
+  }
+  await loadNotifications(1);
+}
 </script>
 
 <template>
-  <ElTooltip content="站内通知" placement="bottom">
-    <ElBadge
-      :value="unreadNotificationCount"
-      :max="99"
-      :hidden="unreadNotificationCount === 0"
-      class="notification-badge"
-    >
-      <ElIcon class="action-icon" title="站内通知" @click="openNotifications">
-        <Bell />
-      </ElIcon>
-    </ElBadge>
-  </ElTooltip>
-
-  <ElDrawer
-    v-model="notificationsVisible"
-    direction="rtl"
-    size="400px"
-    :with-header="false"
-    append-to-body
-    class="notification-drawer"
+  <ElPopover
+    v-model:visible="notificationsVisible"
+    placement="bottom-end"
+    trigger="click"
+    :width="540"
+    :teleported="true"
+    popper-class="vben-notification-popover"
+    @show="handlePopoverShow"
   >
-    <div class="notification-panel">
+    <template #reference>
+      <button
+        aria-label="站内通知"
+        class="notification-trigger"
+        title="站内通知"
+        type="button"
+      >
+        <span
+          v-if="unreadNotificationCount > 0"
+          class="notification-trigger__dot"
+        ></span>
+        <Bell class="notification-trigger__icon" />
+      </button>
+    </template>
+
+    <section class="notification-panel">
       <header class="notification-panel__header">
         <div class="notification-panel__title">
-          <ElIcon class="notification-panel__title-icon"><Bell /></ElIcon>
-          <span>站内通知</span>
-          <ElTag
-            v-if="unreadNotificationCount > 0"
-            type="danger"
-            effect="plain"
-            size="small"
-            round
+          <span>通知</span>
+          <span
+            v-if="notificationTotalText"
+            class="notification-panel__summary"
           >
-            {{ unreadNotificationCount }}
-          </ElTag>
+            {{ notificationTotalText }}
+          </span>
         </div>
-        <div class="notification-panel__header-actions">
-          <ElTooltip content="刷新" placement="bottom">
-            <ElIcon
-              class="notification-panel__action-icon"
-              :class="{ 'is-loading': notificationsLoading }"
-              @click="loadNotifications()"
-            >
-              <Refresh />
-            </ElIcon>
-          </ElTooltip>
-          <ElTooltip content="全部标记已读" placement="bottom">
-            <ElIcon
-              class="notification-panel__action-icon"
-              :class="{ 'is-disabled': unreadNotificationCount === 0 }"
-              @click="
-                unreadNotificationCount !== 0 &&
-                markAllNotificationsReadAction()
-              "
-            >
-              <Check />
-            </ElIcon>
-          </ElTooltip>
-          <ElTooltip content="清空已读" placement="bottom">
-            <ElIcon
-              class="notification-panel__action-icon notification-panel__action-icon--danger"
-              :class="{ 'is-disabled': readNotificationCount === 0 }"
-              @click="
-                readNotificationCount !== 0 && clearReadNotificationsAction()
-              "
-            >
-              <Delete />
-            </ElIcon>
-          </ElTooltip>
-          <ElTooltip content="关闭" placement="bottom">
-            <ElIcon
-              class="notification-panel__action-icon"
-              @click="notificationsVisible = false"
-            >
-              <Close />
-            </ElIcon>
-          </ElTooltip>
-        </div>
+        <ElTooltip content="全部标记已读" placement="bottom">
+          <button
+            class="notification-panel__icon-button"
+            :class="{ 'is-disabled': unreadNotificationCount === 0 }"
+            type="button"
+            :disabled="unreadNotificationCount === 0"
+            @click="markAllNotificationsReadAction"
+          >
+            <MailCheck />
+          </button>
+        </ElTooltip>
       </header>
-
-      <div class="notification-panel__filter">
-        <button
-          v-for="option in filterOptions"
-          :key="option.value"
-          type="button"
-          class="notification-tab"
-          :class="{
-            'notification-tab--active': notificationReadFilter === option.value,
-          }"
-          @click="changeNotificationReadFilter(option.value)"
-        >
-          {{ option.label }}
-          <span v-if="option.count > 0" class="notification-tab__count">{{
-            option.count
-          }}</span>
-        </button>
-        <span class="notification-panel__summary">{{ panelSummaryText }}</span>
-      </div>
 
       <div v-loading="notificationsLoading" class="notification-list">
         <ElEmpty
           v-if="notificationPage.records.length === 0"
-          :image-size="80"
-          description="暂无站内通知"
+          :image-size="76"
+          description="暂无通知"
           class="notification-empty"
         />
         <article
           v-for="notification in notificationPage.records"
           :key="notification.id"
           class="notification-item"
-          :class="[
-            `notification-item--${notificationLevelKey(notification.level)}`,
-            { 'notification-item--unread': !notification.read },
-          ]"
+          :class="{ 'notification-item--unread': !notification.read }"
           @click="handleNotificationClick(notification)"
         >
-          <div class="notification-item__main">
-            <div class="notification-item__head">
-              <ElIcon class="notification-item__level-icon">
-                <component :is="notificationLevelIcon(notification.level)" />
-              </ElIcon>
-              <strong
-                class="notification-item__title"
-                :class="{
-                  'notification-item__title--link': !!notification.link,
-                }"
-              >
-                {{ notification.title }}
-              </strong>
-              <span
-                v-if="!notification.read"
-                class="notification-item__unread-dot"
-              ></span>
-            </div>
+          <span
+            class="notification-avatar"
+            :class="notificationAvatarClass(notification)"
+          >
+            {{ notificationAvatarText(notification) }}
+          </span>
+
+          <div class="notification-item__body">
+            <strong class="notification-item__title">
+              {{ notification.title }}
+            </strong>
             <p v-if="notification.content" class="notification-item__content">
               {{ notification.content }}
             </p>
-            <div class="notification-item__footer">
-              <div class="notification-item__tags">
-                <span
-                  v-if="notification.scenarioCode"
-                  class="notification-chip"
-                >
-                  {{ notificationScenarioLabel(notification.scenarioCode) }}
-                </span>
-                <span class="notification-item__time">
-                  {{ formatRelativeTime(notification.createdAt) }}
-                </span>
-              </div>
-              <div class="notification-item__actions">
-                <ElButton
-                  v-if="!notification.read"
-                  link
-                  type="primary"
-                  size="small"
-                  @click.stop="markNotificationRead(notification)"
-                >
-                  标为已读
-                </ElButton>
-                <ElButton
-                  v-if="notification.link"
-                  link
-                  type="primary"
-                  size="small"
-                  @click.stop="openNotificationLink(notification)"
-                >
-                  查看
-                </ElButton>
-              </div>
-            </div>
+            <p class="notification-item__time">
+              {{ formatRelativeTime(notification.createdAt) }}
+            </p>
           </div>
+
+          <span
+            v-if="!notification.read"
+            class="notification-item__unread-dot"
+          ></span>
+          <ElTooltip
+            v-if="!notification.read"
+            content="标记为已读"
+            placement="left"
+          >
+            <button
+              class="notification-item__action"
+              type="button"
+              @click.stop="markNotificationRead(notification)"
+            >
+              <CircleCheckBig class="notification-item__action-icon" />
+            </button>
+          </ElTooltip>
         </article>
       </div>
 
-      <footer
-        v-if="notificationPage.total > notificationPage.size"
-        class="notification-panel__footer"
-      >
-        <ElPagination
-          size="small"
-          background
-          layout="prev, pager, next"
-          :current-page="notificationPage.page"
-          :page-size="notificationPage.size"
-          :total="notificationPage.total"
-          @current-change="handleNotificationPageChange"
-        />
+      <footer class="notification-panel__footer">
+        <ElButton
+          link
+          class="notification-panel__clear"
+          :disabled="readNotificationCount === 0"
+          @click="clearReadNotificationsAction"
+        >
+          清空
+        </ElButton>
+        <ElButton type="primary" @click="handleViewAllMessages">
+          查看所有消息
+        </ElButton>
       </footer>
-    </div>
-  </ElDrawer>
+    </section>
+  </ElPopover>
 </template>
 
 <style scoped lang="scss">
-.notification-badge {
+.notification-trigger {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 32px;
   height: 32px;
   margin-right: 4px;
-}
-
-.notification-badge :deep(.el-badge__content) {
-  transform: translateY(-4px) translateX(4px);
-}
-
-.action-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  font-size: 16px;
-  color: hsl(var(--foreground) / 80%);
+  padding: 0;
+  color: hsl(var(--foreground) / 86%);
   cursor: pointer;
-  border-radius: 999px;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  outline: none;
   transition:
     background-color 0.2s ease,
     color 0.2s ease;
+
+  &:hover {
+    color: hsl(var(--foreground));
+    background: hsl(var(--accent));
+
+    .notification-trigger__icon {
+      animation: notification-bell-ring 1s both;
+    }
+  }
 }
 
-.action-icon:hover {
-  color: hsl(var(--foreground));
-  background: hsl(var(--accent));
+.notification-trigger__icon {
+  width: 18px;
+  height: 18px;
+}
+
+.notification-trigger__dot {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  z-index: 1;
+  width: 8px;
+  height: 8px;
+  background: #1677ff;
+  border-radius: 999px;
 }
 
 .notification-panel {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
   overflow: hidden;
+  color: hsl(var(--foreground));
   background: hsl(var(--background));
+  border-radius: 6px;
 }
 
 .notification-panel__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 52px;
-  padding: 0 16px;
-  background: hsl(var(--background));
+  height: 84px;
+  padding: 0 24px;
   border-bottom: 1px solid hsl(var(--border));
 }
 
 .notification-panel__title {
   display: inline-flex;
-  gap: 8px;
-  align-items: center;
-  font-size: 15px;
-  font-weight: 600;
-  color: hsl(var(--foreground));
-}
-
-.notification-panel__title-icon {
-  font-size: 17px;
-  color: hsl(var(--primary));
-}
-
-.notification-panel__header-actions {
-  display: inline-flex;
-  gap: 2px;
-  align-items: center;
-}
-
-.notification-panel__action-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  font-size: 15px;
-  color: hsl(var(--muted-foreground));
-  cursor: pointer;
-  border-radius: 6px;
-  transition:
-    background-color 0.2s ease,
-    color 0.2s ease;
-}
-
-.notification-panel__action-icon:hover {
-  color: hsl(var(--foreground));
-  background: hsl(var(--accent));
-}
-
-.notification-panel__action-icon--danger:hover {
-  color: hsl(var(--destructive));
-}
-
-.notification-panel__action-icon.is-loading {
-  animation: notification-spin 0.9s linear infinite;
-}
-
-.notification-panel__action-icon.is-disabled {
-  cursor: not-allowed;
-  opacity: 0.4;
-}
-
-@keyframes notification-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.notification-panel__filter {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  min-height: 46px;
-  padding: 0 16px;
-  background: hsl(var(--background));
-  border-bottom: 1px solid hsl(var(--border));
-}
-
-.notification-tab {
-  display: inline-flex;
-  gap: 5px;
-  align-items: center;
-  height: 28px;
-  padding: 0 10px;
-  font-family: inherit;
-  font-size: 13px;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 20px;
   font-weight: 500;
-  color: hsl(var(--muted-foreground));
-  appearance: none;
-  cursor: pointer;
-  background: hsl(var(--background));
-  border: 1px solid hsl(var(--border));
-  border-radius: 6px;
-  transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    color 0.2s ease;
-}
-
-.notification-tab--active {
-  font-weight: 600;
-  color: hsl(var(--primary));
-  background: hsl(var(--primary) / 8%);
-  border-color: hsl(var(--primary) / 28%);
-}
-
-.notification-tab__count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1;
-  color: hsl(var(--destructive-foreground));
-  background: hsl(var(--destructive));
-  border-radius: 999px;
 }
 
 .notification-panel__summary {
-  margin-left: auto;
   font-size: 12px;
   color: hsl(var(--muted-foreground));
-  white-space: nowrap;
+}
+
+.notification-panel__icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  outline: none;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    opacity 0.2s ease;
+
+  svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  &:hover:not(:disabled) {
+    background: hsl(var(--accent));
+  }
+
+  &.is-disabled,
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.35;
+  }
 }
 
 .notification-list {
-  flex: 1;
-  padding: 0;
+  max-height: 532px;
   overflow-y: auto;
 }
 
 .notification-empty {
-  padding: 60px 0;
-  margin: auto;
+  padding: 64px 0;
 }
 
 .notification-item {
   position: relative;
   display: flex;
-  gap: 10px;
-  padding: 12px 16px;
+  gap: 30px;
+  align-items: flex-start;
+  min-height: 132px;
+  padding: 20px 68px 18px 18px;
   cursor: pointer;
-  background: hsl(var(--background));
   border-bottom: 1px solid hsl(var(--border));
-  transition: background-color 0.2s ease;
+  transition: background-color 0.18s ease;
+
+  &:hover {
+    background: hsl(var(--accent) / 68%);
+  }
 }
 
-.notification-item:hover {
-  background: hsl(var(--accent) / 50%);
-}
-
-.notification-item--unread {
-  background: hsl(var(--primary) / 3%);
-}
-
-.notification-item__main {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 5px;
-  min-width: 0;
-}
-
-.notification-item__head {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  min-width: 0;
-}
-
-.notification-item__level-icon {
+.notification-avatar {
+  display: inline-flex;
   flex: 0 0 auto;
-  font-size: 15px;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  margin-top: 2px;
+  overflow: hidden;
+  font-size: 25px;
+  font-weight: 400;
+  line-height: 1;
+  color: white;
+  border-radius: 999px;
+
+  &.is-info,
+  &.is-success {
+    background: linear-gradient(135deg, #a8ff35 0%, #23d7d7 100%);
+  }
+
+  &.is-warning {
+    background: linear-gradient(135deg, #f7dd4a 0%, #20c6dc 100%);
+  }
+
+  &.is-error {
+    background: linear-gradient(135deg, #2915c9 0%, #e20040 100%);
+  }
 }
 
-.notification-item--info .notification-item__level-icon {
-  color: hsl(var(--primary));
-}
-
-.notification-item--success .notification-item__level-icon {
-  color: var(--el-color-success);
-}
-
-.notification-item--warning .notification-item__level-icon {
-  color: var(--el-color-warning);
-}
-
-.notification-item--error .notification-item__level-icon {
-  color: hsl(var(--destructive));
+.notification-item__body {
+  min-width: 0;
 }
 
 .notification-item__title {
-  flex: 1;
-  min-width: 0;
+  display: block;
+  max-width: 300px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.24;
   color: hsl(var(--foreground));
+  text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.notification-item__title--link {
-  cursor: pointer;
-}
-
-.notification-item__unread-dot {
-  flex: 0 0 8px;
-  width: 8px;
-  height: 8px;
-  background: hsl(var(--destructive));
-  border-radius: 50%;
 }
 
 .notification-item__content {
   display: -webkit-box;
-  margin: 0;
+  max-width: 300px;
+  margin: 8px 0 0;
   overflow: hidden;
-  -webkit-line-clamp: 2;
-  font-size: 13px;
-  line-height: 1.5;
+  -webkit-line-clamp: 1;
+  font-size: 16px;
+  line-height: 1.45;
   color: hsl(var(--muted-foreground));
-  white-space: pre-wrap;
   -webkit-box-orient: vertical;
 }
 
-.notification-item__footer {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.notification-item__tags {
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-  min-width: 0;
-}
-
 .notification-item__time {
-  font-size: 12px;
+  margin: 12px 0 0;
+  font-size: 16px;
+  line-height: 1.35;
   color: hsl(var(--muted-foreground));
 }
 
-.notification-item__actions {
-  display: inline-flex;
-  gap: 4px;
-  align-items: center;
-  opacity: 0;
-  transition: opacity 0.2s ease;
+.notification-item__unread-dot {
+  position: absolute;
+  top: 12px;
+  right: 13px;
+  width: 12px;
+  height: 12px;
+  background: #1677ff;
+  border-radius: 999px;
 }
 
-.notification-item:hover .notification-item__actions {
-  opacity: 1;
-}
-
-.notification-item--unread .notification-item__actions {
-  opacity: 1;
-}
-
-.notification-chip {
+.notification-item__action {
+  position: absolute;
+  top: 50%;
+  right: 28px;
   display: inline-flex;
   align-items: center;
-  height: 20px;
-  padding: 0 6px;
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1;
-  color: hsl(var(--muted-foreground));
-  background: hsl(var(--muted) / 45%);
-  border: 1px solid hsl(var(--border));
-  border-radius: 4px;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  outline: none;
+  transform: translateY(-50%);
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+
+  &:hover {
+    color: hsl(var(--primary));
+    background: hsl(var(--accent));
+  }
+}
+
+.notification-item__action-icon {
+  width: 24px;
+  height: 24px;
 }
 
 .notification-panel__footer {
   display: flex;
-  justify-content: center;
-  padding: 12px 16px;
-  background: hsl(var(--background));
+  align-items: center;
+  justify-content: space-between;
+  height: 84px;
+  padding: 0 24px 0 36px;
   border-top: 1px solid hsl(var(--border));
+}
+
+.notification-panel__clear {
+  font-size: 18px;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+
+  &.is-disabled,
+  &:disabled {
+    color: hsl(var(--muted-foreground));
+  }
 }
 
 .notification-list::-webkit-scrollbar {
@@ -649,22 +474,47 @@ function handleNotificationClick(notification: NotificationView) {
 .notification-list::-webkit-scrollbar-track {
   background: transparent;
 }
+
+@keyframes notification-bell-ring {
+  0%,
+  100% {
+    transform-origin: top;
+  }
+
+  15% {
+    transform: rotateZ(10deg);
+  }
+
+  30% {
+    transform: rotateZ(-10deg);
+  }
+
+  45% {
+    transform: rotateZ(5deg);
+  }
+
+  60% {
+    transform: rotateZ(-5deg);
+  }
+
+  75% {
+    transform: rotateZ(2deg);
+  }
+}
 </style>
 
 <style lang="scss">
-.notification-drawer.el-drawer,
-.notification-drawer .el-drawer {
-  overflow: hidden !important;
-  border-left: 1px solid hsl(var(--border)) !important;
-  border-radius: 0 !important;
-  box-shadow: -8px 0 24px hsl(var(--foreground) / 8%) !important;
+.vben-notification-popover.el-popper {
+  padding: 0 !important;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 6px !important;
+  box-shadow:
+    0 10px 15px -3px hsl(var(--foreground) / 10%),
+    0 4px 6px -4px hsl(var(--foreground) / 10%) !important;
 }
 
-.notification-drawer.el-drawer .el-drawer__body,
-.notification-drawer .el-drawer__body {
-  display: block !important;
-  gap: 0 !important;
-  height: 100%;
-  padding: 0 !important;
+.vben-notification-popover.el-popper .el-popper__arrow {
+  display: none;
 }
 </style>

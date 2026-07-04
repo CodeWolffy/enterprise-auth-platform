@@ -210,9 +210,9 @@ initPage();
           />
           <span style="font-size: 13px; color: #64748b">上传可见性:</span>
           <ElRadioGroup v-model="uploadVisibility" size="small">
-            <ElRadioButton label="OWNER">仅自己</ElRadioButton>
-            <ElRadioButton label="TENANT">租户内</ElRadioButton>
-            <ElRadioButton label="PUBLIC">公开</ElRadioButton>
+            <ElRadioButton value="OWNER">仅自己</ElRadioButton>
+            <ElRadioButton value="TENANT">租户内</ElRadioButton>
+            <ElRadioButton value="PUBLIC">公开</ElRadioButton>
           </ElRadioGroup>
         </div>
         <RightToolbar

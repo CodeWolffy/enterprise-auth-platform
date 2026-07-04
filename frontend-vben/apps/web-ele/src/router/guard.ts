@@ -66,8 +66,10 @@ function setupAccessGuard(router: Router) {
       };
     }
 
-    // 基本路由，这些路由不需要进入权限拦截
-    if (coreRouteNames.includes(to.name as string)) {
+    // 基本路由，这些路由不需要进入权限拦截；但登录后首次刷新到隐藏核心路由时，
+    // 仍需继续生成动态菜单，否则侧边栏会因为 accessMenus 为空而消失。
+    const isCoreRoute = coreRouteNames.includes(to.name as string);
+    if (isCoreRoute) {
       if (to.path === LOGIN_PATH && accessStore.accessToken) {
         return decodeURIComponent(
           (to.query?.redirect as string) ||
@@ -75,7 +77,9 @@ function setupAccessGuard(router: Router) {
             preferences.app.defaultHomePath,
         );
       }
-      return true;
+      if (!accessStore.accessToken || accessStore.isAccessChecked) {
+        return true;
+      }
     }
 
     // accessToken 检查

@@ -255,9 +255,14 @@ async function initComponentAdapter() {
         const { options } = attrs;
         if (Array.isArray(options)) {
           defaultSlot = () =>
-            options.map((option) =>
-              h(attrs.isButton ? ElRadioButton : ElRadio, option),
-            );
+            options.map((option: Recordable<any>) => {
+              const { label, value = label, ...radioProps } = option;
+              return h(
+                attrs.isButton ? ElRadioButton : ElRadio,
+                { ...radioProps, value },
+                () => label,
+              );
+            });
         }
       }
       return h(

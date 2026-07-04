@@ -109,6 +109,29 @@
 
 /* ====== 表区域 ====== */
 
+.hx-layout-container {
+  box-sizing: border-box;
+  min-height: 100%;
+  padding: 16px;
+}
+
+.hx-layout-container-auto.hx-layout-container-view {
+  box-sizing: border-box;
+  min-height: 100%;
+  padding: 8px;
+  overflow: auto;
+  background: var(--bg-card);
+  border-radius: 8px;
+}
+
+.hx-table-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
 .table-tools {
   display: flex;
   flex-wrap: wrap;

@@ -86,6 +86,44 @@ describe('preferences', () => {
     expect(preferenceManager.getPreferences()).toEqual(expected);
   });
 
+  it('restores cached preferences while keeping project overrides authoritative', async () => {
+    vi.mocked(localStorage.getItem).mockImplementation((key) => {
+      if (key.endsWith('cached-preferences-preferences')) {
+        return JSON.stringify({
+          value: {
+            app: {
+              accessMode: 'frontend',
+              locale: 'en-US',
+            },
+            theme: {
+              mode: 'light',
+            },
+          },
+        });
+      }
+
+      return null;
+    });
+
+    await preferenceManager.initPreferences({
+      namespace: 'cached-preferences',
+      overrides: {
+        app: {
+          accessMode: 'backend',
+        },
+      },
+    });
+
+    const preferences = preferenceManager.getPreferences();
+
+    expect(preferences.theme.mode).toBe('light');
+    expect(preferences.app.locale).toBe('en-US');
+    expect(preferences.app.accessMode).toBe('backend');
+    expect(preferences.app.defaultHomePath).toBe(
+      defaultPreferences.app.defaultHomePath,
+    );
+  });
+
   it('updates theme mode correctly', () => {
     preferenceManager.updatePreferences({
       theme: {
