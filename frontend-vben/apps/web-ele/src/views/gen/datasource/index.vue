@@ -13,6 +13,7 @@ import {
   ElInput,
   ElMessage,
   ElMessageBox,
+  ElPagination,
   ElTable,
   ElTableColumn,
   ElTag,
@@ -229,7 +230,7 @@ onMounted(() => {
 
       <!-- 分页 -->
       <div v-if="total > 0" style="margin-top: 16px; text-align: right">
-        <el-pagination
+        <ElPagination
           v-model:current-page="currentPage"
           v-model:page-size="pageSize"
           :total="total"

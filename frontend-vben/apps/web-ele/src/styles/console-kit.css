@@ -20,6 +20,20 @@
   gap: 20px;
 }
 
+.workflow-shell,
+.workflow-page,
+.workflow-designer-page {
+  box-sizing: border-box;
+  min-height: 100%;
+  padding: 16px;
+}
+
+.workflow-shell .workflow-page,
+.workflow-shell .workflow-designer-page {
+  min-height: auto;
+  padding: 0;
+}
+
 .dashboard-panel {
   position: relative;
   padding: 22px;

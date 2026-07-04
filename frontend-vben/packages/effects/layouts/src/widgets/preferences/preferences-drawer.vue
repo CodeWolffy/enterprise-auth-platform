@@ -26,6 +26,7 @@ import {
   updateCustomPreferences,
   usePreferences,
 } from '@vben/preferences';
+import { useTimezoneStore } from '@vben/stores';
 
 import { useVbenDrawer } from '@vben-core/popup-ui';
 import {
@@ -63,6 +64,7 @@ import {
 const emit = defineEmits<{ clearPreferencesAndLogout: [] }>();
 
 const message = globalShareState.getMessage();
+const timezoneStore = useTimezoneStore();
 
 const appLocale = defineModel<SupportedLanguagesType>('appLocale');
 const appTimezone = defineModel<string>('appTimezone');
@@ -294,6 +296,7 @@ async function handleReset() {
     return;
   }
   await resetPreferences();
+  await timezoneStore.setTimezone(preferences.app.timezone);
   await loadLocaleMessages(preferences.app.locale);
 }
 

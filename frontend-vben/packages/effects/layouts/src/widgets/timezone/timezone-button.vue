@@ -82,6 +82,6 @@ const handleClick = () => {
 
 <style scoped>
 .timezone-container {
-  @apply pl-5;
+  @apply max-h-96 overflow-y-auto pl-5 pr-2;
 }
 </style>

@@ -4,6 +4,7 @@ import { computed } from 'vue';
 import { Settings } from '@vben/icons';
 import { $t, loadLocaleMessages } from '@vben/locales';
 import { preferences, updatePreferences } from '@vben/preferences';
+import { useTimezoneStore } from '@vben/stores';
 import { capitalizeFirstLetter } from '@vben/utils';
 
 import { useVbenDrawer } from '@vben-core/popup-ui';
@@ -21,6 +22,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{ clearPreferencesAndLogout: [] }>();
+const timezoneStore = useTimezoneStore();
 
 const [Drawer, drawerApi] = useVbenDrawer({
   connectedComponent: PreferencesDrawer,
@@ -57,6 +59,10 @@ const listen = computed(() => {
         result[`update:${key}${capitalizeFirstLetter(subKey)}`] = (
           val: any,
         ) => {
+          if (key === 'app' && subKey === 'timezone') {
+            void timezoneStore.setTimezone(val);
+            return;
+          }
           updatePreferences({ [key]: { [subKey]: val } });
           if (key === 'app' && subKey === 'locale') {
             loadLocaleMessages(val);

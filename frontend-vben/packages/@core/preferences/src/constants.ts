@@ -81,33 +81,98 @@ const BUILT_IN_THEME_PRESETS: BuiltinThemePreset[] = [
 /**
  * 时区选项
  */
-const DEFAULT_TIME_ZONE_OPTIONS: TimezoneOption[] = [
+const TIME_ZONE_DEFINITIONS = [
+  {
+    offset: 0,
+    timezone: 'UTC',
+  },
+  {
+    offset: -8,
+    timezone: 'America/Los_Angeles',
+  },
+  {
+    offset: -6,
+    timezone: 'America/Chicago',
+  },
   {
     offset: -5,
     timezone: 'America/New_York',
-    label: 'America/New_York(GMT-5)',
+  },
+  {
+    offset: -3,
+    timezone: 'America/Sao_Paulo',
   },
   {
     offset: 0,
     timezone: 'Europe/London',
-    label: 'Europe/London(GMT0)',
+  },
+  {
+    offset: 1,
+    timezone: 'Europe/Berlin',
+  },
+  {
+    offset: 1,
+    timezone: 'Europe/Paris',
+  },
+  {
+    offset: 4,
+    timezone: 'Asia/Dubai',
+  },
+  {
+    offset: 5.5,
+    timezone: 'Asia/Kolkata',
+  },
+  {
+    offset: 7,
+    timezone: 'Asia/Bangkok',
+  },
+  {
+    offset: 8,
+    timezone: 'Asia/Singapore',
   },
   {
     offset: 8,
     timezone: 'Asia/Shanghai',
-    label: 'Asia/Shanghai(GMT+8)',
+  },
+  {
+    offset: 8,
+    timezone: 'Asia/Hong_Kong',
   },
   {
     offset: 9,
     timezone: 'Asia/Tokyo',
-    label: 'Asia/Tokyo(GMT+9)',
   },
   {
     offset: 9,
     timezone: 'Asia/Seoul',
-    label: 'Asia/Seoul(GMT+9)',
+  },
+  {
+    offset: 10,
+    timezone: 'Australia/Sydney',
   },
 ];
+
+function resolveCurrentOffsetLabel(timezone: string) {
+  try {
+    const offsetPart = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      timeZoneName: 'shortOffset',
+    })
+      .formatToParts(new Date())
+      .find((part) => part.type === 'timeZoneName')?.value;
+
+    return offsetPart?.replace('GMT', 'UTC') || 'UTC';
+  } catch {
+    return 'UTC';
+  }
+}
+
+const DEFAULT_TIME_ZONE_OPTIONS: TimezoneOption[] = TIME_ZONE_DEFINITIONS.map(
+  (item) => ({
+    ...item,
+    label: `${item.timezone} (${resolveCurrentOffsetLabel(item.timezone)})`,
+  }),
+);
 
 export const COLOR_PRESETS = [...BUILT_IN_THEME_PRESETS].slice(0, 7);
 

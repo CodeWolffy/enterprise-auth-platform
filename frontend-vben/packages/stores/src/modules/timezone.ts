@@ -1,6 +1,10 @@
 import { ref, unref } from 'vue';
 
-import { DEFAULT_TIME_ZONE_OPTIONS } from '@vben-core/preferences';
+import {
+  DEFAULT_TIME_ZONE_OPTIONS,
+  preferences,
+  updatePreferences,
+} from '@vben-core/preferences';
 import {
   getCurrentTimezone,
   setCurrentTimezone,
@@ -25,6 +29,9 @@ interface TimezoneHandler {
  */
 const getDefaultTimezoneHandler = (): TimezoneHandler => {
   return {
+    getTimezone: () => {
+      return Promise.resolve(preferences.app.timezone);
+    },
     getTimezoneOptions: () => {
       return Promise.resolve(
         DEFAULT_TIME_ZONE_OPTIONS.map((item) => {
@@ -34,6 +41,14 @@ const getDefaultTimezoneHandler = (): TimezoneHandler => {
           };
         }),
       );
+    },
+    setTimezone: (timezone: string) => {
+      updatePreferences({
+        app: {
+          timezone,
+        },
+      });
+      return Promise.resolve();
     },
   };
 };

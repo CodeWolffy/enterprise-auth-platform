@@ -11,7 +11,7 @@ import type {
 import { markRaw, reactive, readonly, watch } from 'vue';
 
 import { StorageManager } from '@vben-core/shared/cache';
-import { isMacOs, merge } from '@vben-core/shared/utils';
+import { isMacOs, merge, setCurrentTimezone } from '@vben-core/shared/utils';
 
 import {
   breakpointsTailwind,
@@ -252,6 +252,10 @@ class PreferenceManager {
       (Reflect.has(app, 'colorGrayMode') || Reflect.has(app, 'colorWeakMode'))
     ) {
       this.updateColorMode(this.state);
+    }
+
+    if (app && Reflect.has(app, 'timezone')) {
+      setCurrentTimezone(this.state.app.timezone);
     }
   }
 

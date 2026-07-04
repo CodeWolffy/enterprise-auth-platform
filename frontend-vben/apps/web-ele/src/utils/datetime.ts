@@ -3,6 +3,15 @@
  * 后端公开 API 使用 ISO-8601 Instant 字符串，业务时区通过 X-Time-Zone 传递。
  */
 
+import dayjs from 'dayjs';
+import timezone from 'dayjs/plugin/timezone.js';
+import utc from 'dayjs/plugin/utc.js';
+
+import { getCurrentTimezone } from '@vben/utils';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
 export type InstantValue = Date | null | string | undefined;
 
 const DEFAULT_TIME_ZONE = 'Asia/Shanghai';
@@ -12,7 +21,23 @@ const localDateTimePattern =
   /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/;
 
 export function getClientTimeZone(): string {
-  return Intl.DateTimeFormat().resolvedOptions().timeZone || DEFAULT_TIME_ZONE;
+  const configuredTimeZone = getCurrentTimezone();
+  if (isValidTimeZone(configuredTimeZone)) {
+    return configuredTimeZone;
+  }
+
+  const systemTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return isValidTimeZone(systemTimeZone) ? systemTimeZone : DEFAULT_TIME_ZONE;
+}
+
+function isValidTimeZone(timeZone?: string): timeZone is string {
+  if (!timeZone) return false;
+  try {
+    new Intl.DateTimeFormat('zh-CN', { timeZone });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function getFormatter(timeZone = getClientTimeZone()): Intl.DateTimeFormat {
@@ -58,35 +83,73 @@ function parseInstant(value: InstantValue): Date | null {
   return validDate(date) ? date : null;
 }
 
-function parseLocalCalendarDateTime(value: string): Date | null {
+function calendarDateTimeToInstant(
+  year: string,
+  month: string,
+  day: string,
+  hour: string,
+  minute: string,
+  second = '0',
+  millis = '0',
+  timeZone = getClientTimeZone(),
+): Date | null {
+  const localText = `${year}-${month}-${day} ${hour}:${minute}:${second}.${millis.padEnd(3, '0')}`;
+  const date = dayjs.tz(localText, timeZone);
+  return date.isValid() ? date.toDate() : null;
+}
+
+function parseLocalCalendarDateTime(
+  value: string,
+  timeZone = getClientTimeZone(),
+): Date | null {
   const match = localDateTimePattern.exec(value.trim());
   if (!match) return null;
-  const [, year, month, day, hour, minute, second = '0', millis = '0'] = match;
-  const date = new Date(
-    Number(year),
-    Number(month) - 1,
-    Number(day),
-    Number(hour),
-    Number(minute),
-    Number(second),
-    Number(millis.padEnd(3, '0')),
+  const year = match[1]!;
+  const month = match[2]!;
+  const day = match[3]!;
+  const hour = match[4]!;
+  const minute = match[5]!;
+  const second = match[6] ?? '0';
+  const millis = match[7] ?? '0';
+  return calendarDateTimeToInstant(
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    second,
+    millis,
+    timeZone,
   );
-  return validDate(date) ? date : null;
 }
 
 /**
  * Element Plus 日期选择器等本地日历输入转 UTC Instant ISO 字符串。
  */
-export function toInstantIso(value: InstantValue): string | undefined {
+export function toInstantIso(
+  value: InstantValue,
+  timeZone = getClientTimeZone(),
+): string | undefined {
   if (!value) return undefined;
   if (value instanceof Date) {
-    return validDate(value) ? value.toISOString() : undefined;
+    if (!validDate(value)) return undefined;
+    const instant = calendarDateTimeToInstant(
+      String(value.getFullYear()),
+      String(value.getMonth() + 1).padStart(2, '0'),
+      String(value.getDate()).padStart(2, '0'),
+      String(value.getHours()).padStart(2, '0'),
+      String(value.getMinutes()).padStart(2, '0'),
+      String(value.getSeconds()).padStart(2, '0'),
+      String(value.getMilliseconds()).padStart(3, '0'),
+      timeZone,
+    );
+    return instant?.toISOString();
   }
   const trimmed = value.trim();
   if (!trimmed) return undefined;
   const zoned = parseInstant(trimmed);
   if (zoned) return zoned.toISOString();
-  const local = parseLocalCalendarDateTime(trimmed);
+  const local = parseLocalCalendarDateTime(trimmed, timeZone);
   return local ? local.toISOString() : undefined;
 }
 

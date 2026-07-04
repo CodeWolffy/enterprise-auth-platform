@@ -4,6 +4,8 @@ import type { FeatureFlags } from '#/types/api';
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
+import { ElButton, ElCard, ElCol, ElRow, ElTag } from 'element-plus';
+
 import { queryFeatures } from '#/api/system';
 import { getPage as getConfigPage } from '#/api/upms/config';
 import { getPage as getDictPage } from '#/api/upms/dict';
@@ -111,55 +113,55 @@ function goTo(path: string) {
   <div class="hx-layout-container">
     <div class="hx-layout-container-auto hx-layout-container-view">
       <!-- 统计卡片 -->
-      <el-row :gutter="16" class="mb-4">
-        <el-col :span="6">
-          <el-card shadow="never">
+      <ElRow :gutter="16" class="mb-4">
+        <ElCol :span="6">
+          <ElCard shadow="never">
             <div class="stat-cell">
               <span class="stat-eyebrow">字典</span>
               <strong class="stat-value">{{ dictCount }}</strong>
               <span class="stat-hint">当前可见字典条目数量</span>
             </div>
-          </el-card>
-        </el-col>
-        <el-col :span="6">
-          <el-card shadow="never">
+          </ElCard>
+        </ElCol>
+        <ElCol :span="6">
+          <ElCard shadow="never">
             <div class="stat-cell">
               <span class="stat-eyebrow">参数</span>
               <strong class="stat-value">{{ configCount }}</strong>
               <span class="stat-hint">当前可见参数条目数量</span>
             </div>
-          </el-card>
-        </el-col>
-        <el-col :span="6">
-          <el-card shadow="never">
+          </ElCard>
+        </ElCol>
+        <ElCol :span="6">
+          <ElCard shadow="never">
             <div class="stat-cell">
               <span class="stat-eyebrow">公告</span>
               <strong class="stat-value">{{ noticeCount }}</strong>
               <span class="stat-hint">当前公告数量</span>
             </div>
-          </el-card>
-        </el-col>
-        <el-col :span="6">
-          <el-card shadow="never">
+          </ElCard>
+        </ElCol>
+        <ElCol :span="6">
+          <ElCard shadow="never">
             <div class="stat-cell">
               <span class="stat-eyebrow">已发布</span>
               <strong class="stat-value">{{ publishedNoticeCount }}</strong>
               <span class="stat-hint">已发布公告数量</span>
             </div>
-          </el-card>
-        </el-col>
-      </el-row>
+          </ElCard>
+        </ElCol>
+      </ElRow>
 
       <!-- 功能入口卡片 -->
-      <el-card shadow="never" class="mb-4">
+      <ElCard shadow="never" class="mb-4">
         <div class="custom-card-header">
           <div>
             <span class="eyebrow">系统控制台</span>
             <h3 class="panel-title">系统管理工作台</h3>
           </div>
         </div>
-        <el-row :gutter="16">
-          <el-col
+        <ElRow :gutter="16">
+          <ElCol
             v-for="card in entryCards"
             :key="card.path"
             :span="8"
@@ -171,22 +173,22 @@ function goTo(path: string) {
                 <h4 class="entry-title">{{ card.title }}</h4>
                 <p class="entry-desc">{{ card.desc }}</p>
               </div>
-              <el-button type="primary" size="small">进入</el-button>
+              <ElButton type="primary" size="small">进入</ElButton>
             </div>
-          </el-col>
-        </el-row>
-      </el-card>
+          </ElCol>
+        </ElRow>
+      </ElCard>
 
       <!-- 功能开关 -->
-      <el-card shadow="never">
+      <ElCard shadow="never">
         <div class="custom-card-header">
           <div>
             <span class="eyebrow">功能开关</span>
             <h3 class="panel-title">预留组件状态</h3>
           </div>
         </div>
-        <el-row :gutter="16">
-          <el-col
+        <ElRow :gutter="16">
+          <ElCol
             v-for="item in featureItems"
             :key="item.key"
             :span="8"
@@ -194,13 +196,13 @@ function goTo(path: string) {
           >
             <div class="feature-tag-row">
               <strong>{{ item.label }}</strong>
-              <el-tag :type="item.enabled ? 'success' : 'info'">
+              <ElTag :type="item.enabled ? 'success' : 'info'">
                 {{ item.enabled ? '已启用' : '预留' }}
-              </el-tag>
+              </ElTag>
             </div>
-          </el-col>
-        </el-row>
-      </el-card>
+          </ElCol>
+        </ElRow>
+      </ElCard>
     </div>
   </div>
 </template>
