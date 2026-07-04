@@ -28,7 +28,7 @@ const { apiURL } = useAppConfig(import.meta.env, import.meta.env.PROD);
  * - operator: 使用操作者租户ID（平台管理员切换租户时）
  * - none: 不附加租户ID头
  */
-export type TenantScope = 'active' | 'operator' | 'none';
+export type TenantScope = 'active' | 'none' | 'operator';
 
 export interface ScopedRequestConfig extends RequestClientConfig {
   requestKey?: string;
@@ -151,7 +151,7 @@ function createRequestClient(baseURL: string, options?: RequestClientOptions) {
     if (typeof headers.delete === 'function') {
       headers.delete(name);
     }
-    delete headers[name];
+    Reflect.deleteProperty(headers, name);
   }
 
   function resolveTenantId(scope: TenantScope): string | undefined {

@@ -104,7 +104,7 @@ watch(
     }
     internalValue.value = nextValue;
     if (editorRef.value && editorRef.value.getHTML() !== nextValue) {
-      editorRef.value.commands.setContent(nextValue, false);
+      editorRef.value.commands.setContent(nextValue, { emitUpdate: false });
     }
   },
 );
@@ -114,7 +114,7 @@ function onCreated(editor: any) {
   // 编辑器创建时同步一次当前 modelValue，防止 prop 在编辑器就绪前已变化
   const current = internalValue.value;
   if (editor.getHTML() !== current) {
-    editor.commands.setContent(current, false);
+    editor.commands.setContent(current, { emitUpdate: false });
   }
   editor.setEditable(!props.disabled && mode.value === 'edit');
 }
@@ -644,10 +644,10 @@ defineExpose({
 .rich-text-editor {
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  background: var(--el-bg-color);
   border: 1px solid var(--el-border-color);
   border-radius: var(--el-border-radius-base);
-  background: var(--el-bg-color);
-  overflow: hidden;
   transition: border-color 0.2s;
 
   &:hover,
@@ -663,19 +663,19 @@ defineExpose({
 .rich-text-editor__header {
   display: flex;
   flex-wrap: wrap;
+  gap: 12px;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
   padding: 10px 12px;
-  border-bottom: 1px solid var(--el-border-color-light);
   background: var(--el-fill-color-light);
+  border-bottom: 1px solid var(--el-border-color-light);
 }
 
 .rich-text-editor__toolbar {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
   gap: 8px;
+  align-items: center;
 }
 
 .rich-text-editor__divider {
@@ -687,13 +687,13 @@ defineExpose({
 .rich-text-editor__block-select {
   height: 28px;
   padding: 0 8px;
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+  cursor: pointer;
+  outline: none;
+  background: var(--el-bg-color);
   border: 1px solid var(--el-border-color);
   border-radius: var(--el-border-radius-small);
-  background: var(--el-bg-color);
-  color: var(--el-text-color-regular);
-  font-size: 13px;
-  outline: none;
-  cursor: pointer;
 
   &:disabled {
     cursor: not-allowed;
@@ -710,8 +710,8 @@ defineExpose({
   width: 14px;
   height: 3px;
   margin-left: 3px;
-  border-radius: 2px;
   vertical-align: middle;
+  border-radius: 2px;
 }
 
 .rich-text-editor__mode-switch {
@@ -721,8 +721,8 @@ defineExpose({
 
 .rich-text-editor__body {
   position: relative;
-  min-height: 200px;
   flex: 1;
+  min-height: 200px;
 }
 
 .rich-text-editor__preview {
@@ -745,8 +745,8 @@ defineExpose({
 }
 
 .rich-text-editor__upload-text {
-  color: var(--el-text-color-regular);
   font-size: 14px;
+  color: var(--el-text-color-regular);
 
   span {
     color: var(--el-color-primary);
@@ -756,8 +756,8 @@ defineExpose({
 
 .rich-text-editor__upload-tip {
   margin-top: 12px;
-  color: var(--el-text-color-secondary);
   font-size: 12px;
+  color: var(--el-text-color-secondary);
   text-align: center;
 }
 
@@ -777,9 +777,9 @@ defineExpose({
   width: 24px;
   height: 24px;
   padding: 0;
+  cursor: pointer;
   border: 1px solid var(--el-border-color);
   border-radius: var(--el-border-radius-small);
-  cursor: pointer;
   transition: transform 0.15s;
 
   &:hover {

@@ -1,7 +1,13 @@
 <script lang="ts" setup>
 import { defineAsyncComponent, reactive, ref } from 'vue';
 
-import { Download, Link, Refresh, Search, Upload } from '@element-plus/icons-vue';
+import {
+  Download,
+  Link,
+  Refresh,
+  Search,
+  Upload,
+} from '@element-plus/icons-vue';
 import {
   ElButton,
   ElForm,
@@ -18,8 +24,8 @@ import {
   ElTag,
 } from 'element-plus';
 
-import { delObj, getPage, upload } from '#/api/upms/file';
 import { requestClient } from '#/api/request';
+import { delObj, getPage, upload } from '#/api/upms/file';
 import { formatDateTime } from '#/utils/datetime';
 
 const RightToolbar = defineAsyncComponent(
@@ -47,7 +53,6 @@ const state = reactive({
 });
 const showSearch = ref(true);
 const loading = ref(false);
-const queryRef = ref();
 const uploadRef = ref();
 const uploadVisibility = ref('OWNER');
 
@@ -104,8 +109,8 @@ const downloadFile = async (row: any) => {
     anchor.click();
     URL.revokeObjectURL(url);
     ElMessage.success('文件下载成功');
-  } catch (e: any) {
-    ElMessage.error(e?.message || '下载失败');
+  } catch (error: any) {
+    ElMessage.error(error?.message || '下载失败');
   }
 };
 
@@ -138,12 +143,7 @@ initPage();
   <div class="hx-layout-container">
     <div class="hx-layout-container-auto hx-layout-container-view">
       <!-- 搜索 -->
-      <ElForm
-        :model="state.queryParams"
-        ref="queryRef"
-        :inline="true"
-        v-show="showSearch"
-      >
+      <ElForm :model="state.queryParams" :inline="true" v-show="showSearch">
         <ElFormItem label="文件名" prop="keyword">
           <ElInput
             v-model="state.queryParams.keyword"
@@ -191,17 +191,24 @@ initPage();
       </ElForm>
       <!-- 工具栏 -->
       <div class="hx-table-toolbar">
-        <div style="display: flex; gap: 12px; align-items: center;">
-          <ElButton type="primary" @click="uploadRef?.click()" :icon="Upload" v-access:code="'upms:file:add'">
+        <div style="display: flex; gap: 12px; align-items: center">
+          <ElButton
+            type="primary"
+            @click="uploadRef?.click()"
+            :icon="Upload"
+            v-access:code="'upms:file:add'"
+          >
             上传文件
           </ElButton>
           <input
             ref="uploadRef"
             type="file"
             style="display: none"
-            @change="(e: any) => e.target.files[0] && handleUpload(e.target.files[0])"
+            @change="
+              (e: any) => e.target.files[0] && handleUpload(e.target.files[0])
+            "
           />
-          <span style="font-size: 13px; color: #64748b;">上传可见性:</span>
+          <span style="font-size: 13px; color: #64748b">上传可见性:</span>
           <ElRadioGroup v-model="uploadVisibility" size="small">
             <ElRadioButton label="OWNER">仅自己</ElRadioButton>
             <ElRadioButton label="TENANT">租户内</ElRadioButton>
@@ -217,7 +224,11 @@ initPage();
       </div>
       <!-- 列表 -->
       <ElTable v-loading="loading" :data="state.tableData" border>
-        <ElTableColumn prop="originalName" label="文件名" show-overflow-tooltip />
+        <ElTableColumn
+          prop="originalName"
+          label="文件名"
+          show-overflow-tooltip
+        />
         <ElTableColumn prop="contentType" label="内容类型" width="150" />
         <ElTableColumn prop="size" label="大小" width="100">
           <template #default="scope">

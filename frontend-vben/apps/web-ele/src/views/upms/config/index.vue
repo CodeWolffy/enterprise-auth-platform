@@ -47,7 +47,10 @@ const refForm = ref();
 const formMounted = ref(false);
 const queryRef = ref();
 
-const configTypeMap: Record<string, { label: string; type: 'primary' | 'warning' }> = {
+const configTypeMap: Record<
+  string,
+  { label: string; type: 'primary' | 'warning' }
+> = {
   business: { label: '业务参数', type: 'primary' },
   system: { label: '系统参数', type: 'warning' },
 };
@@ -166,12 +169,22 @@ initPage();
         <ElTableColumn prop="category" label="分类" width="120" />
         <ElTableColumn prop="configType" label="类型" width="110">
           <template #default="scope">
-            <ElTag :type="configTypeMap[scope.row.configType]?.type ?? 'primary'">
-              {{ configTypeMap[scope.row.configType]?.label ?? scope.row.configType }}
+            <ElTag
+              :type="configTypeMap[scope.row.configType]?.type ?? 'primary'"
+            >
+              {{
+                configTypeMap[scope.row.configType]?.label ??
+                scope.row.configType
+              }}
             </ElTag>
           </template>
         </ElTableColumn>
-        <ElTableColumn prop="configValue" label="参数值" min-width="220" show-overflow-tooltip />
+        <ElTableColumn
+          prop="configValue"
+          label="参数值"
+          min-width="220"
+          show-overflow-tooltip
+        />
         <ElTableColumn prop="enabled" label="状态" width="90">
           <template #default="scope">
             <ElTag :type="scope.row.enabled ? 'success' : 'danger'">
@@ -186,7 +199,12 @@ initPage();
             </ElTag>
           </template>
         </ElTableColumn>
-        <ElTableColumn prop="remark" label="备注" min-width="180" show-overflow-tooltip />
+        <ElTableColumn
+          prop="remark"
+          label="备注"
+          min-width="180"
+          show-overflow-tooltip
+        />
         <ElTableColumn label="更新时间" width="180">
           <template #default="scope">
             {{ formatDateTime(scope.row.updatedAt) }}

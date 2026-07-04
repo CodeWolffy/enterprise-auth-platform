@@ -3,14 +3,12 @@ import type {
   DrawerProps,
   ExtendedDrawerApi,
 } from './drawer';
-import type { Component } from 'vue';
 
 import {
   defineComponent,
   h,
   inject,
   nextTick,
-  onDeactivated,
   provide,
   reactive,
   ref,
@@ -73,13 +71,6 @@ export function useVbenDrawer<
       },
     );
 
-    /**
-     * 在开启keepAlive情况下 直接通过浏览器按钮/手势等返回 不会关闭弹窗
-     */
-    onDeactivated(() => {
-      (extendedApi as ExtendedDrawerApi)?.close?.();
-    });
-
     return [Drawer, extendedApi as ExtendedDrawerApi] as const;
   }
 
@@ -114,11 +105,7 @@ export function useVbenDrawer<
   const Drawer = defineComponent(
     (props: DrawerProps, { attrs, slots }) => {
       return () =>
-        h(
-          VbenDrawer as Component,
-          { ...props, ...attrs, drawerApi: extendedApi },
-          slots,
-        );
+        h(VbenDrawer, { ...props, ...attrs, drawerApi: extendedApi }, slots);
     },
     // eslint-disable-next-line vue/one-component-per-file
     {

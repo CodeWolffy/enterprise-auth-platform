@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import type {
+  TenantPackageImpactView,
+  TenantPackageView,
+} from '#/types/tenant';
+
 import { ref } from 'vue';
 
 import { useVbenDrawer } from '@vben/common-ui';
@@ -11,16 +16,12 @@ import {
 } from 'element-plus';
 
 import { queryTenantPackageImpact } from '#/api/upms/tenant-package';
-import type {
-  TenantPackageImpactView,
-  TenantPackageView,
-} from '#/types/tenant';
 
-const detailPackage = ref<TenantPackageView | null>(null);
-const detailImpact = ref<TenantPackageImpactView | null>(null);
+const detailPackage = ref<null | TenantPackageView>(null);
+const detailImpact = ref<null | TenantPackageImpactView>(null);
 const detailLoading = ref(false);
 
-function appKeys(value?: string | null) {
+function appKeys(value?: null | string) {
   if (!value?.trim()) return [];
   return value
     .split(/[,;\s]+/)
@@ -76,7 +77,11 @@ const [Drawer, drawerApi] = useVbenDrawer({
             >
               {{ key }}
             </ElTag>
-            <span v-if="!appKeys(detailPackage.appKey).length" class="text-muted-foreground">未配置</span>
+            <span
+              v-if="appKeys(detailPackage.appKey).length === 0"
+              class="text-muted-foreground"
+              >未配置</span
+            >
           </div>
         </ElDescriptionsItem>
         <ElDescriptionsItem label="排序">

@@ -3,6 +3,9 @@ import { defineAsyncComponent } from 'vue';
 
 import { ElDialog } from 'element-plus';
 
+defineProps<{
+  activeUser?: any;
+}>();
 const LoginLog = defineAsyncComponent(() => import('./loginlog.vue'));
 const OperationLog = defineAsyncComponent(() => import('./operatelog.vue'));
 const ResetPwd = defineAsyncComponent(() => import('./resetpwd.vue'));
@@ -16,10 +19,6 @@ const operationLogVisible = defineModel<boolean>('operationLogVisible', {
 const resetPwdVisible = defineModel<boolean>('resetPwdVisible', {
   default: false,
 });
-
-defineProps<{
-  activeUser?: any;
-}>();
 </script>
 
 <template>

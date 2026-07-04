@@ -1,6 +1,6 @@
 {
   "name": "@vben/web-ele",
-  "version": "3.2.1",
+  "version": "5.7.0",
   "homepage": "https://github.com/enterprise-auth-platform",
   "bugs": "https://github.com/enterprise-auth-platform/frontend-vben/issues",
   "repository": {
@@ -21,7 +21,7 @@
     "#/*": "./src/*"
   },
   "dependencies": {
-    "@element-plus/icons-vue": "^2.3.1",
+    "@element-plus/icons-vue": "catalog:",
     "@vben-core/editor-ui": "workspace:*",
     "@vben/access": "workspace:*",
     "@vben/common-ui": "workspace:*",
@@ -38,7 +38,6 @@
     "@vben/types": "workspace:*",
     "@vben/utils": "workspace:*",
     "@vueuse/core": "catalog:",
-    "@vueuse/integrations": "catalog:",
     "dayjs": "catalog:",
     "echarts": "catalog:",
     "element-plus": "catalog:",
@@ -47,6 +46,7 @@
     "vue-router": "catalog:"
   },
   "devDependencies": {
+    "@vben/tailwind-config": "workspace:*",
     "unplugin-element-plus": "catalog:"
   }
 }

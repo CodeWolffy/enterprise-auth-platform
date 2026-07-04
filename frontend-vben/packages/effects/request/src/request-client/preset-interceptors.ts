@@ -61,12 +61,7 @@ export const authenticateResponseInterceptor = ({
     rejected: async (error) => {
       const { config, response } = error;
       // 如果不是 401 错误，直接抛出异常
-      // 同时检查 HTTP 状态码和业务 code，兼容不同后端的返回格式
-      if (
-        response?.status !== 401 &&
-        response?.data?.code !== 401 &&
-        response?.data?.code !== '401'
-      ) {
+      if (response?.status !== 401) {
         throw error;
       }
       // 判断是否启用了 refreshToken 功能
@@ -135,7 +130,7 @@ export const errorMessageResponseInterceptor = (
         return Promise.reject(error);
       }
 
-      let errorMessage = '';
+      let errorMessage: string;
       const status = error?.response?.status;
 
       switch (status) {

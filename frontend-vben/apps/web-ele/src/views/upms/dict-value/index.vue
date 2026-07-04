@@ -114,9 +114,16 @@ initPage();
     <ElTable v-loading="loading" :data="state.tableData" border>
       <ElTableColumn prop="dictLabel" label="字典标签" align="center" />
       <ElTableColumn prop="dictValue" label="字典键值" align="center" />
-      <ElTableColumn prop="showClass" label="回显样式" align="center" width="110">
+      <ElTableColumn
+        prop="showClass"
+        label="回显样式"
+        align="center"
+        width="110"
+      >
         <template #default="scope">
-          <ElTag :type="scope.row.showClass === 'default' ? '' : scope.row.showClass">
+          <ElTag
+            :type="scope.row.showClass === 'default' ? '' : scope.row.showClass"
+          >
             {{ scope.row.showClass || 'default' }}
           </ElTag>
         </template>

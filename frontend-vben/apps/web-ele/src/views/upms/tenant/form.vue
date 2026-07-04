@@ -21,26 +21,26 @@ import {
 
 import { addObj, editObj, getById } from '#/api/upms/tenant';
 import { getList } from '#/api/upms/tenant-package';
-import { useDict } from '#/utils/dict';
 import { formatDateTime, toInstantIso } from '#/utils/datetime';
+import { useDict } from '#/utils/dict';
 
 const emit = defineEmits(['initPage']);
 
 interface State {
   form: {
-    tenantId: string;
-    tenantName: string;
-    status: string;
     address: string;
-    website: string;
     contactEmail: string;
+    contactName: string;
     contactPhone: string;
     datatimes: Array<string>;
-    packageCode: string;
-    logoUrl: string;
-    contactName: string;
-    platformLevel: string;
     lifecycleNote: string;
+    logoUrl: string;
+    packageCode: string;
+    platformLevel: string;
+    status: string;
+    tenantId: string;
+    tenantName: string;
+    website: string;
   };
   rules: any;
   tenantPackageList: Array<any>;
@@ -156,29 +156,34 @@ const initForm = (row?: any) => {
 
 const getDetail = (tenantId: string) => {
   loading.value = true;
-  getById(tenantId).then((response: any) => {
-    state.form = {
-      tenantId: response.tenantId,
-      tenantName: response.name,
-      status: String(response.tenantStatus ?? 1),
-      address: response.address || '',
-      website: response.website || '',
-      contactEmail: response.contactEmail || '',
-      contactPhone: response.contactPhone || '',
-      datatimes:
-        response.authBeginAt && response.expireAt
-          ? [formatDateTime(response.authBeginAt), formatDateTime(response.expireAt)]
-          : [],
-      packageCode: response.packageCode || '',
-      logoUrl: response.logoUrl || '',
-      contactName: response.contactName || '',
-      platformLevel: response.platformLevel ? 'PLATFORM' : 'BUSINESS',
-      lifecycleNote: response.lifecycleNote || '',
-    };
-    loading.value = false;
-  }).catch(() => {
-    loading.value = false;
-  });
+  getById(tenantId)
+    .then((response: any) => {
+      state.form = {
+        tenantId: response.tenantId,
+        tenantName: response.name,
+        status: String(response.tenantStatus ?? 1),
+        address: response.address || '',
+        website: response.website || '',
+        contactEmail: response.contactEmail || '',
+        contactPhone: response.contactPhone || '',
+        datatimes:
+          response.authBeginAt && response.expireAt
+            ? [
+                formatDateTime(response.authBeginAt),
+                formatDateTime(response.expireAt),
+              ]
+            : [],
+        packageCode: response.packageCode || '',
+        logoUrl: response.logoUrl || '',
+        contactName: response.contactName || '',
+        platformLevel: response.platformLevel ? 'PLATFORM' : 'BUSINESS',
+        lifecycleNote: response.lifecycleNote || '',
+      };
+      loading.value = false;
+    })
+    .catch(() => {
+      loading.value = false;
+    });
 };
 
 /** 关闭事件 */
@@ -363,7 +368,11 @@ defineExpose({
         </ElCol>
         <ElCol :span="12">
           <ElFormItem label="租户名" prop="tenantName">
-            <ElInput v-model="state.form.tenantName" show-word-limit maxlength="50" />
+            <ElInput
+              v-model="state.form.tenantName"
+              show-word-limit
+              maxlength="50"
+            />
           </ElFormItem>
           <ElFormItem label="邮箱" prop="contactEmail">
             <ElInput v-model="state.form.contactEmail" />

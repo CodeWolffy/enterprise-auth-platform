@@ -1,6 +1,6 @@
 <script setup lang="ts">
-
 import type { VbenFormSchema } from '#/adapter/form';
+import type { SystemMenu } from '#/api/upms/menu';
 
 import { computed, ref } from 'vue';
 
@@ -14,7 +14,6 @@ import { useVbenForm, z } from '#/adapter/form';
 import {
   addObj as createMenu,
   getList as getMenuList,
-  type SystemMenu,
   editObj as updateMenu,
 } from '#/api/upms/menu';
 import { $t } from '#/locales';
@@ -216,7 +215,12 @@ const [Drawer, drawerApi] = useVbenDrawer({
       if (data) {
         // 后端返回的 parentId：null/0/'0' 都统一为 '0'（匹配虚拟"顶级菜单"节点）
         // numberToString=true 使树节点 value 统一为字符串，parentId 也需转为字符串以匹配
-        if (data.parentId === 0 || data.parentId === '0' || data.parentId == null) {
+        if (
+          data.parentId === 0 ||
+          data.parentId === '0' ||
+          data.parentId === null ||
+          data.parentId === undefined
+        ) {
           data.parentId = '0';
         } else if (typeof data.parentId === 'number') {
           data.parentId = String(data.parentId);
@@ -238,10 +242,7 @@ async function onSubmit() {
   const { valid } = await formApi.validate();
   if (valid) {
     drawerApi.lock();
-    let data =
-      await formApi.getValues<
-        Omit<SystemMenu, 'children' | 'id'>
-      >();
+    const data = await formApi.getValues<Omit<SystemMenu, 'children' | 'id'>>();
     if (data.type === 'link') {
       data.meta = { ...data.meta, link: data.linkSrc };
     } else if (data.type === 'embedded') {
@@ -271,9 +272,7 @@ async function onSubmit() {
       emit('success');
     } catch (error: any) {
       const msg =
-        error?.response?.data?.message ||
-        error?.message ||
-        '操作失败，请重试';
+        error?.response?.data?.message || error?.message || '操作失败，请重试';
       ElMessage.error(msg);
     } finally {
       drawerApi.unlock();

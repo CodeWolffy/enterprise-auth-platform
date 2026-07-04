@@ -8,6 +8,7 @@ import { defineOverridesPreferences } from '@vben/preferences';
 export const overridesPreferences = defineOverridesPreferences({
   app: {
     name: import.meta.env.VITE_APP_TITLE,
+    defaultHomePath: '/dashboard',
     // 后端菜单驱动路由生成，前端静态路由作为后备
     // 切换为 backend 后，getAllMenusApi() 将被调用并解析为实际路由
     accessMode: 'backend',

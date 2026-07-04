@@ -11,12 +11,17 @@ const SvgCardIcon = createIconifyIcon('svg:card');
 const SvgBellIcon = createIconifyIcon('svg:bell');
 const SvgCakeIcon = createIconifyIcon('svg:cake');
 const SvgAntdvLogoIcon = createIconifyIcon('svg:antdv-logo');
-const SvgGoodsIcon = createIconifyIcon('svg:goods');
-const SvgOrderIcon = createIconifyIcon('svg:order');
-const SvgShopIcon = createIconifyIcon('svg:shop');
-const SvgUserIcon = createIconifyIcon('svg:user');
+const SvgGithubIcon = createIconifyIcon('svg:github');
+const SvgGoogleIcon = createIconifyIcon('svg:google');
+const SvgQQChatIcon = createIconifyIcon('svg:qqchat');
+const SvgWeChatIcon = createIconifyIcon('svg:wechat');
+const SvgDingDingIcon = createIconifyIcon('svg:dingding');
+const SvgTDesignIcon = createIconifyIcon('svg:tdesign-logo');
+const SvgAntdvNextLogoIcon = createIconifyIcon('svg:antdv-next-logo');
+
 export {
   SvgAntdvLogoIcon,
+  SvgAntdvNextLogoIcon,
   SvgAvatar1Icon,
   SvgAvatar2Icon,
   SvgAvatar3Icon,
@@ -24,9 +29,11 @@ export {
   SvgBellIcon,
   SvgCakeIcon,
   SvgCardIcon,
+  SvgDingDingIcon,
   SvgDownloadIcon,
-  SvgGoodsIcon,
-  SvgOrderIcon,
-  SvgShopIcon,
-  SvgUserIcon,
+  SvgGithubIcon,
+  SvgGoogleIcon,
+  SvgQQChatIcon,
+  SvgTDesignIcon,
+  SvgWeChatIcon,
 };

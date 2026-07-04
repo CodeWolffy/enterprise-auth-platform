@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
 
+import { Plus, Refresh, Search } from '@element-plus/icons-vue';
 import {
   ElButton,
   ElCol,
@@ -18,13 +19,12 @@ import {
   ElTableColumn,
   ElTag,
 } from 'element-plus';
-import { Plus, Refresh, Search } from '@element-plus/icons-vue';
 
 import {
-  getTemplates,
   createTemplate,
-  updateTemplate,
   deleteTemplate,
+  getTemplates,
+  updateTemplate,
 } from '#/api/gen/table';
 
 interface TemplateRow {
@@ -65,7 +65,12 @@ const asTemplateRow = (row: unknown) => row as TemplateRow;
 const loading = ref(false);
 const records = ref<TemplateRow[]>([]);
 const total = ref(0);
-const query = reactive({ keyword: '', templateCategory: '', page: 1, size: 10 });
+const query = reactive({
+  keyword: '',
+  templateCategory: '',
+  page: 1,
+  size: 10,
+});
 
 async function load() {
   loading.value = true;
@@ -105,8 +110,7 @@ onMounted(() => load());
 // 新建 / 编辑弹窗
 const dialogVisible = ref(false);
 const saving = ref(false);
-const editing = ref<TemplateRow | null>(null);
-const formRef = ref<any>(null);
+const editing = ref<null | TemplateRow>(null);
 
 const form = reactive<TemplateRow>({
   name: '',
@@ -169,7 +173,9 @@ async function handleSave() {
 
 async function handleDelete(row: TemplateRow) {
   if (!row.id) return;
-  await ElMessageBox.confirm(`确认删除模板「${row.name}」？`, '删除确认', { type: 'warning' });
+  await ElMessageBox.confirm(`确认删除模板「${row.name}」？`, '删除确认', {
+    type: 'warning',
+  });
   await deleteTemplate(row.id);
   ElMessage.success('模板已删除');
   await load();
@@ -182,52 +188,98 @@ async function handleDelete(row: TemplateRow) {
       <!-- 工具栏 -->
       <div class="hx-table-toolbar" style="margin-bottom: 16px">
         <div><h2>自定义模板</h2></div>
-        <ElButton :icon="Refresh" :loading="loading" @click="load">刷新</ElButton>
+        <ElButton :icon="Refresh" :loading="loading" @click="load">
+          刷新
+        </ElButton>
       </div>
 
       <!-- 搜索栏 -->
-      <div class="hx-table-toolbar" style="margin-bottom: 12px; flex-wrap: wrap; gap: 10px">
+      <div
+        class="hx-table-toolbar"
+        style="flex-wrap: wrap; gap: 10px; margin-bottom: 12px"
+      >
         <ElRow :gutter="10" style="width: 100%">
           <ElCol :span="5">
-            <ElInput v-model="query.keyword" placeholder="关键字搜索" clearable @keyup.enter="applySearch" />
+            <ElInput
+              v-model="query.keyword"
+              placeholder="关键字搜索"
+              clearable
+              @keyup.enter="applySearch"
+            />
           </ElCol>
           <ElCol :span="4">
-            <ElSelect v-model="query.templateCategory" placeholder="分类" clearable>
-              <ElOption v-for="c in CATEGORY_OPTIONS" :key="c.value" :label="c.label" :value="c.value" />
+            <ElSelect
+              v-model="query.templateCategory"
+              placeholder="分类"
+              clearable
+            >
+              <ElOption
+                v-for="c in CATEGORY_OPTIONS"
+                :key="c.value"
+                :label="c.label"
+                :value="c.value"
+              />
             </ElSelect>
           </ElCol>
           <ElCol :span="6">
-            <ElButton type="primary" :icon="Search" @click="applySearch">查询</ElButton>
-            <ElButton style="margin-left: 8px" @click="resetSearch">重置</ElButton>
+            <ElButton type="primary" :icon="Search" @click="applySearch">
+              查询
+            </ElButton>
+            <ElButton style="margin-left: 8px" @click="resetSearch">
+              重置
+            </ElButton>
           </ElCol>
           <ElCol :span="9" style="text-align: right">
-            <ElButton type="primary" :icon="Plus" @click="openCreate">新增模板</ElButton>
+            <ElButton type="primary" :icon="Plus" @click="openCreate">
+              新增模板
+            </ElButton>
           </ElCol>
         </ElRow>
       </div>
 
       <!-- 表格 -->
-      <el-table v-loading="loading" :data="records" border stripe>
-        <el-table-column prop="name" label="模板名称" min-width="160" show-overflow-tooltip />
-        <el-table-column label="语言" width="100">
-          <template #default="{ row }">{{ languageLabel(row.language) }}</template>
-        </el-table-column>
-        <el-table-column label="分类" width="100">
-          <template #default="{ row }">{{ categoryLabel(row.templateCategory) }}</template>
-        </el-table-column>
-        <el-table-column prop="pathMatchRegex" label="路径匹配" min-width="200" show-overflow-tooltip />
-        <el-table-column label="内置" width="70">
+      <ElTable v-loading="loading" :data="records" border stripe>
+        <ElTableColumn
+          prop="name"
+          label="模板名称"
+          min-width="160"
+          show-overflow-tooltip
+        />
+        <ElTableColumn label="语言" width="100">
+          <template #default="{ row }">
+            {{ languageLabel(row.language) }}
+          </template>
+        </ElTableColumn>
+        <ElTableColumn label="分类" width="100">
+          <template #default="{ row }">
+            {{ categoryLabel(row.templateCategory) }}
+          </template>
+        </ElTableColumn>
+        <ElTableColumn
+          prop="pathMatchRegex"
+          label="路径匹配"
+          min-width="200"
+          show-overflow-tooltip
+        />
+        <ElTableColumn label="内置" width="70">
           <template #default="{ row }">
             <ElTag v-if="row.builtin" size="small" type="info">内置</ElTag>
             <span v-else style="color: #c0c4cc">-</span>
           </template>
-        </el-table-column>
-        <el-table-column label="描述" min-width="140" show-overflow-tooltip>
+        </ElTableColumn>
+        <ElTableColumn label="描述" min-width="140" show-overflow-tooltip>
           <template #default="{ row }">{{ row.description || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
+        </ElTableColumn>
+        <ElTableColumn label="操作" width="160" fixed="right">
           <template #default="{ row }">
-            <ElButton size="small" link type="primary" @click="openEdit(asTemplateRow(row))">编辑</ElButton>
+            <ElButton
+              size="small"
+              link
+              type="primary"
+              @click="openEdit(asTemplateRow(row))"
+            >
+              编辑
+            </ElButton>
             <ElButton
               v-if="!row.builtin"
               size="small"
@@ -238,8 +290,8 @@ async function handleDelete(row: TemplateRow) {
               删除
             </ElButton>
           </template>
-        </el-table-column>
-      </el-table>
+        </ElTableColumn>
+      </ElTable>
 
       <!-- 分页 -->
       <div v-if="total > 0" style="margin-top: 16px; text-align: right">
@@ -261,22 +313,43 @@ async function handleDelete(row: TemplateRow) {
         destroy-on-close
         @close="dialogVisible = false"
       >
-        <ElForm ref="formRef" :model="form" label-width="90px">
+        <ElForm :model="form" label-width="90px">
           <ElFormItem label="模板名称" required>
-            <ElInput v-model="form.name" placeholder="例如：entity.java.ftl" :disabled="!!editing?.builtin" />
+            <ElInput
+              v-model="form.name"
+              placeholder="例如：entity.java.ftl"
+              :disabled="!!editing?.builtin"
+            />
           </ElFormItem>
           <ElFormItem label="语言" required>
             <ElSelect v-model="form.language" :disabled="!!editing?.builtin">
-              <ElOption v-for="l in LANGUAGE_OPTIONS" :key="l.value" :label="l.label" :value="l.value" />
+              <ElOption
+                v-for="l in LANGUAGE_OPTIONS"
+                :key="l.value"
+                :label="l.label"
+                :value="l.value"
+              />
             </ElSelect>
           </ElFormItem>
           <ElFormItem label="分类" required>
-            <ElSelect v-model="form.templateCategory" :disabled="!!editing?.builtin">
-              <ElOption v-for="c in CATEGORY_OPTIONS" :key="c.value" :label="c.label" :value="c.value" />
+            <ElSelect
+              v-model="form.templateCategory"
+              :disabled="!!editing?.builtin"
+            >
+              <ElOption
+                v-for="c in CATEGORY_OPTIONS"
+                :key="c.value"
+                :label="c.label"
+                :value="c.value"
+              />
             </ElSelect>
           </ElFormItem>
           <ElFormItem label="路径匹配" required>
-            <ElInput v-model="form.pathMatchRegex" placeholder="正则表达式，例如 .*\/entity\.java$" :disabled="!!editing?.builtin" />
+            <ElInput
+              v-model="form.pathMatchRegex"
+              placeholder="正则表达式，例如 .*\/entity\.java$"
+              :disabled="!!editing?.builtin"
+            />
           </ElFormItem>
           <ElFormItem label="描述">
             <ElInput
@@ -298,7 +371,9 @@ async function handleDelete(row: TemplateRow) {
         </ElForm>
         <template #footer>
           <ElButton @click="dialogVisible = false">取消</ElButton>
-          <ElButton type="primary" :loading="saving" @click="handleSave">保存</ElButton>
+          <ElButton type="primary" :loading="saving" @click="handleSave">
+            保存
+          </ElButton>
         </template>
       </ElDialog>
     </div>

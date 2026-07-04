@@ -255,16 +255,16 @@ const resetQuery = () => {
       <!-- 详情抽屉 -->
       <ElDrawer v-model="detailDrawer" title="公告详情" size="600px">
         <div v-if="detailData" style="padding: 0 16px">
-          <h2 style="margin: 0 0 16px 0; font-size: 20px">
+          <h2 style="margin: 0 0 16px; font-size: 20px">
             {{ detailData.noticeTitle }}
           </h2>
           <div
             style="
-              margin-bottom: 16px;
               padding-bottom: 16px;
-              border-bottom: 1px solid #e5e7eb;
-              color: #64748b;
+              margin-bottom: 16px;
               font-size: 13px;
+              color: #64748b;
+              border-bottom: 1px solid #e5e7eb;
             "
           >
             <div>

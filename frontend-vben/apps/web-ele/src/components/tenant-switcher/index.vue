@@ -85,7 +85,7 @@ async function loadTenants() {
   }
 }
 
-async function handleSwitchTenant(command: string | number | object) {
+async function handleSwitchTenant(command: number | object | string) {
   const tenantId = String(command);
   const target = tenants.value.find((tenant) => tenant.tenantId === tenantId);
   if (!target || target.active || switching.value) {
@@ -182,8 +182,8 @@ watch(canSwitchTenant, (enabled) => {
 
 <style scoped>
 .tenant-switcher-button {
-  max-width: 220px;
   min-width: 132px;
+  max-width: 220px;
   padding: 0 10px;
 }
 
@@ -201,10 +201,10 @@ watch(canSwitchTenant, (enabled) => {
 
 .tenant-option {
   display: flex;
+  gap: 8px;
+  align-items: flex-start;
   min-width: 240px;
   max-width: 320px;
-  align-items: flex-start;
-  gap: 8px;
 }
 
 .tenant-option-icon {
@@ -218,8 +218,8 @@ watch(canSwitchTenant, (enabled) => {
 
 .tenant-option-title {
   display: flex;
-  align-items: center;
   gap: 6px;
+  align-items: center;
 }
 
 .tenant-option-title span:first-child {
@@ -230,8 +230,8 @@ watch(canSwitchTenant, (enabled) => {
 
 .tenant-option-meta {
   margin-top: 2px;
-  color: var(--el-text-color-secondary);
   font-size: 12px;
   line-height: 1.3;
+  color: var(--el-text-color-secondary);
 }
 </style>

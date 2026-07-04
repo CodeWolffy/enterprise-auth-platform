@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, useAttrs } from 'vue';
+import { computed } from 'vue';
 
 import { Settings } from '@vben/icons';
 import { $t, loadLocaleMessages } from '@vben/locales';
@@ -11,10 +11,25 @@ import { VbenButton } from '@vben-core/shadcn-ui';
 
 import PreferencesDrawer from './preferences-drawer.vue';
 
+interface Props {
+  /** 是否显示按钮 */
+  showButton?: boolean;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  showButton: true,
+});
+
+const emit = defineEmits<{ clearPreferencesAndLogout: [] }>();
+
 const [Drawer, drawerApi] = useVbenDrawer({
   connectedComponent: PreferencesDrawer,
 });
-const componentAttrs = useAttrs();
+
+// 暴露打开抽屉的方法
+defineExpose({
+  open: () => drawerApi.open(),
+});
 
 /**
  * preferences 转成 vue props
@@ -54,25 +69,25 @@ const listen = computed(() => {
   }
   return result;
 });
-
-const drawerAttrs = computed<Record<string, any>>(() => ({
-  ...componentAttrs,
-  ...attrs.value,
-}));
 </script>
 <template>
   <div>
-    <Drawer v-bind="drawerAttrs" v-on="listen" />
+    <Drawer
+      v-bind="{ ...$attrs, ...attrs }"
+      v-on="listen"
+      @clear-preferences-and-logout="emit('clearPreferencesAndLogout')"
+    />
 
-    <div @click="() => drawerApi.open()">
-      <slot>
-        <VbenButton
-          :title="$t('preferences.title')"
-          class="bg-primary flex-col-center size-10 cursor-pointer rounded-l-lg rounded-r-none border-none"
-        >
-          <Settings class="size-5" />
-        </VbenButton>
-      </slot>
-    </div>
+    <!-- 触发打开抽屉的按钮(可覆盖) -->
+    <slot>
+      <VbenButton
+        v-if="props.showButton"
+        :title="$t('preferences.title')"
+        class="flex-col-center size-10 cursor-pointer rounded-l-lg rounded-r-none border-none bg-primary"
+        @click="() => drawerApi.open()"
+      >
+        <Settings class="size-5" />
+      </VbenButton>
+    </slot>
   </div>
 </template>

@@ -18,10 +18,10 @@ export async function getDataSourceTables(dsId: number, query: any) {
  * 后端：POST /api/codegen/tables/import
  */
 export async function importTables(payload: {
-  dataSourceId: number;
-  tableNames: string[];
-  packageName?: string;
   author?: string;
+  dataSourceId: number;
+  packageName?: string;
+  tableNames: string[];
 }) {
   return requestClient.post('/codegen/tables/import', payload, {
     headers: { isSwitchTenant: false },
@@ -55,10 +55,7 @@ export async function getTableConfig(tableId: number) {
  * 保存导入表字段配置
  * 后端：PUT /api/codegen/imported-tables/{tableId}/columns
  */
-export async function saveTableColumns(
-  tableId: number,
-  columns: any[],
-) {
+export async function saveTableColumns(tableId: number, columns: any[]) {
   return requestClient.put(
     `/codegen/imported-tables/${tableId}/columns`,
     { columns },
@@ -106,14 +103,14 @@ export async function getTableDetail(tableName: string) {
  * 后端：POST /api/codegen/preview
  */
 export async function previewCode(data: {
-  tableName: string;
-  moduleName: string;
-  packageName: string;
+  autoRegister?: boolean;
   className: string;
   includeBackend?: boolean;
   includeFrontend?: boolean;
+  moduleName: string;
+  packageName: string;
   selectedFiles?: string[];
-  autoRegister?: boolean;
+  tableName: string;
 }) {
   return requestClient.post('/codegen/preview', data, {
     headers: { isSwitchTenant: false },
@@ -125,15 +122,15 @@ export async function previewCode(data: {
  * 后端：POST /api/codegen/download
  */
 export async function downloadCode(data: {
-  tableName: string;
-  moduleName: string;
-  packageName: string;
+  autoRegister?: boolean;
   className: string;
   includeBackend?: boolean;
   includeFrontend?: boolean;
-  selectedFiles?: string[];
+  moduleName: string;
   overwrite?: boolean;
-  autoRegister?: boolean;
+  packageName: string;
+  selectedFiles?: string[];
+  tableName: string;
 }) {
   return requestClient.post('/codegen/download', data, {
     headers: {
@@ -162,11 +159,11 @@ export async function getTemplates(query: any) {
  * 后端：POST /api/codegen/templates
  */
 export async function createTemplate(payload: {
-  name: string;
-  language: string;
-  templateCategory: string;
-  pathMatchRegex: string;
   content: string;
+  language: string;
+  name: string;
+  pathMatchRegex: string;
+  templateCategory: string;
 }) {
   return requestClient.post('/codegen/templates', payload, {
     headers: { isSwitchTenant: false },
@@ -180,11 +177,11 @@ export async function createTemplate(payload: {
 export async function updateTemplate(
   templateId: number,
   payload: {
-    name: string;
-    language: string;
-    templateCategory: string;
-    pathMatchRegex: string;
     content: string;
+    language: string;
+    name: string;
+    pathMatchRegex: string;
+    templateCategory: string;
   },
 ) {
   return requestClient.put(`/codegen/templates/${templateId}`, payload, {
@@ -219,15 +216,15 @@ export async function deleteTemplate(templateId: number) {
  * 后端：POST /api/codegen/generate
  */
 export async function generateCode(data: {
-  tableName: string;
-  moduleName: string;
-  packageName: string;
+  autoRegister?: boolean;
   className: string;
   includeBackend?: boolean;
   includeFrontend?: boolean;
-  selectedFiles?: string[];
+  moduleName: string;
   overwrite?: boolean;
-  autoRegister?: boolean;
+  packageName: string;
+  selectedFiles?: string[];
+  tableName: string;
 }) {
   return requestClient.post('/codegen/generate', data, {
     headers: { isSwitchTenant: false },

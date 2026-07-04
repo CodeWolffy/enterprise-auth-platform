@@ -1,12 +1,13 @@
 <script setup lang="ts">
+import type { FeatureFlags } from '#/types/api';
+
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { getPage as getDictPage } from '#/api/upms/dict';
-import { getPage as getConfigPage } from '#/api/upms/config';
-import { getPage as getNoticePage } from '#/api/upms/notice';
 import { queryFeatures } from '#/api/system';
-import type { FeatureFlags } from '#/types/api';
+import { getPage as getConfigPage } from '#/api/upms/config';
+import { getPage as getDictPage } from '#/api/upms/dict';
+import { getPage as getNoticePage } from '#/api/upms/notice';
 
 const router = useRouter();
 
@@ -19,10 +20,22 @@ const features = ref<FeatureFlags | null>(null);
 const featureItems = computed(() => {
   if (!features.value) return [];
   return [
-    { key: 'gatewayEnabled', label: 'Gateway', enabled: features.value.gatewayEnabled },
-    { key: 'nacosEnabled', label: 'Nacos', enabled: features.value.nacosEnabled },
+    {
+      key: 'gatewayEnabled',
+      label: 'Gateway',
+      enabled: features.value.gatewayEnabled,
+    },
+    {
+      key: 'nacosEnabled',
+      label: 'Nacos',
+      enabled: features.value.nacosEnabled,
+    },
     { key: 'mqEnabled', label: 'RocketMQ', enabled: features.value.mqEnabled },
-    { key: 'seataEnabled', label: 'Seata', enabled: features.value.seataEnabled },
+    {
+      key: 'seataEnabled',
+      label: 'Seata',
+      enabled: features.value.seataEnabled,
+    },
     { key: 'jobEnabled', label: 'XXL-Job', enabled: features.value.jobEnabled },
     { key: 'lokiEnabled', label: 'Loki', enabled: features.value.lokiEnabled },
   ];
@@ -198,8 +211,8 @@ function goTo(path: string) {
   align-items: center;
   justify-content: space-between;
   padding: 0 0 16px;
-  border-bottom: 1px solid var(--el-border-color-light);
   margin-bottom: 16px;
+  border-bottom: 1px solid var(--el-border-color-light);
 }
 
 .stat-cell {
@@ -217,8 +230,8 @@ function goTo(path: string) {
 
 .stat-value {
   font-size: 36px;
-  line-height: 1;
   font-weight: 700;
+  line-height: 1;
   color: var(--el-text-color-primary);
 }
 
@@ -243,20 +256,20 @@ function goTo(path: string) {
 
 .entry-card {
   display: flex;
+  gap: 16px;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
   padding: 20px;
+  cursor: pointer;
   border: 1px solid var(--el-border-color-light);
   border-radius: 18px;
-  cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .entry-card:hover {
+  border-color: rgb(22 119 255 / 20%);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 4%);
   transform: translateY(-2px);
-  border-color: rgba(22, 119, 255, 0.2);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
 }
 
 .entry-eyebrow {
@@ -275,8 +288,8 @@ function goTo(path: string) {
 .entry-desc {
   margin: 0;
   font-size: 13px;
-  color: var(--el-text-color-regular);
   line-height: 1.5;
+  color: var(--el-text-color-regular);
 }
 
 .feature-tag-row {
@@ -284,8 +297,8 @@ function goTo(path: string) {
   align-items: center;
   justify-content: space-between;
   padding: 16px 18px;
-  border-radius: 14px;
   background: var(--el-fill-color-lighter);
+  border-radius: 14px;
 }
 
 .mb-3 {

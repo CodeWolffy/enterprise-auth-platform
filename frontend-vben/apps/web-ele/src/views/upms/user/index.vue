@@ -1,7 +1,14 @@
 <script setup lang="ts">
-import { defineAsyncComponent, reactive, ref, computed } from 'vue';
+import { computed, defineAsyncComponent, reactive, ref } from 'vue';
 
-import { Delete, Edit, Plus, Refresh, Search, View } from '@element-plus/icons-vue';
+import {
+  Delete,
+  Edit,
+  Plus,
+  Refresh,
+  Search,
+  View,
+} from '@element-plus/icons-vue';
 import {
   ElButton,
   ElCard,
@@ -25,8 +32,8 @@ import {
 
 import { delObj, getAssignedRoles, getPage } from '#/api/upms/user';
 import { useAuthStore } from '#/store/auth';
-import { formatDateTime } from '#/utils/datetime';
 import { invokeWhenComponentReady } from '#/utils/component-ready';
+import { formatDateTime } from '#/utils/datetime';
 
 const Pagination = defineAsyncComponent(
   () => import('#/components/pagination/index.vue'),
@@ -54,14 +61,17 @@ const statData = computed(() => {
   const all = state.tableData;
   const enabled = all.filter((u: any) => u.enabled);
   const disabled = all.filter((u: any) => !u.enabled);
-  const avgRoles = all.length
-    ? Number(
-        (
-          all.reduce((sum: number, u: any) => sum + (u.roles?.length ?? 0), 0) /
-          all.length
-        ).toFixed(1),
-      )
-    : 0;
+  const avgRoles =
+    all.length > 0
+      ? Number(
+          (
+            all.reduce(
+              (sum: number, u: any) => sum + (u.roles?.length ?? 0),
+              0,
+            ) / all.length
+          ).toFixed(1),
+        )
+      : 0;
   return {
     total: state.page.total,
     enabled: enabled.length,
@@ -82,7 +92,9 @@ const openDetail = async (row: any) => {
   try {
     const roles = await getAssignedRoles(row.id);
     detailRoles.value = Array.isArray(roles)
-      ? roles.map((r: any) => (typeof r === 'string' ? r : r?.code || r?.name || ''))
+      ? roles.map((r: any) =>
+          typeof r === 'string' ? r : r?.code || r?.name || '',
+        )
       : [];
   } catch {
     detailRoles.value = row.roles ?? [];
@@ -181,7 +193,11 @@ initPage();
         </ElCol>
         <ElCol :span="6">
           <ElCard shadow="hover">
-            <ElStatistic title="平均角色数" :value="statData.avgRoles" :precision="1" />
+            <ElStatistic
+              title="平均角色数"
+              :value="statData.avgRoles"
+              :precision="1"
+            />
           </ElCard>
         </ElCol>
       </ElRow>
@@ -295,8 +311,12 @@ initPage();
             >
               修改
             </ElButton>
-            <ElButton link type="primary" @click="openLoginLog(scope.row)">日志</ElButton>
-            <ElButton link type="primary" @click="openResetPwd(scope.row)">改密</ElButton>
+            <ElButton link type="primary" @click="openLoginLog(scope.row)">
+              日志
+            </ElButton>
+            <ElButton link type="primary" @click="openResetPwd(scope.row)">
+              改密
+            </ElButton>
             <ElButton
               v-access:code="'upms:sysuser:del'"
               :icon="Delete"
@@ -321,14 +341,32 @@ initPage();
     <!-- 用户详情抽屉 -->
     <ElDrawer v-model="detailVisible" title="用户详情" size="500px">
       <ElDescriptions :column="1" border v-if="detailData">
-        <ElDescriptionsItem label="用户ID">{{ detailData.id }}</ElDescriptionsItem>
-        <ElDescriptionsItem label="用户名">{{ detailData.username }}</ElDescriptionsItem>
-        <ElDescriptionsItem label="显示名称">{{ detailData.displayName || '-' }}</ElDescriptionsItem>
-        <ElDescriptionsItem label="手机号">{{ detailData.mobile || '-' }}</ElDescriptionsItem>
-        <ElDescriptionsItem label="邮箱">{{ detailData.email || '-' }}</ElDescriptionsItem>
-        <ElDescriptionsItem label="部门">{{ detailData.deptName || detailData.deptId || '-' }}</ElDescriptionsItem>
+        <ElDescriptionsItem label="用户ID">
+          {{ detailData.id }}
+        </ElDescriptionsItem>
+        <ElDescriptionsItem label="用户名">
+          {{ detailData.username }}
+        </ElDescriptionsItem>
+        <ElDescriptionsItem label="显示名称">
+          {{ detailData.displayName || '-' }}
+        </ElDescriptionsItem>
+        <ElDescriptionsItem label="手机号">
+          {{ detailData.mobile || '-' }}
+        </ElDescriptionsItem>
+        <ElDescriptionsItem label="邮箱">
+          {{ detailData.email || '-' }}
+        </ElDescriptionsItem>
+        <ElDescriptionsItem label="部门">
+          {{ detailData.deptName || detailData.deptId || '-' }}
+        </ElDescriptionsItem>
         <ElDescriptionsItem label="数据权限">
-          <ElTag size="small">{{ DATA_SCOPE_LABELS[detailData.dataScopeType] || detailData.dataScopeType || '-' }}</ElTag>
+          <ElTag size="small">
+            {{
+              DATA_SCOPE_LABELS[detailData.dataScopeType] ||
+              detailData.dataScopeType ||
+              '-'
+            }}
+          </ElTag>
         </ElDescriptionsItem>
         <ElDescriptionsItem label="角色">
           <div style="display: flex; flex-wrap: wrap; gap: 4px">
@@ -341,7 +379,7 @@ initPage();
             >
               {{ r }}
             </ElTag>
-            <span v-if="!detailRoles.length">-</span>
+            <span v-if="detailRoles.length === 0">-</span>
           </div>
         </ElDescriptionsItem>
         <ElDescriptionsItem label="状态">
@@ -349,9 +387,15 @@ initPage();
             {{ detailData.enabled ? '启用' : '停用' }}
           </ElTag>
         </ElDescriptionsItem>
-        <ElDescriptionsItem label="创建时间">{{ formatDateTime(detailData.createdAt) }}</ElDescriptionsItem>
-        <ElDescriptionsItem label="最后登录">{{ formatDateTime(detailData.lastLoginAt) }}</ElDescriptionsItem>
-        <ElDescriptionsItem label="最后登录IP">{{ detailData.lastLoginIp || '-' }}</ElDescriptionsItem>
+        <ElDescriptionsItem label="创建时间">
+          {{ formatDateTime(detailData.createdAt) }}
+        </ElDescriptionsItem>
+        <ElDescriptionsItem label="最后登录">
+          {{ formatDateTime(detailData.lastLoginAt) }}
+        </ElDescriptionsItem>
+        <ElDescriptionsItem label="最后登录IP">
+          {{ detailData.lastLoginIp || '-' }}
+        </ElDescriptionsItem>
       </ElDescriptions>
     </ElDrawer>
   </div>

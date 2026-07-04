@@ -30,12 +30,8 @@ const state = reactive({
     enabled: true,
   },
   rules: {
-    code: [
-      { required: true, message: '请输入分类编码', trigger: 'change' },
-    ],
-    name: [
-      { required: true, message: '请输入分类名称', trigger: 'change' },
-    ],
+    code: [{ required: true, message: '请输入分类编码', trigger: 'change' }],
+    name: [{ required: true, message: '请输入分类名称', trigger: 'change' }],
   },
 });
 
@@ -185,7 +181,11 @@ defineExpose({
         />
       </ElFormItem>
       <ElFormItem label="描述">
-        <ElInput v-model="state.form.description" type="textarea" maxlength="200" />
+        <ElInput
+          v-model="state.form.description"
+          type="textarea"
+          maxlength="200"
+        />
       </ElFormItem>
       <ElFormItem label="排序序号">
         <ElInputNumber v-model="state.form.sort" :min="0" />
@@ -200,7 +200,11 @@ defineExpose({
     <template #footer>
       <span class="dialog-footer">
         <ElButton @click="handleClose">关 闭</ElButton>
-        <ElButton type="primary" @click="submitForm(formRef)" :loading="loading">
+        <ElButton
+          type="primary"
+          @click="submitForm(formRef)"
+          :loading="loading"
+        >
           确 认
         </ElButton>
       </span>

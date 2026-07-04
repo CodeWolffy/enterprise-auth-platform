@@ -37,8 +37,8 @@ const filterNodeMethod = (value: string, data: any) => {
   return name.toLowerCase().includes(value.toLowerCase());
 };
 
-watch(filterText, (val) => {
-  menuRef.value?.filter(val);
+watch(filterText, (value) => {
+  menuRef.value?.filter(`${value}`);
 });
 
 const handleChange = () => {
@@ -93,7 +93,12 @@ defineExpose({ initRoleMenu });
 </script>
 
 <template>
-  <ElDialog v-model="dialog" destroy-on-close :title="`分配菜单 - ${roleRow?.name || ''}`" width="60%">
+  <ElDialog
+    v-model="dialog"
+    destroy-on-close
+    :title="`分配菜单 - ${roleRow?.name || ''}`"
+    width="60%"
+  >
     <div class="rolemenu-toolbar">
       <ElInput
         v-model="filterText"
@@ -102,7 +107,9 @@ defineExpose({ initRoleMenu });
         style="width: 260px"
       />
       <div class="rolemenu-summary">
-        <ElTag size="small" type="info" effect="plain">已选 {{ state.menuIds.length }} 项</ElTag>
+        <ElTag size="small" type="info" effect="plain">
+          已选 {{ state.menuIds.length }} 项
+        </ElTag>
       </div>
     </div>
     <div class="hx-menus">
@@ -119,8 +126,12 @@ defineExpose({ initRoleMenu });
           <span class="custom-tree-node">
             <span>{{ data.name || data.label }}</span>
             <div class="tree-tags" v-if="data.type || data.permission">
-              <ElTag v-if="data.type" size="small" effect="plain" type="info">{{ data.type }}</ElTag>
-              <ElTag v-if="data.permission" size="small" effect="plain">{{ data.permission }}</ElTag>
+              <ElTag v-if="data.type" size="small" effect="plain" type="info">{{
+                data.type
+              }}</ElTag>
+              <ElTag v-if="data.permission" size="small" effect="plain">{{
+                data.permission
+              }}</ElTag>
             </div>
           </span>
         </template>

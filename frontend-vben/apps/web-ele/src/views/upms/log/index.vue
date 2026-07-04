@@ -19,6 +19,7 @@ import {
 import { getPage } from '#/api/upms/sys-log';
 import { formatDateTime } from '#/utils/datetime';
 import { operationStatusMeta } from '#/utils/log-status';
+
 import LogDetail from './detail.vue';
 
 const RightToolbar = defineAsyncComponent(
@@ -30,7 +31,6 @@ const Pagination = defineAsyncComponent(
 
 const showSearch = ref(true);
 const loading = ref(false);
-const queryRef = ref();
 const detailVisible = ref(false);
 const detailRow = ref<any>(null);
 
@@ -99,12 +99,7 @@ const openDetail = (row: any) => {
   <div class="hx-layout-container">
     <div class="hx-layout-container-auto hx-layout-container-view">
       <!-- 搜索 -->
-      <ElForm
-        :model="state.queryParams"
-        ref="queryRef"
-        :inline="true"
-        v-show="showSearch"
-      >
+      <ElForm :model="state.queryParams" :inline="true" v-show="showSearch">
         <ElFormItem label="操作用户" prop="operator">
           <ElInput
             v-model="state.queryParams.operator"
@@ -193,7 +188,9 @@ const openDetail = (row: any) => {
         </ElTableColumn>
         <ElTableColumn label="操作" width="100" fixed="right">
           <template #default="scope">
-            <ElButton link type="primary" @click="openDetail(scope.row)">详情</ElButton>
+            <ElButton link type="primary" @click="openDetail(scope.row)">
+              详情
+            </ElButton>
           </template>
         </ElTableColumn>
       </ElTable>
@@ -205,9 +202,14 @@ const openDetail = (row: any) => {
         @change="initPage"
       />
 
-      <el-dialog v-model="detailVisible" title="日志详情" width="720px" destroy-on-close>
+      <ElDialog
+        v-model="detailVisible"
+        title="日志详情"
+        width="720px"
+        destroy-on-close
+      >
         <LogDetail :row="detailRow" />
-      </el-dialog>
+      </ElDialog>
     </div>
   </div>
 </template>

@@ -38,11 +38,14 @@ export async function getById(targetType: string, code: string) {
  * 后端：GET /api/system/categories/{targetType}/{code}/analysis
  */
 export async function getAnalysis(targetType: string, code: string) {
-  return requestClient.get(`/system/categories/${targetType}/${code}/analysis`, {
-    headers: {
-      isSwitchTenant: false,
+  return requestClient.get(
+    `/system/categories/${targetType}/${code}/analysis`,
+    {
+      headers: {
+        isSwitchTenant: false,
+      },
     },
-  });
+  );
 }
 
 /**

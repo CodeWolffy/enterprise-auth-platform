@@ -24,7 +24,7 @@ export const useDictStore = defineStore('dict', {
     },
     removeDict(key: string) {
       const index = this.dict.findIndex((item) => item.key === key);
-      if (index < 0) {
+      if (index === -1) {
         return false;
       }
       this.dict.splice(index, 1);

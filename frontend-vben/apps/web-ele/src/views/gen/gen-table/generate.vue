@@ -38,22 +38,22 @@ import {
 } from '#/api/gen/table';
 
 type ColumnRow = {
-  id: number;
-  columnName: string;
   columnComment: string;
+  columnName: string;
   columnType: string;
   dataType: string;
-  javaType: string;
-  javaField: string;
-  primaryKey: boolean;
-  required: boolean;
-  insert: boolean;
+  dictType: string;
   edit: boolean;
+  htmlType: string;
+  id: number;
+  insert: boolean;
+  javaField: string;
+  javaType: string;
   list: boolean;
+  primaryKey: boolean;
   query: boolean;
   queryType: string;
-  htmlType: string;
-  dictType: string;
+  required: boolean;
   sort: number;
 };
 
@@ -84,15 +84,19 @@ const columns = ref<ColumnRow[]>([]);
 const tableHeight = ref(`${document.documentElement.scrollHeight - 280}px`);
 const previewVisible = ref(false);
 const previewLoading = ref(false);
-const previewFiles = ref<Array<{ fileName: string; content: string }>>([]);
+const previewFiles = ref<Array<{ content: string; fileName: string }>>([]);
 const previewActiveFile = ref('');
 const generateLoading = ref(false);
 const generateResult = ref<any>(null);
 const generateResultVisible = ref(false);
 
 const rules = ref({
-  packageName: [{ required: true, message: '请输入生成包路径', trigger: 'blur' }],
-  moduleName: [{ required: true, message: '请输入生成模块名', trigger: 'blur' }],
+  packageName: [
+    { required: true, message: '请输入生成包路径', trigger: 'blur' },
+  ],
+  moduleName: [
+    { required: true, message: '请输入生成模块名', trigger: 'blur' },
+  ],
   className: [{ required: true, message: '请输入实体类名称', trigger: 'blur' }],
 });
 
@@ -111,7 +115,7 @@ function toCamel(value: string, upperFirst: boolean): string {
 
 function stripPrefix(value: string): string {
   for (const prefix of ['sys_', 'wf_']) {
-    if (value.startsWith(prefix)) return value.substring(prefix.length);
+    if (value.startsWith(prefix)) return value.slice(prefix.length);
   }
   return value;
 }
@@ -131,7 +135,8 @@ async function initPage() {
       state.form.tableId = tid;
       state.form.tableName = table.tableName ?? tname;
       state.form.tableComment = table.tableComment ?? '';
-      state.form.className = table.className ?? toCamel(stripPrefix(state.form.tableName), true);
+      state.form.className =
+        table.className ?? toCamel(stripPrefix(state.form.tableName), true);
       state.form.packageName = table.packageName ?? '';
       state.form.moduleName = table.moduleName ?? '';
       state.form.businessName = table.businessName ?? '';
@@ -208,7 +213,7 @@ async function submitForm() {
     const link = document.createElement('a');
     link.href = url;
     link.download = `${state.form.moduleName || 'codegen'}.zip`;
-    document.body.appendChild(link);
+    document.body.append(link);
     link.click();
     link.remove();
     window.URL.revokeObjectURL(url);
@@ -222,7 +227,11 @@ async function submitForm() {
 
 // 预览生成结果
 async function previewGenCode() {
-  if (!state.form.packageName || !state.form.moduleName || !state.form.className) {
+  if (
+    !state.form.packageName ||
+    !state.form.moduleName ||
+    !state.form.className
+  ) {
     ElMessage.warning('请先填写生成包路径、模块名和实体类名称');
     return;
   }
@@ -299,17 +308,17 @@ async function generateCodeToFile() {
 initPage();
 
 function getPreviewContent() {
-  const file = previewFiles.value.find((f) => f.fileName === previewActiveFile.value);
+  const file = previewFiles.value.find(
+    (f) => f.fileName === previewActiveFile.value,
+  );
   return file?.content ?? '// 请选择文件查看预览';
 }
-
 </script>
 
 <template>
   <div class="hx-layout-container">
     <div class="hx-layout-container-auto hx-layout-container-view">
       <ElForm
-        ref="genInfoForm"
         :model="state.form"
         :rules="rules"
         label-width="150px"
@@ -348,7 +357,9 @@ function getPreviewContent() {
           <ElTabPane label="字段信息" name="column">
             <div v-loading="loading">
               <div v-if="columns.length === 0" class="py-8">
-                <ElEmpty description="暂无字段信息，请先在数据表管理中导入表配置" />
+                <ElEmpty
+                  description="暂无字段信息，请先在数据表管理中导入表配置"
+                />
               </div>
               <ElTable
                 v-else
@@ -357,7 +368,12 @@ function getPreviewContent() {
                 :max-height="tableHeight"
                 border
               >
-                <ElTableColumn label="序号" type="index" width="60" align="center" />
+                <ElTableColumn
+                  label="序号"
+                  type="index"
+                  width="60"
+                  align="center"
+                />
                 <ElTableColumn
                   label="字段列名"
                   prop="columnName"
@@ -366,10 +382,19 @@ function getPreviewContent() {
                 />
                 <ElTableColumn label="字段描述" min-width="140">
                   <template #default="scope">
-                    <ElInput v-model="scope.row.columnComment" size="small" placeholder="字段描述" />
+                    <ElInput
+                      v-model="scope.row.columnComment"
+                      size="small"
+                      placeholder="字段描述"
+                    />
                   </template>
                 </ElTableColumn>
-                <ElTableColumn label="物理类型" prop="columnType" width="130" show-overflow-tooltip />
+                <ElTableColumn
+                  label="物理类型"
+                  prop="columnType"
+                  width="130"
+                  show-overflow-tooltip
+                />
                 <ElTableColumn label="Java类型" width="130">
                   <template #default="scope">
                     <ElSelect v-model="scope.row.javaType" size="small">
@@ -377,7 +402,10 @@ function getPreviewContent() {
                       <ElOption label="Long" value="Long" />
                       <ElOption label="Integer" value="Integer" />
                       <ElOption label="Double" value="Double" />
-                      <ElOption label="BigDecimal" value="java.math.BigDecimal" />
+                      <ElOption
+                        label="BigDecimal"
+                        value="java.math.BigDecimal"
+                      />
                       <ElOption label="Instant" value="java.time.Instant" />
                       <ElOption label="LocalDate" value="java.time.LocalDate" />
                       <ElOption label="LocalTime" value="java.time.LocalTime" />
@@ -459,12 +487,19 @@ function getPreviewContent() {
                 </ElTableColumn>
                 <ElTableColumn label="字典类型" width="140">
                   <template #default="scope">
-                    <ElInput v-model="scope.row.dictType" size="small" placeholder="字典编码" />
+                    <ElInput
+                      v-model="scope.row.dictType"
+                      size="small"
+                      placeholder="字典编码"
+                    />
                   </template>
                 </ElTableColumn>
               </ElTable>
 
-              <div v-if="columns.length > 0" style="margin-top: 12px; text-align: right">
+              <div
+                v-if="columns.length > 0"
+                style="margin-top: 12px; text-align: right"
+              >
                 <ElButton
                   type="primary"
                   :disabled="!state.form.tableId"
@@ -486,12 +521,18 @@ function getPreviewContent() {
                     <template #label>
                       <span>
                         生成包路径
-                        <ElTooltip content="生成在哪个Java包下，例如 com.enterprise.auth.platform" placement="top">
+                        <ElTooltip
+                          content="生成在哪个Java包下，例如 com.enterprise.auth.platform"
+                          placement="top"
+                        >
                           <ElIcon><QuestionFilled /></ElIcon>
                         </ElTooltip>
                       </span>
                     </template>
-                    <ElInput v-model="state.form.packageName" placeholder="例如 com.enterprise.auth.platform" />
+                    <ElInput
+                      v-model="state.form.packageName"
+                      placeholder="例如 com.enterprise.auth.platform"
+                    />
                   </ElFormItem>
                 </ElCol>
                 <ElCol :span="12">
@@ -499,12 +540,18 @@ function getPreviewContent() {
                     <template #label>
                       <span>
                         生成模块名
-                        <ElTooltip content="可理解为子系统名，例如 system" placement="top">
+                        <ElTooltip
+                          content="可理解为子系统名，例如 system"
+                          placement="top"
+                        >
                           <ElIcon><QuestionFilled /></ElIcon>
                         </ElTooltip>
                       </span>
                     </template>
-                    <ElInput v-model="state.form.moduleName" placeholder="例如 system" />
+                    <ElInput
+                      v-model="state.form.moduleName"
+                      placeholder="例如 system"
+                    />
                   </ElFormItem>
                 </ElCol>
                 <ElCol :span="12">
@@ -547,10 +594,18 @@ function getPreviewContent() {
 
       <div class="mt-2 flex items-end justify-center" style="gap: 16px">
         <ElButton style="width: 120px" @click="router.back()">返回</ElButton>
-        <ElButton style="width: 120px" @click="previewGenCode" :loading="previewLoading">
+        <ElButton
+          style="width: 120px"
+          @click="previewGenCode"
+          :loading="previewLoading"
+        >
           预览代码
         </ElButton>
-        <ElButton style="width: 140px" @click="generateCodeToFile" :loading="generateLoading">
+        <ElButton
+          style="width: 140px"
+          @click="generateCodeToFile"
+          :loading="generateLoading"
+        >
           生成到目录
         </ElButton>
         <ElButton
@@ -562,22 +617,39 @@ function getPreviewContent() {
           生成代码并下载
         </ElButton>
       </div>
-
     </div>
 
     <!-- 预览弹窗 -->
     <ElDialog v-model="previewVisible" title="代码预览" width="80%" top="40px">
-      <div v-loading="previewLoading" style="display: flex; gap: 12px; height: 70vh">
+      <div
+        v-loading="previewLoading"
+        style="display: flex; gap: 12px; height: 70vh"
+      >
         <!-- 文件列表 -->
-        <div style="width: 240px; overflow-y: auto; border-right: 1px solid #ebeef5; padding-right: 8px">
+        <div
+          style="
+            width: 240px;
+            padding-right: 8px;
+            overflow-y: auto;
+            border-right: 1px solid #ebeef5;
+          "
+        >
           <div
             v-for="file in previewFiles"
             :key="file.fileName"
-            style="padding: 6px 10px; cursor: pointer; border-radius: 4px; font-size: 13px"
+            style="
+              padding: 6px 10px;
+              font-size: 13px;
+              cursor: pointer;
+              border-radius: 4px;
+            "
             :style="{
-              background: previewActiveFile === file.fileName ? '#ecf5ff' : 'transparent',
-              color: previewActiveFile === file.fileName ? '#409eff' : '#606266',
-              fontWeight: previewActiveFile === file.fileName ? '600' : 'normal',
+              background:
+                previewActiveFile === file.fileName ? '#ecf5ff' : 'transparent',
+              color:
+                previewActiveFile === file.fileName ? '#409eff' : '#606266',
+              fontWeight:
+                previewActiveFile === file.fileName ? '600' : 'normal',
             }"
             @click="previewActiveFile = file.fileName"
           >
@@ -586,7 +658,20 @@ function getPreviewContent() {
         </div>
         <!-- 代码内容 -->
         <div style="flex: 1; overflow: auto">
-          <pre style="margin: 0; padding: 12px; font-size: 13px; line-height: 1.6; background: #0f172a; color: #e2e8f0; border-radius: 8px; min-height: 100%; white-space: pre-wrap">{{ getPreviewContent() }}</pre>
+          <pre
+            style="
+              min-height: 100%;
+              padding: 12px;
+              margin: 0;
+              font-size: 13px;
+              line-height: 1.6;
+              color: #e2e8f0;
+              white-space: pre-wrap;
+              background: #0f172a;
+              border-radius: 8px;
+            "
+            >{{ getPreviewContent() }}</pre
+          >
         </div>
       </div>
     </ElDialog>
@@ -594,21 +679,50 @@ function getPreviewContent() {
     <!-- 生成结果弹窗 -->
     <ElDialog v-model="generateResultVisible" title="生成结果" width="600px">
       <div v-if="generateResult">
-        <ElTag type="success" size="large" effect="dark" style="margin-bottom: 16px">
+        <ElTag
+          type="success"
+          size="large"
+          effect="dark"
+          style="margin-bottom: 16px"
+        >
           代码已成功生成
         </ElTag>
-        <div v-if="generateResult.generatedFiles?.length" style="margin-bottom: 16px">
-          <h4 style="margin-bottom: 8px">生成文件 ({{ generateResult.generatedFiles.length }})</h4>
-          <div style="max-height: 200px; overflow-y: auto; border: 1px solid #ebeef5; border-radius: 4px; padding: 8px">
-            <div v-for="file in generateResult.generatedFiles" :key="file" style="font-size: 13px; padding: 2px 0; color: #606266">
+        <div
+          v-if="generateResult.generatedFiles?.length"
+          style="margin-bottom: 16px"
+        >
+          <h4 style="margin-bottom: 8px">
+            生成文件 ({{ generateResult.generatedFiles.length }})
+          </h4>
+          <div
+            style="
+              max-height: 200px;
+              padding: 8px;
+              overflow-y: auto;
+              border: 1px solid #ebeef5;
+              border-radius: 4px;
+            "
+          >
+            <div
+              v-for="file in generateResult.generatedFiles"
+              :key="file"
+              style="padding: 2px 0; font-size: 13px; color: #606266"
+            >
               {{ file }}
             </div>
           </div>
         </div>
         <div v-if="generateResult.registeredPermissions?.length">
-          <h4 style="margin-bottom: 8px">注册权限 ({{ generateResult.registeredPermissions.length }})</h4>
+          <h4 style="margin-bottom: 8px">
+            注册权限 ({{ generateResult.registeredPermissions.length }})
+          </h4>
           <div style="display: flex; flex-wrap: wrap; gap: 4px">
-            <ElTag v-for="perm in generateResult.registeredPermissions" :key="perm" size="small" effect="plain">
+            <ElTag
+              v-for="perm in generateResult.registeredPermissions"
+              :key="perm"
+              size="small"
+              effect="plain"
+            >
               {{ perm }}
             </ElTag>
           </div>

@@ -1,161 +1,35 @@
-<template>
-  <div class="panel-stack workflow-designer-page">
-    <section class="designer-hero dashboard-panel">
-      <div>
-        <span class="eyebrow">Workflow Designer</span>
-        <h3>流程设计器</h3>
-        <p class="muted-line">顺序审批、候选人、候选组和驳回策略都能在这里配置，保存后直接生成流程定义。</p>
-      </div>
-      <div class="designer-hero__actions">
-        <el-button @click="resetDesigner">重置</el-button>
-        <el-button type="primary" plain :disabled="Boolean(validationIssue)" :loading="submitting" @click="saveDefinition(false)">保存草稿</el-button>
-        <el-button type="primary" :disabled="Boolean(validationIssue)" :loading="submitting" @click="saveDefinition(true)">保存并部署</el-button>
-      </div>
-    </section>
-
-    <section class="dashboard-grid designer-stats">
-      <article class="stat-card designer-stat designer-stat--primary">
-        <span class="eyebrow">Steps</span>
-        <strong>{{ steps.length }}</strong>
-        <span>顺序审批节点</span>
-      </article>
-      <article class="stat-card designer-stat">
-        <span class="eyebrow">Users</span>
-        <strong>{{ candidateUserCount }}</strong>
-        <span>候选人 ID 数</span>
-      </article>
-      <article class="stat-card designer-stat">
-        <span class="eyebrow">Groups</span>
-        <strong>{{ candidateGroupCount }}</strong>
-        <span>候选组编码数</span>
-      </article>
-    </section>
-
-    <section class="designer-workbench">
-      <aside class="dashboard-panel designer-config-card">
-        <div class="panel-head designer-card-head">
-          <div>
-            <span class="eyebrow">Definition</span>
-            <h3>流程定义</h3>
-          </div>
-        </div>
-        <el-form label-position="top" :model="definitionForm">
-          <el-form-item label="定义标识">
-            <el-input v-model="definitionForm.definitionKey" placeholder="例如 leave-approval" />
-          </el-form-item>
-          <el-form-item label="定义名称">
-            <el-input v-model="definitionForm.definitionName" placeholder="例如 请假审批" />
-          </el-form-item>
-          <el-form-item label="备注">
-            <el-input v-model="definitionForm.remark" type="textarea" :rows="4" maxlength="255" show-word-limit />
-          </el-form-item>
-        </el-form>
-        <el-alert class="designer-tip" title="当前设计器输出会保存为流程步骤 JSON；流程执行仍沿用已有轻量状态机。" type="info" :closable="false" show-icon />
-      </aside>
-
-      <main class="dashboard-panel designer-canvas-card">
-        <div class="panel-head designer-card-head">
-          <div>
-            <span class="eyebrow">Sequential Flow</span>
-            <h3>审批节点</h3>
-            <p class="muted-line">节点会按从上到下的顺序执行。每个节点至少配置一个候选人 ID 或候选组编码。</p>
-          </div>
-          <el-button type="primary" plain @click="addStep">新增节点</el-button>
-        </div>
-
-        <div class="designer-lane">
-          <article v-for="(step, index) in steps" :key="step.localId" class="designer-step-card">
-            <div class="step-index-block">
-              <span>{{ index + 1 }}</span>
-              <small>{{ index === 0 ? 'START' : 'STEP' }}</small>
-            </div>
-            <div class="step-body">
-              <div class="step-title-row">
-                <el-input v-model="step.name" class="step-name-input" placeholder="节点名称，例如 直属主管审批" />
-                <div class="step-actions">
-                  <el-button size="small" :disabled="index === 0" @click="moveStep(index, -1)">上移</el-button>
-                  <el-button size="small" :disabled="index === steps.length - 1" @click="moveStep(index, 1)">下移</el-button>
-                  <el-button size="small" @click="duplicateStep(index)">复制</el-button>
-                  <el-button size="small" type="danger" plain :disabled="steps.length === 1" @click="removeStep(index)">删除</el-button>
-                </div>
-              </div>
-              <div class="step-candidate-grid">
-                <el-form-item label="候选人 ID">
-                  <el-input v-model="step.candidateUserIdsText" placeholder="用逗号分隔，例如 1, 2, 3" />
-                </el-form-item>
-                <el-form-item label="候选组编码">
-                  <el-input v-model="step.candidateGroupCodesText" placeholder="用逗号分隔，例如 ADMIN, FINANCE" />
-                </el-form-item>
-              </div>
-              <div class="step-reject-row">
-                <el-form-item label="驳回策略">
-                  <el-select v-model="step.rejectStrategy" class="step-reject-select" placeholder="选择驳回策略" @change="handleRejectStrategyChange(step)">
-                    <el-option v-for="option in REJECT_STRATEGY_OPTIONS" :key="option.value" :value="option.value" :label="option.label">
-                      <div class="reject-option">
-                        <strong>{{ option.label }}</strong>
-                        <small>{{ option.description }}</small>
-                      </div>
-                    </el-option>
-                  </el-select>
-                </el-form-item>
-                <el-form-item v-if="step.rejectStrategy === 'TO_STEP'" label="目标节点">
-                  <el-select v-model="step.rejectTarget" class="step-reject-select" placeholder="选择当前节点之前的节点" :disabled="index === 0">
-                    <el-option v-for="option in rejectTargetOptions(index)" :key="option.value" :value="option.value" :label="option.label" />
-                  </el-select>
-                </el-form-item>
-              </div>
-              <div class="candidate-preview-row">
-                <el-tag v-for="userId in previewUserIds(step)" :key="`${step.localId}-user-${userId}`" effect="plain">用户 {{ userId }}</el-tag>
-                <el-tag v-for="groupCode in previewGroupCodes(step)" :key="`${step.localId}-group-${groupCode}`" type="success" effect="plain">{{ groupCode }}</el-tag>
-                <span v-if="!previewUserIds(step).length && !previewGroupCodes(step).length" class="muted-inline">未配置候选范围</span>
-              </div>
-            </div>
-          </article>
-        </div>
-      </main>
-
-      <aside class="dashboard-panel designer-preview-card">
-        <div class="panel-head designer-card-head">
-          <div>
-            <span class="eyebrow">Output</span>
-            <h3>执行产物</h3>
-          </div>
-          <el-tag :type="validationIssue ? 'warning' : 'success'" effect="plain">{{ validationIssue ? '待补齐' : '可保存' }}</el-tag>
-        </div>
-
-        <el-alert v-if="validationIssue" class="designer-tip" :title="validationIssue" type="warning" :closable="false" show-icon />
-
-        <div class="flow-preview">
-          <div v-for="(step, index) in steps" :key="`preview-${step.localId}`" class="flow-preview-node">
-            <span>{{ index + 1 }}</span>
-            <div>
-              <strong>{{ step.name || `审批节点 ${index + 1}` }}</strong>
-              <small>{{ formatPreviewCandidates(step) }}</small>
-              <small class="flow-preview-reject">驳回策略：{{ formatRejectStrategy(step) }}</small>
-            </div>
-          </div>
-        </div>
-
-        <div class="json-preview">
-          <div class="json-preview__head">
-            <span>steps JSON</span>
-            <el-button size="small" text @click="copyPreview">复制</el-button>
-          </div>
-          <pre>{{ previewJson }}</pre>
-        </div>
-      </aside>
-    </section>
-  </div>
-</template>
-
 <script setup lang="ts">
+import type {
+  WorkflowDefinitionRequest,
+  WorkflowStepInput,
+} from '#/types/workflow';
+
 import { computed, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { ElAlert, ElButton, ElForm, ElFormItem, ElInput, ElMessage, ElOption, ElSelect, ElTag } from 'element-plus';
-import { createWorkflowDefinition, deployWorkflowDefinition } from '#/api/modules';
-import type { WorkflowDefinitionRequest, WorkflowStepInput } from '#/types/workflow';
 
-type DesignerRejectStrategy = 'END' | 'PREVIOUS' | 'RESTART' | 'TO_STEP' | 'TO_STARTER';
+import {
+  ElAlert,
+  ElButton,
+  ElForm,
+  ElFormItem,
+  ElInput,
+  ElMessage,
+  ElOption,
+  ElSelect,
+  ElTag,
+} from 'element-plus';
+
+import {
+  createWorkflowDefinition,
+  deployWorkflowDefinition,
+} from '#/api/modules';
+
+type DesignerRejectStrategy =
+  | 'END'
+  | 'PREVIOUS'
+  | 'RESTART'
+  | 'TO_STARTER'
+  | 'TO_STEP';
 
 interface DesignerStep {
   localId: string;
@@ -163,15 +37,35 @@ interface DesignerStep {
   candidateUserIdsText: string;
   candidateGroupCodesText: string;
   rejectStrategy: DesignerRejectStrategy;
-  rejectTarget: number | null;
+  rejectTarget: null | number;
 }
 
-const REJECT_STRATEGY_OPTIONS: Array<{ value: DesignerRejectStrategy; label: string; description: string }> = [
+const REJECT_STRATEGY_OPTIONS: Array<{
+  description: string;
+  label: string;
+  value: DesignerRejectStrategy;
+}> = [
   { value: 'END', label: '驳回结束', description: '驳回后结束流程（默认）' },
-  { value: 'PREVIOUS', label: '驳回上一节点', description: '驳回后回到上一节点；首节点驳回等同于结束' },
-  { value: 'RESTART', label: '驳回首节点', description: '驳回后重新从第一个审批节点开始' },
-  { value: 'TO_STEP', label: '驳回指定节点', description: '驳回到当前节点之前的指定审批节点' },
-  { value: 'TO_STARTER', label: '驳回发起人重提', description: '交回发起人修改后重新提交审批' },
+  {
+    value: 'PREVIOUS',
+    label: '驳回上一节点',
+    description: '驳回后回到上一节点；首节点驳回等同于结束',
+  },
+  {
+    value: 'RESTART',
+    label: '驳回首节点',
+    description: '驳回后重新从第一个审批节点开始',
+  },
+  {
+    value: 'TO_STEP',
+    label: '驳回指定节点',
+    description: '驳回到当前节点之前的指定审批节点',
+  },
+  {
+    value: 'TO_STARTER',
+    label: '驳回发起人重提',
+    description: '交回发起人修改后重新提交审批',
+  },
 ];
 
 let stepSerial = 0;
@@ -187,9 +81,19 @@ const definitionForm = reactive({
 
 const steps = ref<DesignerStep[]>(defaultSteps());
 
-const candidateUserCount = computed(() => new Set(steps.value.flatMap((step) => previewUserIds(step))).size);
-const candidateGroupCount = computed(() => new Set(steps.value.flatMap((step) => previewGroupCodes(step))).size);
-const previewJson = computed(() => JSON.stringify(steps.value.map(toPreviewStep), null, 2));
+const candidateUserCount = computed(
+  () => new Set(steps.value.flatMap((step) => previewUserIds(step))).size,
+);
+const candidateGroupCount = computed(
+  () => new Set(steps.value.flatMap((step) => previewGroupCodes(step))).size,
+);
+const previewJson = computed(() =>
+  JSON.stringify(
+    steps.value.map((step) => toPreviewStep(step)),
+    null,
+    2,
+  ),
+);
 const validationIssue = computed(() => {
   try {
     buildPayload();
@@ -211,7 +115,7 @@ function createStep(
   candidateUserIdsText = '',
   candidateGroupCodesText = '',
   rejectStrategy: DesignerRejectStrategy = 'END',
-  rejectTarget: number | null = null,
+  rejectTarget: null | number = null,
 ): DesignerStep {
   stepSerial += 1;
   return {
@@ -236,7 +140,13 @@ function duplicateStep(index: number) {
   steps.value.splice(
     index + 1,
     0,
-    createStep(`${source.name || `审批节点 ${index + 1}`} 副本`, source.candidateUserIdsText, source.candidateGroupCodesText, source.rejectStrategy, source.rejectTarget),
+    createStep(
+      `${source.name || `审批节点 ${index + 1}`} 副本`,
+      source.candidateUserIdsText,
+      source.candidateGroupCodesText,
+      source.rejectStrategy,
+      source.rejectTarget,
+    ),
   );
 }
 
@@ -273,7 +183,9 @@ async function saveDefinition(deployAfterCreate: boolean) {
   try {
     payload = buildPayload();
   } catch (error) {
-    ElMessage.warning(error instanceof Error ? error.message : '流程设计不完整');
+    ElMessage.warning(
+      error instanceof Error ? error.message : '流程设计不完整',
+    );
     return;
   }
 
@@ -301,13 +213,13 @@ function buildPayload(): WorkflowDefinitionRequest {
   if (!definitionName) {
     throw new Error('请输入定义名称');
   }
-  if (!steps.value.length) {
+  if (steps.value.length === 0) {
     throw new Error('至少需要一个审批节点');
   }
   return {
     definitionKey,
     definitionName,
-    steps: steps.value.map(toWorkflowStep),
+    steps: steps.value.map((step, index) => toWorkflowStep(step, index)),
     remark: definitionForm.remark.trim() || undefined,
   };
 }
@@ -319,7 +231,7 @@ function toWorkflowStep(step: DesignerStep, index: number): WorkflowStepInput {
   }
   const candidateUserIds = parseUserIds(step.candidateUserIdsText, index);
   const candidateGroupCodes = normalizeGroupCodes(step.candidateGroupCodesText);
-  if (!candidateUserIds.length && !candidateGroupCodes.length) {
+  if (candidateUserIds.length === 0 && candidateGroupCodes.length === 0) {
     throw new Error(`第 ${index + 1} 个审批节点至少需要候选人或候选组`);
   }
   const rejectTarget = resolveRejectTarget(step, index);
@@ -343,7 +255,11 @@ function toPreviewStep(step: DesignerStep) {
 }
 
 function previewUserIds(step: DesignerStep) {
-  return uniqueNumbers(splitTokens(step.candidateUserIdsText).map(Number).filter((item) => Number.isInteger(item) && item > 0));
+  return uniqueNumbers(
+    splitTokens(step.candidateUserIdsText)
+      .map(Number)
+      .filter((item) => Number.isInteger(item) && item > 0),
+  );
 }
 
 function previewGroupCodes(step: DesignerStep) {
@@ -379,12 +295,14 @@ function resolveRejectTarget(step: DesignerStep, index: number) {
   return step.rejectTarget;
 }
 
-function rejectTargetLabel(target: number | null) {
+function rejectTargetLabel(target: null | number) {
   if (target === null || target === undefined) {
     return '未选择目标节点';
   }
   const targetStep = steps.value[target];
-  return targetStep ? `${target + 1}. ${targetStep.name.trim() || `审批节点 ${target + 1}`}` : '目标节点不存在';
+  return targetStep
+    ? `${target + 1}. ${targetStep.name.trim() || `审批节点 ${target + 1}`}`
+    : '目标节点不存在';
 }
 
 function formatRejectStrategy(step: DesignerStep) {
@@ -397,9 +315,13 @@ function formatRejectStrategy(step: DesignerStep) {
 
 function parseUserIds(value: string, index: number) {
   const tokens = splitTokens(value);
-  const invalidTokens = tokens.filter((token) => !Number.isInteger(Number(token)) || Number(token) <= 0);
-  if (invalidTokens.length) {
-    throw new Error(`第 ${index + 1} 个审批节点存在无效候选人 ID：${invalidTokens.join(', ')}`);
+  const invalidTokens = tokens.filter(
+    (token) => !Number.isInteger(Number(token)) || Number(token) <= 0,
+  );
+  if (invalidTokens.length > 0) {
+    throw new Error(
+      `第 ${index + 1} 个审批节点存在无效候选人 ID：${invalidTokens.join(', ')}`,
+    );
   }
   return uniqueNumbers(tokens.map(Number));
 }
@@ -409,24 +331,31 @@ function normalizeGroupCodes(value: string) {
 }
 
 function splitTokens(value: string) {
-  return value.split(/[\s,，、;；]+/).map((item) => item.trim()).filter(Boolean);
+  return value
+    .split(/[\s,，、;；]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function uniqueNumbers(values: number[]) {
-  return Array.from(new Set(values));
+  return [...new Set(values)];
 }
 
 function uniqueStrings(values: string[]) {
-  return Array.from(new Set(values));
+  return [...new Set(values)];
 }
 
 function formatPreviewCandidates(step: DesignerStep) {
   const users = previewUserIds(step);
   const groups = previewGroupCodes(step);
-  return [
-    users.length ? `候选人：${users.join(', ')}` : '',
-    groups.length ? `候选组：${groups.join(', ')}` : '',
-  ].filter(Boolean).join('；') || '未配置候选范围';
+  return (
+    [
+      users.length > 0 ? `候选人：${users.join(', ')}` : '',
+      groups.length > 0 ? `候选组：${groups.join(', ')}` : '',
+    ]
+      .filter(Boolean)
+      .join('；') || '未配置候选范围'
+  );
 }
 
 async function copyPreview() {
@@ -435,9 +364,294 @@ async function copyPreview() {
 }
 
 function rejectStrategyLabel(value: DesignerStep['rejectStrategy']) {
-  return REJECT_STRATEGY_OPTIONS.find((option) => option.value === value)?.label ?? '结束流程';
+  return (
+    REJECT_STRATEGY_OPTIONS.find((option) => option.value === value)?.label ??
+    '结束流程'
+  );
 }
 </script>
+
+<template>
+  <div class="panel-stack workflow-designer-page">
+    <section class="designer-hero dashboard-panel">
+      <div>
+        <span class="eyebrow">Workflow Designer</span>
+        <h3>流程设计器</h3>
+        <p class="muted-line">
+          顺序审批、候选人、候选组和驳回策略都能在这里配置，保存后直接生成流程定义。
+        </p>
+      </div>
+      <div class="designer-hero__actions">
+        <ElButton @click="resetDesigner">重置</ElButton>
+        <ElButton
+          type="primary"
+          plain
+          :disabled="Boolean(validationIssue)"
+          :loading="submitting"
+          @click="saveDefinition(false)"
+        >
+          保存草稿
+        </ElButton>
+        <ElButton
+          type="primary"
+          :disabled="Boolean(validationIssue)"
+          :loading="submitting"
+          @click="saveDefinition(true)"
+        >
+          保存并部署
+        </ElButton>
+      </div>
+    </section>
+
+    <section class="dashboard-grid designer-stats">
+      <article class="stat-card designer-stat designer-stat--primary">
+        <span class="eyebrow">Steps</span>
+        <strong>{{ steps.length }}</strong>
+        <span>顺序审批节点</span>
+      </article>
+      <article class="stat-card designer-stat">
+        <span class="eyebrow">Users</span>
+        <strong>{{ candidateUserCount }}</strong>
+        <span>候选人 ID 数</span>
+      </article>
+      <article class="stat-card designer-stat">
+        <span class="eyebrow">Groups</span>
+        <strong>{{ candidateGroupCount }}</strong>
+        <span>候选组编码数</span>
+      </article>
+    </section>
+
+    <section class="designer-workbench">
+      <aside class="dashboard-panel designer-config-card">
+        <div class="panel-head designer-card-head">
+          <div>
+            <span class="eyebrow">Definition</span>
+            <h3>流程定义</h3>
+          </div>
+        </div>
+        <ElForm label-position="top" :model="definitionForm">
+          <ElFormItem label="定义标识">
+            <ElInput
+              v-model="definitionForm.definitionKey"
+              placeholder="例如 leave-approval"
+            />
+          </ElFormItem>
+          <ElFormItem label="定义名称">
+            <ElInput
+              v-model="definitionForm.definitionName"
+              placeholder="例如 请假审批"
+            />
+          </ElFormItem>
+          <ElFormItem label="备注">
+            <ElInput
+              v-model="definitionForm.remark"
+              type="textarea"
+              :rows="4"
+              maxlength="255"
+              show-word-limit
+            />
+          </ElFormItem>
+        </ElForm>
+        <ElAlert
+          class="designer-tip"
+          title="当前设计器输出会保存为流程步骤 JSON；流程执行仍沿用已有轻量状态机。"
+          type="info"
+          :closable="false"
+          show-icon
+        />
+      </aside>
+
+      <main class="dashboard-panel designer-canvas-card">
+        <div class="panel-head designer-card-head">
+          <div>
+            <span class="eyebrow">Sequential Flow</span>
+            <h3>审批节点</h3>
+            <p class="muted-line">
+              节点会按从上到下的顺序执行。每个节点至少配置一个候选人 ID
+              或候选组编码。
+            </p>
+          </div>
+          <ElButton type="primary" plain @click="addStep">新增节点</ElButton>
+        </div>
+
+        <div class="designer-lane">
+          <article
+            v-for="(step, index) in steps"
+            :key="step.localId"
+            class="designer-step-card"
+          >
+            <div class="step-index-block">
+              <span>{{ index + 1 }}</span>
+              <small>{{ index === 0 ? 'START' : 'STEP' }}</small>
+            </div>
+            <div class="step-body">
+              <div class="step-title-row">
+                <ElInput
+                  v-model="step.name"
+                  class="step-name-input"
+                  placeholder="节点名称，例如 直属主管审批"
+                />
+                <div class="step-actions">
+                  <ElButton
+                    size="small"
+                    :disabled="index === 0"
+                    @click="moveStep(index, -1)"
+                  >
+                    上移
+                  </ElButton>
+                  <ElButton
+                    size="small"
+                    :disabled="index === steps.length - 1"
+                    @click="moveStep(index, 1)"
+                  >
+                    下移
+                  </ElButton>
+                  <ElButton size="small" @click="duplicateStep(index)">
+                    复制
+                  </ElButton>
+                  <ElButton
+                    size="small"
+                    type="danger"
+                    plain
+                    :disabled="steps.length === 1"
+                    @click="removeStep(index)"
+                  >
+                    删除
+                  </ElButton>
+                </div>
+              </div>
+              <div class="step-candidate-grid">
+                <ElFormItem label="候选人 ID">
+                  <ElInput
+                    v-model="step.candidateUserIdsText"
+                    placeholder="用逗号分隔，例如 1, 2, 3"
+                  />
+                </ElFormItem>
+                <ElFormItem label="候选组编码">
+                  <ElInput
+                    v-model="step.candidateGroupCodesText"
+                    placeholder="用逗号分隔，例如 ADMIN, FINANCE"
+                  />
+                </ElFormItem>
+              </div>
+              <div class="step-reject-row">
+                <ElFormItem label="驳回策略">
+                  <ElSelect
+                    v-model="step.rejectStrategy"
+                    class="step-reject-select"
+                    placeholder="选择驳回策略"
+                    @change="handleRejectStrategyChange(step)"
+                  >
+                    <ElOption
+                      v-for="option in REJECT_STRATEGY_OPTIONS"
+                      :key="option.value"
+                      :value="option.value"
+                      :label="option.label"
+                    >
+                      <div class="reject-option">
+                        <strong>{{ option.label }}</strong>
+                        <small>{{ option.description }}</small>
+                      </div>
+                    </ElOption>
+                  </ElSelect>
+                </ElFormItem>
+                <ElFormItem
+                  v-if="step.rejectStrategy === 'TO_STEP'"
+                  label="目标节点"
+                >
+                  <ElSelect
+                    v-model="step.rejectTarget"
+                    class="step-reject-select"
+                    placeholder="选择当前节点之前的节点"
+                    :disabled="index === 0"
+                  >
+                    <ElOption
+                      v-for="option in rejectTargetOptions(index)"
+                      :key="option.value"
+                      :value="option.value"
+                      :label="option.label"
+                    />
+                  </ElSelect>
+                </ElFormItem>
+              </div>
+              <div class="candidate-preview-row">
+                <ElTag
+                  v-for="userId in previewUserIds(step)"
+                  :key="`${step.localId}-user-${userId}`"
+                  effect="plain"
+                >
+                  用户 {{ userId }}
+                </ElTag>
+                <ElTag
+                  v-for="groupCode in previewGroupCodes(step)"
+                  :key="`${step.localId}-group-${groupCode}`"
+                  type="success"
+                  effect="plain"
+                >
+                  {{ groupCode }}
+                </ElTag>
+                <span
+                  v-if="
+                    previewUserIds(step).length === 0 &&
+                    previewGroupCodes(step).length === 0
+                  "
+                  class="muted-inline"
+                  >未配置候选范围</span
+                >
+              </div>
+            </div>
+          </article>
+        </div>
+      </main>
+
+      <aside class="dashboard-panel designer-preview-card">
+        <div class="panel-head designer-card-head">
+          <div>
+            <span class="eyebrow">Output</span>
+            <h3>执行产物</h3>
+          </div>
+          <ElTag :type="validationIssue ? 'warning' : 'success'" effect="plain">
+            {{ validationIssue ? '待补齐' : '可保存' }}
+          </ElTag>
+        </div>
+
+        <ElAlert
+          v-if="validationIssue"
+          class="designer-tip"
+          :title="validationIssue"
+          type="warning"
+          :closable="false"
+          show-icon
+        />
+
+        <div class="flow-preview">
+          <div
+            v-for="(step, index) in steps"
+            :key="`preview-${step.localId}`"
+            class="flow-preview-node"
+          >
+            <span>{{ index + 1 }}</span>
+            <div>
+              <strong>{{ step.name || `审批节点 ${index + 1}` }}</strong>
+              <small>{{ formatPreviewCandidates(step) }}</small>
+              <small class="flow-preview-reject"
+                >驳回策略：{{ formatRejectStrategy(step) }}</small
+              >
+            </div>
+          </div>
+        </div>
+
+        <div class="json-preview">
+          <div class="json-preview__head">
+            <span>steps JSON</span>
+            <ElButton size="small" text @click="copyPreview">复制</ElButton>
+          </div>
+          <pre>{{ previewJson }}</pre>
+        </div>
+      </aside>
+    </section>
+  </div>
+</template>
 
 <style scoped lang="scss">
 .workflow-designer-page {
@@ -446,12 +660,12 @@ function rejectStrategyLabel(value: DesignerStep['rejectStrategy']) {
 
 .designer-hero {
   display: flex;
-  justify-content: space-between;
   gap: 20px;
   align-items: flex-start;
+  justify-content: space-between;
   padding: 24px;
   background:
-    linear-gradient(135deg, rgba(22, 119, 255, 0.13), rgba(20, 184, 166, 0.09)),
+    linear-gradient(135deg, rgb(22 119 255 / 13%), rgb(20 184 166 / 9%)),
     var(--bg-card);
 
   h3 {
@@ -462,8 +676,8 @@ function rejectStrategyLabel(value: DesignerStep['rejectStrategy']) {
   &__actions {
     display: flex;
     flex-wrap: wrap;
-    justify-content: flex-end;
     gap: 10px;
+    justify-content: flex-end;
   }
 }
 
@@ -473,13 +687,16 @@ function rejectStrategyLabel(value: DesignerStep['rejectStrategy']) {
 
 .designer-stat--primary {
   background:
-    linear-gradient(135deg, rgba(22, 119, 255, 0.16), rgba(20, 184, 166, 0.1)),
+    linear-gradient(135deg, rgb(22 119 255 / 16%), rgb(20 184 166 / 10%)),
     var(--bg-card);
 }
 
 .designer-workbench {
   display: grid;
-  grid-template-columns: minmax(260px, 0.78fr) minmax(420px, 1.35fr) minmax(300px, 0.9fr);
+  grid-template-columns: minmax(260px, 0.78fr) minmax(420px, 1.35fr) minmax(
+      300px,
+      0.9fr
+    );
   gap: 18px;
   align-items: start;
 }
@@ -509,21 +726,21 @@ function rejectStrategyLabel(value: DesignerStep['rejectStrategy']) {
   grid-template-columns: 74px 1fr;
   gap: 16px;
   padding: 16px;
-  border: 1px solid rgba(22, 119, 255, 0.13);
-  border-radius: 18px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.94)),
+    linear-gradient(180deg, rgb(255 255 255 / 96%), rgb(248 250 252 / 94%)),
     var(--bg-card-muted);
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+  border: 1px solid rgb(22 119 255 / 13%);
+  border-radius: 18px;
+  box-shadow: 0 12px 28px rgb(15 23 42 / 5%);
 
   &::after {
-    content: '';
     position: absolute;
-    left: 52px;
     bottom: -15px;
+    left: 52px;
     width: 2px;
     height: 15px;
-    background: linear-gradient(180deg, rgba(22, 119, 255, 0.36), transparent);
+    content: '';
+    background: linear-gradient(180deg, rgb(22 119 255 / 36%), transparent);
   }
 
   &:last-child::after {
@@ -533,13 +750,13 @@ function rejectStrategyLabel(value: DesignerStep['rejectStrategy']) {
 
 .step-index-block {
   display: grid;
+  gap: 8px;
   place-items: center;
   align-content: center;
-  gap: 8px;
   min-height: 112px;
-  border-radius: 16px;
-  background: rgba(22, 119, 255, 0.08);
   color: var(--accent);
+  background: rgb(22 119 255 / 8%);
+  border-radius: 16px;
 
   span {
     display: inline-flex;
@@ -547,11 +764,11 @@ function rejectStrategyLabel(value: DesignerStep['rejectStrategy']) {
     justify-content: center;
     width: 38px;
     height: 38px;
-    border-radius: 999px;
-    background: var(--accent);
-    color: #fff;
     font-weight: 800;
-    box-shadow: 0 10px 22px rgba(22, 119, 255, 0.24);
+    color: #fff;
+    background: var(--accent);
+    border-radius: 999px;
+    box-shadow: 0 10px 22px rgb(22 119 255 / 24%);
   }
 
   small {
@@ -580,8 +797,8 @@ function rejectStrategyLabel(value: DesignerStep['rejectStrategy']) {
 .step-actions {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
   gap: 6px;
+  justify-content: flex-end;
 }
 
 .step-candidate-grid {
@@ -598,8 +815,8 @@ function rejectStrategyLabel(value: DesignerStep['rejectStrategy']) {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  min-height: 26px;
   align-items: center;
+  min-height: 26px;
 }
 
 .step-reject-row {
@@ -626,8 +843,8 @@ function rejectStrategyLabel(value: DesignerStep['rejectStrategy']) {
 }
 
 .muted-inline {
-  color: var(--text-soft);
   font-size: 13px;
+  color: var(--text-soft);
 }
 
 .flow-preview {
@@ -641,9 +858,9 @@ function rejectStrategyLabel(value: DesignerStep['rejectStrategy']) {
   gap: 12px;
   align-items: flex-start;
   padding: 12px;
+  background: var(--bg-card-muted);
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: var(--bg-card-muted);
 
   > span {
     display: inline-flex;
@@ -651,10 +868,10 @@ function rejectStrategyLabel(value: DesignerStep['rejectStrategy']) {
     justify-content: center;
     width: 28px;
     height: 28px;
-    border-radius: 999px;
-    background: var(--accent-soft);
-    color: var(--accent);
     font-weight: 800;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: 999px;
   }
 
   strong,
@@ -664,41 +881,41 @@ function rejectStrategyLabel(value: DesignerStep['rejectStrategy']) {
 
   small {
     margin-top: 4px;
-    color: var(--text-soft);
     line-height: 1.5;
+    color: var(--text-soft);
   }
 }
 
 .flow-preview-reject {
   margin-top: 2px;
-  color: var(--accent);
   font-weight: 600;
+  color: var(--accent);
 }
 
 .json-preview {
   overflow: hidden;
+  color: #dbeafe;
+  background: #0f172a;
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: #0f172a;
-  color: #dbeafe;
 
   &__head {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: space-between;
     padding: 10px 12px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    color: #93c5fd;
     font-size: 12px;
     font-weight: 800;
-    letter-spacing: 0.08em;
+    color: #93c5fd;
     text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border-bottom: 1px solid rgb(255 255 255 / 8%);
   }
 
   pre {
     max-height: 360px;
-    margin: 0;
     padding: 14px;
+    margin: 0;
     overflow: auto;
     font-size: 12px;
     line-height: 1.7;

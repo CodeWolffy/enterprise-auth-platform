@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue';
 import type { FormInstance, FormRules } from 'element-plus';
+
+import type { DataSourceView } from '#/api/codegen';
+
+import { computed, reactive, ref, watch } from 'vue';
+
 import {
   ElButton,
   ElForm,
@@ -10,11 +14,7 @@ import {
   ElSwitch,
 } from 'element-plus';
 
-import {
-  createDataSource,
-  updateDataSource,
-  type DataSourceView,
-} from '#/api/codegen';
+import { createDataSource, updateDataSource } from '#/api/codegen';
 
 const props = defineProps<{
   modelValue?: DataSourceView | null;
@@ -93,11 +93,9 @@ async function submit() {
   loading.value = true;
   try {
     const payload = buildPayload();
-    if (isEdit.value && props.modelValue?.id) {
-      await updateDataSource(props.modelValue.id, payload);
-    } else {
-      await createDataSource(payload);
-    }
+    await (isEdit.value && props.modelValue?.id
+      ? updateDataSource(props.modelValue.id, payload)
+      : createDataSource(payload));
     ElMessage.success('保存成功');
     emit('saved');
   } finally {
@@ -109,20 +107,12 @@ defineExpose({ resetForm });
 </script>
 
 <template>
-  <ElForm
-    ref="formRef"
-    :model="form"
-    :rules="rules"
-    label-width="120px"
-  >
+  <ElForm ref="formRef" :model="form" :rules="rules" label-width="120px">
     <ElFormItem label="名称" prop="name">
       <ElInput v-model="form.name" maxlength="64" />
     </ElFormItem>
     <ElFormItem label="JDBC 地址" prop="jdbcUrl">
-      <ElInput
-        v-model="form.jdbcUrl"
-        placeholder="jdbc:mysql://host:3306/db"
-      />
+      <ElInput v-model="form.jdbcUrl" placeholder="jdbc:mysql://host:3306/db" />
     </ElFormItem>
     <ElFormItem label="主机" prop="host">
       <ElInput v-model="form.host" maxlength="128" placeholder="127.0.0.1" />
@@ -161,7 +151,7 @@ defineExpose({ resetForm });
 <style scoped>
 .form-actions {
   display: flex;
-  justify-content: flex-end;
   gap: 10px;
+  justify-content: flex-end;
 }
 </style>

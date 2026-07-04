@@ -6,7 +6,7 @@ export interface SystemMenu {
   id: number | string;
   name: string;
   parentId: number | string;
-  type?: '0' | '1' | 'link' | 'embedded';
+  type?: '0' | '1' | 'embedded' | 'link';
   path?: string;
   component?: string;
   icon?: string;
@@ -98,9 +98,5 @@ export async function batchCreateMenuActions(
  * 后端：PUT /api/menus/{menuId}/sort
  */
 export async function sortMenu(menuId: number | string, sort: number) {
-  return requestClient.put(
-    `/menus/${menuId}/sort`,
-    { sort },
-    SYS,
-  );
+  return requestClient.put(`/menus/${menuId}/sort`, { sort }, SYS);
 }

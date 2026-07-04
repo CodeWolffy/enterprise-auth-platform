@@ -3,24 +3,24 @@ export interface TenantView {
   name: string;
   platformLevel?: boolean;
   tenantStatus?: number;
-  authBeginAt?: string | null;
-  expireAt?: string | null;
-  packageCode?: string | null;
-  packageName?: string | null;
-  logoUrl?: string | null;
-  contactName?: string | null;
-  contactPhone?: string | null;
-  contactEmail?: string | null;
-  website?: string | null;
-  address?: string | null;
-  lifecycleNote?: string | null;
+  authBeginAt?: null | string;
+  expireAt?: null | string;
+  packageCode?: null | string;
+  packageName?: null | string;
+  logoUrl?: null | string;
+  contactName?: null | string;
+  contactPhone?: null | string;
+  contactEmail?: null | string;
+  website?: null | string;
+  address?: null | string;
+  lifecycleNote?: null | string;
 }
 
 export interface SwitchableTenantView {
   tenantId: string;
   name: string;
   platformLevel: boolean;
-  tenantStatus?: number | null;
+  tenantStatus?: null | number;
   active: boolean;
   origin: boolean;
   switchable: boolean;
@@ -40,15 +40,15 @@ export interface TenantPackageView {
   id: number;
   packageCode: string;
   packageName: string;
-  subtitle?: string | null;
-  salesPrice?: number | null;
-  originalPrice?: number | null;
-  descriptionMd?: string | null;
-  appKey?: string | null;
-  orderNo?: number | null;
-  packageDesc?: string | null;
+  subtitle?: null | string;
+  salesPrice?: null | number;
+  originalPrice?: null | number;
+  descriptionMd?: null | string;
+  appKey?: null | string;
+  orderNo?: null | number;
+  packageDesc?: null | string;
   status: '0' | '1';
-  updatedAt?: string | null;
+  updatedAt?: null | string;
   referencedTenantCount?: number;
   referencedTenantIds?: string[];
 }
@@ -58,7 +58,7 @@ export interface TenantPackageImpactView {
   packageCode: string;
   packageName: string;
   status: '0' | '1';
-  appKey?: string | null;
+  appKey?: null | string;
   referencedTenantCount: number;
   referencedTenantIds: string[];
   rules: ImpactRuleView[];

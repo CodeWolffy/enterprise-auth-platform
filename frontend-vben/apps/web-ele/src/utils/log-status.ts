@@ -23,9 +23,13 @@ function fallbackStatus(status?: null | string): LogStatusMeta {
 }
 
 export function operationStatusMeta(status?: null | string): LogStatusMeta {
-  return status ? (OPERATION_STATUS[status] ?? fallbackStatus(status)) : fallbackStatus(status);
+  return status
+    ? (OPERATION_STATUS[status] ?? fallbackStatus(status))
+    : fallbackStatus(status);
 }
 
 export function loginStatusMeta(status?: null | string): LogStatusMeta {
-  return status ? (LOGIN_STATUS[status] ?? fallbackStatus(status)) : fallbackStatus(status);
+  return status
+    ? (LOGIN_STATUS[status] ?? fallbackStatus(status))
+    : fallbackStatus(status);
 }

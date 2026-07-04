@@ -5,6 +5,8 @@ import { getCurrentInstance, inject, provide } from 'vue';
 import { findComponentUpward } from '../utils';
 
 const menuContextKey = Symbol('menuContext');
+const menuComponentNames = ['Menu', 'VbenMenu'];
+const subMenuComponentNames = ['SubMenu'];
 
 /**
  * @zh_CN Provide menu context
@@ -42,14 +44,25 @@ function useSubMenuContext() {
   if (!instance) {
     throw new Error('instance is required');
   }
-  const parentMenu = findComponentUpward(instance, ['Menu', 'SubMenu']);
-  const subMenu = inject(`subMenu:${parentMenu?.uid}`) as SubMenuProvider;
+  const parentMenu = findComponentUpward(instance, [
+    ...menuComponentNames,
+    ...subMenuComponentNames,
+  ]);
+  if (!parentMenu) {
+    return;
+  }
+  const subMenu = inject<SubMenuProvider | undefined>(
+    `subMenu:${parentMenu.uid}`,
+    undefined,
+  );
   return subMenu;
 }
 
 export {
   createMenuContext,
   createSubMenuContext,
+  menuComponentNames,
+  subMenuComponentNames,
   useMenuContext,
   useSubMenuContext,
 };

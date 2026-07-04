@@ -42,37 +42,3 @@
 html .el-loading-mask {
   z-index: 1000;
 }
-
-.hx-table-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.hx-layout-container {
-  position: absolute;
-  top: 0;
-  left: 0;
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  width: 100%;
-  height: 100%;
-  padding: 16px !important;
-
-  &-auto {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    padding: 10px;
-    overflow-y: auto;
-  }
-
-  &-view {
-    width: 100%;
-    height: 100%;
-    background-color: hsl(var(--card));
-    border-radius: calc(var(--radius) - 2px);
-  }
-}

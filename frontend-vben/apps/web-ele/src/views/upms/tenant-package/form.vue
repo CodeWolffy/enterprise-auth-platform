@@ -11,10 +11,10 @@ import {
   ElInput,
   ElInputNumber,
   ElMessage,
+  ElOption,
   ElRadio,
   ElRadioGroup,
   ElSelect,
-  ElOption,
 } from 'element-plus';
 
 import { addObj, editObj } from '#/api/upms/tenant-package';
@@ -145,13 +145,25 @@ defineExpose({ initForm });
         <ElInput v-model="state.form.subtitle" maxlength="200" />
       </ElFormItem>
       <ElFormItem label="原价（元）" prop="originalPrice">
-        <ElInputNumber v-model="state.form.originalPrice" :min="0" :precision="2" />
+        <ElInputNumber
+          v-model="state.form.originalPrice"
+          :min="0"
+          :precision="2"
+        />
       </ElFormItem>
       <ElFormItem label="销售价（元）" prop="salesPrice">
-        <ElInputNumber v-model="state.form.salesPrice" :min="0" :precision="2" />
+        <ElInputNumber
+          v-model="state.form.salesPrice"
+          :min="0"
+          :precision="2"
+        />
       </ElFormItem>
       <ElFormItem label="应用标识" prop="appKey">
-        <ElSelect v-model="state.form.appKey" multiple placeholder="请选择应用标识">
+        <ElSelect
+          v-model="state.form.appKey"
+          multiple
+          placeholder="请选择应用标识"
+        >
           <ElOption
             v-for="item in dictOptions.tenant_package_app_key"
             :key="item.value"
@@ -181,7 +193,11 @@ defineExpose({ initForm });
     <template #footer>
       <span class="dialog-footer">
         <ElButton @click="handleClose">关 闭</ElButton>
-        <ElButton :loading="loading" type="primary" @click="submitForm(formRef)">
+        <ElButton
+          :loading="loading"
+          type="primary"
+          @click="submitForm(formRef)"
+        >
           确 认
         </ElButton>
       </span>

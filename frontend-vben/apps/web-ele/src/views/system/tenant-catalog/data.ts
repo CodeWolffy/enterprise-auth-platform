@@ -1,5 +1,4 @@
 import type { VxeTableGridOptions } from '#/adapter/vxe-table';
-
 import type { TenantPackageView } from '#/types/tenant';
 
 export function useColumns(): VxeTableGridOptions<TenantPackageView>['columns'] {

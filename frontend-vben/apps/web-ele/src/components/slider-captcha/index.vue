@@ -291,7 +291,10 @@ function normalizeTrack(points: Array<{ t: number; x: number; y: number }>) {
     if (index === 0) {
       return true;
     }
-    const previous = points[index - 1]!;
+    const previous = points[index - 1];
+    if (!previous) {
+      return true;
+    }
     return (
       point.x !== previous.x || point.y !== previous.y || point.t !== previous.t
     );
@@ -301,12 +304,20 @@ function normalizeTrack(points: Array<{ t: number; x: number; y: number }>) {
     return deduped;
   }
 
+  const firstDeduped = deduped[0];
+  if (!firstDeduped) {
+    return deduped;
+  }
+
   const interpolated: Array<{ t: number; x: number; y: number }> = [
-    deduped[0]!,
+    firstDeduped,
   ];
   for (let index = 1; index < deduped.length; index += 1) {
-    const from = interpolated[interpolated.length - 1]!;
-    const to = deduped[index]!;
+    const from = interpolated.at(-1);
+    const to = deduped[index];
+    if (!from || !to) {
+      continue;
+    }
     const steps = Math.max(
       1,
       Math.ceil(
@@ -329,8 +340,12 @@ function normalizeTrack(points: Array<{ t: number; x: number; y: number }>) {
     MAX_TRACK_POINTS,
   );
 
-  const first = interpolated[0]!;
-  const last = interpolated[interpolated.length - 1]!;
+  const first = interpolated[0];
+  const last = interpolated.at(-1);
+  if (!first || !last) {
+    return interpolated;
+  }
+
   return Array.from({ length: targetLength }, (_, index) => {
     const progress = index / (targetLength - 1);
     return {
@@ -541,13 +556,13 @@ onUnmounted(() => {
 @keyframes captcha-chevron {
   0%,
   100% {
-    transform: translateX(-1px);
     opacity: 0.75;
+    transform: translateX(-1px);
   }
 
   50% {
-    transform: translateX(2px);
     opacity: 1;
+    transform: translateX(2px);
   }
 }
 
@@ -738,9 +753,8 @@ onUnmounted(() => {
     var(--el-text-color-secondary) 62%,
     var(--el-text-color-secondary) 100%
   );
-  background-size: 220% 100%;
-  -webkit-background-clip: text;
   background-clip: text;
+  background-size: 220% 100%;
   animation: captcha-shimmer 2.8s linear infinite;
 }
 

@@ -6,7 +6,6 @@ export async function vue(): Promise<Linter.Config[]> {
   const [pluginVue, parserVue, parserTs] = await Promise.all([
     interopDefault(import('eslint-plugin-vue')),
     interopDefault(import('vue-eslint-parser')),
-    // @ts-expect-error missing types
     interopDefault(import('@typescript-eslint/parser')),
   ] as const);
 
@@ -86,7 +85,7 @@ export async function vue(): Promise<Linter.Config[]> {
         'vue/dot-location': ['error', 'property'],
         'vue/dot-notation': ['error', { allowKeywords: true }],
         'vue/eqeqeq': ['error', 'smart'],
-        'vue/html-closing-bracket-newline': 'error',
+        'vue/html-closing-bracket-newline': 'off',
         'vue/html-indent': 'off',
         // 'vue/html-indent': ['error', 2],
         'vue/html-quotes': ['error', 'double'],
@@ -129,7 +128,6 @@ export async function vue(): Promise<Linter.Config[]> {
           },
         ],
         'vue/one-component-per-file': 'error',
-        'vue/prefer-import-from-vue': 'error',
         'vue/prefer-separate-static-class': 'error',
         'vue/prefer-template': 'error',
         'vue/prop-name-casing': ['error', 'camelCase'],

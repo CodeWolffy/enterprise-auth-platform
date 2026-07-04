@@ -1,4 +1,5 @@
 import type { Recordable, UserInfo } from '@vben/types';
+
 import type { PermissionSnapshot } from '#/types/auth-models';
 
 import { computed, ref } from 'vue';
@@ -52,8 +53,8 @@ export const useAuthStore = defineStore('auth', () => {
   });
 
   function toUserInfo(me: PermissionSnapshot): UserInfo {
-    const roles: string[] = Array.from(me?.roles ?? []);
-    const permissions: string[] = Array.from(me?.grants ?? []);
+    const roles: string[] = [...(me?.roles ?? [])];
+    const permissions: string[] = [...(me?.grants ?? [])];
     return {
       userId: me?.userId,
       username: me?.username,

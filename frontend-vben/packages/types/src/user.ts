@@ -15,10 +15,6 @@ interface UserInfo extends BasicUserInfo {
    * accessToken
    */
   token: string;
-  /**
-   * 用户权限
-   */
-  permissions: string[];
 }
 
 export type { UserInfo };

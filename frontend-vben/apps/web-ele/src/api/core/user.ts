@@ -11,8 +11,8 @@ export async function getUserInfoApi() {
   const me = await requestClient.get<any>('/auth/me', {
     headers: { isSwitchTenant: false },
   });
-  const roles: string[] = Array.from(me?.roles ?? []);
-  const permissions: string[] = Array.from(me?.grants ?? []);
+  const roles: string[] = [...(me?.roles ?? [])];
+  const permissions: string[] = [...(me?.grants ?? [])];
   return {
     userId: me?.userId,
     username: me?.username,

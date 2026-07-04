@@ -1,4 +1,8 @@
-import type { Preferences } from '@vben-core/preferences';
+import type {
+  CustomPreferencesRecord,
+  Preferences,
+  PreferencesExtension,
+} from '@vben-core/preferences';
 import type { DeepPartial } from '@vben-core/typings';
 
 /**
@@ -9,27 +13,15 @@ import type { DeepPartial } from '@vben-core/typings';
  */
 
 function defineOverridesPreferences(preferences: DeepPartial<Preferences>) {
-  preferences.app = {
-    accessMode: 'backend',
-    defaultHomePath: '/dashboard',
-    name: '企业认证平台',
-  };
-  preferences.theme = {
-    mode: 'light',
-  };
-  preferences.logo = {
-    enable: true,
-    source: '/static/logo.svg',
-  };
-  preferences.copyright = {
-    companyName: '企业认证平台',
-    companySiteLink: '',
-    date: '2026',
-    enable: true,
-  };
   return preferences;
 }
 
-export { defineOverridesPreferences };
+function definePreferencesExtension<
+  TCustomPreferences extends object = CustomPreferencesRecord,
+>(extension: PreferencesExtension<TCustomPreferences>) {
+  return extension;
+}
+
+export { defineOverridesPreferences, definePreferencesExtension };
 
 export * from '@vben-core/preferences';

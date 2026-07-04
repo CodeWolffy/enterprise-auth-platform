@@ -41,7 +41,7 @@ export async function getById(id: string) {
  * 添加字典值
  * 后端：POST /api/system/dicts/{id}/values
  */
-export async function addObj(data: { dictId: string; [key: string]: any }) {
+export async function addObj(data: { [key: string]: any; dictId: string }) {
   return requestClient.post(`/system/dicts/${data.dictId}/values`, data, {
     headers: {
       isSwitchTenant: false,
@@ -53,7 +53,11 @@ export async function addObj(data: { dictId: string; [key: string]: any }) {
  * 编辑字典值
  * 后端：PUT /api/system/dict-values/{valueId}
  */
-export async function editObj(data: { id?: string; valueId?: string; [key: string]: any }) {
+export async function editObj(data: {
+  [key: string]: any;
+  id?: string;
+  valueId?: string;
+}) {
   const valueId = data.valueId ?? data.id;
   return requestClient.put(`/system/dict-values/${valueId}`, data, {
     headers: {

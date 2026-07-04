@@ -7,7 +7,7 @@ import { formatDateTime } from '#/utils/datetime';
 import { operationStatusMeta } from '#/utils/log-status';
 
 const props = defineProps<{
-  row?: Record<string, any> | null;
+  row?: null | Record<string, any>;
 }>();
 
 const detailItems = computed(() => {
@@ -20,7 +20,13 @@ const detailItems = computed(() => {
     { label: '操作地点', value: row.location || '-' },
     { label: '请求方法', value: row.method || '-' },
     { label: '操作状态', value: status.label },
-    { label: '请求时长', value: row.requestTime == null ? '-' : `${row.requestTime}ms` },
+    {
+      label: '请求时长',
+      value:
+        row.requestTime === null || row.requestTime === undefined
+          ? '-'
+          : `${row.requestTime}ms`,
+    },
     { label: '创建时间', value: formatDateTime(row.createdAt) },
     { label: '请求 ID', value: row.requestId || '-' },
     { label: '描述', value: row.msg || '-' },
@@ -28,7 +34,11 @@ const detailItems = computed(() => {
 });
 
 const payloadText = computed(() => {
-  const raw = props.row?.payloadJson || props.row?.paramsJson || props.row?.contentJson || '{}';
+  const raw =
+    props.row?.payloadJson ||
+    props.row?.paramsJson ||
+    props.row?.contentJson ||
+    '{}';
   try {
     return JSON.stringify(JSON.parse(raw), null, 2);
   } catch {
@@ -39,11 +49,15 @@ const payloadText = computed(() => {
 
 <template>
   <div class="log-detail-page">
-    <el-descriptions :column="2" border>
-      <el-descriptions-item v-for="item in detailItems" :key="item.label" :label="item.label">
+    <ElDescriptions :column="2" border>
+      <ElDescriptionsItem
+        v-for="item in detailItems"
+        :key="item.label"
+        :label="item.label"
+      >
         {{ item.value }}
-      </el-descriptions-item>
-    </el-descriptions>
+      </ElDescriptionsItem>
+    </ElDescriptions>
 
     <div class="payload-block">
       <div class="payload-title">请求载荷</div>
@@ -60,9 +74,9 @@ const payloadText = computed(() => {
 
 .payload-block {
   padding: 16px;
+  background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-light);
   border-radius: 8px;
-  background: var(--el-bg-color);
 }
 
 .payload-title {
@@ -71,12 +85,12 @@ const payloadText = computed(() => {
 }
 
 pre {
-  margin: 0;
   max-height: 360px;
+  margin: 0;
   overflow: auto;
-  white-space: pre-wrap;
-  word-break: break-word;
   font-size: 12px;
   line-height: 1.6;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 </style>

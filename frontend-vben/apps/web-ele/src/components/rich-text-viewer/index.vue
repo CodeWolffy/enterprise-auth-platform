@@ -39,16 +39,16 @@ const hasContent = computed(() => hasMeaningfulRichText(props.content));
 
 .rich-text-viewer.is-card {
   padding: 20px;
+  background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-light);
   border-radius: var(--el-border-radius-base);
-  background: var(--el-bg-color);
 }
 
 .rich-text-viewer__content {
-  color: var(--el-text-color-primary);
   font-size: 15px;
   line-height: 1.8;
-  word-break: break-word;
+  color: var(--el-text-color-primary);
+  overflow-wrap: anywhere;
 
   :deep(h1),
   :deep(h2),
@@ -97,8 +97,8 @@ const hasContent = computed(() => hasMeaningfulRichText(props.content));
 
   :deep(ul),
   :deep(ol) {
-    margin: 0 0 12px 20px;
     padding: 0;
+    margin: 0 0 12px 20px;
   }
 
   :deep(li) {
@@ -106,60 +106,60 @@ const hasContent = computed(() => hasMeaningfulRichText(props.content));
   }
 
   :deep(blockquote) {
-    margin: 14px 0;
     padding: 12px 16px;
+    margin: 14px 0;
+    color: var(--el-text-color-regular);
+    background: var(--el-fill-color-light);
     border-left: 4px solid var(--el-color-primary);
     border-radius: 0 var(--el-border-radius-base) var(--el-border-radius-base) 0;
-    background: var(--el-fill-color-light);
-    color: var(--el-text-color-regular);
   }
 
   :deep(pre) {
-    overflow-x: auto;
-    margin: 14px 0;
     padding: 14px;
-    border-radius: var(--el-border-radius-base);
-    background: var(--el-fill-color-dark);
-    color: var(--el-text-color-primary);
+    margin: 14px 0;
+    overflow-x: auto;
     font-family:
       ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 13px;
     line-height: 1.6;
+    color: var(--el-text-color-primary);
+    background: var(--el-fill-color-dark);
+    border-radius: var(--el-border-radius-base);
   }
 
   :deep(code) {
     padding: 2px 6px;
-    border-radius: var(--el-border-radius-small);
-    background: var(--el-fill-color);
-    color: var(--el-color-danger);
     font-family:
       ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 13px;
+    color: var(--el-color-danger);
+    background: var(--el-fill-color);
+    border-radius: var(--el-border-radius-small);
   }
 
   :deep(pre code) {
     padding: 0;
-    background: transparent;
     color: inherit;
+    background: transparent;
   }
 
   :deep(table) {
     width: 100%;
     margin: 14px 0;
-    border-collapse: collapse;
     table-layout: fixed;
+    border-collapse: collapse;
   }
 
   :deep(th),
   :deep(td) {
     padding: 8px 12px;
-    border: 1px solid var(--el-border-color);
     vertical-align: top;
+    border: 1px solid var(--el-border-color);
   }
 
   :deep(th) {
-    background: var(--el-fill-color-light);
     font-weight: 600;
+    background: var(--el-fill-color-light);
   }
 
   :deep(hr) {

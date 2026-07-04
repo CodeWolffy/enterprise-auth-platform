@@ -42,8 +42,12 @@ function defaultForm() {
 const state = reactive({
   form: defaultForm(),
   rules: {
-    roleName: [{ message: '请输入角色名称', required: true, trigger: 'change' }],
-    roleCode: [{ message: '请输入角色编码', required: true, trigger: 'change' }],
+    roleName: [
+      { message: '请输入角色名称', required: true, trigger: 'change' },
+    ],
+    roleCode: [
+      { message: '请输入角色编码', required: true, trigger: 'change' },
+    ],
     dataScopeType: [
       { message: '请选择数据权限范围', required: true, trigger: 'change' },
     ],
@@ -203,7 +207,11 @@ defineExpose({ initForm });
     <template #footer>
       <span class="dialog-footer">
         <ElButton @click="handleClose">关 闭</ElButton>
-        <ElButton :loading="loading" type="primary" @click="submitForm(formRef)">
+        <ElButton
+          :loading="loading"
+          type="primary"
+          @click="submitForm(formRef)"
+        >
           确 认
         </ElButton>
       </span>

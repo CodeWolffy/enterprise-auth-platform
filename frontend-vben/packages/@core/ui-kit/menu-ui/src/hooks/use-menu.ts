@@ -3,6 +3,11 @@ import type { SubMenuProvider } from '../types';
 import { computed, getCurrentInstance } from 'vue';
 
 import { findComponentUpward } from '../utils';
+import { menuComponentNames, subMenuComponentNames } from './use-menu-context';
+
+function isMenuComponentName(name?: string) {
+  return !!name && menuComponentNames.includes(name);
+}
 
 function useMenu() {
   const instance = getCurrentInstance();
@@ -16,7 +21,7 @@ function useMenu() {
   const parentPaths = computed(() => {
     let parent = instance.parent;
     const paths: string[] = [instance.props.path as string];
-    while (parent?.type.name !== 'Menu') {
+    while (parent && !isMenuComponentName(parent.type.name)) {
       if (parent?.props.path) {
         paths.unshift(parent.props.path as string);
       }
@@ -27,7 +32,10 @@ function useMenu() {
   });
 
   const parentMenu = computed(() => {
-    return findComponentUpward(instance, ['Menu', 'SubMenu']);
+    return findComponentUpward(instance, [
+      ...menuComponentNames,
+      ...subMenuComponentNames,
+    ]);
   });
 
   return {

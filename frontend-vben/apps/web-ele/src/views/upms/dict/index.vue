@@ -1,7 +1,14 @@
 <script lang="ts" setup>
 import { defineAsyncComponent, reactive, ref } from 'vue';
 
-import { Delete, Edit, Plus, Refresh, Search, View } from '@element-plus/icons-vue';
+import {
+  Delete,
+  Edit,
+  Plus,
+  Refresh,
+  Search,
+  View,
+} from '@element-plus/icons-vue';
 import {
   ElButton,
   ElDrawer,
@@ -226,7 +233,9 @@ initPage();
         <template #header>
           <div>
             <h4 style="margin: 0">字典键值</h4>
-            <span style="color: var(--el-text-color-secondary); font-size: 12px">
+            <span
+              style="font-size: 12px; color: var(--el-text-color-secondary)"
+            >
               {{ currentDict?.dictType }} / {{ currentDict?.description }}
             </span>
           </div>

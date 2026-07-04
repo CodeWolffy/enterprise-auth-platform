@@ -1,5 +1,9 @@
+import type {
+  TenantPackageImpactView,
+  TenantPackageView,
+} from '#/types/tenant';
+
 import { requestClient } from '#/api/request';
-import type { TenantPackageImpactView, TenantPackageView } from '#/types/tenant';
 
 /**
  * 套餐列表
@@ -14,7 +18,10 @@ export async function getList() {
  * 后端：POST /api/tenant-catalog/packages (TenantPackageCrudRequest)
  */
 export async function addObj(data: any) {
-  return requestClient.post<TenantPackageView>('/tenant-catalog/packages', data);
+  return requestClient.post<TenantPackageView>(
+    '/tenant-catalog/packages',
+    data,
+  );
 }
 
 /**
@@ -22,7 +29,10 @@ export async function addObj(data: any) {
  * 后端：PUT /api/tenant-catalog/packages/{id}
  */
 export async function editObj(data: any) {
-  return requestClient.put<TenantPackageView>(`/tenant-catalog/packages/${data.id}`, data);
+  return requestClient.put<TenantPackageView>(
+    `/tenant-catalog/packages/${data.id}`,
+    data,
+  );
 }
 
 /**
@@ -38,5 +48,7 @@ export async function delObj(id: number | string) {
  * 后端：GET /api/tenant-catalog/packages/{id}/impact
  */
 export async function queryTenantPackageImpact(id: number) {
-  return requestClient.get<TenantPackageImpactView>(`/tenant-catalog/packages/${id}/impact`);
+  return requestClient.get<TenantPackageImpactView>(
+    `/tenant-catalog/packages/${id}/impact`,
+  );
 }

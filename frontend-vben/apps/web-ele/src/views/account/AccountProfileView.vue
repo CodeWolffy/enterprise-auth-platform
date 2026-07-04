@@ -1,7 +1,12 @@
 <script setup lang="ts">
+import type { FormInstance, FormRules, UploadFile } from 'element-plus';
+
+import type { AccountProfileResponse } from '#/api/account';
+import type { UserSessionView } from '#/types/auth-models';
+
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
-import type { FormInstance, FormRules, UploadFile } from 'element-plus';
+
 import {
   ElAlert,
   ElAvatar,
@@ -31,11 +36,9 @@ import {
   fetchAccountProfile,
   updateAccountProfile,
   uploadAccountAvatar,
-  type AccountProfileResponse,
 } from '#/api/account';
 import { forceOffline, querySessions } from '#/api/auth-session';
 import { useAuthStore } from '#/store/auth';
-import type { UserSessionView } from '#/types/auth-models';
 import { formatDateTime } from '#/utils/datetime';
 
 const authStore = useAuthStore();
@@ -71,10 +74,26 @@ const passwordForm = reactive({
 });
 
 const profileRules: FormRules = {
-  displayName: [{ max: 32, message: '显示名称不能超过32个字符', trigger: ['blur', 'change'] }],
-  mobile: [{ pattern: /^1\d{10}$/, message: '请输入有效的 11 位手机号', trigger: ['blur', 'change'] }],
+  displayName: [
+    {
+      max: 32,
+      message: '显示名称不能超过32个字符',
+      trigger: ['blur', 'change'],
+    },
+  ],
+  mobile: [
+    {
+      pattern: /^1\d{10}$/,
+      message: '请输入有效的 11 位手机号',
+      trigger: ['blur', 'change'],
+    },
+  ],
   email: [
-    { type: 'email', message: '请输入有效的邮箱地址', trigger: ['blur', 'change'] },
+    {
+      type: 'email',
+      message: '请输入有效的邮箱地址',
+      trigger: ['blur', 'change'],
+    },
     { max: 128, message: '邮箱不能超过128个字符', trigger: ['blur', 'change'] },
   ],
 };
@@ -110,16 +129,42 @@ const passwordRules: FormRules = {
   ],
 };
 
-const isForcedPasswordChange = computed(() => authStore.passwordChangeRequired || profile.value?.mustChangePassword === true);
-const profileFormDisabled = computed(() => loading.value || profileSubmitting.value || isForcedPasswordChange.value || !profile.value);
-const avatarUploadDisabled = computed(() => loading.value || avatarSubmitting.value || isForcedPasswordChange.value || !profile.value);
+const isForcedPasswordChange = computed(
+  () =>
+    authStore.passwordChangeRequired ||
+    profile.value?.mustChangePassword === true,
+);
+const profileFormDisabled = computed(
+  () =>
+    loading.value ||
+    profileSubmitting.value ||
+    isForcedPasswordChange.value ||
+    !profile.value,
+);
+const avatarUploadDisabled = computed(
+  () =>
+    loading.value ||
+    avatarSubmitting.value ||
+    isForcedPasswordChange.value ||
+    !profile.value,
+);
 const avatarName = computed(() => {
-  const source = profile.value?.displayName || profile.value?.username || authStore.snapshot?.username || 'U';
+  const source =
+    profile.value?.displayName ||
+    profile.value?.username ||
+    authStore.snapshot?.username ||
+    'U';
   return source.trim().charAt(0).toUpperCase();
 });
 const roleTags = computed(() => authStore.snapshot?.roles ?? []);
-const activeSessionCount = computed(() => sessionsList.value.filter((session) => session.active).length);
-const otherActiveSessions = computed(() => sessionsList.value.filter((session) => session.active && !session.currentSession));
+const activeSessionCount = computed(
+  () => sessionsList.value.filter((session) => session.active).length,
+);
+const otherActiveSessions = computed(() =>
+  sessionsList.value.filter(
+    (session) => session.active && !session.currentSession,
+  ),
+);
 const dataScopeLabel = computed(() => {
   const type = authStore.snapshot?.dataScopeType;
   const labels: Record<string, string> = {
@@ -130,7 +175,7 @@ const dataScopeLabel = computed(() => {
     SELF: '仅本人',
     CUSTOM: '自定义部门',
   };
-  return type ? labels[type] ?? type : '-';
+  return type ? (labels[type] ?? type) : '-';
 });
 const missingProfileItems = computed(() => {
   const missing: string[] = [];
@@ -140,7 +185,9 @@ const missingProfileItems = computed(() => {
   if (!profile.value?.avatarUrl) missing.push('头像');
   return missing;
 });
-const profileCompletion = computed(() => Math.round(((4 - missingProfileItems.value.length) / 4) * 100));
+const profileCompletion = computed(() =>
+  Math.round(((4 - missingProfileItems.value.length) / 4) * 100),
+);
 const passwordFresh = computed(() => {
   const updatedAt = profile.value?.passwordUpdatedAt;
   if (!updatedAt) return false;
@@ -179,10 +226,26 @@ const passwordStrength = computed(() => {
   return { score, label: '弱', status: 'exception' as const };
 });
 const timelineItems = computed(() => [
-  { title: '账号创建', value: formatProfileDate(profile.value?.createdAt), hint: profile.value?.tenantId || '-' },
-  { title: '资料更新', value: formatProfileDate(profile.value?.updatedAt), hint: profile.value?.displayName || profile.value?.username || '-' },
-  { title: '密码更新', value: formatProfileDate(profile.value?.passwordUpdatedAt), hint: passwordAgeHint.value },
-  { title: '最近登录', value: formatProfileDate(profile.value?.lastLoginAt), hint: profile.value?.lastLoginIp || '-' },
+  {
+    title: '账号创建',
+    value: formatProfileDate(profile.value?.createdAt),
+    hint: profile.value?.tenantId || '-',
+  },
+  {
+    title: '资料更新',
+    value: formatProfileDate(profile.value?.updatedAt),
+    hint: profile.value?.displayName || profile.value?.username || '-',
+  },
+  {
+    title: '密码更新',
+    value: formatProfileDate(profile.value?.passwordUpdatedAt),
+    hint: passwordAgeHint.value,
+  },
+  {
+    title: '最近登录',
+    value: formatProfileDate(profile.value?.lastLoginAt),
+    hint: profile.value?.lastLoginIp || '-',
+  },
 ]);
 
 async function loadProfile() {
@@ -236,7 +299,7 @@ function normalizeOptional(value: string) {
 function handleAvatarSelected(uploadFile: UploadFile) {
   const raw = uploadFile.raw;
   if (!raw) return;
-  if (!['image/png', 'image/jpeg'].includes(raw.type)) {
+  if (!['image/jpeg', 'image/png'].includes(raw.type)) {
     ElMessage.warning('头像仅支持 PNG/JPEG');
     return;
   }
@@ -247,17 +310,17 @@ function handleAvatarSelected(uploadFile: UploadFile) {
   selectedAvatarName.value = raw.name;
   const imageUrl = URL.createObjectURL(raw);
   const image = new Image();
-  image.onload = () => {
+  image.addEventListener('load', () => {
     URL.revokeObjectURL(imageUrl);
     cropImage = image;
     cropScale.value = 1;
     cropVisible.value = true;
     void nextTick(drawAvatarPreview);
-  };
-  image.onerror = () => {
+  });
+  image.addEventListener('error', () => {
     URL.revokeObjectURL(imageUrl);
     ElMessage.error('头像图片读取失败');
-  };
+  });
   image.src = imageUrl;
 }
 
@@ -291,15 +354,20 @@ async function submitAvatar() {
   avatarSubmitting.value = true;
   try {
     const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((result) => {
-        if (result) {
-          resolve(result);
-          return;
-        }
-        reject(new Error('头像裁剪失败'));
-      }, 'image/png', 0.92);
+      canvas.toBlob(
+        (result) => {
+          if (result) {
+            resolve(result);
+            return;
+          }
+          reject(new Error('头像裁剪失败'));
+        },
+        'image/png',
+        0.92,
+      );
     });
-    const filename = selectedAvatarName.value.replace(/\.[^.]+$/, '') || 'avatar';
+    const filename =
+      selectedAvatarName.value.replace(/\.[^.]+$/, '') || 'avatar';
     const file = new File([blob], `${filename}.png`, { type: 'image/png' });
     const updated = await uploadAccountAvatar(file);
     profile.value = updated;
@@ -317,7 +385,10 @@ async function submitPasswordChange() {
   passwordSubmitting.value = true;
   const wasForced = isForcedPasswordChange.value;
   try {
-    const updated = await changeAccountPassword({ oldPassword: passwordForm.oldPassword, newPassword: passwordForm.newPassword });
+    const updated = await changeAccountPassword({
+      oldPassword: passwordForm.oldPassword,
+      newPassword: passwordForm.newPassword,
+    });
     profile.value = updated;
     syncProfileForm(updated);
     passwordForm.oldPassword = '';
@@ -326,7 +397,9 @@ async function submitPasswordChange() {
     passwordFormRef.value?.clearValidate();
     authStore.clearPasswordChangeRequirement();
     await authStore.bootstrapSnapshot();
-    ElMessage.success(wasForced ? '密码已更新，请继续使用控制台' : '密码已更新');
+    ElMessage.success(
+      wasForced ? '密码已更新，请继续使用控制台' : '密码已更新',
+    );
     if (wasForced) {
       router.replace('/dashboard');
     }
@@ -363,7 +436,11 @@ async function loadSessions() {
 
 async function kickSession(sessionId: string) {
   try {
-    await ElMessageBox.confirm('下线后该设备将立即失去访问权限，是否继续？', '下线确认', { type: 'warning' });
+    await ElMessageBox.confirm(
+      '下线后该设备将立即失去访问权限，是否继续？',
+      '下线确认',
+      { type: 'warning' },
+    );
     sessionActioning.value = true;
     await forceOffline(sessionId);
     ElMessage.success('设备已下线');
@@ -377,9 +454,17 @@ async function kickSession(sessionId: string) {
 
 async function offlineOtherSessions() {
   try {
-    await ElMessageBox.confirm(`确认下线 ${otherActiveSessions.value.length} 个其他在线设备？`, '批量下线确认', { type: 'warning' });
+    await ElMessageBox.confirm(
+      `确认下线 ${otherActiveSessions.value.length} 个其他在线设备？`,
+      '批量下线确认',
+      { type: 'warning' },
+    );
     sessionActioning.value = true;
-    await Promise.all(otherActiveSessions.value.map((session) => forceOffline(session.sessionId)));
+    await Promise.all(
+      otherActiveSessions.value.map((session) =>
+        forceOffline(session.sessionId),
+      ),
+    );
     ElMessage.success('其他在线设备已下线');
     await loadSessions();
   } catch {
@@ -389,15 +474,15 @@ async function offlineOtherSessions() {
   }
 }
 
-function formatProfileDate(value?: string | null, placeholder = '-') {
+function formatProfileDate(value?: null | string, placeholder = '-') {
   return formatDateTime(value, placeholder);
 }
 
-function formatSessionTime(value?: string | null) {
+function formatSessionTime(value?: null | string) {
   return formatDateTime(value);
 }
 
-function formatDevice(raw?: string | null) {
+function formatDevice(raw?: null | string) {
   if (!raw) return 'Unknown';
   const ua = raw.toLowerCase();
   if (ua.includes('edg/')) return 'Microsoft Edge';
@@ -421,27 +506,54 @@ onMounted(() => {
   <section class="personal-center-page">
     <div class="personal-hero">
       <div class="hero-profile">
-        <el-avatar :size="84" :src="profile?.avatarUrl || undefined" class="hero-avatar">
+        <ElAvatar
+          :size="84"
+          :src="profile?.avatarUrl || undefined"
+          class="hero-avatar"
+        >
           {{ avatarName }}
-        </el-avatar>
+        </ElAvatar>
         <div class="hero-copy">
           <p class="eyebrow">Personal Center</p>
           <h1>个人中心</h1>
           <p class="summary">
-            {{ isForcedPasswordChange ? '当前会话处于受限改密态，请先完成密码更新。' : '集中维护个人资料、头像、密码与在线设备。' }}
+            {{
+              isForcedPasswordChange
+                ? '当前会话处于受限改密态，请先完成密码更新。'
+                : '集中维护个人资料、头像、密码与在线设备。'
+            }}
           </p>
           <div class="hero-tags">
-            <el-tag :type="profile?.enabled === false ? 'danger' : 'success'" effect="dark">
+            <ElTag
+              :type="profile?.enabled === false ? 'danger' : 'success'"
+              effect="dark"
+            >
               {{ profile?.enabled === false ? '账号停用' : '账号启用' }}
-            </el-tag>
-            <el-tag v-if="isForcedPasswordChange" type="warning" effect="dark">必须修改密码</el-tag>
-            <el-tag v-else type="info" effect="plain">{{ profile?.tenantId || authStore.snapshot?.tenantId || '-' }}</el-tag>
+            </ElTag>
+            <ElTag v-if="isForcedPasswordChange" type="warning" effect="dark">
+              必须修改密码
+            </ElTag>
+            <ElTag v-else type="info" effect="plain">
+              {{ profile?.tenantId || authStore.snapshot?.tenantId || '-' }}
+            </ElTag>
           </div>
         </div>
       </div>
       <div class="hero-actions">
-        <el-button :loading="loading" :disabled="isForcedPasswordChange" @click="loadProfile">刷新资料</el-button>
-        <el-button type="primary" :disabled="isForcedPasswordChange" @click="openSessionDrawer">在线设备</el-button>
+        <ElButton
+          :loading="loading"
+          :disabled="isForcedPasswordChange"
+          @click="loadProfile"
+        >
+          刷新资料
+        </ElButton>
+        <ElButton
+          type="primary"
+          :disabled="isForcedPasswordChange"
+          @click="openSessionDrawer"
+        >
+          在线设备
+        </ElButton>
       </div>
     </div>
 
@@ -449,13 +561,21 @@ onMounted(() => {
       <article class="overview-card">
         <span>资料完整度</span>
         <strong>{{ profileCompletion }}%</strong>
-        <el-progress :percentage="profileCompletion" :show-text="false" />
-        <small>{{ missingProfileItems.length ? `待补充：${missingProfileItems.join('、')}` : '资料已完整' }}</small>
+        <ElProgress :percentage="profileCompletion" :show-text="false" />
+        <small>{{
+          missingProfileItems.length > 0
+            ? `待补充：${missingProfileItems.join('、')}`
+            : '资料已完整'
+        }}</small>
       </article>
       <article class="overview-card">
         <span>安全状态</span>
         <strong>{{ securityScore }}%</strong>
-        <el-progress :percentage="securityScore" :show-text="false" :status="securityScore >= 80 ? 'success' : undefined" />
+        <ElProgress
+          :percentage="securityScore"
+          :show-text="false"
+          :status="securityScore >= 80 ? 'success' : undefined"
+        />
         <small>{{ passwordAgeHint }}</small>
       </article>
       <article class="overview-card">
@@ -471,54 +591,97 @@ onMounted(() => {
     </section>
 
     <div class="content-grid">
-      <el-card class="profile-card" shadow="never">
+      <ElCard class="profile-card" shadow="never">
         <template #header>
           <div class="card-head">
             <span>个人资料</span>
-            <el-tag size="small" type="info" effect="plain">可编辑</el-tag>
+            <ElTag size="small" type="info" effect="plain">可编辑</ElTag>
           </div>
         </template>
 
-        <el-skeleton v-if="loading && !profile" :rows="8" animated />
+        <ElSkeleton v-if="loading && !profile" :rows="8" animated />
         <template v-else>
           <div class="avatar-panel">
-            <el-avatar :size="96" :src="profile?.avatarUrl || undefined" class="profile-avatar">
+            <ElAvatar
+              :size="96"
+              :src="profile?.avatarUrl || undefined"
+              class="profile-avatar"
+            >
               {{ avatarName }}
-            </el-avatar>
+            </ElAvatar>
             <div class="avatar-copy">
-              <strong>{{ profile?.displayName || profile?.username || '-' }}</strong>
-              <span>{{ profile?.username || '-' }} · {{ profile?.tenantId || '-' }}</span>
-              <el-upload
+              <strong>{{
+                profile?.displayName || profile?.username || '-'
+              }}</strong>
+              <span
+                >{{ profile?.username || '-' }} ·
+                {{ profile?.tenantId || '-' }}</span
+              >
+              <ElUpload
                 :auto-upload="false"
                 :show-file-list="false"
                 accept="image/png,image/jpeg"
                 :disabled="avatarUploadDisabled"
                 :on-change="handleAvatarSelected"
               >
-                <el-button type="primary" plain :disabled="avatarUploadDisabled">更换头像</el-button>
-              </el-upload>
+                <ElButton type="primary" plain :disabled="avatarUploadDisabled">
+                  更换头像
+                </ElButton>
+              </ElUpload>
             </div>
           </div>
 
-          <el-form ref="profileFormRef" :model="profileForm" :rules="profileRules" label-position="top" class="profile-form">
-            <el-form-item label="显示名称" prop="displayName">
-              <el-input v-model.trim="profileForm.displayName" maxlength="32" show-word-limit placeholder="用于页面展示" :disabled="profileFormDisabled" />
-            </el-form-item>
-            <el-form-item label="手机号" prop="mobile">
-              <el-input v-model.trim="profileForm.mobile" maxlength="11" placeholder="11 位手机号" :disabled="profileFormDisabled" />
-            </el-form-item>
-            <el-form-item label="邮箱" prop="email">
-              <el-input v-model.trim="profileForm.email" maxlength="128" placeholder="用于密码找回和通知" :disabled="profileFormDisabled" />
-            </el-form-item>
+          <ElForm
+            ref="profileFormRef"
+            :model="profileForm"
+            :rules="profileRules"
+            label-position="top"
+            class="profile-form"
+          >
+            <ElFormItem label="显示名称" prop="displayName">
+              <ElInput
+                v-model.trim="profileForm.displayName"
+                maxlength="32"
+                show-word-limit
+                placeholder="用于页面展示"
+                :disabled="profileFormDisabled"
+              />
+            </ElFormItem>
+            <ElFormItem label="手机号" prop="mobile">
+              <ElInput
+                v-model.trim="profileForm.mobile"
+                maxlength="11"
+                placeholder="11 位手机号"
+                :disabled="profileFormDisabled"
+              />
+            </ElFormItem>
+            <ElFormItem label="邮箱" prop="email">
+              <ElInput
+                v-model.trim="profileForm.email"
+                maxlength="128"
+                placeholder="用于密码找回和通知"
+                :disabled="profileFormDisabled"
+              />
+            </ElFormItem>
             <div class="form-actions">
-              <el-button :disabled="profileFormDisabled" @click="resetProfileForm">重置</el-button>
-              <el-button type="primary" :loading="profileSubmitting" :disabled="profileFormDisabled" @click="submitProfile">
+              <ElButton
+                :disabled="profileFormDisabled"
+                @click="resetProfileForm"
+              >
+                重置
+              </ElButton>
+              <ElButton
+                type="primary"
+                :loading="profileSubmitting"
+                :disabled="profileFormDisabled"
+                @click="submitProfile"
+              >
                 保存资料
-              </el-button>
+              </ElButton>
             </div>
-          </el-form>
+          </ElForm>
 
-          <el-alert
+          <ElAlert
             v-if="isForcedPasswordChange"
             class="inline-alert"
             type="warning"
@@ -527,20 +690,26 @@ onMounted(() => {
             title="受限改密态下暂不允许修改个人资料，请先完成密码更新。"
           />
         </template>
-      </el-card>
+      </ElCard>
 
       <div class="right-stack">
-        <el-card class="password-card" shadow="never">
+        <ElCard class="password-card" shadow="never">
           <template #header>
             <div class="card-head">
-              <span>{{ isForcedPasswordChange ? '完成强制改密' : '修改密码' }}</span>
-              <el-tag :type="isForcedPasswordChange ? 'warning' : 'success'" size="small" effect="plain">
+              <span>{{
+                isForcedPasswordChange ? '完成强制改密' : '修改密码'
+              }}</span>
+              <ElTag
+                :type="isForcedPasswordChange ? 'warning' : 'success'"
+                size="small"
+                effect="plain"
+              >
                 {{ isForcedPasswordChange ? '待处理' : '正常' }}
-              </el-tag>
+              </ElTag>
             </div>
           </template>
 
-          <el-alert
+          <ElAlert
             v-if="isForcedPasswordChange"
             class="inline-alert"
             type="warning"
@@ -549,89 +718,180 @@ onMounted(() => {
             title="为了保护账号安全，请先更新密码。"
           />
 
-          <el-form ref="passwordFormRef" :model="passwordForm" :rules="passwordRules" label-position="top" @submit.prevent>
-            <el-form-item label="原密码" prop="oldPassword">
-              <el-input v-model="passwordForm.oldPassword" type="password" show-password autocomplete="current-password" />
-            </el-form-item>
-            <el-form-item label="新密码" prop="newPassword">
-              <el-input v-model="passwordForm.newPassword" type="password" show-password autocomplete="new-password" />
-            </el-form-item>
+          <ElForm
+            ref="passwordFormRef"
+            :model="passwordForm"
+            :rules="passwordRules"
+            label-position="top"
+            @submit.prevent
+          >
+            <ElFormItem label="原密码" prop="oldPassword">
+              <ElInput
+                v-model="passwordForm.oldPassword"
+                type="password"
+                show-password
+                autocomplete="current-password"
+              />
+            </ElFormItem>
+            <ElFormItem label="新密码" prop="newPassword">
+              <ElInput
+                v-model="passwordForm.newPassword"
+                type="password"
+                show-password
+                autocomplete="new-password"
+              />
+            </ElFormItem>
             <div class="password-strength">
               <div class="strength-head">
                 <span>密码强度</span>
                 <strong>{{ passwordStrength.label }}</strong>
               </div>
-              <el-progress :percentage="passwordStrength.score" :show-text="false" :status="passwordStrength.status" />
+              <ElProgress
+                :percentage="passwordStrength.score"
+                :show-text="false"
+                :status="passwordStrength.status"
+              />
               <ul>
-                <li v-for="item in passwordChecks" :key="item.label" :class="{ passed: item.passed }">{{ item.label }}</li>
+                <li
+                  v-for="item in passwordChecks"
+                  :key="item.label"
+                  :class="{ passed: item.passed }"
+                >
+                  {{ item.label }}
+                </li>
               </ul>
             </div>
-            <el-form-item label="确认新密码" prop="confirmPassword">
-              <el-input v-model="passwordForm.confirmPassword" type="password" show-password autocomplete="new-password" />
-            </el-form-item>
-            <el-button type="primary" :loading="passwordSubmitting" @click="submitPasswordChange">更新密码</el-button>
-          </el-form>
-        </el-card>
+            <ElFormItem label="确认新密码" prop="confirmPassword">
+              <ElInput
+                v-model="passwordForm.confirmPassword"
+                type="password"
+                show-password
+                autocomplete="new-password"
+              />
+            </ElFormItem>
+            <ElButton
+              type="primary"
+              :loading="passwordSubmitting"
+              @click="submitPasswordChange"
+            >
+              更新密码
+            </ElButton>
+          </ElForm>
+        </ElCard>
 
-        <el-card class="security-card" shadow="never">
+        <ElCard class="security-card" shadow="never">
           <template #header>
             <div class="card-head">
               <span>账号与安全</span>
-              <el-button link type="primary" :disabled="isForcedPasswordChange" @click="openSessionDrawer">管理设备</el-button>
+              <ElButton
+                link
+                type="primary"
+                :disabled="isForcedPasswordChange"
+                @click="openSessionDrawer"
+              >
+                管理设备
+              </ElButton>
             </div>
           </template>
 
-          <el-descriptions :column="1" border>
-            <el-descriptions-item label="用户 ID">{{ profile?.id || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="当前租户">{{ profile?.tenantId || authStore.snapshot?.tenantId || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="角色">
+          <ElDescriptions :column="1" border>
+            <ElDescriptionsItem label="用户 ID">
+              {{ profile?.id || '-' }}
+            </ElDescriptionsItem>
+            <ElDescriptionsItem label="当前租户">
+              {{ profile?.tenantId || authStore.snapshot?.tenantId || '-' }}
+            </ElDescriptionsItem>
+            <ElDescriptionsItem label="角色">
               <div class="role-list">
-                <el-tag v-for="role in roleTags" :key="role" size="small" effect="plain">{{ role }}</el-tag>
-                <span v-if="!roleTags.length">-</span>
+                <ElTag
+                  v-for="role in roleTags"
+                  :key="role"
+                  size="small"
+                  effect="plain"
+                >
+                  {{ role }}
+                </ElTag>
+                <span v-if="roleTags.length === 0">-</span>
               </div>
-            </el-descriptions-item>
-            <el-descriptions-item label="数据权限">{{ dataScopeLabel }}</el-descriptions-item>
-            <el-descriptions-item label="密码更新时间">{{ formatProfileDate(profile?.passwordUpdatedAt) }}</el-descriptions-item>
-            <el-descriptions-item label="资料更新时间">{{ formatProfileDate(profile?.updatedAt) }}</el-descriptions-item>
-            <el-descriptions-item label="账号创建时间">{{ formatProfileDate(profile?.createdAt) }}</el-descriptions-item>
-          </el-descriptions>
-        </el-card>
+            </ElDescriptionsItem>
+            <ElDescriptionsItem label="数据权限">
+              {{ dataScopeLabel }}
+            </ElDescriptionsItem>
+            <ElDescriptionsItem label="密码更新时间">
+              {{ formatProfileDate(profile?.passwordUpdatedAt) }}
+            </ElDescriptionsItem>
+            <ElDescriptionsItem label="资料更新时间">
+              {{ formatProfileDate(profile?.updatedAt) }}
+            </ElDescriptionsItem>
+            <ElDescriptionsItem label="账号创建时间">
+              {{ formatProfileDate(profile?.createdAt) }}
+            </ElDescriptionsItem>
+          </ElDescriptions>
+        </ElCard>
       </div>
     </div>
 
-    <el-card class="timeline-card" shadow="never">
+    <ElCard class="timeline-card" shadow="never">
       <template #header>
         <div class="card-head">
           <span>账号动态</span>
-          <el-tag size="small" effect="plain">当前账号</el-tag>
+          <ElTag size="small" effect="plain">当前账号</ElTag>
         </div>
       </template>
       <div class="timeline-grid">
-        <article v-for="item in timelineItems" :key="item.title" class="timeline-item">
+        <article
+          v-for="item in timelineItems"
+          :key="item.title"
+          class="timeline-item"
+        >
           <span>{{ item.title }}</span>
           <strong>{{ item.value }}</strong>
           <small>{{ item.hint }}</small>
         </article>
       </div>
-    </el-card>
+    </ElCard>
 
-    <el-dialog v-model="cropVisible" title="裁剪头像" width="520px" destroy-on-close>
+    <ElDialog
+      v-model="cropVisible"
+      title="裁剪头像"
+      width="520px"
+      destroy-on-close
+    >
       <div class="crop-dialog">
-        <canvas ref="canvasRef" class="avatar-canvas" width="320" height="320" />
+        <canvas
+          ref="canvasRef"
+          class="avatar-canvas"
+          width="320"
+          height="320"
+        ></canvas>
         <div class="crop-controls">
           <span>缩放</span>
-          <el-slider v-model="cropScale" :min="1" :max="2.5" :step="0.05" @input="drawAvatarPreview" />
+          <ElSlider
+            v-model="cropScale"
+            :min="1"
+            :max="2.5"
+            :step="0.05"
+            @input="drawAvatarPreview"
+          />
         </div>
-        <p class="crop-hint">头像会按正方形裁剪并上传，仅支持 PNG/JPEG，建议小于 2MB。</p>
+        <p class="crop-hint">
+          头像会按正方形裁剪并上传，仅支持 PNG/JPEG，建议小于 2MB。
+        </p>
       </div>
       <template #footer>
-        <el-button @click="cropVisible = false">取消</el-button>
-        <el-button type="primary" :loading="avatarSubmitting" @click="submitAvatar">上传头像</el-button>
+        <ElButton @click="cropVisible = false">取消</ElButton>
+        <ElButton
+          type="primary"
+          :loading="avatarSubmitting"
+          @click="submitAvatar"
+        >
+          上传头像
+        </ElButton>
       </template>
-    </el-dialog>
+    </ElDialog>
 
-    <el-drawer v-model="sessionDrawerVisible" title="在线设备" size="860px">
-      <el-alert
+    <ElDrawer v-model="sessionDrawerVisible" title="在线设备" size="860px">
+      <ElAlert
         title="可查看当前账号的在线会话，并将不再使用的设备强制下线。当前会话不能在这里下线。"
         type="info"
         show-icon
@@ -639,47 +899,92 @@ onMounted(() => {
         class="inline-alert"
       />
       <div class="session-toolbar">
-        <span>共 {{ sessionsList.length }} 个会话，{{ activeSessionCount }} 个在线</span>
+        <span
+          >共 {{ sessionsList.length }} 个会话，{{
+            activeSessionCount
+          }}
+          个在线</span
+        >
         <div>
-          <el-button size="small" :loading="sessionsLoading" @click="loadSessions">刷新</el-button>
-          <el-button size="small" type="danger" plain :disabled="!otherActiveSessions.length" :loading="sessionActioning" @click="offlineOtherSessions">
+          <ElButton
+            size="small"
+            :loading="sessionsLoading"
+            @click="loadSessions"
+          >
+            刷新
+          </ElButton>
+          <ElButton
+            size="small"
+            type="danger"
+            plain
+            :disabled="otherActiveSessions.length === 0"
+            :loading="sessionActioning"
+            @click="offlineOtherSessions"
+          >
             下线其他设备
-          </el-button>
+          </ElButton>
         </div>
       </div>
-      <el-table v-loading="sessionsLoading" :data="sessionsList" stripe>
-        <el-table-column label="标记" width="90">
+      <ElTable v-loading="sessionsLoading" :data="sessionsList" stripe>
+        <ElTableColumn label="标记" width="90">
           <template #default="{ row }">
-            <el-tag v-if="row.currentSession" type="success" effect="dark" size="small">当前</el-tag>
-            <el-tag v-else-if="row.active" type="info" size="small">在线</el-tag>
-            <el-tag v-else type="info" effect="plain" size="small">离线</el-tag>
+            <ElTag
+              v-if="row.currentSession"
+              type="success"
+              effect="dark"
+              size="small"
+            >
+              当前
+            </ElTag>
+            <ElTag v-else-if="row.active" type="info" size="small">
+              在线
+            </ElTag>
+            <ElTag v-else type="info" effect="plain" size="small">离线</ElTag>
           </template>
-        </el-table-column>
-        <el-table-column label="设备" min-width="180" show-overflow-tooltip>
+        </ElTableColumn>
+        <ElTableColumn label="设备" min-width="180" show-overflow-tooltip>
           <template #default="{ row }">{{ formatDevice(row.device) }}</template>
-        </el-table-column>
-        <el-table-column prop="clientIp" label="登录 IP" width="140" />
-        
-        <el-table-column prop="loginLocation" label="登录地址" min-width="120" show-overflow-tooltip />
-        <el-table-column label="首次登录" width="180">
-          <template #default="{ row }">{{ formatSessionTime(row.issuedAt) }}</template>
-        </el-table-column>
-        <el-table-column label="最后访问" width="180">
-          <template #default="{ row }">{{ formatSessionTime(row.lastAccessAt) }}</template>
-        </el-table-column>
-        <el-table-column label="过期时间" width="180">
-          <template #default="{ row }">{{ formatSessionTime(row.expiresAt) }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="110" fixed="right">
+        </ElTableColumn>
+        <ElTableColumn prop="clientIp" label="登录 IP" width="140" />
+
+        <ElTableColumn
+          prop="loginLocation"
+          label="登录地址"
+          min-width="120"
+          show-overflow-tooltip
+        />
+        <ElTableColumn label="首次登录" width="180">
           <template #default="{ row }">
-            <el-button link type="danger" :disabled="!row.active || row.currentSession" @click="kickSession(row.sessionId)">下线</el-button>
+            {{ formatSessionTime(row.issuedAt) }}
           </template>
-        </el-table-column>
+        </ElTableColumn>
+        <ElTableColumn label="最后访问" width="180">
+          <template #default="{ row }">
+            {{ formatSessionTime(row.lastAccessAt) }}
+          </template>
+        </ElTableColumn>
+        <ElTableColumn label="过期时间" width="180">
+          <template #default="{ row }">
+            {{ formatSessionTime(row.expiresAt) }}
+          </template>
+        </ElTableColumn>
+        <ElTableColumn label="操作" width="110" fixed="right">
+          <template #default="{ row }">
+            <ElButton
+              link
+              type="danger"
+              :disabled="!row.active || row.currentSession"
+              @click="kickSession(row.sessionId)"
+            >
+              下线
+            </ElButton>
+          </template>
+        </ElTableColumn>
         <template #empty>
-          <el-empty description="暂无在线设备" />
+          <ElEmpty description="暂无在线设备" />
         </template>
-      </el-table>
-    </el-drawer>
+      </ElTable>
+    </ElDrawer>
   </section>
 </template>
 
@@ -696,24 +1001,24 @@ onMounted(() => {
 .password-card,
 .security-card,
 .timeline-card {
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid rgb(15 23 42 / 8%);
   border-radius: 20px;
 }
 
 .personal-hero {
   display: flex;
+  gap: 24px;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 22px;
   padding: 28px;
-  background: rgba(255, 255, 255, 0.88);
+  margin-bottom: 22px;
+  background: rgb(255 255 255 / 88%);
 }
 
 .hero-profile {
   display: flex;
-  align-items: center;
   gap: 20px;
+  align-items: center;
   min-width: 0;
 }
 
@@ -723,24 +1028,24 @@ onMounted(() => {
 
 .eyebrow {
   margin: 0 0 8px;
-  color: #64748b;
   font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.18em;
+  color: #64748b;
   text-transform: uppercase;
+  letter-spacing: 0.18em;
 }
 
 h1 {
   margin: 0;
-  color: #0f172a;
   font-size: 32px;
+  color: #0f172a;
 }
 
 .summary {
   max-width: 660px;
   margin: 10px 0 0;
-  color: #52657a;
   line-height: 1.7;
+  color: #52657a;
 }
 
 .hero-tags,
@@ -771,18 +1076,18 @@ h1 {
   gap: 10px;
   min-height: 136px;
   padding: 20px;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgb(255 255 255 / 90%);
 }
 
 .overview-card span,
 .timeline-item span {
-  color: #64748b;
   font-size: 13px;
+  color: #64748b;
 }
 
 .overview-card strong {
-  color: #0f172a;
   font-size: 24px;
+  color: #0f172a;
 }
 
 .overview-card small,
@@ -805,20 +1110,24 @@ h1 {
 .session-toolbar,
 .strength-head {
   display: flex;
+  gap: 12px;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
 }
 
 .avatar-panel {
   display: flex;
-  align-items: center;
   gap: 18px;
-  margin-bottom: 20px;
+  align-items: center;
   padding: 18px;
-  border: 1px solid rgba(20, 184, 166, 0.18);
+  margin-bottom: 20px;
+  background: linear-gradient(
+    135deg,
+    rgb(20 184 166 / 10%),
+    rgb(14 165 233 / 8%)
+  );
+  border: 1px solid rgb(20 184 166 / 18%);
   border-radius: 18px;
-  background: linear-gradient(135deg, rgba(20, 184, 166, 0.1), rgba(14, 165, 233, 0.08));
 }
 
 .avatar-copy {
@@ -832,8 +1141,8 @@ h1 {
 
 .form-actions {
   display: flex;
-  justify-content: flex-end;
   gap: 10px;
+  justify-content: flex-end;
 }
 
 .inline-alert {
@@ -841,25 +1150,25 @@ h1 {
 }
 
 .password-strength {
-  margin: -4px 0 18px;
   padding: 14px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 16px;
+  margin: -4px 0 18px;
   background: #f8fafc;
+  border: 1px solid rgb(15 23 42 / 8%);
+  border-radius: 16px;
 }
 
 .password-strength ul {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px 14px;
-  margin: 12px 0 0;
   padding: 0;
+  margin: 12px 0 0;
   list-style: none;
 }
 
 .password-strength li {
-  color: #94a3b8;
   font-size: 13px;
+  color: #94a3b8;
 }
 
 .password-strength li.passed {
@@ -880,15 +1189,15 @@ h1 {
   display: grid;
   gap: 8px;
   padding: 16px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 16px;
   background: #f8fafc;
+  border: 1px solid rgb(15 23 42 / 8%);
+  border-radius: 16px;
 }
 
 .crop-dialog {
   display: grid;
-  justify-items: center;
   gap: 18px;
+  justify-items: center;
 }
 
 .avatar-canvas {
@@ -898,17 +1207,17 @@ h1 {
 }
 
 .crop-controls {
-  width: 100%;
   display: grid;
   grid-template-columns: 48px 1fr;
-  align-items: center;
   gap: 12px;
+  align-items: center;
+  width: 100%;
 }
 
 .crop-hint {
   margin: 0;
-  color: #64748b;
   font-size: 13px;
+  color: #64748b;
 }
 
 @media (max-width: 1180px) {
@@ -932,8 +1241,8 @@ h1 {
   .hero-actions,
   .avatar-panel,
   .session-toolbar {
-    align-items: stretch;
     flex-direction: column;
+    align-items: stretch;
   }
 
   .overview-grid,

@@ -146,7 +146,9 @@ async function onSubmit() {
     drawerApi.close();
     emit('success');
   } catch (error: any) {
-    ElMessage.error(error?.response?.data?.message || error?.message || '操作失败');
+    ElMessage.error(
+      error?.response?.data?.message || error?.message || '操作失败',
+    );
   } finally {
     drawerApi.unlock();
   }

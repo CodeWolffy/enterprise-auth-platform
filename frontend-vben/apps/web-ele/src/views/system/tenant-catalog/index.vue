@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import type { VxeTableGridOptions } from '#/adapter/vxe-table';
+import type { TenantPackageView } from '#/types/tenant';
 
 import { Page, useVbenDrawer } from '@vben/common-ui';
 import { Plus } from '@vben/icons';
@@ -8,11 +9,10 @@ import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { delObj, getList } from '#/api/upms/tenant-package';
-import type { TenantPackageView } from '#/types/tenant';
 
 import { useColumns } from './data';
-import Form from './modules/form.vue';
 import Detail from './modules/detail.vue';
+import Form from './modules/form.vue';
 
 const [FormDrawer, formDrawerApi] = useVbenDrawer({
   connectedComponent: Form,
@@ -87,7 +87,7 @@ async function onDelete(row: TenantPackageView) {
   onRefresh();
 }
 
-function appKeys(value?: string | null) {
+function appKeys(value?: null | string) {
   if (!value?.trim()) return [];
   return value
     .split(/[,;\s]+/)
@@ -115,14 +115,13 @@ function appKeys(value?: string | null) {
 
       <template #appKey="{ row }">
         <div class="flex flex-wrap gap-1">
-          <ElTag
-            v-for="key in appKeys(row.appKey)"
-            :key="key"
-            effect="plain"
-          >
+          <ElTag v-for="key in appKeys(row.appKey)" :key="key" effect="plain">
             {{ key }}
           </ElTag>
-          <span v-if="!appKeys(row.appKey).length" class="text-muted-foreground">
+          <span
+            v-if="appKeys(row.appKey).length === 0"
+            class="text-muted-foreground"
+          >
             未配置
           </span>
         </div>
@@ -139,9 +138,7 @@ function appKeys(value?: string | null) {
       </template>
 
       <template #operation="{ row }">
-        <ElButton link type="primary" @click="onDetail(row)">
-          详情
-        </ElButton>
+        <ElButton link type="primary" @click="onDetail(row)"> 详情 </ElButton>
         <ElButton
           v-access:code="'upms:tenantpackage:edit'"
           link

@@ -34,6 +34,17 @@ const coreRoutes: RouteRecordRaw[] = [
     children: [],
   },
   {
+    meta: {
+      hideInBreadcrumb: true,
+      hideInMenu: true,
+      hideInTab: true,
+      title: 'LegacyAnalyticsRedirect',
+    },
+    name: 'LegacyAnalyticsRedirect',
+    path: '/analytics',
+    redirect: preferences.app.defaultHomePath,
+  },
+  {
     component: AuthPageLayout,
     meta: {
       hideInTab: true,

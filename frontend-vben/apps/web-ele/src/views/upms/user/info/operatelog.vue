@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
+
 import {
   ElButton,
   ElEmpty,
@@ -28,9 +29,11 @@ const query = reactive({
   current: 1,
   size: 10,
 });
-const page = ref<{ total: number; records: any[] }>({ total: 0, records: [] });
+const page = ref<{ records: any[]; total: number }>({ total: 0, records: [] });
 
-const resolvedOperator = computed(() => props.operator?.trim() || query.operator.trim());
+const resolvedOperator = computed(
+  () => props.operator?.trim() || query.operator.trim(),
+);
 
 async function load() {
   loading.value = true;
@@ -42,7 +45,10 @@ async function load() {
       clientIp: query.clientIp || undefined,
       status: query.status || undefined,
     });
-    page.value = { total: response?.total ?? 0, records: response?.records ?? [] };
+    page.value = {
+      total: response?.total ?? 0,
+      records: response?.records ?? [],
+    };
   } catch {
     ElMessage.error('操作日志加载失败');
   } finally {
@@ -67,9 +73,24 @@ onMounted(() => {
 <template>
   <div class="user-log-panel">
     <div class="toolbar">
-      <ElInput v-model="query.operator" placeholder="操作用户" clearable style="width: 180px" />
-      <ElInput v-model="query.clientIp" placeholder="操作地址" clearable style="width: 180px" />
-      <ElSelect v-model="query.status" placeholder="操作状态" clearable style="width: 140px">
+      <ElInput
+        v-model="query.operator"
+        placeholder="操作用户"
+        clearable
+        style="width: 180px"
+      />
+      <ElInput
+        v-model="query.clientIp"
+        placeholder="操作地址"
+        clearable
+        style="width: 180px"
+      />
+      <ElSelect
+        v-model="query.status"
+        placeholder="操作状态"
+        clearable
+        style="width: 140px"
+      >
         <ElOption label="成功" value="1" />
         <ElOption label="失败" value="0" />
       </ElSelect>
@@ -85,12 +106,16 @@ onMounted(() => {
       <ElTableColumn prop="method" label="操作方法" />
       <ElTableColumn label="操作状态">
         <template #default="scope">
-          <ElTag :type="operationStatusMeta(scope.row.status).type">{{ operationStatusMeta(scope.row.status).label }}</ElTag>
+          <ElTag :type="operationStatusMeta(scope.row.status).type">
+            {{ operationStatusMeta(scope.row.status).label }}
+          </ElTag>
         </template>
       </ElTableColumn>
       <ElTableColumn prop="requestTime" label="请求时长">
         <template #default="scope">
-          {{ scope.row.requestTime == null ? '-' : `${scope.row.requestTime}ms` }}
+          {{
+            scope.row.requestTime == null ? '-' : `${scope.row.requestTime}ms`
+          }}
         </template>
       </ElTableColumn>
       <ElTableColumn label="创建时间" width="180">

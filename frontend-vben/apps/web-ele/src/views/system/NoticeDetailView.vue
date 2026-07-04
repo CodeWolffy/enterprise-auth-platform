@@ -64,21 +64,21 @@ const goBack = () => {
   }
 
   .notice-detail-loading {
-    margin-top: 24px;
     padding: 24px;
+    margin-top: 24px;
     background: var(--el-bg-color);
     border-radius: 8px;
   }
 
   .notice-detail-card {
-    margin-top: 24px;
     padding: 32px;
+    margin-top: 24px;
     background: var(--el-bg-color);
     border-radius: 8px;
 
     header {
-      margin-bottom: 24px;
       padding-bottom: 24px;
+      margin-bottom: 24px;
       border-bottom: 1px solid var(--el-border-color-light);
 
       h1 {
@@ -91,8 +91,8 @@ const goBack = () => {
 
   .notice-detail-card__meta {
     display: flex;
-    align-items: center;
     gap: 16px;
+    align-items: center;
     color: var(--el-text-color-secondary);
   }
 }

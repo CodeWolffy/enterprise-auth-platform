@@ -104,12 +104,19 @@ export async function getTenantMenuList(tenantId: string) {
  * 保存租户菜单分配（全量替换）
  * 后端：PUT /api/tenants/{tenantId}/menus { menuIds }
  */
-export async function saveTenantMenu(data: { tenantId: string; menuIds: number[] }) {
-  return requestClient.put(`/tenants/${data.tenantId}/menus`, { menuIds: data.menuIds }, {
-    headers: {
-      isSwitchTenant: false,
+export async function saveTenantMenu(data: {
+  menuIds: number[];
+  tenantId: string;
+}) {
+  return requestClient.put(
+    `/tenants/${data.tenantId}/menus`,
+    { menuIds: data.menuIds },
+    {
+      headers: {
+        isSwitchTenant: false,
+      },
     },
-  });
+  );
 }
 
 /**
@@ -117,7 +124,8 @@ export async function saveTenantMenu(data: { tenantId: string; menuIds: number[]
  * 后端：GET /api/tenants/{tenantId}/history?changeType&fieldKey&operator&from&to&page&size
  */
 export async function getTenantHistory(tenantId: string, query: any) {
-  const { page, size, changeType, fieldKey, operator, from, to, dateRange } = query ?? {};
+  const { page, size, changeType, fieldKey, operator, from, to, dateRange } =
+    query ?? {};
   const [rangeStart, rangeEnd] = Array.isArray(dateRange) ? dateRange : [];
   return requestClient.get(`/tenants/${tenantId}/history`, {
     params: {

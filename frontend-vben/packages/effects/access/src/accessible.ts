@@ -25,11 +25,9 @@ async function generateAccessible(
   const { router } = options;
 
   options.routes = cloneDeep(options.routes);
+
   // 生成路由
-  const { accessibleMenus, accessibleRoutes } = await generateRoutes(
-    mode,
-    options,
-  );
+  const accessibleRoutes = await generateRoutes(mode, options);
 
   const root = router.getRoutes().find((item) => item.path === '/');
 
@@ -39,6 +37,11 @@ async function generateAccessible(
   // 动态添加到router实例内
   accessibleRoutes.forEach((route) => {
     if (root && !route.meta?.noBasicLayout) {
+      // 为了兼容之前的版本用法，如果包含子路由，则将component移除，以免出现多层BasicLayout
+      // 如果你的项目已经跟进了本次修改，移除了所有自定义菜单首级的BasicLayout，可以将这段if代码删除
+      if (route.children && route.children.length > 0) {
+        delete route.component;
+      }
       // 根据router name判断，如果路由已经存在，则不再添加
       if (names?.includes(route.name)) {
         // 找到已存在的路由索引并更新，不更新会造成切换用户时，一级目录未更新，homePath 在二级目录导致的404问题
@@ -63,6 +66,9 @@ async function generateAccessible(
     router.addRoute(root);
   }
 
+  // 生成菜单
+  const accessibleMenus = generateMenus(accessibleRoutes, options.router);
+
   return { accessibleMenus, accessibleRoutes };
 }
 
@@ -78,12 +84,9 @@ async function generateRoutes(
   const { forbiddenComponent, roles, routes } = options;
 
   let resultRoutes: RouteRecordRaw[] = routes;
-  let menuRoutes: RouteRecordRaw[] = routes;
   switch (mode) {
     case 'backend': {
-      const backendRoutes = await generateRoutesByBackend(options);
-      resultRoutes = [...backendRoutes, ...routes];
-      menuRoutes = backendRoutes;
+      resultRoutes = await generateRoutesByBackend(options);
       break;
     }
     case 'frontend': {
@@ -92,7 +95,6 @@ async function generateRoutes(
         roles || [],
         forbiddenComponent,
       );
-      menuRoutes = resultRoutes;
       break;
     }
     case 'mixed': {
@@ -100,9 +102,10 @@ async function generateRoutes(
         generateRoutesByFrontend(routes, roles || [], forbiddenComponent),
         generateRoutesByBackend(options),
       ]);
-
-      resultRoutes = [...frontend_resultRoutes, ...backend_resultRoutes];
-      menuRoutes = resultRoutes;
+      resultRoutes = mergeRoutesByName(
+        backend_resultRoutes,
+        frontend_resultRoutes,
+      );
       break;
     }
   }
@@ -110,10 +113,16 @@ async function generateRoutes(
   /**
    * 调整路由树，做以下处理：
    * 1. 对未添加redirect的路由添加redirect
-   * 2. 给懒加载组件包装一个稳定的 name，避免多个页面复用同一个组件标识
+   * 2. 将懒加载的组件名称修改为当前路由的名称（如果启用了keep-alive的话）
    */
   resultRoutes = mapTree(resultRoutes, (route) => {
-    if (route.name && isString(route.name) && isFunction(route.component)) {
+    // 重新包装component，使用与路由名称相同的name以支持keep-alive的条件缓存。
+    if (
+      route.meta?.keepAlive &&
+      isFunction(route.component) &&
+      route.name &&
+      isString(route.name)
+    ) {
       const originalComponent = route.component as () => Promise<{
         default: Component | DefineComponent;
       }>;
@@ -144,9 +153,66 @@ async function generateRoutes(
     return route;
   });
 
-  const accessibleMenus = generateMenus(menuRoutes, options.router);
+  return resultRoutes;
+}
 
-  return { accessibleMenus, accessibleRoutes: resultRoutes };
+/**
+ * 根据 name 合并前后端路由
+ * @param baseRoutes 后端路由
+ * @param extraRoutes 前端路由
+ */
+function mergeRoutesByName(
+  baseRoutes: RouteRecordRaw[],
+  extraRoutes: RouteRecordRaw[],
+): RouteRecordRaw[] {
+  const result: RouteRecordRaw[] = [];
+  const routeMap = new Map<string, RouteRecordRaw>();
+
+  for (const route of baseRoutes) {
+    const clone = { ...route } as RouteRecordRaw;
+    result.push(clone);
+    if (clone.name && isString(clone.name)) {
+      routeMap.set(clone.name as string, clone);
+    }
+  }
+
+  for (const route of extraRoutes) {
+    if (
+      route.name &&
+      isString(route.name) &&
+      routeMap.has(route.name as string)
+    ) {
+      const existing = routeMap.get(route.name as string);
+      if (!existing) {
+        continue;
+      }
+      const existingChildren = existing.children ?? [];
+      const routeChildren = route.children ?? [];
+
+      const merged = {
+        ...route,
+        ...existing, // keep backend as base
+        meta: {
+          ...route.meta,
+          ...existing.meta, // backend meta wins on conflicts
+        },
+      } as RouteRecordRaw;
+
+      if (existingChildren.length > 0 || routeChildren.length > 0) {
+        merged.children = mergeRoutesByName(existingChildren, routeChildren);
+      }
+
+      Object.assign(existing, merged);
+    } else {
+      const clone = { ...route } as RouteRecordRaw;
+      result.push(clone);
+      if (clone.name && isString(clone.name)) {
+        routeMap.set(clone.name as string, clone);
+      }
+    }
+  }
+
+  return result;
 }
 
 export { generateAccessible };

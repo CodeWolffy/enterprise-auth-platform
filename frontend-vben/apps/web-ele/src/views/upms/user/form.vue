@@ -42,22 +42,31 @@ const state = reactive<any>({
   rules: {
     username: [
       { message: '请输入用户名(5-16位)', required: true, trigger: 'change' },
-      { pattern: /^[a-zA-Z0-9_]{3,16}$/, message: '用户名只能包含字母、数字和下划线，3-16位', trigger: 'blur' },
+      {
+        pattern: /^[a-zA-Z0-9_]{3,16}$/,
+        message: '用户名只能包含字母、数字和下划线，3-16位',
+        trigger: 'blur',
+      },
     ],
     mobile: [
-      { pattern: /^1[3-9]\d{9}$/, message: '请输入有效的11位手机号', trigger: 'blur' },
+      {
+        pattern: /^1[3-9]\d{9}$/,
+        message: '请输入有效的11位手机号',
+        trigger: 'blur',
+      },
     ],
     email: [
       { type: 'email', message: '请输入有效的邮箱地址', trigger: 'blur' },
     ],
-    password: [
-      { min: 8, max: 64, message: '密码长度8-64位', trigger: 'blur' },
-    ],
-    deptId: [
-      { message: '请选择部门', required: true, trigger: 'change' },
-    ],
+    password: [{ min: 8, max: 64, message: '密码长度8-64位', trigger: 'blur' }],
+    deptId: [{ message: '请选择部门', required: true, trigger: 'change' }],
     roleCodes: [
-      { type: 'array', required: true, message: '请至少分配一个角色', trigger: 'change' },
+      {
+        type: 'array',
+        required: true,
+        message: '请至少分配一个角色',
+        trigger: 'change',
+      },
     ],
   },
   roleList: [] as any[],
@@ -78,7 +87,7 @@ const initForm = (row?: any) => {
     state.form.email = row.email ?? '';
     state.form.deptId = row.deptId ?? undefined;
     state.form.enabled = row.enabled ?? true;
-    state.form.roleCodes = Array.from(row.roles ?? []);
+    state.form.roleCodes = [...(row.roles ?? [])];
   }
   handleRoleList();
   handleDeptList();
@@ -216,7 +225,11 @@ defineExpose({ initForm });
     <template #footer>
       <span class="dialog-footer">
         <ElButton @click="handleClose">关 闭</ElButton>
-        <ElButton :loading="loading" type="primary" @click="submitForm(formRef)">
+        <ElButton
+          :loading="loading"
+          type="primary"
+          @click="submitForm(formRef)"
+        >
           确 认
         </ElButton>
       </span>

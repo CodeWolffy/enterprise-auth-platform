@@ -158,11 +158,7 @@ defineExpose({
       status-icon
     >
       <ElFormItem label="字典类型" prop="dictType">
-        <ElInput
-          v-model="state.form.dictType"
-          show-word-limit
-          maxlength="64"
-        />
+        <ElInput v-model="state.form.dictType" show-word-limit maxlength="64" />
       </ElFormItem>
       <ElFormItem label="描述" prop="description">
         <ElInput

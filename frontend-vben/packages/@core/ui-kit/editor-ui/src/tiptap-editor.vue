@@ -16,7 +16,8 @@ import TextAlign from '@tiptap/extension-text-align';
 import { TextStyle } from '@tiptap/extension-text-style';
 import Underline from '@tiptap/extension-underline';
 import StarterKit from '@tiptap/starter-kit';
-import { BubbleMenu, EditorContent, useEditor } from '@tiptap/vue-3';
+import { EditorContent, useEditor } from '@tiptap/vue-3';
+import { BubbleMenu } from '@tiptap/vue-3/menus';
 
 interface Props {
   /** 允许上传的图片 MIME 类型 */
@@ -198,7 +199,7 @@ watch(
       return;
     }
     if (editor && editor.getHTML() !== value) {
-      editor.commands.setContent(value || '', false);
+      editor.commands.setContent(value || '', { emitUpdate: false });
     }
   },
 );
@@ -368,7 +369,7 @@ function toggleSourceMode() {
   const editor = editorRef.value;
   if (!editor) return;
   if (sourceMode.value) {
-    editor.commands.setContent(sourceHtml.value || '', false);
+    editor.commands.setContent(sourceHtml.value || '', { emitUpdate: false });
     emit('update:modelValue', editor.getHTML());
     editor.setEditable(!props.disabled);
     sourceMode.value = false;
@@ -903,10 +904,10 @@ defineExpose({
 
 <style scoped>
 .tiptap-editor {
+  overflow: hidden;
+  background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
-  background: #fff;
-  overflow: hidden;
 }
 
 .tiptap-editor.is-fullscreen {
@@ -924,11 +925,11 @@ defineExpose({
 .tiptap-editor__toolbar {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
   gap: 8px;
+  align-items: center;
   padding: 10px;
-  border-bottom: 1px solid #e5e7eb;
   background: #f8fafc;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .toolbar-divider {
@@ -940,11 +941,11 @@ defineExpose({
 .tiptap-toolbar__select {
   height: 32px;
   padding: 0 10px;
+  font-size: 14px;
+  color: #374151;
+  background: #fff;
   border: 1px solid #d1d5db;
   border-radius: 7px;
-  background: #fff;
-  color: #374151;
-  font-size: 14px;
 }
 
 .tiptap-toolbar__group {
@@ -957,13 +958,13 @@ defineExpose({
   min-width: 32px;
   height: 32px;
   padding: 0 8px;
-  border: 1px solid #d1d5db;
-  border-radius: 7px;
-  background: #fff;
-  color: #374151;
   font-size: 13px;
   font-weight: 600;
+  color: #374151;
   cursor: pointer;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
   transition: all 0.16s ease;
 }
 
@@ -973,9 +974,9 @@ defineExpose({
 
 .tiptap-toolbar__group button:hover,
 .tiptap-bubble-menu button:hover {
+  color: #1d4ed8;
   background: #eff6ff;
   border-color: #93c5fd;
-  color: #1d4ed8;
 }
 
 .tiptap-toolbar__group button:disabled,
@@ -986,9 +987,9 @@ defineExpose({
 
 .tiptap-toolbar__group button.is-active,
 .tiptap-bubble-menu button.is-active {
+  color: #fff;
   background: #2563eb;
   border-color: #2563eb;
-  color: #fff;
 }
 
 .color-picker-wrapper {
@@ -1019,9 +1020,9 @@ defineExpose({
   grid-template-columns: repeat(7, 22px);
   gap: 6px;
   padding: 10px;
+  background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
-  background: #fff;
   box-shadow: 0 12px 32px rgb(15 23 42 / 18%);
 }
 
@@ -1049,9 +1050,9 @@ defineExpose({
   display: flex;
   gap: 4px;
   padding: 6px;
+  background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
-  background: #fff;
   box-shadow: 0 12px 32px rgb(15 23 42 / 18%);
 }
 
@@ -1069,28 +1070,28 @@ defineExpose({
   min-width: 360px;
   max-width: 92vw;
   padding: 22px;
-  border-radius: 12px;
   background: #fff;
+  border-radius: 12px;
   box-shadow: 0 24px 64px rgb(15 23 42 / 28%);
 }
 
 .editor-modal__content h3 {
   margin: 0 0 16px;
-  color: #111827;
   font-size: 16px;
   font-weight: 700;
+  color: #111827;
 }
 
 .editor-modal__input {
   box-sizing: border-box;
   width: 100%;
   height: 38px;
-  margin-bottom: 16px;
   padding: 0 12px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  outline: none;
   border: 1px solid #d1d5db;
   border-radius: 8px;
-  outline: none;
-  font-size: 14px;
 }
 
 .editor-modal__input:focus {
@@ -1110,24 +1111,24 @@ defineExpose({
 
 .editor-form-row label {
   display: flex;
-  align-items: center;
   gap: 8px;
-  color: #374151;
+  align-items: center;
   font-size: 14px;
+  color: #374151;
 }
 
 .editor-form-row input {
   width: 72px;
   height: 34px;
+  text-align: center;
   border: 1px solid #d1d5db;
   border-radius: 7px;
-  text-align: center;
 }
 
 .editor-modal__actions {
   display: flex;
-  justify-content: flex-end;
   gap: 8px;
+  justify-content: flex-end;
 }
 
 .editor-modal__actions--split {
@@ -1141,17 +1142,17 @@ defineExpose({
 .editor-modal__actions button {
   height: 34px;
   padding: 0 16px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  background: #fff;
   color: #374151;
   cursor: pointer;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
 }
 
 .editor-modal__actions button:last-child {
-  border-color: #2563eb;
-  background: #2563eb;
   color: #fff;
+  background: #2563eb;
+  border-color: #2563eb;
 }
 
 .editor-modal__actions button:disabled {
@@ -1163,35 +1164,35 @@ defineExpose({
 .tiptap-editor__source {
   box-sizing: border-box;
   width: 100%;
-  overflow: auto;
   padding: 16px;
+  overflow: auto;
 }
 
 .tiptap-editor__source {
-  border: 0;
-  outline: none;
-  resize: vertical;
-  background: #0f172a;
-  color: #e5e7eb;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 13px;
   line-height: 1.7;
+  color: #e5e7eb;
+  resize: vertical;
+  outline: none;
+  background: #0f172a;
+  border: 0;
 }
 
 .tiptap-editor__content :deep(.ProseMirror) {
   min-height: 100%;
-  outline: none;
-  color: #111827;
   line-height: 1.75;
+  color: #111827;
+  outline: none;
 }
 
 .tiptap-editor__content
   :deep(.ProseMirror p.is-editor-empty:first-child::before) {
-  content: attr(data-placeholder);
   float: left;
   height: 0;
   color: #9ca3af;
   pointer-events: none;
+  content: attr(data-placeholder);
 }
 
 .tiptap-editor__content :deep(.ProseMirror h1),
@@ -1219,27 +1220,27 @@ defineExpose({
 }
 
 .tiptap-editor__content :deep(.ProseMirror blockquote) {
-  margin: 12px 0;
   padding: 10px 14px;
+  margin: 12px 0;
+  color: #1e40af;
+  background: #eff6ff;
   border-left: 4px solid #2563eb;
   border-radius: 0 8px 8px 0;
-  background: #eff6ff;
-  color: #1e40af;
 }
 
 .tiptap-editor__content :deep(.ProseMirror pre) {
-  overflow: auto;
-  margin: 12px 0;
   padding: 14px;
-  border-radius: 8px;
-  background: #111827;
+  margin: 12px 0;
+  overflow: auto;
   color: #e5e7eb;
+  background: #111827;
+  border-radius: 8px;
 }
 
 .tiptap-editor__content :deep(.ProseMirror ul),
 .tiptap-editor__content :deep(.ProseMirror ol) {
-  margin: 0 0 10px 22px;
   padding: 0;
+  margin: 0 0 10px 22px;
 }
 
 .tiptap-editor__content :deep(.ProseMirror a) {
@@ -1257,8 +1258,8 @@ defineExpose({
 .tiptap-editor__content :deep(.ProseMirror .tiptap-table) {
   width: 100%;
   margin: 14px 0;
-  border-collapse: collapse;
   table-layout: fixed;
+  border-collapse: collapse;
 }
 
 .tiptap-editor__content :deep(.ProseMirror .tiptap-table th),
@@ -1266,22 +1267,22 @@ defineExpose({
   position: relative;
   min-width: 48px;
   padding: 8px 10px;
-  border: 1px solid #d1d5db;
   vertical-align: top;
+  border: 1px solid #d1d5db;
 }
 
 .tiptap-editor__content :deep(.ProseMirror .tiptap-table th) {
-  background: #f8fafc;
   font-weight: 700;
+  background: #f8fafc;
 }
 
 .tiptap-editor__content :deep(.ProseMirror .tiptap-table .selectedCell::after) {
-  content: '';
   position: absolute;
   inset: 0;
   z-index: 2;
-  background: rgb(37 99 235 / 12%);
   pointer-events: none;
+  content: '';
+  background: rgb(37 99 235 / 12%);
 }
 
 .tiptap-editor__content
@@ -1291,7 +1292,7 @@ defineExpose({
   right: -2px;
   bottom: -2px;
   width: 4px;
-  background-color: #2563eb;
   pointer-events: none;
+  background-color: #2563eb;
 }
 </style>

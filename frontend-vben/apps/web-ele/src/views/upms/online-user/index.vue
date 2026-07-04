@@ -95,8 +95,13 @@ initPage();
         <ElTableColumn prop="tenantId" label="租户编码" />
         <ElTableColumn prop="activeTenantId" label="活跃租户" />
         <ElTableColumn prop="clientIp" label="登录IP" width="140" />
-        
-        <ElTableColumn prop="loginLocation" label="登录地址" min-width="120" show-overflow-tooltip />
+
+        <ElTableColumn
+          prop="loginLocation"
+          label="登录地址"
+          min-width="120"
+          show-overflow-tooltip
+        />
         <ElTableColumn prop="device" label="设备标识" show-overflow-tooltip />
         <ElTableColumn label="签发时间" width="180">
           <template #default="scope">

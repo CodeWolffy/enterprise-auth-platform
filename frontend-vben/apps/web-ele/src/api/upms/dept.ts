@@ -7,7 +7,7 @@ function buildTree(list: any[]): any[] {
   (list ?? []).forEach((d) => map.set(d.id, { ...d, children: [] }));
   map.forEach((node) => {
     const pid = node.parentId;
-    if (pid != null && map.has(pid)) {
+    if (pid !== null && pid !== undefined && map.has(pid)) {
       map.get(pid).children.push(node);
     } else {
       roots.push(node);

@@ -77,9 +77,7 @@ const submit = () => {
     })
       .then(() => {
         ElMessage.success(
-          props.username
-            ? `已重置 ${props.username} 的密码`
-            : '密码重置成功',
+          props.username ? `已重置 ${props.username} 的密码` : '密码重置成功',
         );
         state.form.newPassword = '';
         state.form.confirmPassword = '';

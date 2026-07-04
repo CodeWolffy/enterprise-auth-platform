@@ -112,7 +112,7 @@ function setupAccessGuard(router: Router) {
     if (!userInfo) {
       try {
         userInfo = await authStore.fetchUserInfo();
-      } catch (error) {
+      } catch {
         // fetchUserInfo 失败时（如 token 失效），拦截器已触发 doReAuthenticate
         // 此处阻止错误继续传播，避免 Vue Router 因未捕获异常而崩溃
         return {

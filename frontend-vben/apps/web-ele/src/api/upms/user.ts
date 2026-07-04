@@ -5,8 +5,7 @@ import { requestClient } from '#/api/request';
  * 后端：GET /api/users?username&mobile&email&enabled&deptId&page&size -> PageResult<UserSummary>
  */
 export async function getPage(query: any) {
-  const { page, size, username, mobile, email, enabled, deptId } =
-    query ?? {};
+  const { page, size, username, mobile, email, enabled, deptId } = query ?? {};
   return requestClient.get('/users', {
     params: {
       username,
@@ -68,8 +67,8 @@ export async function getAssignedRoles(userId: number | string) {
  * 后端：POST /api/account/password/change (AccountPasswordChangeRequest)
  */
 export async function editPassword(data: {
-  password: string;
   newPassword: string;
+  password: string;
 }) {
   return requestClient.post('/account/password/change', {
     oldPassword: data.password,

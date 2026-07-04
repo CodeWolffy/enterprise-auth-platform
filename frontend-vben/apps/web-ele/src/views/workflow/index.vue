@@ -1,34 +1,7 @@
-<template>
-  <div class="workflow-shell">
-    <section class="workflow-hero dashboard-panel">
-      <div>
-        <span class="eyebrow">Workflow</span>
-        <h3>流程管理</h3>
-        <p class="muted-line">覆盖流程定义、设计器、我的待办、我的已办和我的发起，入口已按当前项目路由体系接好。</p>
-      </div>
-      <div class="workflow-hero__actions">
-        <el-button @click="goRoute('workflow-definitions')">流程定义</el-button>
-        <el-button type="primary" plain @click="goRoute('workflow-designer')">流程设计器</el-button>
-      </div>
-    </section>
-
-    <section class="workflow-nav">
-      <el-tabs v-model="activeTab" @tab-change="handleTabChange">
-        <el-tab-pane label="流程定义" name="workflow-definitions" />
-        <el-tab-pane label="流程设计器" name="workflow-designer" />
-        <el-tab-pane label="我的待办" name="workflow-todo" />
-        <el-tab-pane label="我的已办" name="workflow-done" />
-        <el-tab-pane label="我的发起" name="workflow-instances" />
-      </el-tabs>
-    </section>
-
-    <RouterView />
-  </div>
-</template>
-
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+
 import { ElButton, ElTabPane, ElTabs } from 'element-plus';
 
 const router = useRouter();
@@ -48,10 +21,42 @@ function goRoute(name: string) {
   void router.push({ name });
 }
 
-function handleTabChange(name: string | number) {
+function handleTabChange(name: number | string) {
   goRoute(String(name));
 }
 </script>
+
+<template>
+  <div class="workflow-shell">
+    <section class="workflow-hero dashboard-panel">
+      <div>
+        <span class="eyebrow">Workflow</span>
+        <h3>流程管理</h3>
+        <p class="muted-line">
+          覆盖流程定义、设计器、我的待办、我的已办和我的发起，入口已按当前项目路由体系接好。
+        </p>
+      </div>
+      <div class="workflow-hero__actions">
+        <ElButton @click="goRoute('workflow-definitions')">流程定义</ElButton>
+        <ElButton type="primary" plain @click="goRoute('workflow-designer')">
+          流程设计器
+        </ElButton>
+      </div>
+    </section>
+
+    <section class="workflow-nav">
+      <ElTabs v-model="activeTab" @tab-change="handleTabChange">
+        <ElTabPane label="流程定义" name="workflow-definitions" />
+        <ElTabPane label="流程设计器" name="workflow-designer" />
+        <ElTabPane label="我的待办" name="workflow-todo" />
+        <ElTabPane label="我的已办" name="workflow-done" />
+        <ElTabPane label="我的发起" name="workflow-instances" />
+      </ElTabs>
+    </section>
+
+    <RouterView />
+  </div>
+</template>
 
 <style scoped lang="scss">
 .workflow-shell {
@@ -61,9 +66,9 @@ function handleTabChange(name: string | number) {
 
 .workflow-hero {
   display: flex;
-  justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
+  justify-content: space-between;
   padding: 22px;
 }
 
@@ -74,8 +79,8 @@ function handleTabChange(name: string | number) {
 
 .workflow-hero__actions {
   display: flex;
-  gap: 10px;
   flex-wrap: wrap;
+  gap: 10px;
   justify-content: flex-end;
 }
 

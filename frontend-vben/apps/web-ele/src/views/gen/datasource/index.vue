@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import type { DataSourceView } from '#/api/codegen';
+
 import { computed, onMounted, ref } from 'vue';
+
 import { Delete, Edit, Plus, Refresh, Search } from '@element-plus/icons-vue';
 import {
   ElButton,
@@ -20,15 +23,15 @@ import {
   deleteDataSource,
   getDataSources,
   testDataSource,
-  type DataSourceView,
 } from '#/api/codegen';
+
 import DataSourceForm from './form.vue';
 
 const loading = ref(false);
 const allRows = ref<DataSourceView[]>([]);
 const dialogVisible = ref(false);
 const currentRow = ref<DataSourceView | null>(null);
-const formRef = ref<{ resetForm?: () => void } | null>(null);
+const formRef = ref<null | { resetForm?: () => void }>(null);
 
 // 搜索 & 分页（数据源总量小，前端分页即可）
 const searchKeyword = ref('');

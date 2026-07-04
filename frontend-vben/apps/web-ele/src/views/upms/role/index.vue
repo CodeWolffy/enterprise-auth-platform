@@ -47,7 +47,6 @@ const formRef = ref();
 const roleMenuRef = ref();
 const formMounted = ref(false);
 const menuMounted = ref(false);
-const queryRef = ref();
 
 const initPage = async () => {
   loading.value = true;
@@ -82,29 +81,31 @@ const del = (id: number | string) => {
     type: 'warning',
   }).then(() => {
     // 先检查影响分析
-    queryRoleImpact(id).then((impact: any) => {
-      const userCount = impact?.assignedUserCount ?? 0;
-      const menuCount = impact?.assignedMenuCount ?? 0;
-      if (userCount > 0 || menuCount > 0) {
-        const details = [];
-        if (userCount > 0) details.push(`${userCount} 个用户引用`);
-        if (menuCount > 0) details.push(`${menuCount} 个菜单授权`);
-        ElMessageBox.confirm(
-          `该角色存在关联引用（${details.join('、')}），删除后相关用户将失去此角色权限。是否继续？`,
-          '删除影响提示',
-          {
-            cancelButtonText: '取消',
-            confirmButtonText: '强制删除',
-            type: 'warning',
-          },
-        ).then(() => doDelete(id));
-      } else {
+    queryRoleImpact(id)
+      .then((impact: any) => {
+        const userCount = impact?.assignedUserCount ?? 0;
+        const menuCount = impact?.assignedMenuCount ?? 0;
+        if (userCount > 0 || menuCount > 0) {
+          const details = [];
+          if (userCount > 0) details.push(`${userCount} 个用户引用`);
+          if (menuCount > 0) details.push(`${menuCount} 个菜单授权`);
+          ElMessageBox.confirm(
+            `该角色存在关联引用（${details.join('、')}），删除后相关用户将失去此角色权限。是否继续？`,
+            '删除影响提示',
+            {
+              cancelButtonText: '取消',
+              confirmButtonText: '强制删除',
+              type: 'warning',
+            },
+          ).then(() => doDelete(id));
+        } else {
+          doDelete(id);
+        }
+      })
+      .catch(() => {
+        // 影响分析查询失败，直接删除
         doDelete(id);
-      }
-    }).catch(() => {
-      // 影响分析查询失败，直接删除
-      doDelete(id);
-    });
+      });
   });
 };
 
@@ -129,7 +130,7 @@ initPage();
 <template>
   <div class="hx-layout-container">
     <div class="hx-layout-container-auto hx-layout-container-view">
-      <ElForm ref="queryRef" :inline="true" :model="state.queryParams">
+      <ElForm :inline="true" :model="state.queryParams">
         <ElFormItem label="关键字" prop="keyword">
           <ElInput
             v-model="state.queryParams.keyword"
@@ -163,11 +164,18 @@ initPage();
       <ElTable v-loading="loading" :data="state.tableData" border>
         <ElTableColumn label="角色名称" prop="name" />
         <ElTableColumn label="角色编码" prop="code" />
-        <ElTableColumn label="角色描述" prop="description" show-overflow-tooltip />
+        <ElTableColumn
+          label="角色描述"
+          prop="description"
+          show-overflow-tooltip
+        />
         <ElTableColumn label="数据权限" width="140">
           <template #default="scope">
             <ElTag>
-              {{ DATA_SCOPE_LABELS[scope.row.dataScopeType] ?? scope.row.dataScopeType }}
+              {{
+                DATA_SCOPE_LABELS[scope.row.dataScopeType] ??
+                scope.row.dataScopeType
+              }}
             </ElTag>
           </template>
         </ElTableColumn>

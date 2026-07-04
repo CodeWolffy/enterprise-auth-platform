@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
+
 import {
   ElButton,
   ElEmpty,
@@ -28,9 +29,11 @@ const query = reactive({
   current: 1,
   size: 10,
 });
-const page = ref<{ total: number; records: any[] }>({ total: 0, records: [] });
+const page = ref<{ records: any[]; total: number }>({ total: 0, records: [] });
 
-const resolvedUserName = computed(() => props.userName?.trim() || query.userName.trim());
+const resolvedUserName = computed(
+  () => props.userName?.trim() || query.userName.trim(),
+);
 
 async function load() {
   loading.value = true;
@@ -42,7 +45,10 @@ async function load() {
       clientIp: query.clientIp || undefined,
       status: query.status || undefined,
     });
-    page.value = { total: response?.total ?? 0, records: response?.records ?? [] };
+    page.value = {
+      total: response?.total ?? 0,
+      records: response?.records ?? [],
+    };
   } catch {
     ElMessage.error('登录日志加载失败');
   } finally {
@@ -67,9 +73,24 @@ onMounted(() => {
 <template>
   <div class="user-log-panel">
     <div class="toolbar">
-      <ElInput v-model="query.userName" placeholder="登录用户" clearable style="width: 180px" />
-      <ElInput v-model="query.clientIp" placeholder="登录地址" clearable style="width: 180px" />
-      <ElSelect v-model="query.status" placeholder="操作状态" clearable style="width: 140px">
+      <ElInput
+        v-model="query.userName"
+        placeholder="登录用户"
+        clearable
+        style="width: 180px"
+      />
+      <ElInput
+        v-model="query.clientIp"
+        placeholder="登录地址"
+        clearable
+        style="width: 180px"
+      />
+      <ElSelect
+        v-model="query.status"
+        placeholder="操作状态"
+        clearable
+        style="width: 140px"
+      >
         <ElOption label="成功" value="SUCCESS" />
         <ElOption label="失败" value="FAILED" />
         <ElOption label="锁定" value="LOCKED" />
@@ -91,7 +112,9 @@ onMounted(() => {
       <ElTableColumn prop="os" label="操作系统" />
       <ElTableColumn label="操作状态">
         <template #default="scope">
-          <ElTag :type="loginStatusMeta(scope.row.status).type">{{ loginStatusMeta(scope.row.status).label }}</ElTag>
+          <ElTag :type="loginStatusMeta(scope.row.status).type">
+            {{ loginStatusMeta(scope.row.status).label }}
+          </ElTag>
         </template>
       </ElTableColumn>
       <ElTableColumn prop="msg" label="操作描述" show-overflow-tooltip />

@@ -7,10 +7,10 @@ import { BasicLayout, LockScreen, UserDropdown } from '@vben/layouts';
 import { preferences } from '@vben/preferences';
 import { useAccessStore, useUserStore } from '@vben/stores';
 
-import { useAuthStore } from '#/store';
 import NotificationBell from '#/components/notification/NotificationBell.vue';
-import LoginForm from '#/views/_core/authentication/login.vue';
 import TenantSwitcher from '#/components/tenant-switcher/index.vue';
+import { useAuthStore } from '#/store';
+import LoginForm from '#/views/_core/authentication/login.vue';
 
 const userStore = useUserStore();
 const authStore = useAuthStore();

@@ -18,5 +18,5 @@ export async function getPage(query: any) {
  * 后端无单条详情接口，详情使用列表行数据回填
  */
 export async function getById(_id: string) {
-  return Promise.resolve(null);
+  return null;
 }

@@ -783,11 +783,11 @@ h3 {
 
 .score-row {
   display: flex;
-  align-items: center;
   gap: 16px;
+  align-items: center;
   padding: 12px 14px;
-  border-radius: 6px;
   background: var(--el-fill-color-lighter);
+  border-radius: 6px;
 }
 
 .score-row > span {
@@ -835,8 +835,8 @@ h3 {
 @media (max-width: 768px) {
   .score-row,
   .flex.items-start.justify-between {
-    align-items: flex-start;
     flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>

@@ -8,8 +8,8 @@ export interface PermissionSnapshot {
   dataScopeType: string;
   customDeptIds: number[];
   menus: MenuItem[];
-  avatarFileKey?: string | null;
-  avatarUrl?: string | null;
+  avatarFileKey?: null | string;
+  avatarUrl?: null | string;
   superAdmin?: boolean;
 }
 
@@ -17,12 +17,12 @@ export interface MenuItem {
   id: number;
   code: string;
   title: string;
-  name?: string | null;
-  path?: string | null;
-  component?: string | null;
-  permission?: string | null;
-  icon?: string | null;
-  sort?: number | null;
+  name?: null | string;
+  path?: null | string;
+  component?: null | string;
+  permission?: null | string;
+  icon?: null | string;
+  sort?: null | number;
   children?: MenuItem[];
 }
 
@@ -31,20 +31,20 @@ export interface TokenSessionResponse {
   token: string;
   expiresAt: string;
   passwordChangeRequired?: boolean;
-  passwordChangeReason?: 'FORCE_CHANGE' | 'PASSWORD_EXPIRED' | string | null;
+  passwordChangeReason?: 'FORCE_CHANGE' | 'PASSWORD_EXPIRED' | null | string;
 }
 
 export interface UserSessionView {
   sessionId: string;
   username: string;
   tenantId: string;
-  activeTenantId?: string | null;
-  clientIp?: string | null;
-  loginLocation?: string | null;
-  device?: string | null;
-  issuedAt?: string | null;
-  expiresAt?: string | null;
-  lastAccessAt?: string | null;
+  activeTenantId?: null | string;
+  clientIp?: null | string;
+  loginLocation?: null | string;
+  device?: null | string;
+  issuedAt?: null | string;
+  expiresAt?: null | string;
+  lastAccessAt?: null | string;
   active: boolean;
   currentSession?: boolean;
 }

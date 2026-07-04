@@ -1,10 +1,19 @@
 <script lang="ts" setup>
+import type { CategoryAnalysis, CategoryOption } from '#/types/system';
+
 import { computed, defineAsyncComponent, nextTick, ref, watch } from 'vue';
 
+import { useTablePreferences } from '@vben/hooks';
+
 import { Delete, Edit, Plus, Refresh, Search } from '@element-plus/icons-vue';
+import { BarChart } from 'echarts/charts';
+import { GridComponent, TooltipComponent } from 'echarts/components';
+import { getInstanceByDom, init, use } from 'echarts/core';
+import { CanvasRenderer } from 'echarts/renderers';
 import {
   ElButton,
   ElCard,
+  ElCheckbox,
   ElCol,
   ElDescriptions,
   ElDescriptionsItem,
@@ -14,31 +23,23 @@ import {
   ElInput,
   ElMessage,
   ElMessageBox,
-  ElRadioGroup,
-  ElRadioButton,
   ElPopover,
-  ElCheckbox,
+  ElRadioButton,
+  ElRadioGroup,
   ElRow,
+  ElStatistic,
   ElTable,
   ElTableColumn,
+  ElTabPane,
+  ElTabs,
   ElTag,
   ElTimeline,
   ElTimelineItem,
-  ElTabs,
-  ElTabPane,
-  ElStatistic,
 } from 'element-plus';
-
-import { BarChart } from 'echarts/charts';
-import { GridComponent, TooltipComponent } from 'echarts/components';
-import { getInstanceByDom, init, use } from 'echarts/core';
-import { CanvasRenderer } from 'echarts/renderers';
 
 import { delObj, getAnalysis, getOptions } from '#/api/upms/category';
 import { invokeWhenComponentReady } from '#/utils/component-ready';
 import { formatDateTime } from '#/utils/datetime';
-import { useTablePreferences } from '@vben/hooks';
-import type { CategoryAnalysis, CategoryOption } from '#/types/system';
 
 use([BarChart, GridComponent, TooltipComponent, CanvasRenderer]);
 
@@ -47,7 +48,7 @@ const RightToolbar = defineAsyncComponent(
 );
 const Form = defineAsyncComponent(() => import('./form.vue'));
 
-const activeTab = ref<'dict' | 'config'>('dict');
+const activeTab = ref<'config' | 'dict'>('dict');
 const loading = ref(false);
 const tableData = ref<CategoryOption[]>([]);
 const showSearch = ref(true);
@@ -77,8 +78,8 @@ const categoryTablePrefs = useTablePreferences('table:system-categories', [
   { key: 'actions', label: '操作', width: 180 },
 ]);
 
-const matcherCount = computed(
-  () => tableData.value.reduce((sum, item) => sum + item.matchers.length, 0),
+const matcherCount = computed(() =>
+  tableData.value.reduce((sum, item) => sum + item.matchers.length, 0),
 );
 
 const initPage = async () => {
@@ -223,12 +224,7 @@ initPage();
         </ElTabs>
 
         <!-- 搜索 -->
-        <ElForm
-          ref="queryRef"
-          :inline="true"
-          v-show="showSearch"
-          class="mb-4"
-        >
+        <ElForm ref="queryRef" :inline="true" v-show="showSearch" class="mb-4">
           <ElFormItem label="关键字" prop="keyword">
             <ElInput
               v-model="keyword"
@@ -247,10 +243,7 @@ initPage();
         <!-- 工具栏 -->
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center gap-2">
-            <ElRadioGroup
-              v-model="categoryTablePrefs.density"
-              size="small"
-            >
+            <ElRadioGroup v-model="categoryTablePrefs.density" size="small">
               <ElRadioButton value="compact">紧凑</ElRadioButton>
               <ElRadioButton value="default">默认</ElRadioButton>
               <ElRadioButton value="comfortable">宽松</ElRadioButton>
@@ -266,7 +259,10 @@ initPage();
                   :model-value="categoryTablePrefs.visibleColumnMap[item.key]"
                   @change="
                     (value) =>
-                      categoryTablePrefs.setColumnVisible(item.key, Boolean(value))
+                      categoryTablePrefs.setColumnVisible(
+                        item.key,
+                        Boolean(value),
+                      )
                   "
                 >
                   {{ item.label }}
@@ -293,9 +289,7 @@ initPage();
           :class="`table-density-${categoryTablePrefs.density}`"
           @header-dragend="
             (newWidth: number, _oldWidth: number, column: any) => {
-              const key = String(
-                column.columnKey || column.property || '',
-              );
+              const key = String(column.columnKey || column.property || '');
               if (key) {
                 categoryTablePrefs.setColumnWidth(key, newWidth);
               }
@@ -407,13 +401,13 @@ initPage();
 
           <section class="analysis-section">
             <h4>七日影响趋势</h4>
-            <div ref="trendChartRef" class="trend-chart" />
+            <div ref="trendChartRef" class="trend-chart"></div>
           </section>
 
           <section class="analysis-section">
             <h4>引用样例</h4>
             <ElEmpty
-              v-if="!analysis.sampleReferences.length"
+              v-if="analysis.sampleReferences.length === 0"
               description="暂无引用样例"
             />
             <ElTimeline v-else>
@@ -429,16 +423,15 @@ initPage();
           <section class="analysis-section">
             <h4>最近审计记录</h4>
             <ElEmpty
-              v-if="!analysis.recentAudits.length"
+              v-if="analysis.recentAudits.length === 0"
               description="暂无分类变更审计"
             />
-            <ElTable
-              v-else
-              :data="analysis.recentAudits"
-              stripe
-              size="small"
-            >
-              <ElTableColumn prop="eventType" label="事件类型" min-width="180" />
+            <ElTable v-else :data="analysis.recentAudits" stripe size="small">
+              <ElTableColumn
+                prop="eventType"
+                label="事件类型"
+                min-width="180"
+              />
               <ElTableColumn prop="operator" label="操作人" min-width="120" />
               <ElTableColumn label="发生时间" min-width="180">
                 <template #default="{ row }">
@@ -483,7 +476,7 @@ initPage();
   margin: 0;
   font-size: 12px;
   line-height: 1.5;
-  white-space: pre-wrap;
   word-break: break-all;
+  white-space: pre-wrap;
 }
 </style>

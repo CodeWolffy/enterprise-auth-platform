@@ -35,7 +35,9 @@ function getFormatter(timeZone = getClientTimeZone()): Intl.DateTimeFormat {
 }
 
 function normalizeParts(parts: Intl.DateTimeFormatPart[]): string {
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const values = Object.fromEntries(
+    parts.map((part) => [part.type, part.value]),
+  );
   return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}:${values.second}`;
 }
 
@@ -97,7 +99,9 @@ export function formatDateTime(
   timeZone = getClientTimeZone(),
 ): string {
   const date = parseInstant(value);
-  return date ? normalizeParts(getFormatter(timeZone).formatToParts(date)) : placeholder;
+  return date
+    ? normalizeParts(getFormatter(timeZone).formatToParts(date))
+    : placeholder;
 }
 
 /**
@@ -105,7 +109,7 @@ export function formatDateTime(
  */
 export function formatDate(value?: InstantValue, placeholder = '-'): string {
   const formatted = formatDateTime(value, placeholder);
-  return formatted === placeholder ? placeholder : formatted.substring(0, 10);
+  return formatted === placeholder ? placeholder : formatted.slice(0, 10);
 }
 
 /**
@@ -115,9 +119,9 @@ export function formatRelativeTime(value?: InstantValue): string {
   const date = parseInstant(value);
   if (!date) return '-';
   const diff = Date.now() - date.getTime();
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
+  const minutes = Math.floor(diff / 60_000);
+  const hours = Math.floor(diff / 3_600_000);
+  const days = Math.floor(diff / 86_400_000);
   if (minutes < 1) return '刚刚';
   if (minutes < 60) return `${minutes}分钟前`;
   if (hours < 24) return `${hours}小时前`;

@@ -28,11 +28,7 @@ const content = ref('<p>初始内容</p>');
 </script>
 
 <template>
-  <TiptapEditor
-    v-model="content"
-    placeholder="请输入内容"
-    height="500px"
-  />
+  <TiptapEditor v-model="content" placeholder="请输入内容" height="500px" />
 </template>
 ```
 
@@ -81,7 +77,7 @@ function insertLink() {
       @created="handleCreated"
       @change="handleChange"
     />
-    
+
     <button @click="insertImage">插入图片</button>
     <button @click="insertLink">插入链接</button>
   </div>
@@ -92,11 +88,7 @@ function insertLink() {
 
 ```vue
 <template>
-  <TiptapEditor
-    v-model="content"
-    :disabled="true"
-    placeholder="只读模式"
-  />
+  <TiptapEditor v-model="content" :disabled="true" placeholder="只读模式" />
 </template>
 ```
 
@@ -104,10 +96,7 @@ function insertLink() {
 
 ```vue
 <template>
-  <TiptapEditor
-    v-model="content"
-    :show-toolbar="false"
-  />
+  <TiptapEditor v-model="content" :show-toolbar="false" />
 </template>
 ```
 
@@ -115,22 +104,22 @@ function insertLink() {
 
 ### Props
 
-| 属性 | 说明 | 类型 | 默认值 |
-| --- | --- | --- | --- |
-| modelValue | 编辑器内容（HTML） | `string` | `''` |
-| disabled | 是否禁用 | `boolean` | `false` |
-| placeholder | 占位符文本 | `string` | `'请输入内容...'` |
-| height | 编辑器高度 | `string` | `'400px'` |
-| width | 编辑器宽度 | `string` | `'100%'` |
-| showToolbar | 是否显示工具栏 | `boolean` | `true` |
+| 属性        | 说明               | 类型      | 默认值            |
+| ----------- | ------------------ | --------- | ----------------- |
+| modelValue  | 编辑器内容（HTML） | `string`  | `''`              |
+| disabled    | 是否禁用           | `boolean` | `false`           |
+| placeholder | 占位符文本         | `string`  | `'请输入内容...'` |
+| height      | 编辑器高度         | `string`  | `'400px'`         |
+| width       | 编辑器宽度         | `string`  | `'100%'`          |
+| showToolbar | 是否显示工具栏     | `boolean` | `true`            |
 
 ### Events
 
-| 事件名 | 说明 | 参数 |
-| --- | --- | --- |
-| update:modelValue | 内容更新 | `(value: string)` |
-| change | 内容改变 | `(editor: Editor)` |
-| created | 编辑器创建完成 | `(editor: Editor)` |
+| 事件名            | 说明           | 参数               |
+| ----------------- | -------------- | ------------------ |
+| update:modelValue | 内容更新       | `(value: string)`  |
+| change            | 内容改变       | `(editor: Editor)` |
+| created           | 编辑器创建完成 | `(editor: Editor)` |
 
 ### Expose Methods
 
@@ -191,14 +180,14 @@ function insertLink() {
 
 ## 与 Legacy 项目对比
 
-| 特性 | WangEditor | TipTap |
-|-----|-----------|---------|
-| 框架 | 独立 | Vue 3 优化 |
-| 扩展性 | 中等 | 优秀 |
-| TypeScript | 部分 | 完整 |
-| 包体积 | 较大 | 适中 |
-| 社区活跃度 | 中等 | 高 |
-| 文档质量 | 良好 | 优秀 |
+| 特性       | WangEditor | TipTap     |
+| ---------- | ---------- | ---------- |
+| 框架       | 独立       | Vue 3 优化 |
+| 扩展性     | 中等       | 优秀       |
+| TypeScript | 部分       | 完整       |
+| 包体积     | 较大       | 适中       |
+| 社区活跃度 | 中等       | 高         |
+| 文档质量   | 良好       | 优秀       |
 
 ## 更多资源
 

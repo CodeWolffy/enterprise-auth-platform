@@ -1,14 +1,24 @@
-import type { FieldOptions, FormContext, GenericObject } from 'vee-validate';
+import type {
+  FieldOptions,
+  FormContext,
+  FormState,
+  GenericObject,
+  ResetFormOpts,
+  ValidationOptions,
+} from 'vee-validate';
 import type { ZodTypeAny } from 'zod';
 
-import type { Component, HtmlHTMLAttributes, Ref } from 'vue';
+import type {
+  Component,
+  ComponentPublicInstance,
+  HtmlHTMLAttributes,
+  Ref,
+} from 'vue';
 
 import type { VbenButtonProps } from '@vben-core/shadcn-ui';
 import type { ClassType, MaybeComputedRef } from '@vben-core/typings';
 
-import type { FormApi } from './form-api';
-
-export type FormLayout = 'horizontal' | 'vertical';
+export type FormLayout = 'horizontal' | 'inline' | 'vertical';
 
 export type BaseFormComponentType =
   | 'DefaultButton'
@@ -67,6 +77,14 @@ export type FormActions = FormContext<GenericObject>;
 
 export type CustomRenderType = (() => Component | string) | string;
 
+// 动态渲染参数
+export type CustomParamsRenderType =
+  | ((
+      value: Partial<Record<string, any>>,
+      actions: FormActions,
+    ) => Component | string)
+  | string;
+
 export type FormSchemaRuleType =
   | 'required'
   | 'selectRequired'
@@ -77,16 +95,19 @@ export type FormSchemaRuleType =
 type FormItemDependenciesCondition<T = boolean | PromiseLike<boolean>> = (
   value: Partial<Record<string, any>>,
   actions: FormActions,
+  controller: ExtendedFormApi, // 在 dependencies 里提供访问extendApi的能力
 ) => T;
 
 type FormItemDependenciesConditionWithRules = (
   value: Partial<Record<string, any>>,
   actions: FormActions,
+  controller: ExtendedFormApi, // 在 dependencies 里提供访问extendApi的能力
 ) => FormSchemaRuleType | PromiseLike<FormSchemaRuleType>;
 
 type FormItemDependenciesConditionWithProps = (
   value: Partial<Record<string, any>>,
   actions: FormActions,
+  controller: ExtendedFormApi, // 在 dependencies 里提供访问extendApi的能力
 ) => MaybeComponentProps | PromiseLike<MaybeComponentProps>;
 
 export interface FormItemDependencies {
@@ -138,6 +159,11 @@ type ComponentProps =
 
 export interface FormCommonConfig {
   /**
+   * 是否可折叠的
+   * @default false
+   */
+  collapsible?: boolean;
+  /**
    * 在Label后显示一个冒号
    */
   colon?: boolean;
@@ -149,6 +175,11 @@ export interface FormCommonConfig {
    * 所有表单项的控件样式
    */
   controlClass?: string;
+  /**
+   * 默认折叠
+   * @default false
+   */
+  defaultCollapsed?: boolean;
   /**
    * 所有表单项的禁用状态
    * @default false
@@ -174,10 +205,10 @@ export interface FormCommonConfig {
    */
   formFieldProps?: FormFieldOptions;
   /**
-   * 所有表单项的栅格布局
+   * 所有表单项的栅格布局，支持函数形式
    * @default ""
    */
-  formItemClass?: string;
+  formItemClass?: (() => string) | string;
   /**
    * 隐藏所有表单项label
    * @default false
@@ -213,6 +244,79 @@ type RenderComponentContentType = (
   api: FormActions,
 ) => Record<string, any>;
 
+type MappedComponentProps<P> =
+  | ((
+      value: Partial<Record<string, any>>,
+      actions: FormActions,
+    ) => P & Record<string, any>)
+  | (P & Record<string, any>);
+
+/**
+ * 格式化 `getValues()` 输出中的当前字段值。
+ * - 返回 `undefined`：保留当前字段已被移除的状态，通常配合 `setValue(key, nextValue)`
+ *   把一个字段拆分写入到其他字段，例如 `startTime` / `endTime`
+ * - 返回其他值：会将当前字段恢复/写回为该返回值
+ * - `setValue` 回调签名为 `(key, nextValue) => void`
+ */
+export type FormValueFormat = (
+  value: any,
+  setValue: (fieldName: string, value: any) => void,
+  values: Record<string, any>,
+) => any;
+
+interface FormSchemaBody extends Omit<FormCommonConfig, 'componentProps'> {
+  /** 默认值 */
+  defaultValue?: any;
+  /** 依赖 */
+  dependencies?: FormItemDependencies;
+  /** 描述 */
+  description?: CustomRenderType;
+  /** 字段名 */
+  fieldName: string;
+  /** 帮助信息 */
+  help?: CustomParamsRenderType;
+  /** 是否隐藏表单项 */
+  hide?: boolean;
+  /** 表单项 */
+  label?: CustomRenderType;
+  // 自定义组件内部渲染
+  renderComponentContent?: RenderComponentContentType;
+  /** 字段规则 */
+  rules?: FormSchemaRuleType;
+  /** 后缀 */
+  suffix?: CustomRenderType;
+  /**
+   * 获取表单值时格式化当前字段。
+   * - 返回值不为 `undefined` 时，会回写到当前 fieldName
+   * - 返回值为 `undefined` 时，可通过 setValue 写入一个或多个目标字段
+   */
+  valueFormat?: FormValueFormat;
+}
+
+type FormSchemaDiscriminated<
+  T extends BaseFormComponentType,
+  P extends Record<string, any>,
+> = {
+  [K in Extract<keyof P, T>]: {
+    /** 组件 */
+    component: K;
+    /** 组件参数 */
+    componentProps?: MappedComponentProps<P[K]>;
+  } & FormSchemaBody;
+}[Extract<keyof P, T>];
+
+type FormSchemaFallback<T extends BaseFormComponentType> = {
+  /** 组件 */
+  component: Component | T;
+  /** 组件参数 */
+  componentProps?: ComponentProps;
+} & FormSchemaBody;
+
+export type FormSchema<
+  T extends BaseFormComponentType = BaseFormComponentType,
+  P extends Record<string, any> = Record<never, never>,
+> = FormSchemaDiscriminated<T, P> | FormSchemaFallback<T>;
+
 export type HandleSubmitFn = (
   values: Record<string, any>,
 ) => Promise<void> | void;
@@ -238,46 +342,26 @@ export type ArrayToStringFields = Array<
   | string[] // 简单数组格式，最后一个元素可以是分隔符
 >;
 
-export interface FormSchema<
+export interface FormFieldProps<
   T extends BaseFormComponentType = BaseFormComponentType,
-> extends FormCommonConfig {
+> extends FormSchemaBody {
   /** 组件 */
   component: Component | T;
   /** 组件参数 */
   componentProps?: ComponentProps;
-  /** 默认值 */
-  defaultValue?: any;
-  /** 依赖 */
-  dependencies?: FormItemDependencies;
-  /** 描述 */
-  description?: CustomRenderType;
-  /** 字段名 */
-  fieldName: string;
-  /** 帮助信息 */
-  help?: CustomRenderType;
-  /** 表单项 */
-  label?: CustomRenderType;
-  // 自定义组件内部渲染
-  renderComponentContent?: RenderComponentContentType;
-  /** 字段规则 */
-  rules?: FormSchemaRuleType;
-  /** 后缀 */
-  suffix?: CustomRenderType;
-}
-
-export interface FormFieldProps extends FormSchema {
-  required?: boolean;
 }
 
 export interface FormRenderProps<
   T extends BaseFormComponentType = BaseFormComponentType,
+  P extends Record<string, any> = Record<never, never>,
 > {
   /**
    * 表单字段数组映射字符串配置 默认使用","
    */
   arrayToStringFields?: ArrayToStringFields;
   /**
-   * 是否展开，在showCollapseButton=true下生效
+   * 是否折叠，在showCollapseButton=true下生效
+   * true:折叠 false:展开
    */
   collapsed?: boolean;
   /**
@@ -321,7 +405,7 @@ export interface FormRenderProps<
   /**
    * 表单定义
    */
-  schema?: FormSchema<T>[];
+  schema?: FormSchema<T, P>[];
 
   /**
    * 是否显示展开/折叠
@@ -346,14 +430,24 @@ export interface ActionButtonOptions extends VbenButtonProps {
 
 export interface VbenFormProps<
   T extends BaseFormComponentType = BaseFormComponentType,
+  P extends Record<string, any> = Record<never, never>,
 > extends Omit<
-    FormRenderProps<T>,
-    'componentBindEventMap' | 'componentMap' | 'form'
-  > {
+  FormRenderProps<T, P>,
+  'componentBindEventMap' | 'componentMap' | 'form'
+> {
   /**
    * 操作按钮是否反转（提交按钮前置）
    */
   actionButtonsReverse?: boolean;
+  /**
+   * 操作按钮组的样式
+   * newLine: 在新行显示。rowEnd: 在行内显示，靠右对齐（默认）。inline: 使用grid默认样式
+   */
+  actionLayout?: 'inline' | 'newLine' | 'rowEnd';
+  /**
+   * 操作按钮组显示位置，默认靠右显示
+   */
+  actionPosition?: 'center' | 'left' | 'right';
   /**
    * 表单操作区域class
    */
@@ -367,6 +461,10 @@ export interface VbenFormProps<
    * 表单字段映射
    */
   fieldMappingTime?: FieldMappingTime;
+  /**
+   * 表单收起展开状态变化回调
+   */
+  handleCollapsedChange?: (collapsed: boolean) => void;
   /**
    * 表单重置回调
    */
@@ -386,6 +484,12 @@ export interface VbenFormProps<
    * 重置按钮参数
    */
   resetButtonOptions?: ActionButtonOptions;
+
+  /**
+   * 验证失败时是否自动滚动到第一个错误字段
+   * @default false
+   */
+  scrollToFirstError?: boolean;
 
   /**
    * 是否显示默认操作按钮
@@ -411,11 +515,59 @@ export interface VbenFormProps<
   submitOnEnter?: boolean;
 }
 
-export type ExtendedFormApi = FormApi & {
+export interface ExtendedFormApi {
+  form: FormActions;
+  getFieldComponentRef: <T = ComponentPublicInstance>(
+    fieldName: string,
+  ) => T | undefined;
+  getFocusedField: () => string | undefined;
+  getLatestSubmissionValues: () => Record<string, any>;
+  getState: () => null | VbenFormProps;
+  getValues: <T = Record<string, any>>() => Promise<T>;
+  isFieldValid: (fieldName: string) => Promise<boolean>;
+  isMounted: boolean;
+  merge: (formApi: ExtendedFormApi) => ExtendedFormApi;
+  mount: (
+    formActions: FormActions,
+    componentRefMap?: Map<string, unknown>,
+  ) => void;
+  removeSchemaByFields: (fields: string[]) => Promise<void>;
+  resetForm: (
+    state?: Partial<FormState<GenericObject>>,
+    opts?: Partial<ResetFormOpts>,
+  ) => Promise<void>;
+  resetValidate: () => Promise<void>;
+  scrollToFirstError: (errors: Record<string, any> | string) => void;
+  setFieldValue: (
+    field: string,
+    value: any,
+    shouldValidate?: boolean,
+  ) => Promise<void>;
+  setLatestSubmissionValues: (values: null | Record<string, any>) => void;
+  setState: (
+    stateOrFn:
+      | ((prev: VbenFormProps) => Partial<VbenFormProps>)
+      | Partial<VbenFormProps>,
+  ) => void;
+  setValues: (
+    fields: Record<string, any>,
+    filterFields?: boolean,
+    shouldValidate?: boolean,
+  ) => Promise<void>;
+  state: null | VbenFormProps;
+  submitForm: (e?: Event) => Promise<Record<string, any>>;
+  unmount: () => void;
+  updateSchema: (schema: Partial<FormSchema>[]) => void;
   useStore: <T = NoInfer<VbenFormProps>>(
     selector?: (state: NoInfer<VbenFormProps>) => T,
   ) => Readonly<Ref<T>>;
-};
+  validate: (opts?: Partial<ValidationOptions>) => Promise<any>;
+  validateAndSubmitForm: () => Promise<Record<string, any> | undefined>;
+  validateField: (
+    fieldName: string,
+    opts?: Partial<ValidationOptions>,
+  ) => Promise<any>;
+}
 
 export interface VbenFormAdapterOptions<
   T extends BaseFormComponentType = BaseFormComponentType,

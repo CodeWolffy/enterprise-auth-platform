@@ -3,11 +3,11 @@ export interface NoticeView {
   noticeTitle: string;
   noticeContent: string;
   published?: boolean;
-  publishTime?: string | null;
-  createdBy?: string | null;
-  createdAt?: string | null;
-  updatedAt?: string | null;
-  workflowStatus?: string | null;
+  publishTime?: null | string;
+  createdBy?: null | string;
+  createdAt?: null | string;
+  updatedAt?: null | string;
+  workflowStatus?: null | string;
 }
 
 export interface MailChannelPreset {
@@ -60,7 +60,7 @@ export interface CategoryOption {
 export interface CategoryAuditView {
   eventType: string;
   operator: string;
-  occurredAt?: string | null;
+  occurredAt?: null | string;
   payloadJson: string;
 }
 
@@ -72,5 +72,5 @@ export interface CategoryAnalysis {
   referenceCount: number;
   sampleReferences: string[];
   recentAudits: CategoryAuditView[];
-  trend: { date: string; count: number }[];
+  trend: { count: number; date: string }[];
 }

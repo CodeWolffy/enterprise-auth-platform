@@ -3,8 +3,9 @@ import type { NotificationView } from '#/api/notification';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { ElMessage, ElMessageBox } from 'element-plus';
 import { useAccessStore } from '@vben/stores';
+
+import { ElMessage, ElMessageBox } from 'element-plus';
 
 import {
   buildNotificationStreamUrl,
@@ -24,10 +25,10 @@ export function useNotifications() {
   const unreadNotificationCount = ref(0);
   const notificationReadFilter = ref<'all' | 'unread'>('all');
   const notificationPage = ref<{
-    total: number;
     page: number;
-    size: number;
     records: NotificationView[];
+    size: number;
+    total: number;
   }>({
     total: 0,
     page: 1,
@@ -35,7 +36,8 @@ export function useNotifications() {
     records: [],
   });
 
-  const notificationServiceUnavailableMessage = '站内通知暂时无法同步，不影响当前操作';
+  const notificationServiceUnavailableMessage =
+    '站内通知暂时无法同步，不影响当前操作';
   const notificationErrorThrottleMs = 15_000;
 
   let lastNotificationErrorAt = 0;
@@ -52,13 +54,15 @@ export function useNotifications() {
   );
 
   let sseSource: EventSource | null = null;
-  let sseReconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let sseReconnectTimer: null | ReturnType<typeof setTimeout> = null;
   let sseManualClose = false;
   const sseReconnectBaseDelayMs = 5000;
   const sseReconnectMaxDelayMs = 60_000;
   let sseReconnectDelayMs = sseReconnectBaseDelayMs;
 
-  function showNotificationServiceWarning(message = notificationServiceUnavailableMessage) {
+  function showNotificationServiceWarning(
+    message = notificationServiceUnavailableMessage,
+  ) {
     const now = Date.now();
     if (now - lastNotificationErrorAt < notificationErrorThrottleMs) {
       return;
@@ -121,11 +125,16 @@ export function useNotifications() {
     try {
       const updated = await markNotificationReadRequest(notification.id);
       if (notificationReadFilter.value === 'unread') {
-        notificationPage.value.records = notificationPage.value.records.filter((item) => item.id !== updated.id);
-        notificationPage.value.total = Math.max(notificationPage.value.total - 1, 0);
+        notificationPage.value.records = notificationPage.value.records.filter(
+          (item) => item.id !== updated.id,
+        );
+        notificationPage.value.total = Math.max(
+          notificationPage.value.total - 1,
+          0,
+        );
       } else {
-        notificationPage.value.records = notificationPage.value.records.map((item) =>
-          item.id === updated.id ? updated : item,
+        notificationPage.value.records = notificationPage.value.records.map(
+          (item) => (item.id === updated.id ? updated : item),
         );
       }
       await loadUnreadNotificationCount();
@@ -206,7 +215,8 @@ export function useNotifications() {
     sseManualClose = false;
     let streamTicket: string;
     try {
-      streamTicket = (await createNotificationStreamTicket()).ticket;
+      const ticketResponse = await createNotificationStreamTicket();
+      streamTicket = ticketResponse.ticket;
     } catch {
       scheduleSseReconnect();
       return;
@@ -226,7 +236,9 @@ export function useNotifications() {
     });
     sseSource.addEventListener('notification', (event) => {
       try {
-        const notification = JSON.parse((event as MessageEvent).data) as NotificationView;
+        const notification = JSON.parse(
+          (event as MessageEvent).data,
+        ) as NotificationView;
         handleIncomingNotification(notification);
       } catch {
         // ignore malformed event
@@ -262,7 +274,10 @@ export function useNotifications() {
       return;
     }
     const reconnectDelay = sseReconnectDelayMs;
-    sseReconnectDelayMs = Math.min(sseReconnectDelayMs * 2, sseReconnectMaxDelayMs);
+    sseReconnectDelayMs = Math.min(
+      sseReconnectDelayMs * 2,
+      sseReconnectMaxDelayMs,
+    );
     sseReconnectTimer = setTimeout(() => {
       sseReconnectTimer = null;
       if (!sseManualClose && accessStore.accessToken) {
@@ -274,9 +289,14 @@ export function useNotifications() {
   function handleIncomingNotification(notification: NotificationView) {
     unreadNotificationCount.value += 1;
     if (notificationsVisible.value && notificationReadFilter.value === 'all') {
-      const exists = notificationPage.value.records.some((item) => item.id === notification.id);
+      const exists = notificationPage.value.records.some(
+        (item) => item.id === notification.id,
+      );
       if (!exists) {
-        notificationPage.value.records = [notification, ...notificationPage.value.records].slice(0, notificationPage.value.size);
+        notificationPage.value.records = [
+          notification,
+          ...notificationPage.value.records,
+        ].slice(0, notificationPage.value.size);
         notificationPage.value.total += 1;
       }
     }
@@ -285,10 +305,25 @@ export function useNotifications() {
 
   function showNotificationToast(notification: NotificationView) {
     const level = notification.level;
-    const type: 'success' | 'warning' | 'error' | 'info' =
-      level === 'SUCCESS' ? 'success' :
-      level === 'WARNING' ? 'warning' :
-      level === 'ERROR' ? 'error' : 'info';
+    let type: 'error' | 'info' | 'success' | 'warning' = 'info';
+    switch (level) {
+      case 'ERROR': {
+        type = 'error';
+
+        break;
+      }
+      case 'SUCCESS': {
+        type = 'success';
+
+        break;
+      }
+      case 'WARNING': {
+        type = 'warning';
+
+        break;
+      }
+      // No default
+    }
     ElMessage({
       type,
       message: notification.title,

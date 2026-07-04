@@ -28,7 +28,6 @@ const Pagination = defineAsyncComponent(
 
 const showSearch = ref(true);
 const loading = ref(false);
-const queryRef = ref();
 
 const state = reactive({
   queryParams: {
@@ -90,12 +89,7 @@ const resetQuery = () => {
   <div class="hx-layout-container">
     <div class="hx-layout-container-auto hx-layout-container-view">
       <!-- 搜索 -->
-      <ElForm
-        :model="state.queryParams"
-        ref="queryRef"
-        :inline="true"
-        v-show="showSearch"
-      >
+      <ElForm :model="state.queryParams" :inline="true" v-show="showSearch">
         <ElFormItem label="登录用户" prop="userName">
           <ElInput
             v-model="state.queryParams.userName"

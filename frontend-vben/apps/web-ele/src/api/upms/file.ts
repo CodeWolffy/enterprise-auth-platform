@@ -5,7 +5,8 @@ import { requestClient } from '#/api/request';
  * 后端：GET /api/files?keyword&contentType&storageType&visibility&page&size
  */
 export async function getPage(query: any) {
-  const { page, size, keyword, contentType, storageType, visibility } = query ?? {};
+  const { page, size, keyword, contentType, storageType, visibility } =
+    query ?? {};
   return requestClient.get('/files', {
     params: {
       keyword,

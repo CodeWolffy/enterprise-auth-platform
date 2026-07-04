@@ -1,7 +1,29 @@
-export type WorkflowDefinitionStatus = 'DRAFT' | 'DEPLOYED' | 'DISABLED' | string;
-export type WorkflowInstanceStatus = 'RUNNING' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN' | 'TERMINATED' | string;
-export type WorkflowTaskStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'TRANSFERRED' | string;
-export type WorkflowRejectStrategy = 'END' | 'PREVIOUS' | 'RESTART' | 'TO_STEP' | 'TO_STARTER' | string;
+export type WorkflowDefinitionStatus =
+  | 'DEPLOYED'
+  | 'DISABLED'
+  | 'DRAFT'
+  | string;
+export type WorkflowInstanceStatus =
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'RUNNING'
+  | 'TERMINATED'
+  | 'WITHDRAWN'
+  | string;
+export type WorkflowTaskStatus =
+  | 'APPROVED'
+  | 'CANCELLED'
+  | 'PENDING'
+  | 'REJECTED'
+  | 'TRANSFERRED'
+  | string;
+export type WorkflowRejectStrategy =
+  | 'END'
+  | 'PREVIOUS'
+  | 'RESTART'
+  | 'TO_STARTER'
+  | 'TO_STEP'
+  | string;
 
 export interface WorkflowStepView {
   stepIndex: number;
@@ -9,7 +31,7 @@ export interface WorkflowStepView {
   candidateUserIds: number[];
   candidateGroupCodes: string[];
   rejectStrategy?: WorkflowRejectStrategy;
-  rejectTarget?: number | null;
+  rejectTarget?: null | number;
 }
 
 export interface WorkflowStepInput {
@@ -17,7 +39,7 @@ export interface WorkflowStepInput {
   candidateUserIds: number[];
   candidateGroupCodes: string[];
   rejectStrategy?: WorkflowRejectStrategy;
-  rejectTarget?: number | null;
+  rejectTarget?: null | number;
 }
 
 export interface WorkflowDefinitionView {
@@ -28,9 +50,9 @@ export interface WorkflowDefinitionView {
   version: number;
   status: WorkflowDefinitionStatus;
   steps: WorkflowStepView[];
-  remark?: string | null;
-  createdAt?: string | null;
-  updatedAt?: string | null;
+  remark?: null | string;
+  createdAt?: null | string;
+  updatedAt?: null | string;
 }
 
 export interface WorkflowDefinitionRequest {
@@ -66,8 +88,8 @@ export interface WorkflowInstanceView {
   starterUsername: string;
   currentStepIndex: number;
   variablesSnapshot: Record<string, unknown>;
-  startedAt?: string | null;
-  endedAt?: string | null;
+  startedAt?: null | string;
+  endedAt?: null | string;
 }
 
 export interface WorkflowInstanceQueryParams {
@@ -86,11 +108,11 @@ export interface WorkflowTaskView {
   status: WorkflowTaskStatus;
   candidateUserIds: number[];
   candidateGroupCodes: string[];
-  assigneeUserId?: number | null;
-  assigneeUsername?: string | null;
-  comment?: string | null;
-  createdAt?: string | null;
-  completedAt?: string | null;
+  assigneeUserId?: null | number;
+  assigneeUsername?: null | string;
+  comment?: null | string;
+  createdAt?: null | string;
+  completedAt?: null | string;
   actionable: boolean;
   urgeCount: number;
 }
@@ -108,12 +130,12 @@ export interface WorkflowTaskQueryParams {
 
 export interface WorkflowStartResult {
   instance: WorkflowInstanceView;
-  currentTask?: WorkflowTaskView | null;
+  currentTask?: null | WorkflowTaskView;
 }
 
 export interface WorkflowActionResult {
   instance: WorkflowInstanceView;
-  nextTask?: WorkflowTaskView | null;
+  nextTask?: null | WorkflowTaskView;
 }
 
 export interface WorkflowTaskUrgeView {
@@ -122,13 +144,13 @@ export interface WorkflowTaskUrgeView {
   instanceId: number;
   urgedByUserId: number;
   urgedByUsername: string;
-  comment?: string | null;
-  urgedAt?: string | null;
+  comment?: null | string;
+  urgedAt?: null | string;
   targetUsernames: string[];
 }
 
 export interface WorkflowTaskUrgeResult {
   urge: WorkflowTaskUrgeView;
   totalUrgeCount: number;
-  instance?: WorkflowInstanceView | null;
+  instance?: null | WorkflowInstanceView;
 }

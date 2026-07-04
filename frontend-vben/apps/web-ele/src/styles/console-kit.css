@@ -4,13 +4,13 @@
 
 .eyebrow {
   display: inline-flex;
-  align-items: center;
   gap: 6px;
+  align-items: center;
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
   color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
 }
 
 /* ====== 面板 ====== */
@@ -21,45 +21,47 @@
 }
 
 .dashboard-panel {
-  padding: 22px;
   position: relative;
+  padding: 22px;
   overflow: hidden;
   background: var(--bg-card);
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .dashboard-panel:hover {
-  transform: translateY(-2px);
   box-shadow: var(--shadow-soft);
+  transform: translateY(-2px);
 }
 
 .panel-head {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
   gap: 16px;
-  margin-bottom: 18px;
+  align-items: center;
+  justify-content: space-between;
   padding-bottom: 12px;
+  margin-bottom: 18px;
   border-bottom: 1px solid var(--line);
 }
 
 .panel-head h3 {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 600;
   font-size: 24px;
+  font-weight: 600;
   line-height: 1.2;
 }
 
 .panel-actions {
   display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
 }
 
 /* ====== 统计卡片 ====== */
@@ -71,19 +73,21 @@
 }
 
 .stat-card {
-  padding: 22px;
   display: grid;
   gap: 10px;
+  padding: 22px;
   background: var(--bg-card);
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .stat-card:hover {
-  transform: translateY(-2px);
   box-shadow: var(--shadow-soft);
+  transform: translateY(-2px);
 }
 
 .stat-card strong {
@@ -99,33 +103,33 @@
 }
 
 .muted-inline {
-  color: var(--text-soft);
   font-size: 13px;
+  color: var(--text-soft);
 }
 
 /* ====== 表区域 ====== */
 
 .table-tools {
   display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
   align-items: center;
   justify-content: flex-end;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin: 12px 0 14px;
   padding: 12px 14px;
+  margin: 12px 0 14px;
+  background: var(--bg-card-muted);
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: var(--bg-card-muted);
 }
 
 .footer-bar {
   display: flex;
+  gap: 12px;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
   margin-top: 16px;
-  color: var(--text-soft);
   font-size: 13px;
+  color: var(--text-soft);
 }
 
 /* ====== 抽屉区域 ====== */
@@ -151,9 +155,9 @@
   gap: 10px 12px;
   align-items: center;
   padding: 14px 16px;
+  background: var(--bg-card-muted);
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: var(--bg-card-muted);
 }
 
 .toolbar-inline .el-form-item {
@@ -169,18 +173,18 @@
 /* ====== JSON 预览 ====== */
 
 .json-pre {
-  margin: 0;
   max-height: 320px;
-  overflow: auto;
   padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  background: rgba(15, 23, 42, 0.96);
-  color: #f8fafc;
+  margin: 0;
+  overflow: auto;
   font-size: 12px;
   line-height: 1.6;
-  white-space: pre-wrap;
+  color: #f8fafc;
   word-break: break-all;
+  white-space: pre-wrap;
+  background: rgb(15 23 42 / 96%);
+  border: 1px solid rgb(15 23 42 / 12%);
+  border-radius: 12px;
 }
 
 /* ====== Element Plus 表格单元格压缩 ====== */
@@ -204,9 +208,9 @@
   }
 
   .panel-actions {
-    width: 100%;
     flex-wrap: wrap;
     justify-content: flex-start;
+    width: 100%;
   }
 
   .toolbar-inline .el-input,

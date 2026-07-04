@@ -4,8 +4,7 @@ import { requestClient } from '#/api/request';
  * 生成随机len位数字
  */
 export const randomLenNum = (len: any, date: any) => {
-  let random = '';
-  random = Math.ceil(Math.random() * 100_000_000_000_000)
+  let random = Math.ceil(Math.random() * 100_000_000_000_000)
     .toString()
     .slice(0, Math.max(0, len || 4));
   if (date) random = random + Date.now();
@@ -42,17 +41,19 @@ export const arrEquals = (arr1: any, arr2: any) => {
  */
 export const descartes = (array: any[]) => {
   if (array.length < 2) return array[0] || [];
-  return array.reduce((col: any, set: any) => {
+  let result = array[0] || [];
+  for (const set of array.slice(1)) {
     const res: any = [];
-    col.forEach((c: any) => {
+    result.forEach((c: any) => {
       set.forEach((s: any) => {
         const t = [Array.isArray(c) ? c : [c]].flat();
         t.push(s);
         res.push(t);
       });
     });
-    return res;
-  });
+    result = res;
+  }
+  return result;
 };
 
 export const findArray = (array: any, value: string) => {

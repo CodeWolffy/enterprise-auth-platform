@@ -1,25 +1,25 @@
-import type { PageResult } from '#/types/api';
 import type { ScopedRequestConfig } from '#/api/request';
+import type { PageResult } from '#/types/api';
 
 import { requestClient } from '#/api/request';
 
 export interface NotificationView {
   id: number;
-  scenarioCode?: string | null;
-  sourceType?: string | null;
-  sourceId?: string | null;
-  bizType?: string | null;
-  bizId?: string | null;
+  scenarioCode?: null | string;
+  sourceType?: null | string;
+  sourceId?: null | string;
+  bizType?: null | string;
+  bizId?: null | string;
   title: string;
-  content?: string | null;
-  level?: 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR' | string | null;
-  link?: string | null;
-  actionPayload?: string | null;
-  metadata?: string | null;
+  content?: null | string;
+  level?: 'ERROR' | 'INFO' | 'SUCCESS' | 'WARNING' | null | string;
+  link?: null | string;
+  actionPayload?: null | string;
+  metadata?: null | string;
   read: boolean;
-  readAt?: string | null;
-  expiresAt?: string | null;
-  createdAt?: string | null;
+  readAt?: null | string;
+  expiresAt?: null | string;
+  createdAt?: null | string;
 }
 
 export interface NotificationQueryParams {
@@ -33,7 +33,9 @@ export interface NotificationStreamTicket {
   expiresAt: string;
 }
 
-function withSilentNotificationError(config: ScopedRequestConfig = {}): ScopedRequestConfig {
+function withSilentNotificationError(
+  config: ScopedRequestConfig = {},
+): ScopedRequestConfig {
   return {
     ...config,
     suppressErrorMessage: true,

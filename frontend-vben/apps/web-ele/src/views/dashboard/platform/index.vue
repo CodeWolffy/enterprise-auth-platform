@@ -1,7 +1,15 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 
 import { Refresh } from '@element-plus/icons-vue';
+import { LineChart } from 'echarts/charts';
+import {
+  GridComponent,
+  LegendComponent,
+  TooltipComponent,
+} from 'echarts/components';
+import * as echarts from 'echarts/core';
+import { CanvasRenderer } from 'echarts/renderers';
 import {
   ElButton,
   ElCard,
@@ -16,16 +24,14 @@ import {
 import { getStats } from '#/api/dashboard';
 import { useAuthStore } from '#/store/auth';
 import { formatDateTime, formatRelativeTime } from '#/utils/datetime';
-import * as echarts from 'echarts/core';
-import { LineChart } from 'echarts/charts';
-import {
+
+echarts.use([
+  LineChart,
   GridComponent,
   LegendComponent,
   TooltipComponent,
-} from 'echarts/components';
-import { CanvasRenderer } from 'echarts/renderers';
-
-echarts.use([LineChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer]);
+  CanvasRenderer,
+]);
 
 const loading = ref(false);
 const chartRef = ref<HTMLElement | null>(null);
@@ -45,9 +51,25 @@ const stats = ref({
   todayOperationLogCount: 0,
   todayLoginFailedCount: 0,
   todayRiskEventCount: 0,
-  dailyTrend: [] as Array<{ date: string; loginCount: number; operationCount: number; loginFailedCount: number }>,
-  serviceHealth: [] as Array<{ code: string; name: string; status: string; message: string }>,
-  recentAuditEvents: [] as Array<{ eventType: string; operator: string; tenantId: string; clientIp: string; occurredAt: string }>,
+  dailyTrend: [] as Array<{
+    date: string;
+    loginCount: number;
+    loginFailedCount: number;
+    operationCount: number;
+  }>,
+  serviceHealth: [] as Array<{
+    code: string;
+    message: string;
+    name: string;
+    status: string;
+  }>,
+  recentAuditEvents: [] as Array<{
+    clientIp: string;
+    eventType: string;
+    occurredAt: string;
+    operator: string;
+    tenantId: string;
+  }>,
 });
 
 const authStore = useAuthStore();
@@ -62,10 +84,14 @@ const DATA_SCOPE_LABELS: Record<string, string> = {
 
 const dataScopeLabel = computed(() => {
   const dataScopeType = authStore.snapshot?.dataScopeType;
-  return dataScopeType ? (DATA_SCOPE_LABELS[dataScopeType] ?? dataScopeType) : '-';
+  return dataScopeType
+    ? (DATA_SCOPE_LABELS[dataScopeType] ?? dataScopeType)
+    : '-';
 });
 
-const topPermissions = computed(() => (authStore.snapshot?.grants ?? []).slice(0, 8));
+const topPermissions = computed(() =>
+  (authStore.snapshot?.grants ?? []).slice(0, 8),
+);
 
 const loadStats = async () => {
   loading.value = true;
@@ -83,24 +109,24 @@ const formatBytes = (bytes: number) => {
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+  return `${(bytes / k ** i).toFixed(2)} ${sizes[i]}`;
 };
 
 const eventTypeLabel = (type: string) => {
   const map: Record<string, string> = {
-    'LOGIN': '登录',
-    'LOGOUT': '登出',
-    'PASSWORD_CHANGE': '密码修改',
-    'ROLE_CHANGE': '角色变更',
-    'PERMISSION_CHANGE': '权限变更',
-    'DATA_EXPORT': '数据导出',
-    'SENSITIVE_OPERATION': '敏感操作',
+    LOGIN: '登录',
+    LOGOUT: '登出',
+    PASSWORD_CHANGE: '密码修改',
+    ROLE_CHANGE: '角色变更',
+    PERMISSION_CHANGE: '权限变更',
+    DATA_EXPORT: '数据导出',
+    SENSITIVE_OPERATION: '敏感操作',
   };
   return map[type] || type;
 };
 
 const healthTagType = (status: string) => {
-  const map: Record<string, 'success' | 'warning' | 'danger' | 'info'> = {
+  const map: Record<string, 'danger' | 'info' | 'success' | 'warning'> = {
     UP: 'success',
     DEGRADED: 'warning',
     DOWN: 'danger',
@@ -108,10 +134,11 @@ const healthTagType = (status: string) => {
   return map[status] || 'info';
 };
 
-const formatTimestamp = (timestamp?: string | null) => formatRelativeTime(timestamp);
+const formatTimestamp = (timestamp?: null | string) =>
+  formatRelativeTime(timestamp);
 
 const renderTrendChart = () => {
-  if (!chartRef.value || !stats.value.dailyTrend.length) {
+  if (!chartRef.value || stats.value.dailyTrend.length === 0) {
     return;
   }
 
@@ -121,8 +148,12 @@ const renderTrendChart = () => {
 
   const dates = stats.value.dailyTrend.map((item) => item.date);
   const loginCounts = stats.value.dailyTrend.map((item) => item.loginCount);
-  const operationCounts = stats.value.dailyTrend.map((item) => item.operationCount);
-  const loginFailedCounts = stats.value.dailyTrend.map((item) => item.loginFailedCount);
+  const operationCounts = stats.value.dailyTrend.map(
+    (item) => item.operationCount,
+  );
+  const loginFailedCounts = stats.value.dailyTrend.map(
+    (item) => item.loginFailedCount,
+  );
 
   chartInstance.setOption({
     tooltip: {
@@ -237,7 +268,9 @@ onMounted(() => {
         <ElCol :span="6">
           <ElCard shadow="hover">
             <div class="metric-title">存储大小</div>
-            <div class="metric-value">{{ formatBytes(stats.storageBytes) }}</div>
+            <div class="metric-value">
+              {{ formatBytes(stats.storageBytes) }}
+            </div>
           </ElCard>
         </ElCol>
         <ElCol :span="6">
@@ -252,9 +285,18 @@ onMounted(() => {
         </ElCol>
         <ElCol :span="6">
           <ElCard shadow="hover">
-            <ElStatistic title="今日风险事件" :value="stats.todayRiskEventCount">
+            <ElStatistic
+              title="今日风险事件"
+              :value="stats.todayRiskEventCount"
+            >
               <template #suffix>
-                <ElTag v-if="stats.todayRiskEventCount > 0" type="danger" size="small">需关注</ElTag>
+                <ElTag
+                  v-if="stats.todayRiskEventCount > 0"
+                  type="danger"
+                  size="small"
+                >
+                  需关注
+                </ElTag>
               </template>
             </ElStatistic>
           </ElCard>
@@ -275,11 +317,20 @@ onMounted(() => {
             <template #header>
               <span>服务健康</span>
             </template>
-            <div v-for="item in stats.serviceHealth" :key="item.code" style="margin-bottom: 8px">
-              <ElTag :type="healthTagType(item.status)" style="width: 80px; text-align: center">
+            <div
+              v-for="item in stats.serviceHealth"
+              :key="item.code"
+              style="margin-bottom: 8px"
+            >
+              <ElTag
+                :type="healthTagType(item.status)"
+                style="width: 80px; text-align: center"
+              >
                 {{ item.status }}
               </ElTag>
-              <span style="margin-left: 8px">{{ item.name }}：{{ item.message }}</span>
+              <span style="margin-left: 8px"
+                >{{ item.name }}：{{ item.message }}</span
+              >
             </div>
           </ElCard>
         </ElCol>
@@ -291,29 +342,38 @@ onMounted(() => {
             <template #header>
               <span>最近审计事件</span>
             </template>
-            <el-table :data="stats.recentAuditEvents" style="width: 100%" stripe>
-              <el-table-column label="事件类型" width="120">
+            <ElTable :data="stats.recentAuditEvents" style="width: 100%" stripe>
+              <ElTableColumn label="事件类型" width="120">
                 <template #default="{ row }">
-                  <ElTag size="small" type="info">{{ eventTypeLabel(row.eventType) }}</ElTag>
+                  <ElTag size="small" type="info">
+                    {{ eventTypeLabel(row.eventType) }}
+                  </ElTag>
                 </template>
-              </el-table-column>
-              <el-table-column prop="operator" label="操作人" width="150" />
-              <el-table-column prop="tenantId" label="租户ID" width="180" />
-              <el-table-column prop="clientIp" label="客户端IP" width="150" />
-              <el-table-column label="发生时间" width="150">
+              </ElTableColumn>
+              <ElTableColumn prop="operator" label="操作人" width="150" />
+              <ElTableColumn prop="tenantId" label="租户ID" width="180" />
+              <ElTableColumn prop="clientIp" label="客户端IP" width="150" />
+              <ElTableColumn label="发生时间" width="150">
                 <template #default="{ row }">
-                  <span style="color: #909399; font-size: 13px;">{{ formatTimestamp(row.occurredAt) }}</span>
+                  <span style="font-size: 13px; color: #909399">{{
+                    formatTimestamp(row.occurredAt)
+                  }}</span>
                 </template>
-              </el-table-column>
-              <el-table-column label="精确时间">
+              </ElTableColumn>
+              <ElTableColumn label="精确时间">
                 <template #default="{ row }">
-                  <span style="color: #c0c4cc; font-size: 12px;">
+                  <span style="font-size: 12px; color: #c0c4cc">
                     {{ formatDateTime(row.occurredAt) }}
                   </span>
                 </template>
-              </el-table-column>
-            </el-table>
-            <div v-if="!stats.recentAuditEvents || stats.recentAuditEvents.length === 0" style="text-align: center; padding: 40px 0; color: #909399;">
+              </ElTableColumn>
+            </ElTable>
+            <div
+              v-if="
+                !stats.recentAuditEvents || stats.recentAuditEvents.length === 0
+              "
+              style="padding: 40px 0; color: #909399; text-align: center"
+            >
               暂无审计事件
             </div>
           </ElCard>
@@ -331,17 +391,28 @@ onMounted(() => {
               <ElCol :span="6">
                 <div class="stat-cell">
                   <span class="stat-eyebrow">当前用户</span>
-                  <strong class="stat-value" style="font-size: 20px">{{ authStore.snapshot?.username || '-' }}</strong>
-                  <span class="stat-hint">{{ authStore.snapshot?.tenantId || '-' }}</span>
+                  <strong class="stat-value" style="font-size: 20px">{{
+                    authStore.snapshot?.username || '-'
+                  }}</strong>
+                  <span class="stat-hint">{{
+                    authStore.snapshot?.tenantId || '-'
+                  }}</span>
                 </div>
               </ElCol>
               <ElCol :span="6">
                 <div class="stat-cell">
                   <span class="stat-eyebrow">数据权限</span>
-                  <ElTag size="small" :type="authStore.snapshot?.superAdmin ? 'danger' : 'primary'">
+                  <ElTag
+                    size="small"
+                    :type="
+                      authStore.snapshot?.superAdmin ? 'danger' : 'primary'
+                    "
+                  >
                     {{ dataScopeLabel }}
                   </ElTag>
-                  <span class="stat-hint">{{ authStore.snapshot?.superAdmin ? '超级管理员' : '按角色授权' }}</span>
+                  <span class="stat-hint">{{
+                    authStore.snapshot?.superAdmin ? '超级管理员' : '按角色授权'
+                  }}</span>
                 </div>
               </ElCol>
               <ElCol :span="6">
@@ -349,7 +420,7 @@ onMounted(() => {
                   <span class="stat-eyebrow">角色</span>
                   <div class="chip-list">
                     <ElTag
-                      v-for="role in (authStore.snapshot?.roles ?? [])"
+                      v-for="role in authStore.snapshot?.roles ?? []"
                       :key="role"
                       size="small"
                       effect="plain"
@@ -357,7 +428,11 @@ onMounted(() => {
                     >
                       {{ role }}
                     </ElTag>
-                    <span v-if="!(authStore.snapshot?.roles ?? []).length" class="stat-hint">无</span>
+                    <span
+                      v-if="(authStore.snapshot?.roles ?? []).length === 0"
+                      class="stat-hint"
+                      >无</span
+                    >
                   </div>
                 </div>
               </ElCol>
@@ -374,7 +449,9 @@ onMounted(() => {
                     >
                       {{ grant }}
                     </ElTag>
-                    <span v-if="!topPermissions.length" class="stat-hint">无</span>
+                    <span v-if="topPermissions.length === 0" class="stat-hint"
+                      >无</span
+                    >
                   </div>
                 </div>
               </ElCol>
@@ -393,10 +470,10 @@ onMounted(() => {
 }
 
 .metric-value {
+  margin-top: 8px;
   font-size: 24px;
   font-weight: bold;
   color: #303133;
-  margin-top: 8px;
 }
 
 /* ── 权限快照面板 ── */

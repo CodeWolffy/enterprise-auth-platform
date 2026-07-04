@@ -5,4 +5,3 @@ import SecurityPolicyView from '#/views/system/SecurityPolicyView.vue';
 <template>
   <SecurityPolicyView />
 </template>
-

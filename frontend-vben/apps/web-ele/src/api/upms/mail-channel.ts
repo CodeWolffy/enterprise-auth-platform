@@ -1,16 +1,24 @@
+import type {
+  MailChannel,
+  MailChannelPreset,
+  MailChannelSaveRequest,
+} from '#/types/system';
+
 import { requestClient } from '#/api/request';
-import type { MailChannel, MailChannelPreset, MailChannelSaveRequest } from '#/types/system';
 
 /**
  * 获取邮件渠道预设列表
  * 后端：GET /api/system/mail-channel/presets
  */
 export async function getPresets() {
-  return requestClient.get<MailChannelPreset[]>('/system/mail-channel/presets', {
-    headers: {
-      isSwitchTenant: false,
+  return requestClient.get<MailChannelPreset[]>(
+    '/system/mail-channel/presets',
+    {
+      headers: {
+        isSwitchTenant: false,
+      },
     },
-  });
+  );
 }
 
 /**

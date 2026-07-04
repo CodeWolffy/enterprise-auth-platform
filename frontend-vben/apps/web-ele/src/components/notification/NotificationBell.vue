@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import type { Component } from 'vue';
+
+import type { NotificationView } from '#/api/notification';
+
+import { computed } from 'vue';
 
 import {
   Bell,
@@ -24,7 +27,6 @@ import {
   ElTooltip,
 } from 'element-plus';
 
-import type { NotificationView } from '#/api/notification';
 import { useNotifications } from '#/composables/useNotifications';
 import { formatRelativeTime } from '#/utils/datetime';
 
@@ -48,11 +50,19 @@ const {
   closeSseSubscription,
 } = useNotifications();
 
-defineExpose({ loadUnreadNotificationCount, startSseSubscription, closeSseSubscription });
+defineExpose({
+  loadUnreadNotificationCount,
+  startSseSubscription,
+  closeSseSubscription,
+});
 
 const filterOptions = computed(() => [
   { label: '全部', value: 'all' as const, count: 0 },
-  { label: '未读', value: 'unread' as const, count: unreadNotificationCount.value },
+  {
+    label: '未读',
+    value: 'unread' as const,
+    count: unreadNotificationCount.value,
+  },
 ]);
 
 const panelSummaryText = computed(() => {
@@ -62,21 +72,21 @@ const panelSummaryText = computed(() => {
   return `共 ${notificationPage.value.total} 条`;
 });
 
-function notificationLevelKey(level?: string | null) {
+function notificationLevelKey(level?: null | string) {
   if (level === 'SUCCESS') return 'success';
   if (level === 'WARNING') return 'warning';
   if (level === 'ERROR') return 'error';
   return 'info';
 }
 
-function notificationLevelIcon(level?: string | null): Component {
+function notificationLevelIcon(level?: null | string): Component {
   if (level === 'SUCCESS') return SuccessFilled;
   if (level === 'WARNING') return WarningFilled;
   if (level === 'ERROR') return CircleCloseFilled;
   return InfoFilled;
 }
 
-function notificationScenarioLabel(scenarioCode?: string | null) {
+function notificationScenarioLabel(scenarioCode?: null | string) {
   const labels: Record<string, string> = {
     WORKFLOW_TODO_CREATED: '新待办',
     WORKFLOW_TASK_APPROVED: '审批通过',
@@ -132,7 +142,13 @@ function handleNotificationClick(notification: NotificationView) {
         <div class="notification-panel__title">
           <ElIcon class="notification-panel__title-icon"><Bell /></ElIcon>
           <span>站内通知</span>
-          <ElTag v-if="unreadNotificationCount > 0" type="danger" effect="plain" size="small" round>
+          <ElTag
+            v-if="unreadNotificationCount > 0"
+            type="danger"
+            effect="plain"
+            size="small"
+            round
+          >
             {{ unreadNotificationCount }}
           </ElTag>
         </div>
@@ -150,7 +166,10 @@ function handleNotificationClick(notification: NotificationView) {
             <ElIcon
               class="notification-panel__action-icon"
               :class="{ 'is-disabled': unreadNotificationCount === 0 }"
-              @click="unreadNotificationCount !== 0 && markAllNotificationsReadAction()"
+              @click="
+                unreadNotificationCount !== 0 &&
+                markAllNotificationsReadAction()
+              "
             >
               <Check />
             </ElIcon>
@@ -159,13 +178,18 @@ function handleNotificationClick(notification: NotificationView) {
             <ElIcon
               class="notification-panel__action-icon notification-panel__action-icon--danger"
               :class="{ 'is-disabled': readNotificationCount === 0 }"
-              @click="readNotificationCount !== 0 && clearReadNotificationsAction()"
+              @click="
+                readNotificationCount !== 0 && clearReadNotificationsAction()
+              "
             >
               <Delete />
             </ElIcon>
           </ElTooltip>
           <ElTooltip content="关闭" placement="bottom">
-            <ElIcon class="notification-panel__action-icon" @click="notificationsVisible = false">
+            <ElIcon
+              class="notification-panel__action-icon"
+              @click="notificationsVisible = false"
+            >
               <Close />
             </ElIcon>
           </ElTooltip>
@@ -178,18 +202,22 @@ function handleNotificationClick(notification: NotificationView) {
           :key="option.value"
           type="button"
           class="notification-tab"
-          :class="{ 'notification-tab--active': notificationReadFilter === option.value }"
+          :class="{
+            'notification-tab--active': notificationReadFilter === option.value,
+          }"
           @click="changeNotificationReadFilter(option.value)"
         >
           {{ option.label }}
-          <span v-if="option.count > 0" class="notification-tab__count">{{ option.count }}</span>
+          <span v-if="option.count > 0" class="notification-tab__count">{{
+            option.count
+          }}</span>
         </button>
         <span class="notification-panel__summary">{{ panelSummaryText }}</span>
       </div>
 
       <div v-loading="notificationsLoading" class="notification-list">
         <ElEmpty
-          v-if="!notificationPage.records.length"
+          v-if="notificationPage.records.length === 0"
           :image-size="80"
           description="暂无站内通知"
           class="notification-empty"
@@ -211,18 +239,26 @@ function handleNotificationClick(notification: NotificationView) {
               </ElIcon>
               <strong
                 class="notification-item__title"
-                :class="{ 'notification-item__title--link': !!notification.link }"
+                :class="{
+                  'notification-item__title--link': !!notification.link,
+                }"
               >
                 {{ notification.title }}
               </strong>
-              <span v-if="!notification.read" class="notification-item__unread-dot"></span>
+              <span
+                v-if="!notification.read"
+                class="notification-item__unread-dot"
+              ></span>
             </div>
             <p v-if="notification.content" class="notification-item__content">
               {{ notification.content }}
             </p>
             <div class="notification-item__footer">
               <div class="notification-item__tags">
-                <span v-if="notification.scenarioCode" class="notification-chip">
+                <span
+                  v-if="notification.scenarioCode"
+                  class="notification-chip"
+                >
                   {{ notificationScenarioLabel(notification.scenarioCode) }}
                 </span>
                 <span class="notification-item__time">
@@ -254,7 +290,10 @@ function handleNotificationClick(notification: NotificationView) {
         </article>
       </div>
 
-      <footer v-if="notificationPage.total > notificationPage.size" class="notification-panel__footer">
+      <footer
+        v-if="notificationPage.total > notificationPage.size"
+        class="notification-panel__footer"
+      >
         <ElPagination
           size="small"
           background
@@ -289,11 +328,13 @@ function handleNotificationClick(notification: NotificationView) {
   justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: 999px;
-  color: hsl(var(--foreground) / 0.8);
-  cursor: pointer;
   font-size: 16px;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  color: hsl(var(--foreground) / 80%);
+  cursor: pointer;
+  border-radius: 999px;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
 }
 
 .action-icon:hover {
@@ -315,17 +356,17 @@ function handleNotificationClick(notification: NotificationView) {
   justify-content: space-between;
   min-height: 52px;
   padding: 0 16px;
-  border-bottom: 1px solid hsl(var(--border));
   background: hsl(var(--background));
+  border-bottom: 1px solid hsl(var(--border));
 }
 
 .notification-panel__title {
   display: inline-flex;
-  align-items: center;
   gap: 8px;
-  color: hsl(var(--foreground));
+  align-items: center;
   font-size: 15px;
   font-weight: 600;
+  color: hsl(var(--foreground));
 }
 
 .notification-panel__title-icon {
@@ -335,8 +376,8 @@ function handleNotificationClick(notification: NotificationView) {
 
 .notification-panel__header-actions {
   display: inline-flex;
-  align-items: center;
   gap: 2px;
+  align-items: center;
 }
 
 .notification-panel__action-icon {
@@ -345,11 +386,13 @@ function handleNotificationClick(notification: NotificationView) {
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  font-size: 15px;
   color: hsl(var(--muted-foreground));
   cursor: pointer;
-  font-size: 15px;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  border-radius: 6px;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
 }
 
 .notification-panel__action-icon:hover {
@@ -366,8 +409,8 @@ function handleNotificationClick(notification: NotificationView) {
 }
 
 .notification-panel__action-icon.is-disabled {
-  opacity: 0.4;
   cursor: not-allowed;
+  opacity: 0.4;
 }
 
 @keyframes notification-spin {
@@ -378,37 +421,40 @@ function handleNotificationClick(notification: NotificationView) {
 
 .notification-panel__filter {
   display: flex;
-  align-items: center;
   gap: 8px;
+  align-items: center;
   min-height: 46px;
   padding: 0 16px;
-  border-bottom: 1px solid hsl(var(--border));
   background: hsl(var(--background));
+  border-bottom: 1px solid hsl(var(--border));
 }
 
 .notification-tab {
-  appearance: none;
   display: inline-flex;
-  align-items: center;
   gap: 5px;
+  align-items: center;
   height: 28px;
   padding: 0 10px;
-  border: 1px solid hsl(var(--border));
-  border-radius: 6px;
-  background: hsl(var(--background));
-  color: hsl(var(--muted-foreground));
   font-family: inherit;
   font-size: 13px;
   font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  appearance: none;
   cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
 }
 
 .notification-tab--active {
-  color: hsl(var(--primary));
-  background: hsl(var(--primary) / 0.08);
-  border-color: hsl(var(--primary) / 0.28);
   font-weight: 600;
+  color: hsl(var(--primary));
+  background: hsl(var(--primary) / 8%);
+  border-color: hsl(var(--primary) / 28%);
 }
 
 .notification-tab__count {
@@ -418,30 +464,30 @@ function handleNotificationClick(notification: NotificationView) {
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
-  border-radius: 999px;
-  background: hsl(var(--destructive));
-  color: hsl(var(--destructive-foreground));
   font-size: 11px;
   font-weight: 600;
   line-height: 1;
+  color: hsl(var(--destructive-foreground));
+  background: hsl(var(--destructive));
+  border-radius: 999px;
 }
 
 .notification-panel__summary {
   margin-left: auto;
-  color: hsl(var(--muted-foreground));
   font-size: 12px;
+  color: hsl(var(--muted-foreground));
   white-space: nowrap;
 }
 
 .notification-list {
   flex: 1;
-  overflow-y: auto;
   padding: 0;
+  overflow-y: auto;
 }
 
 .notification-empty {
-  margin: auto;
   padding: 60px 0;
+  margin: auto;
 }
 
 .notification-item {
@@ -449,32 +495,32 @@ function handleNotificationClick(notification: NotificationView) {
   display: flex;
   gap: 10px;
   padding: 12px 16px;
-  border-bottom: 1px solid hsl(var(--border));
-  background: hsl(var(--background));
   cursor: pointer;
+  background: hsl(var(--background));
+  border-bottom: 1px solid hsl(var(--border));
   transition: background-color 0.2s ease;
 }
 
 .notification-item:hover {
-  background: hsl(var(--accent) / 0.5);
+  background: hsl(var(--accent) / 50%);
 }
 
 .notification-item--unread {
-  background: hsl(var(--primary) / 0.03);
+  background: hsl(var(--primary) / 3%);
 }
 
 .notification-item__main {
-  flex: 1;
-  min-width: 0;
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 5px;
+  min-width: 0;
 }
 
 .notification-item__head {
   display: flex;
-  align-items: center;
   gap: 8px;
+  align-items: center;
   min-width: 0;
 }
 
@@ -502,11 +548,11 @@ function handleNotificationClick(notification: NotificationView) {
 .notification-item__title {
   flex: 1;
   min-width: 0;
-  color: hsl(var(--foreground));
-  font-size: 14px;
-  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 14px;
+  font-weight: 600;
+  color: hsl(var(--foreground));
   white-space: nowrap;
 }
 
@@ -518,45 +564,45 @@ function handleNotificationClick(notification: NotificationView) {
   flex: 0 0 8px;
   width: 8px;
   height: 8px;
-  border-radius: 50%;
   background: hsl(var(--destructive));
+  border-radius: 50%;
 }
 
 .notification-item__content {
+  display: -webkit-box;
   margin: 0;
-  color: hsl(var(--muted-foreground));
+  overflow: hidden;
+  -webkit-line-clamp: 2;
   font-size: 13px;
   line-height: 1.5;
+  color: hsl(var(--muted-foreground));
   white-space: pre-wrap;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .notification-item__footer {
   display: flex;
+  gap: 8px;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
 }
 
 .notification-item__tags {
   display: inline-flex;
-  align-items: center;
   gap: 8px;
+  align-items: center;
   min-width: 0;
 }
 
 .notification-item__time {
-  color: hsl(var(--muted-foreground));
   font-size: 12px;
+  color: hsl(var(--muted-foreground));
 }
 
 .notification-item__actions {
   display: inline-flex;
-  align-items: center;
   gap: 4px;
+  align-items: center;
   opacity: 0;
   transition: opacity 0.2s ease;
 }
@@ -574,21 +620,21 @@ function handleNotificationClick(notification: NotificationView) {
   align-items: center;
   height: 20px;
   padding: 0 6px;
-  border: 1px solid hsl(var(--border));
-  border-radius: 4px;
-  background: hsl(var(--muted) / 0.45);
-  color: hsl(var(--muted-foreground));
   font-size: 11px;
   font-weight: 500;
   line-height: 1;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted) / 45%);
+  border: 1px solid hsl(var(--border));
+  border-radius: 4px;
 }
 
 .notification-panel__footer {
   display: flex;
   justify-content: center;
   padding: 12px 16px;
-  border-top: 1px solid hsl(var(--border));
   background: hsl(var(--background));
+  border-top: 1px solid hsl(var(--border));
 }
 
 .notification-list::-webkit-scrollbar {
@@ -608,17 +654,17 @@ function handleNotificationClick(notification: NotificationView) {
 <style lang="scss">
 .notification-drawer.el-drawer,
 .notification-drawer .el-drawer {
+  overflow: hidden !important;
   border-left: 1px solid hsl(var(--border)) !important;
   border-radius: 0 !important;
-  overflow: hidden !important;
-  box-shadow: -8px 0 24px hsl(var(--foreground) / 0.08) !important;
+  box-shadow: -8px 0 24px hsl(var(--foreground) / 8%) !important;
 }
 
 .notification-drawer.el-drawer .el-drawer__body,
 .notification-drawer .el-drawer__body {
-  padding: 0 !important;
   display: block !important;
   gap: 0 !important;
   height: 100%;
+  padding: 0 !important;
 }
 </style>

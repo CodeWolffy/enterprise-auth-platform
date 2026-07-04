@@ -1,7 +1,9 @@
 import type {
+  VxeGridInstance,
   VxeGridListeners,
   VxeGridPropTypes,
   VxeGridProps as VxeTableGridProps,
+  VxeTablePropTypes,
   VxeUIExport,
 } from 'vxe-table';
 
@@ -9,9 +11,11 @@ import type { Ref } from 'vue';
 
 import type { ClassType, DeepPartial } from '@vben/types';
 
-import type { VbenFormProps } from '@vben-core/form-ui';
-
-import type { VxeGridApi } from './api';
+import type {
+  BaseFormComponentType,
+  ExtendedFormApi,
+  VbenFormProps,
+} from '@vben-core/form-ui';
 
 import { useVbenForm } from '@vben-core/form-ui';
 
@@ -26,6 +30,8 @@ interface ToolbarConfigOptions extends VxeGridPropTypes.ToolbarConfig {
   search?: boolean;
 }
 
+export type VxeTableGridColumns<T = any> = VxeTableGridOptions<T>['columns'];
+
 export interface VxeTableGridOptions<T = any> extends VxeTableGridProps<T> {
   /** 工具栏配置 */
   toolbarConfig?: ToolbarConfigOptions;
@@ -35,7 +41,108 @@ export interface SeparatorOptions {
   show?: boolean;
   backgroundColor?: string;
 }
-export interface VxeGridProps {
+
+/**
+ * 自定义存储适配器接口
+ * 用户可接入任意后端（API、IndexedDB wrapper、第三方库等）
+ */
+export interface ViewedRowStorageAdapter {
+  /** 读取所有已查看的 key 列表 */
+  getKeys(): Promise<Array<number | string>>;
+
+  /** 移除所有已查看数据 */
+  removeKeys(): Promise<void>;
+
+  /** 持久化已查看的 key 列表 */
+  setKeys(keys: Array<number | string>): Promise<void>;
+}
+
+/**
+ * 已读行持久化 — 公共基础字段
+ */
+interface ViewedRowPersistBase {
+  /** 持久化数据的存活时间（毫秒） */
+  ttl?: number;
+  /** 最大缓存数量，超出时淘汰最早标记的 key（FIFO），默认 100 */
+  maxSize?: number;
+}
+
+/**
+ * 已读行持久化配置（按 type 区分的联合类型）
+ *
+ * - 'memory'          → 仅内存，不持久化
+ * - 'localStorage'    → 使用 localStorage 整体存储，key 必传
+ * - 'sessionStorage'  → 使用 sessionStorage 整体存储，key 必传
+ * - 'indexedDB'       → 使用 IndexedDB 单条存储，key 必传
+ * - 'custom'          → 用户自定义存储适配器，storage 必传
+ */
+export type ViewedRowPersistOptions =
+  | ({
+      /** IndexedDB 数据库名称，默认 'viewed-table-db' */
+      dbName?: string;
+      /** IndexedDB 数据库版本，默认 1 */
+      dbVersion?: number;
+      /** 存储 key / prefix（必传） */
+      key: string;
+      /** IndexedDB 对象存储名称，默认 'viewed-table-row' */
+      storeName?: string;
+      type: 'indexedDB';
+    } & ViewedRowPersistBase)
+  | ({
+      /** 存储 key（必传） */
+      key: string;
+      type: 'localStorage' | 'sessionStorage';
+    } & ViewedRowPersistBase)
+  | ({
+      /** 自定义存储适配器（必传） */
+      storage: ViewedRowStorageAdapter;
+      type: 'custom';
+    } & ViewedRowPersistBase)
+  | (ViewedRowPersistBase & {
+      type: 'memory';
+    });
+
+/**
+ * 已查看row设置
+ */
+export interface ViewedRowOptions<T = any> {
+  /** 点击 CellOperation 中匹配的 code 时，自动将该行标记为已读 */
+  actionCodes?: string | string[];
+  /** 行唯一标识字段，默认取 gridOptions.rowConfig.keyField，最终兜底 'id' */
+  keyField?: string;
+  /** 已查看的行key列表 */
+  viewedKeys?: Array<number | string> | Ref<Array<number | string>>;
+  /**
+   * 持久化配置
+   * - 传 string：使用内置 localStorage，值为 storage key（向后兼容）
+   * - 传 object：高级配置
+   * - 不传：不持久化（等同于 memory）
+   */
+  persist?: string | ViewedRowPersistOptions;
+  rowClassName?: VxeTablePropTypes.RowClassName<T>;
+  rowStyle?: VxeTablePropTypes.RowStyle<T>;
+}
+
+export interface ViewedRowHelper<T = any> {
+  clearViewed: () => void;
+  getRowClassName: (params: any) => string;
+  getRowStyle: (params: any) => any;
+  isViewed: (record: T) => boolean;
+  markAsViewed: (record: T) => void;
+  markKeysAsViewed: (keys: Array<number | string>) => void;
+  removeKeys: (keys: Array<number | string>) => void;
+  viewedSet: Ref<Set<number | string>>;
+}
+
+export interface VxeGridProps<
+  T extends Record<string, any> = any,
+  D extends BaseFormComponentType = BaseFormComponentType,
+  P extends Record<string, any> = Record<never, never>,
+> {
+  /**
+   * 数据
+   */
+  tableData?: any[];
   /**
    * 标题
    */
@@ -55,15 +162,15 @@ export interface VxeGridProps {
   /**
    * vxe-grid 配置
    */
-  gridOptions?: DeepPartial<VxeTableGridOptions>;
+  gridOptions?: DeepPartial<VxeTableGridOptions<T>>;
   /**
    * vxe-grid 事件
    */
-  gridEvents?: DeepPartial<VxeGridListeners>;
+  gridEvents?: DeepPartial<VxeGridListeners<T>>;
   /**
    * 表单配置
    */
-  formOptions?: VbenFormProps;
+  formOptions?: VbenFormProps<D, P>;
   /**
    * 显示搜索表单
    */
@@ -72,15 +179,47 @@ export interface VxeGridProps {
    * 搜索表单与表格主体之间的分隔条
    */
   separator?: boolean | SeparatorOptions;
+  /**
+   * 已读行功能
+   */
+  viewedRowOptions?: boolean | ViewedRowOptions<T>;
 }
 
-export type ExtendedVxeGridApi = VxeGridApi & {
-  useStore: <T = NoInfer<VxeGridProps>>(
-    selector?: (state: NoInfer<VxeGridProps>) => T,
-  ) => Readonly<Ref<T>>;
+export type ExtendedVxeGridApi<
+  D extends Record<string, any> = any,
+  F extends BaseFormComponentType = BaseFormComponentType,
+  P extends Record<string, any> = Record<never, never>,
+> = {
+  clearViewedRows: () => void;
+  formApi: ExtendedFormApi;
+  getViewedKeys: () => Set<number | string>;
+  grid: VxeGridInstance<D>;
+  isRowViewed: (record: D) => boolean;
+  markKeysAsViewed: (keys: Array<number | string>) => void;
+  markRowAsViewed: (record: D) => void;
+  mount: (instance: null | VxeGridInstance, formApi: ExtendedFormApi) => void;
+  query: (params?: Record<string, any>) => Promise<void>;
+  reload: (params?: Record<string, any>) => Promise<void>;
+  removeViewedKeys: (keys: Array<number | string>) => void;
+  setGridOptions: (
+    options: Partial<VxeGridProps<D, F, P>['gridOptions']>,
+  ) => void;
+  setLoading: (isLoading: boolean) => void;
+  setState: (
+    stateOrFn:
+      | ((prev: VxeGridProps<D, F, P>) => Partial<VxeGridProps<D, F, P>>)
+      | Partial<VxeGridProps<D, F, P>>,
+  ) => void;
+  state: null | VxeGridProps<D, F, P>;
+  toggleSearchForm: (show?: boolean) => boolean | undefined;
+  unmount: () => void;
+  useStore: <S = NoInfer<VxeGridProps<D, F, P>>>(
+    selector?: (state: NoInfer<VxeGridProps<D, F, P>>) => S,
+  ) => Readonly<Ref<S>>;
+  viewedRowHelper: null | ViewedRowHelper<D>;
 };
 
 export interface SetupVxeTable {
   configVxeTable: (ui: VxeUIExport) => void;
-  useVbenForm: typeof useVbenForm;
+  useVbenForm?: typeof useVbenForm;
 }

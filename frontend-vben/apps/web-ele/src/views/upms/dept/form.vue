@@ -26,7 +26,7 @@ function defaultForm() {
     deptName: '',
     deptCode: '',
     parentId: 0 as any,
-    leaderUserId: null as number | null,
+    leaderUserId: null as null | number,
     leaderName: '',
     leaderPhone: '',
     orderNo: 0,
@@ -37,7 +37,9 @@ function defaultForm() {
 const state = reactive<any>({
   form: defaultForm(),
   rules: {
-    deptName: [{ message: '请输入部门名称', required: true, trigger: 'change' }],
+    deptName: [
+      { message: '请输入部门名称', required: true, trigger: 'change' },
+    ],
   },
   deptTree: [],
 });
@@ -141,7 +143,12 @@ defineExpose({ initForm });
         <ElInput v-model="state.form.deptCode" maxlength="50" />
       </ElFormItem>
       <ElFormItem label="负责人用户ID" prop="leaderUserId">
-        <ElInputNumber v-model="state.form.leaderUserId" :min="0" style="width: 100%" placeholder="关联的用户ID" />
+        <ElInputNumber
+          v-model="state.form.leaderUserId"
+          :min="0"
+          style="width: 100%"
+          placeholder="关联的用户ID"
+        />
       </ElFormItem>
       <ElFormItem label="负责人" prop="leaderName">
         <ElInput v-model="state.form.leaderName" maxlength="50" />
@@ -162,7 +169,11 @@ defineExpose({ initForm });
     <template #footer>
       <span class="dialog-footer">
         <ElButton @click="handleClose">关 闭</ElButton>
-        <ElButton :loading="loading" type="primary" @click="submitForm(formRef)">
+        <ElButton
+          :loading="loading"
+          type="primary"
+          @click="submitForm(formRef)"
+        >
           确 认
         </ElButton>
       </span>

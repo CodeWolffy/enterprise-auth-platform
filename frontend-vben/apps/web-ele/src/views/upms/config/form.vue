@@ -169,7 +169,11 @@ defineExpose({ initForm });
     <template #footer>
       <span class="dialog-footer">
         <ElButton @click="handleClose">关 闭</ElButton>
-        <ElButton :loading="loading" type="primary" @click="submitForm(formRef)">
+        <ElButton
+          :loading="loading"
+          type="primary"
+          @click="submitForm(formRef)"
+        >
           确 认
         </ElButton>
       </span>

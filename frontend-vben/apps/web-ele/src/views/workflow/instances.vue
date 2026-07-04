@@ -1,190 +1,44 @@
-<template>
-  <div class="panel-stack workflow-page">
-    <section class="dashboard-grid">
-      <article class="stat-card workflow-stat workflow-stat--primary">
-        <span class="eyebrow">Instances</span>
-        <strong>{{ pageData.total }}</strong>
-        <span>我的发起总数</span>
-      </article>
-      <article class="stat-card workflow-stat">
-        <span class="eyebrow">Running</span>
-        <strong>{{ runningCount }}</strong>
-        <span>当前页进行中</span>
-      </article>
-      <article class="stat-card workflow-stat">
-        <span class="eyebrow">Closed</span>
-        <strong>{{ closedCount }}</strong>
-        <span>当前页已结束</span>
-      </article>
-    </section>
-
-    <section class="dashboard-panel workflow-console">
-      <div class="panel-head">
-        <div>
-          <span class="eyebrow">我的发起</span>
-          <h3>流程实例</h3>
-          <p class="muted-line">发起时保存变量快照，审批过程只读取快照，不反向改写业务变量。</p>
-        </div>
-        <el-button type="primary" @click="openStartDialog">发起流程</el-button>
-      </div>
-
-      <el-form :inline="true" :model="query" class="workflow-search">
-        <el-form-item label="状态">
-          <el-select v-model="query.status" placeholder="全部" clearable style="width: 180px">
-            <el-option label="全部" value="" />
-            <el-option label="进行中" value="RUNNING" />
-            <el-option label="已通过" value="APPROVED" />
-            <el-option label="已驳回" value="REJECTED" />
-            <el-option label="已撤回" value="WITHDRAWN" />
-            <el-option label="已终止" value="TERMINATED" />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="applySearch">搜索</el-button>
-          <el-button @click="resetSearch">重置</el-button>
-        </el-form-item>
-      </el-form>
-
-      <div class="table-tools">
-        <el-button size="small" :loading="loading" @click="loadInstances">刷新</el-button>
-      </div>
-
-      <el-table v-loading="loading" :data="pageData.records" stripe>
-        <el-table-column prop="title" label="标题" min-width="220" show-overflow-tooltip>
-          <template #default="{ row }">
-            <div class="workflow-name-cell">
-              <strong>{{ row.title }}</strong>
-              <small>{{ row.businessKey }} · {{ row.definitionKey }} v{{ row.definitionVersion }}</small>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" width="110">
-          <template #default="{ row }">
-            <el-tag :type="instanceStatusTag(row.status)" effect="plain">{{ instanceStatusText(row.status) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="currentStepIndex" label="当前步骤" width="110" />
-        <el-table-column prop="tenantId" label="租户" width="130" />
-        <el-table-column label="发起时间" width="180">
-          <template #default="{ row }">{{ formatDateTime(row.startedAt) }}</template>
-        </el-table-column>
-        <el-table-column fixed="right" label="操作" width="240">
-          <template #default="{ row }">
-            <el-button link type="primary" @click="openDetail(asWorkflowInstance(row))">详情</el-button>
-            <el-button v-if="row.status === 'RUNNING'" :loading="withdrawingId === row.id" link type="danger" @click="withdrawInstance(asWorkflowInstance(row))">撤回</el-button>
-            <el-button
-              v-if="row.status === 'RUNNING'"
-              :loading="terminatingId === row.id"
-              link
-              type="danger"
-              @click="terminateInstance(asWorkflowInstance(row))"
-            >终止</el-button>
-          </template>
-        </el-table-column>
-        <template #empty>
-          <el-empty description="暂无流程实例" />
-        </template>
-      </el-table>
-
-      <div class="footer-bar">
-        <span>共 {{ pageData.total }} 条实例</span>
-        <el-pagination
-          background
-          layout="sizes, prev, pager, next"
-          :current-page="query.page"
-          :page-size="query.size"
-          :page-sizes="[10, 20, 50]"
-          :total="pageData.total"
-          @current-change="handlePageChange"
-          @size-change="handleSizeChange"
-        />
-      </div>
-    </section>
-
-    <el-dialog v-model="startVisible" title="发起流程" width="640px">
-      <el-form ref="formRef" label-position="top" :model="form" :rules="rules">
-        <el-form-item label="流程定义" prop="definitionKey">
-          <el-select
-            v-model="form.definitionKey"
-            filterable
-            allow-create
-            default-first-option
-            :loading="definitionLoading"
-            placeholder="选择已部署定义，或手动输入 definitionKey"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="definition in deployedDefinitions"
-              :key="definition.id"
-              :label="`${definition.definitionName} · ${definition.definitionKey} v${definition.version}`"
-              :value="definition.definitionKey"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="业务键" prop="businessKey">
-          <el-input v-model="form.businessKey" placeholder="例如 leave-20260604-001" />
-        </el-form-item>
-        <el-form-item label="标题" prop="title">
-          <el-input v-model="form.title" placeholder="例如 2026 年端午请假申请" />
-        </el-form-item>
-        <el-form-item label="变量 JSON">
-          <el-input v-model="form.variablesText" type="textarea" :rows="7" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="startVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="submitStart">发起</el-button>
-      </template>
-    </el-dialog>
-
-    <el-drawer v-model="detailVisible" title="流程实例详情" size="620px">
-      <template v-if="detailItem">
-        <el-descriptions :column="2" border class="drawer-section">
-          <el-descriptions-item label="标题" :span="2">{{ detailItem.title }}</el-descriptions-item>
-          <el-descriptions-item label="业务键">{{ detailItem.businessKey }}</el-descriptions-item>
-          <el-descriptions-item label="状态">{{ instanceStatusText(detailItem.status) }}</el-descriptions-item>
-          <el-descriptions-item label="定义">{{ detailItem.definitionKey }} v{{ detailItem.definitionVersion }}</el-descriptions-item>
-          <el-descriptions-item label="当前步骤">{{ detailItem.currentStepIndex }}</el-descriptions-item>
-          <el-descriptions-item label="发起人">{{ detailItem.starterUsername }}</el-descriptions-item>
-          <el-descriptions-item label="发起时间">{{ formatDateTime(detailItem.startedAt) }}</el-descriptions-item>
-        </el-descriptions>
-        <section class="snapshot-card">
-          <span class="eyebrow">Variables Snapshot</span>
-          <pre>{{ formatSnapshot(detailItem.variablesSnapshot) }}</pre>
-        </section>
-        <section class="snapshot-card">
-          <div class="urge-card-head">
-            <span class="eyebrow">Urge Records</span>
-            <el-button size="small" text :loading="urgeLoading" @click="loadInstanceUrges(detailItem.id)">刷新</el-button>
-          </div>
-          <el-table v-loading="urgeLoading" :data="urgePage.records" size="small" stripe>
-            <el-table-column label="催办人" prop="urgedByUsername" width="120" />
-            <el-table-column label="接收范围" min-width="160" show-overflow-tooltip>
-              <template #default="{ row }">{{ row.targetUsernames.join('、') || '-' }}</template>
-            </el-table-column>
-            <el-table-column label="说明" min-width="160" show-overflow-tooltip>
-              <template #default="{ row }">{{ row.comment || '-' }}</template>
-            </el-table-column>
-            <el-table-column label="时间" width="160">
-              <template #default="{ row }">{{ formatDateTime(row.urgedAt) }}</template>
-            </el-table-column>
-            <template #empty>
-              <el-empty description="暂无催办记录" />
-            </template>
-          </el-table>
-        </section>
-      </template>
-    </el-drawer>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue';
 import type { FormInstance, FormRules, TagProps } from 'element-plus';
-import { ElButton, ElDescriptions, ElDescriptionsItem, ElDialog, ElDrawer, ElEmpty, ElForm, ElFormItem, ElInput, ElMessage, ElMessageBox, ElOption, ElPagination, ElSelect, ElTable, ElTableColumn, ElTag } from 'element-plus';
-import { listWorkflowInstanceUrges, queryMyWorkflowInstances, queryWorkflowDefinitions, startWorkflowInstance, terminateWorkflowInstance, withdrawWorkflowInstance } from '#/api/modules';
+
 import type { PageResult } from '#/types/api';
-import type { WorkflowDefinitionView, WorkflowInstanceView, WorkflowStartRequest, WorkflowTaskUrgeView } from '#/types/workflow';
+import type {
+  WorkflowDefinitionView,
+  WorkflowInstanceView,
+  WorkflowStartRequest,
+  WorkflowTaskUrgeView,
+} from '#/types/workflow';
+
+import { computed, reactive, ref } from 'vue';
+
+import {
+  ElButton,
+  ElDescriptions,
+  ElDescriptionsItem,
+  ElDialog,
+  ElDrawer,
+  ElEmpty,
+  ElForm,
+  ElFormItem,
+  ElInput,
+  ElMessage,
+  ElMessageBox,
+  ElOption,
+  ElPagination,
+  ElSelect,
+  ElTable,
+  ElTableColumn,
+  ElTag,
+} from 'element-plus';
+
+import {
+  listWorkflowInstanceUrges,
+  queryMyWorkflowInstances,
+  queryWorkflowDefinitions,
+  startWorkflowInstance,
+  terminateWorkflowInstance,
+  withdrawWorkflowInstance,
+} from '#/api/modules';
 import { formatDateTime as formatInstantDateTime } from '#/utils/datetime';
 
 const loading = ref(false);
@@ -192,9 +46,9 @@ const definitionLoading = ref(false);
 const submitting = ref(false);
 const startVisible = ref(false);
 const detailVisible = ref(false);
-const withdrawingId = ref<number | null>(null);
-const terminatingId = ref<number | null>(null);
-const detailItem = ref<WorkflowInstanceView | null>(null);
+const withdrawingId = ref<null | number>(null);
+const terminatingId = ref<null | number>(null);
+const detailItem = ref<null | WorkflowInstanceView>(null);
 const formRef = ref<FormInstance>();
 
 const query = reactive({
@@ -203,9 +57,19 @@ const query = reactive({
   size: 20,
 });
 
-const pageData = ref<PageResult<WorkflowInstanceView>>({ total: 0, page: 1, size: 20, records: [] });
+const pageData = ref<PageResult<WorkflowInstanceView>>({
+  total: 0,
+  page: 1,
+  size: 20,
+  records: [],
+});
 const urgeLoading = ref(false);
-const urgePage = ref<PageResult<WorkflowTaskUrgeView>>({ total: 0, page: 1, size: 20, records: [] });
+const urgePage = ref<PageResult<WorkflowTaskUrgeView>>({
+  total: 0,
+  page: 1,
+  size: 20,
+  records: [],
+});
 const deployedDefinitions = ref<WorkflowDefinitionView[]>([]);
 
 const form = reactive({
@@ -216,13 +80,21 @@ const form = reactive({
 });
 
 const rules = reactive<FormRules>({
-  definitionKey: [{ required: true, message: '请输入流程定义标识', trigger: 'blur' }],
+  definitionKey: [
+    { required: true, message: '请输入流程定义标识', trigger: 'blur' },
+  ],
   businessKey: [{ required: true, message: '请输入业务键', trigger: 'blur' }],
   title: [{ required: true, message: '请输入标题', trigger: 'blur' }],
 });
 
-const runningCount = computed(() => pageData.value.records.filter((item) => item.status === 'RUNNING').length);
-const closedCount = computed(() => pageData.value.records.filter((item) => item.status !== 'RUNNING').length);
+const runningCount = computed(
+  () =>
+    pageData.value.records.filter((item) => item.status === 'RUNNING').length,
+);
+const closedCount = computed(
+  () =>
+    pageData.value.records.filter((item) => item.status !== 'RUNNING').length,
+);
 const asWorkflowInstance = (row: unknown) => row as WorkflowInstanceView;
 
 void loadInstances();
@@ -244,7 +116,11 @@ async function loadInstances() {
 async function loadDeployedDefinitions() {
   definitionLoading.value = true;
   try {
-    const page = await queryWorkflowDefinitions({ status: 'DEPLOYED', page: 1, size: 100 });
+    const page = await queryWorkflowDefinitions({
+      status: 'DEPLOYED',
+      page: 1,
+      size: 100,
+    });
     deployedDefinitions.value = page.records;
   } catch {
     deployedDefinitions.value = [];
@@ -290,7 +166,7 @@ function openStartDialog() {
   form.title = '';
   form.variablesText = defaultVariablesText();
   startVisible.value = true;
-  if (!deployedDefinitions.value.length) {
+  if (deployedDefinitions.value.length === 0) {
     void loadDeployedDefinitions();
   }
 }
@@ -331,7 +207,9 @@ async function submitStart() {
 }
 
 async function withdrawInstance(row: WorkflowInstanceView) {
-  await ElMessageBox.confirm(`确认撤回「${row.title}」？`, '撤回确认', { type: 'warning' });
+  await ElMessageBox.confirm(`确认撤回「${row.title}」？`, '撤回确认', {
+    type: 'warning',
+  });
   withdrawingId.value = row.id;
   try {
     await withdrawWorkflowInstance(row.id);
@@ -343,11 +221,15 @@ async function withdrawInstance(row: WorkflowInstanceView) {
 }
 
 async function terminateInstance(row: WorkflowInstanceView) {
-  const result = await ElMessageBox.prompt(`确认终止「${row.title}」？`, '终止确认', {
-    type: 'warning',
-    inputPlaceholder: '请输入终止原因（可选）',
-    inputType: 'textarea',
-  });
+  const result = await ElMessageBox.prompt(
+    `确认终止「${row.title}」？`,
+    '终止确认',
+    {
+      type: 'warning',
+      inputPlaceholder: '请输入终止原因（可选）',
+      inputType: 'textarea',
+    },
+  );
   terminatingId.value = row.id;
   try {
     await terminateWorkflowInstance(row.id, result.value?.trim() || undefined);
@@ -378,7 +260,17 @@ function formatSnapshot(value: Record<string, unknown>) {
 }
 
 function instanceStatusText(status: string) {
-  return ({ RUNNING: '进行中', APPROVED: '已通过', REJECTED: '已驳回', WITHDRAWN: '已撤回', TERMINATED: '已终止' } as Record<string, string>)[status] ?? status;
+  return (
+    (
+      {
+        RUNNING: '进行中',
+        APPROVED: '已通过',
+        REJECTED: '已驳回',
+        WITHDRAWN: '已撤回',
+        TERMINATED: '已终止',
+      } as Record<string, string>
+    )[status] ?? status
+  );
 }
 
 function instanceStatusTag(status: string): TagProps['type'] {
@@ -394,10 +286,270 @@ function instanceStatusTag(status: string): TagProps['type'] {
   return 'info';
 }
 
-function formatDateTime(value?: string | null) {
+function formatDateTime(value?: null | string) {
   return formatInstantDateTime(value);
 }
 </script>
+
+<template>
+  <div class="panel-stack workflow-page">
+    <section class="dashboard-grid">
+      <article class="stat-card workflow-stat workflow-stat--primary">
+        <span class="eyebrow">Instances</span>
+        <strong>{{ pageData.total }}</strong>
+        <span>我的发起总数</span>
+      </article>
+      <article class="stat-card workflow-stat">
+        <span class="eyebrow">Running</span>
+        <strong>{{ runningCount }}</strong>
+        <span>当前页进行中</span>
+      </article>
+      <article class="stat-card workflow-stat">
+        <span class="eyebrow">Closed</span>
+        <strong>{{ closedCount }}</strong>
+        <span>当前页已结束</span>
+      </article>
+    </section>
+
+    <section class="dashboard-panel workflow-console">
+      <div class="panel-head">
+        <div>
+          <span class="eyebrow">我的发起</span>
+          <h3>流程实例</h3>
+          <p class="muted-line">
+            发起时保存变量快照，审批过程只读取快照，不反向改写业务变量。
+          </p>
+        </div>
+        <ElButton type="primary" @click="openStartDialog">发起流程</ElButton>
+      </div>
+
+      <ElForm :inline="true" :model="query" class="workflow-search">
+        <ElFormItem label="状态">
+          <ElSelect
+            v-model="query.status"
+            placeholder="全部"
+            clearable
+            style="width: 180px"
+          >
+            <ElOption label="全部" value="" />
+            <ElOption label="进行中" value="RUNNING" />
+            <ElOption label="已通过" value="APPROVED" />
+            <ElOption label="已驳回" value="REJECTED" />
+            <ElOption label="已撤回" value="WITHDRAWN" />
+            <ElOption label="已终止" value="TERMINATED" />
+          </ElSelect>
+        </ElFormItem>
+        <ElFormItem>
+          <ElButton type="primary" @click="applySearch">搜索</ElButton>
+          <ElButton @click="resetSearch">重置</ElButton>
+        </ElFormItem>
+      </ElForm>
+
+      <div class="table-tools">
+        <ElButton size="small" :loading="loading" @click="loadInstances">
+          刷新
+        </ElButton>
+      </div>
+
+      <ElTable v-loading="loading" :data="pageData.records" stripe>
+        <ElTableColumn
+          prop="title"
+          label="标题"
+          min-width="220"
+          show-overflow-tooltip
+        >
+          <template #default="{ row }">
+            <div class="workflow-name-cell">
+              <strong>{{ row.title }}</strong>
+              <small
+                >{{ row.businessKey }} · {{ row.definitionKey }} v{{
+                  row.definitionVersion
+                }}</small
+              >
+            </div>
+          </template>
+        </ElTableColumn>
+        <ElTableColumn label="状态" width="110">
+          <template #default="{ row }">
+            <ElTag :type="instanceStatusTag(row.status)" effect="plain">
+              {{ instanceStatusText(row.status) }}
+            </ElTag>
+          </template>
+        </ElTableColumn>
+        <ElTableColumn prop="currentStepIndex" label="当前步骤" width="110" />
+        <ElTableColumn prop="tenantId" label="租户" width="130" />
+        <ElTableColumn label="发起时间" width="180">
+          <template #default="{ row }">
+            {{ formatDateTime(row.startedAt) }}
+          </template>
+        </ElTableColumn>
+        <ElTableColumn fixed="right" label="操作" width="240">
+          <template #default="{ row }">
+            <ElButton
+              link
+              type="primary"
+              @click="openDetail(asWorkflowInstance(row))"
+            >
+              详情
+            </ElButton>
+            <ElButton
+              v-if="row.status === 'RUNNING'"
+              :loading="withdrawingId === row.id"
+              link
+              type="danger"
+              @click="withdrawInstance(asWorkflowInstance(row))"
+            >
+              撤回
+            </ElButton>
+            <ElButton
+              v-if="row.status === 'RUNNING'"
+              :loading="terminatingId === row.id"
+              link
+              type="danger"
+              @click="terminateInstance(asWorkflowInstance(row))"
+            >
+              终止
+            </ElButton>
+          </template>
+        </ElTableColumn>
+        <template #empty>
+          <ElEmpty description="暂无流程实例" />
+        </template>
+      </ElTable>
+
+      <div class="footer-bar">
+        <span>共 {{ pageData.total }} 条实例</span>
+        <ElPagination
+          background
+          layout="sizes, prev, pager, next"
+          :current-page="query.page"
+          :page-size="query.size"
+          :page-sizes="[10, 20, 50]"
+          :total="pageData.total"
+          @current-change="handlePageChange"
+          @size-change="handleSizeChange"
+        />
+      </div>
+    </section>
+
+    <ElDialog v-model="startVisible" title="发起流程" width="640px">
+      <ElForm ref="formRef" label-position="top" :model="form" :rules="rules">
+        <ElFormItem label="流程定义" prop="definitionKey">
+          <ElSelect
+            v-model="form.definitionKey"
+            filterable
+            allow-create
+            default-first-option
+            :loading="definitionLoading"
+            placeholder="选择已部署定义，或手动输入 definitionKey"
+            style="width: 100%"
+          >
+            <ElOption
+              v-for="definition in deployedDefinitions"
+              :key="definition.id"
+              :label="`${definition.definitionName} · ${definition.definitionKey} v${definition.version}`"
+              :value="definition.definitionKey"
+            />
+          </ElSelect>
+        </ElFormItem>
+        <ElFormItem label="业务键" prop="businessKey">
+          <ElInput
+            v-model="form.businessKey"
+            placeholder="例如 leave-20260604-001"
+          />
+        </ElFormItem>
+        <ElFormItem label="标题" prop="title">
+          <ElInput
+            v-model="form.title"
+            placeholder="例如 2026 年端午请假申请"
+          />
+        </ElFormItem>
+        <ElFormItem label="变量 JSON">
+          <ElInput v-model="form.variablesText" type="textarea" :rows="7" />
+        </ElFormItem>
+      </ElForm>
+      <template #footer>
+        <ElButton @click="startVisible = false">取消</ElButton>
+        <ElButton type="primary" :loading="submitting" @click="submitStart">
+          发起
+        </ElButton>
+      </template>
+    </ElDialog>
+
+    <ElDrawer v-model="detailVisible" title="流程实例详情" size="620px">
+      <template v-if="detailItem">
+        <ElDescriptions :column="2" border class="drawer-section">
+          <ElDescriptionsItem label="标题" :span="2">
+            {{ detailItem.title }}
+          </ElDescriptionsItem>
+          <ElDescriptionsItem label="业务键">
+            {{ detailItem.businessKey }}
+          </ElDescriptionsItem>
+          <ElDescriptionsItem label="状态">
+            {{ instanceStatusText(detailItem.status) }}
+          </ElDescriptionsItem>
+          <ElDescriptionsItem label="定义">
+            {{ detailItem.definitionKey }} v{{ detailItem.definitionVersion }}
+          </ElDescriptionsItem>
+          <ElDescriptionsItem label="当前步骤">
+            {{ detailItem.currentStepIndex }}
+          </ElDescriptionsItem>
+          <ElDescriptionsItem label="发起人">
+            {{ detailItem.starterUsername }}
+          </ElDescriptionsItem>
+          <ElDescriptionsItem label="发起时间">
+            {{ formatDateTime(detailItem.startedAt) }}
+          </ElDescriptionsItem>
+        </ElDescriptions>
+        <section class="snapshot-card">
+          <span class="eyebrow">Variables Snapshot</span>
+          <pre>{{ formatSnapshot(detailItem.variablesSnapshot) }}</pre>
+        </section>
+        <section class="snapshot-card">
+          <div class="urge-card-head">
+            <span class="eyebrow">Urge Records</span>
+            <ElButton
+              size="small"
+              text
+              :loading="urgeLoading"
+              @click="loadInstanceUrges(detailItem.id)"
+            >
+              刷新
+            </ElButton>
+          </div>
+          <ElTable
+            v-loading="urgeLoading"
+            :data="urgePage.records"
+            size="small"
+            stripe
+          >
+            <ElTableColumn label="催办人" prop="urgedByUsername" width="120" />
+            <ElTableColumn
+              label="接收范围"
+              min-width="160"
+              show-overflow-tooltip
+            >
+              <template #default="{ row }">
+                {{ row.targetUsernames.join('、') || '-' }}
+              </template>
+            </ElTableColumn>
+            <ElTableColumn label="说明" min-width="160" show-overflow-tooltip>
+              <template #default="{ row }">{{ row.comment || '-' }}</template>
+            </ElTableColumn>
+            <ElTableColumn label="时间" width="160">
+              <template #default="{ row }">
+                {{ formatDateTime(row.urgedAt) }}
+              </template>
+            </ElTableColumn>
+            <template #empty>
+              <ElEmpty description="暂无催办记录" />
+            </template>
+          </ElTable>
+        </section>
+      </template>
+    </ElDrawer>
+  </div>
+</template>
 
 <style scoped lang="scss">
 .workflow-page {
@@ -406,7 +558,7 @@ function formatDateTime(value?: string | null) {
 
 .workflow-stat--primary {
   background:
-    linear-gradient(135deg, rgba(22, 119, 255, 0.14), rgba(20, 184, 166, 0.1)),
+    linear-gradient(135deg, rgb(22 119 255 / 14%), rgb(20 184 166 / 10%)),
     var(--bg-card);
 }
 
@@ -424,31 +576,31 @@ function formatDateTime(value?: string | null) {
   gap: 4px;
 
   small {
-    color: var(--text-soft);
     font-size: 12px;
+    color: var(--text-soft);
   }
 }
 
 .snapshot-card {
-  margin-top: 18px;
   padding: 16px;
+  margin-top: 18px;
+  background: var(--bg-card-muted);
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: var(--bg-card-muted);
 
   pre {
     margin: 12px 0 0;
-    white-space: pre-wrap;
-    word-break: break-word;
     color: var(--text-main);
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
   }
 }
 
 .urge-card-head {
   display: flex;
+  gap: 12px;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
   margin-bottom: 12px;
 }
 
@@ -458,9 +610,9 @@ function formatDateTime(value?: string | null) {
 
 .footer-bar {
   display: flex;
+  gap: 12px;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
   margin-top: 14px;
 }
 

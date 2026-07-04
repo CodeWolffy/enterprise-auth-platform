@@ -4,9 +4,7 @@ function toRoute(node: any): any {
   // Vben 要求 route.name 唯一且稳定：由 path 推导（/system/role -> system-role），
   // 目录无 path 时回退到菜单 ID。
   const routeName = node?.path
-    ? String(node.path)
-        .replace(/^\/+/, '')
-        .replace(/\//g, '-')
+    ? String(node.path).replace(/^\/+/, '').replaceAll('/', '-')
     : `menu-${node?.id}`;
   const route: any = {
     name: routeName,

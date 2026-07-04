@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { AuthenticationProps } from './types';
 
-import { computed, watch, onUnmounted, ref } from 'vue';
+import { computed, watch } from 'vue';
+
+import { $t } from '@vben/locales';
 
 import { useVbenModal } from '@vben-core/popup-ui';
 import { Slot, VbenAvatar } from '@vben-core/shadcn-ui';
@@ -22,49 +24,14 @@ const props = withDefaults(defineProps<Props>(), {
 
 const open = defineModel<boolean>('open');
 
-const emit = defineEmits<{
-  logout: [];
-}>();
-
 const [Modal, modalApi] = useVbenModal();
-
-const countdown = ref(2);
-let timer: ReturnType<typeof setTimeout> | null = null;
 
 watch(
   () => open.value,
   (val) => {
     modalApi.setState({ isOpen: val });
-    if (val) {
-      startCountdown();
-    } else {
-      clearCountdown();
-    }
   },
 );
-
-function startCountdown() {
-  clearCountdown();
-  countdown.value = 2;
-  timer = setInterval(() => {
-    countdown.value--;
-    if (countdown.value <= 0) {
-      clearCountdown();
-      emit('logout');
-    }
-  }, 1000);
-}
-
-function clearCountdown() {
-  if (timer) {
-    clearInterval(timer);
-    timer = null;
-  }
-}
-
-onUnmounted(() => {
-  clearCountdown();
-});
 
 const getZIndex = computed(() => {
   return props.zIndex || calcZIndex();
@@ -111,17 +78,17 @@ function calcZIndex() {
       :fullscreen-button="false"
       :header="false"
       :z-index="getZIndex"
-      class="border-none px-10 py-6 text-center shadow-xl sm:w-[600px] sm:rounded-2xl md:h-[unset]"
+      class="border-none px-10 py-6 text-center shadow-xl sm:w-150 sm:rounded-2xl md:h-[unset]"
     >
       <VbenAvatar :src="avatar" class="mx-auto mb-6 size-20" />
       <Slot
         :show-forget-password="false"
         :show-register="false"
         :show-remember-me="false"
-        :sub-title="`${$t('authentication.loginAgainSubTitle')} (${countdown}s)`"
+        :sub-title="$t('authentication.loginAgainSubTitle')"
         :title="$t('authentication.loginAgainTitle')"
       >
-        <slot></slot>
+        <slot> </slot>
       </Slot>
     </Modal>
   </div>

@@ -1,7 +1,15 @@
 <script lang="ts" setup>
 import type { DrawerProps, ExtendedDrawerApi } from './drawer';
 
-import { computed, provide, ref, unref, useId, watch } from 'vue';
+import {
+  computed,
+  onDeactivated,
+  provide,
+  ref,
+  unref,
+  useId,
+  watch,
+} from 'vue';
 
 import {
   useIsMobile,
@@ -46,6 +54,7 @@ const components = globalShareState.getComponents();
 const id = useId();
 provide('DISMISSABLE_DRAWER_ID', id);
 
+// @ts-expect-error unused
 const wrapperRef = ref<HTMLElement>();
 const { $t } = useSimpleLocale();
 const { isMobile } = useIsMobile();
@@ -93,6 +102,16 @@ const {
 //     }
 //   },
 // );
+
+/**
+ * 在开启keepAlive情况下 直接通过浏览器按钮/手势等返回 不会关闭弹窗
+ */
+onDeactivated(() => {
+  // 如果弹窗没有被挂载到内容区域，则关闭弹窗
+  if (!appendToMain.value) {
+    props.drawerApi?.close();
+  }
+});
 
 function interactOutside(e: Event) {
   if (!closeOnClickModal.value || submitting.value) {
@@ -166,9 +185,9 @@ const getForceMount = computed(() => {
     <SheetContent
       :append-to="getAppendTo"
       :class="
-        cn('flex w-[520px] flex-col', drawerClass, {
-          '!w-full': isMobile || placement === 'bottom' || placement === 'top',
-          'max-h-[100vh]': placement === 'bottom' || placement === 'top',
+        cn('flex w-130 flex-col', drawerClass, {
+          'w-full!': isMobile || placement === 'bottom' || placement === 'top',
+          'max-h-screen': placement === 'bottom' || placement === 'top',
           hidden: isClosed,
         })
       "
@@ -191,7 +210,7 @@ const getForceMount = computed(() => {
         v-if="showHeader"
         :class="
           cn(
-            '!flex flex-row items-center justify-between border-b px-6 py-5',
+            'flex! flex-row items-center justify-between border-b px-6 py-5',
             headerClass,
             {
               'px-4 py-3': closable,
@@ -205,7 +224,7 @@ const getForceMount = computed(() => {
             v-if="closable && closeIconPlacement === 'left'"
             as-child
             :disabled="submitting"
-            class="data-[state=open]:bg-secondary ml-[2px] cursor-pointer rounded-full opacity-80 transition-opacity hover:opacity-100 focus:outline-none disabled:pointer-events-none"
+            class="ml-0.5 cursor-pointer rounded-full opacity-80 transition-opacity hover:opacity-100 focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-secondary"
           >
             <slot name="close-icon">
               <VbenIconButton>
@@ -215,7 +234,7 @@ const getForceMount = computed(() => {
           </SheetClose>
           <Separator
             v-if="closable && closeIconPlacement === 'left'"
-            class="ml-1 mr-2 h-8"
+            class="mr-2 ml-1 h-8"
             decorative
             orientation="vertical"
           />
@@ -246,7 +265,7 @@ const getForceMount = computed(() => {
             v-if="closable && closeIconPlacement === 'right'"
             as-child
             :disabled="submitting"
-            class="data-[state=open]:bg-secondary ml-[2px] cursor-pointer rounded-full opacity-80 transition-opacity hover:opacity-100 focus:outline-none disabled:pointer-events-none"
+            class="ml-0.5 cursor-pointer rounded-full opacity-80 transition-opacity hover:opacity-100 focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-secondary"
           >
             <slot name="close-icon">
               <VbenIconButton>

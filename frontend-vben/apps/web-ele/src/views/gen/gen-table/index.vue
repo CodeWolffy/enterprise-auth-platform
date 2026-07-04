@@ -1,4 +1,6 @@
 <script lang="ts" setup name="genTable">
+import type { DataSourceView } from '#/api/codegen';
+
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -28,7 +30,7 @@ import {
   ElTag,
 } from 'element-plus';
 
-import { getDataSources, type DataSourceView } from '#/api/codegen';
+import { getDataSources } from '#/api/codegen';
 import {
   deleteImportedTable,
   getDataSourceTables,
@@ -40,14 +42,52 @@ import {
 
 const router = useRouter();
 
-type TableRow = { tableName: string; tableComment: string; engine?: string; tableRows?: number; createdAt?: string; updatedAt?: string };
-type ImportedRow = { id: number; dataSourceId: number; tableName: string; tableComment: string; className: string; packageName: string; moduleName: string; businessName: string; functionName: string; functionAuthor: string; columnCount: number; updatedAt?: string };
-type ColumnRow = { id: number; columnName: string; columnComment: string; columnType: string; dataType: string; javaType: string; javaField: string; primaryKey: boolean; required: boolean; insert: boolean; edit: boolean; list: boolean; query: boolean; queryType: string; htmlType: string; dictType: string; sort: number };
+type TableRow = {
+  createdAt?: string;
+  engine?: string;
+  tableComment: string;
+  tableName: string;
+  tableRows?: number;
+  updatedAt?: string;
+};
+type ImportedRow = {
+  businessName: string;
+  className: string;
+  columnCount: number;
+  dataSourceId: number;
+  functionAuthor: string;
+  functionName: string;
+  id: number;
+  moduleName: string;
+  packageName: string;
+  tableComment: string;
+  tableName: string;
+  updatedAt?: string;
+};
+type ColumnRow = {
+  columnComment: string;
+  columnName: string;
+  columnType: string;
+  dataType: string;
+  dictType: string;
+  edit: boolean;
+  htmlType: string;
+  id: number;
+  insert: boolean;
+  javaField: string;
+  javaType: string;
+  list: boolean;
+  primaryKey: boolean;
+  query: boolean;
+  queryType: string;
+  required: boolean;
+  sort: number;
+};
 
 const activeTab = ref('source');
 const loading = ref(false);
 const dsList = ref<DataSourceView[]>([]);
-const selectedDsId = ref<number | null>(null);
+const selectedDsId = ref<null | number>(null);
 const tableKeyword = ref('');
 const importKeyword = ref('');
 
@@ -71,7 +111,9 @@ const columnTableName = ref('');
 const columns = ref<ColumnRow[]>([]);
 
 const dsOptions = computed(() =>
-  dsList.value.filter((ds) => ds.enabled).map((ds) => ({ label: ds.name, value: ds.id })),
+  dsList.value
+    .filter((ds) => ds.enabled)
+    .map((ds) => ({ label: ds.name, value: ds.id })),
 );
 
 const asImportedRow = (row: unknown) => row as ImportedRow;
@@ -125,15 +167,25 @@ async function loadImportedTables() {
 
 // 导入表配置
 async function doImport(tableName: string) {
+  const dataSourceId = selectedDsId.value;
+  if (!dataSourceId) {
+    ElMessage.warning('请选择数据源');
+    return;
+  }
+
   try {
-    await ElMessageBox.confirm(`确认导入表「${tableName}」及其字段配置？`, '导入确认', { type: 'info' });
+    await ElMessageBox.confirm(
+      `确认导入表「${tableName}」及其字段配置？`,
+      '导入确认',
+      { type: 'info' },
+    );
   } catch {
     return;
   }
   loading.value = true;
   try {
     await importTables({
-      dataSourceId: selectedDsId.value!,
+      dataSourceId,
       tableNames: [tableName],
     });
     ElMessage.success(`表「${tableName}」已导入`);
@@ -146,15 +198,23 @@ async function doImport(tableName: string) {
 
 // 批量导入
 async function doBatchImport() {
+  const dataSourceId = selectedDsId.value;
+  if (!dataSourceId) {
+    ElMessage.warning('请选择数据源');
+    return;
+  }
+
   try {
-    await ElMessageBox.confirm('确认导入当前所有数据源表？', '批量导入确认', { type: 'info' });
+    await ElMessageBox.confirm('确认导入当前所有数据源表？', '批量导入确认', {
+      type: 'info',
+    });
   } catch {
     return;
   }
   loading.value = true;
   try {
     await importTables({
-      dataSourceId: selectedDsId.value!,
+      dataSourceId,
       tableNames: sourceTables.value.map((t) => t.tableName),
     });
     ElMessage.success(`已批量导入 ${sourceTables.value.length} 张表`);
@@ -201,7 +261,11 @@ function openGenerate(row: ImportedRow) {
 // 删除导入表配置
 async function deleteImported(row: ImportedRow) {
   try {
-    await ElMessageBox.confirm(`确认删除表「${row.tableName}」的导入配置？`, '提示', { type: 'warning' });
+    await ElMessageBox.confirm(
+      `确认删除表「${row.tableName}」的导入配置？`,
+      '提示',
+      { type: 'warning' },
+    );
   } catch {
     return;
   }
@@ -225,7 +289,7 @@ function handleDsChange() {
   void loadSourceTables();
 }
 
-function onTabChange(name: string | number) {
+function onTabChange(name: number | string) {
   if (name === 'source') {
     void loadSourceTables();
   } else {
@@ -240,7 +304,14 @@ loadDataSources();
   <div class="hx-layout-container">
     <div class="hx-layout-container-auto hx-layout-container-view">
       <!-- 数据源选择 -->
-      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px">
+      <div
+        style="
+          display: flex;
+          gap: 12px;
+          align-items: center;
+          margin-bottom: 12px;
+        "
+      >
         <span style="font-weight: 600; white-space: nowrap">数据源：</span>
         <ElSelect
           v-model="selectedDsId"
@@ -272,7 +343,14 @@ loadDataSources();
               />
             </ElFormItem>
             <ElFormItem>
-              <ElButton type="primary" :icon="Search" @click="sourcePage = 1; loadSourceTables()">
+              <ElButton
+                type="primary"
+                :icon="Search"
+                @click="
+                  sourcePage = 1;
+                  loadSourceTables();
+                "
+              >
                 搜索
               </ElButton>
               <ElButton
@@ -297,10 +375,20 @@ loadDataSources();
 
           <ElTable v-loading="loading" :data="sourceTables" border>
             <ElTableColumn prop="tableName" label="表名称" min-width="180" />
-            <ElTableColumn prop="tableComment" label="表描述" min-width="200" show-overflow-tooltip />
+            <ElTableColumn
+              prop="tableComment"
+              label="表描述"
+              min-width="200"
+              show-overflow-tooltip
+            />
             <ElTableColumn prop="engine" label="引擎" width="100" />
             <ElTableColumn prop="tableRows" label="行数" width="100" />
-            <ElTableColumn label="操作" width="120" align="center" fixed="right">
+            <ElTableColumn
+              label="操作"
+              width="120"
+              align="center"
+              fixed="right"
+            >
               <template #default="scope">
                 <ElButton
                   link
@@ -318,7 +406,10 @@ loadDataSources();
             </template>
           </ElTable>
 
-          <div v-if="sourceTotal > 0" style="margin-top: 16px; text-align: right">
+          <div
+            v-if="sourceTotal > 0"
+            style="margin-top: 16px; text-align: right"
+          >
             <ElPagination
               v-model:current-page="sourcePage"
               v-model:page-size="sourceSize"
@@ -347,7 +438,14 @@ loadDataSources();
               />
             </ElFormItem>
             <ElFormItem>
-              <ElButton type="primary" :icon="Search" @click="importPage = 1; loadImportedTables()">
+              <ElButton
+                type="primary"
+                :icon="Search"
+                @click="
+                  importPage = 1;
+                  loadImportedTables();
+                "
+              >
                 搜索
               </ElButton>
               <ElButton
@@ -365,12 +463,27 @@ loadDataSources();
 
           <ElTable v-loading="loading" :data="importedTables" border>
             <ElTableColumn prop="tableName" label="表名称" min-width="180" />
-            <ElTableColumn prop="tableComment" label="表描述" min-width="180" show-overflow-tooltip />
+            <ElTableColumn
+              prop="tableComment"
+              label="表描述"
+              min-width="180"
+              show-overflow-tooltip
+            />
             <ElTableColumn prop="className" label="类名" width="160" />
             <ElTableColumn prop="moduleName" label="模块" width="120" />
             <ElTableColumn prop="functionAuthor" label="作者" width="100" />
-            <ElTableColumn prop="columnCount" label="字段数" width="80" align="center" />
-            <ElTableColumn label="操作" width="280" align="center" fixed="right">
+            <ElTableColumn
+              prop="columnCount"
+              label="字段数"
+              width="80"
+              align="center"
+            />
+            <ElTableColumn
+              label="操作"
+              width="280"
+              align="center"
+              fixed="right"
+            >
               <template #default="scope">
                 <ElButton
                   link
@@ -406,7 +519,10 @@ loadDataSources();
             </template>
           </ElTable>
 
-          <div v-if="importTotal > 0" style="margin-top: 16px; text-align: right">
+          <div
+            v-if="importTotal > 0"
+            style="margin-top: 16px; text-align: right"
+          >
             <ElPagination
               v-model:current-page="importPage"
               v-model:page-size="importSize"
@@ -435,7 +551,11 @@ loadDataSources();
           <ElTableColumn prop="columnName" label="字段名" width="150" />
           <ElTableColumn label="注释" min-width="140">
             <template #default="scope">
-              <ElInput v-model="scope.row.columnComment" size="small" placeholder="字段注释" />
+              <ElInput
+                v-model="scope.row.columnComment"
+                size="small"
+                placeholder="字段注释"
+              />
             </template>
           </ElTableColumn>
           <ElTableColumn prop="columnType" label="物理类型" width="130" />
@@ -542,14 +662,22 @@ loadDataSources();
           </ElTableColumn>
           <ElTableColumn label="字典类型" width="140">
             <template #default="scope">
-              <ElInput v-model="scope.row.dictType" size="small" placeholder="字典编码" />
+              <ElInput
+                v-model="scope.row.dictType"
+                size="small"
+                placeholder="字典编码"
+              />
             </template>
           </ElTableColumn>
         </ElTable>
       </div>
       <template #footer>
         <ElButton @click="columnDialogVisible = false">关闭</ElButton>
-        <ElButton type="primary" :loading="columnDialogLoading" @click="saveColumnConfig">
+        <ElButton
+          type="primary"
+          :loading="columnDialogLoading"
+          @click="saveColumnConfig"
+        >
           保存配置
         </ElButton>
       </template>
