@@ -1,7 +1,7 @@
 /**
  * 该文件可自行根据业务逻辑进行调整
  */
-import type { RequestClientOptions } from '@vben/request';
+import type { RequestClientConfig, RequestClientOptions } from '@vben/request';
 
 import { useAppConfig } from '@vben/hooks';
 import { preferences } from '@vben/preferences';
@@ -30,7 +30,7 @@ const { apiURL } = useAppConfig(import.meta.env, import.meta.env.PROD);
  */
 export type TenantScope = 'active' | 'operator' | 'none';
 
-export interface ScopedRequestConfig extends RequestClientOptions {
+export interface ScopedRequestConfig extends RequestClientConfig {
   requestKey?: string;
   tenantScope?: TenantScope;
   silentAuthFailure?: boolean;
@@ -257,17 +257,18 @@ function createRequestClient(baseURL: string, options?: RequestClientOptions) {
   // 通用的错误处理,如果没有进入上面的错误处理逻辑，就会进入这里
   client.addResponseInterceptor(
     errorMessageResponseInterceptor((msg: string, error) => {
-      // 这里可以根据业务进行定制,你可以拿到 error 内的信息进行定制化处理，根据不同的 code 做不同的提示，而不是直接使用 message.error 提示 msg
-      // 401 错误由 doReAuthenticate 统一处理，此处不再重复提示
+      const requestConfig = error?.config as ScopedRequestConfig | undefined;
       const status = error?.response?.status;
-      if (status === 401) {
-        return Promise.reject(error);
+      if (status === 401 || requestConfig?.suppressErrorMessage) {
+        return;
       }
-      // 当前mock接口返回的错误字段是 error 或者 message
       const responseData = error?.response?.data ?? {};
       const errorMessage = responseData?.message ?? '';
-      // 如果没有错误信息，则会根据状态码进行提示
-      ElMessage.error(errorMessage || msg);
+      ElMessage({
+        type: 'error',
+        message: errorMessage || msg,
+        grouping: true,
+      });
     }),
   );
 

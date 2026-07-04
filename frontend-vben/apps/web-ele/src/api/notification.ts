@@ -1,4 +1,5 @@
 import type { PageResult } from '#/types/api';
+import type { ScopedRequestConfig } from '#/api/request';
 
 import { requestClient } from '#/api/request';
 
@@ -32,30 +33,56 @@ export interface NotificationStreamTicket {
   expiresAt: string;
 }
 
+function withSilentNotificationError(config: ScopedRequestConfig = {}): ScopedRequestConfig {
+  return {
+    ...config,
+    suppressErrorMessage: true,
+  };
+}
+
 export async function queryNotifications(params?: NotificationQueryParams) {
-  return await requestClient.get<PageResult<NotificationView>>('/notifications', {
-    params,
-  });
+  return await requestClient.get<PageResult<NotificationView>>(
+    '/notifications',
+    withSilentNotificationError({ params }),
+  );
 }
 
 export async function queryUnreadNotificationCount() {
-  return await requestClient.get<number>('/notifications/unread-count');
+  return await requestClient.get<number>(
+    '/notifications/unread-count',
+    withSilentNotificationError(),
+  );
 }
 
 export async function markNotificationRead(notificationId: number) {
-  return await requestClient.put<NotificationView>(`/notifications/${notificationId}/read`);
+  return await requestClient.put<NotificationView>(
+    `/notifications/${notificationId}/read`,
+    undefined,
+    withSilentNotificationError(),
+  );
 }
 
 export async function markAllNotificationsRead() {
-  return await requestClient.put<number>('/notifications/read-all');
+  return await requestClient.put<number>(
+    '/notifications/read-all',
+    undefined,
+    withSilentNotificationError(),
+  );
 }
 
 export async function clearReadNotifications() {
-  return await requestClient.delete<number>('/notifications/read');
+  return await requestClient.delete<number>(
+    '/notifications/read',
+    withSilentNotificationError(),
+  );
 }
 
 export async function createNotificationStreamTicket() {
-  return await requestClient.post<NotificationStreamTicket>('/notifications/stream-ticket');
+  return await requestClient.post<NotificationStreamTicket>(
+    '/notifications/stream-ticket',
+    undefined,
+    withSilentNotificationError(),
+  );
 }
 
 export function buildNotificationStreamUrl(ticket: string): string {

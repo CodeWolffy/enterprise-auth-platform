@@ -35,6 +35,11 @@ export function useNotifications() {
     records: [],
   });
 
+  const notificationServiceUnavailableMessage = '站内通知暂时无法同步，不影响当前操作';
+  const notificationErrorThrottleMs = 15_000;
+
+  let lastNotificationErrorAt = 0;
+
   const notificationSummaryText = computed(() => {
     if (notificationReadFilter.value === 'unread') {
       return `未读 ${notificationPage.value.total} 条 / 全部未读 ${unreadNotificationCount.value} 条`;
@@ -49,6 +54,24 @@ export function useNotifications() {
   let sseSource: EventSource | null = null;
   let sseReconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let sseManualClose = false;
+  const sseReconnectBaseDelayMs = 5000;
+  const sseReconnectMaxDelayMs = 60_000;
+  let sseReconnectDelayMs = sseReconnectBaseDelayMs;
+
+  function showNotificationServiceWarning(message = notificationServiceUnavailableMessage) {
+    const now = Date.now();
+    if (now - lastNotificationErrorAt < notificationErrorThrottleMs) {
+      return;
+    }
+    lastNotificationErrorAt = now;
+    ElMessage({
+      type: 'warning',
+      message,
+      duration: 3000,
+      grouping: true,
+      offset: 24,
+    });
+  }
 
   async function loadUnreadNotificationCount() {
     try {
@@ -73,6 +96,8 @@ export function useNotifications() {
         read: notificationReadFilter.value === 'unread' ? false : undefined,
       });
       await loadUnreadNotificationCount();
+    } catch {
+      showNotificationServiceWarning('站内通知暂时无法加载，请稍后再试');
     } finally {
       notificationsLoading.value = false;
     }
@@ -91,27 +116,37 @@ export function useNotifications() {
 
   async function markNotificationRead(notification: NotificationView) {
     if (notification.read) {
-      return;
+      return true;
     }
-    const updated = await markNotificationReadRequest(notification.id);
-    if (notificationReadFilter.value === 'unread') {
-      notificationPage.value.records = notificationPage.value.records.filter((item) => item.id !== updated.id);
-      notificationPage.value.total = Math.max(notificationPage.value.total - 1, 0);
-    } else {
-      notificationPage.value.records = notificationPage.value.records.map((item) =>
-        item.id === updated.id ? updated : item,
-      );
+    try {
+      const updated = await markNotificationReadRequest(notification.id);
+      if (notificationReadFilter.value === 'unread') {
+        notificationPage.value.records = notificationPage.value.records.filter((item) => item.id !== updated.id);
+        notificationPage.value.total = Math.max(notificationPage.value.total - 1, 0);
+      } else {
+        notificationPage.value.records = notificationPage.value.records.map((item) =>
+          item.id === updated.id ? updated : item,
+        );
+      }
+      await loadUnreadNotificationCount();
+      return true;
+    } catch {
+      showNotificationServiceWarning('通知状态暂时无法更新，请稍后再试');
+      return false;
     }
-    await loadUnreadNotificationCount();
   }
 
   async function markAllNotificationsReadAction() {
-    const changed = await markAllNotificationsRead();
-    if (changed > 0) {
-      ElMessage.success('站内通知已全部标记为已读');
+    try {
+      const changed = await markAllNotificationsRead();
+      if (changed > 0) {
+        ElMessage.success('站内通知已全部标记为已读');
+      }
+      notificationPage.value.page = 1;
+      await loadNotifications(1);
+    } catch {
+      showNotificationServiceWarning('通知状态暂时无法更新，请稍后再试');
     }
-    notificationPage.value.page = 1;
-    await loadNotifications(1);
   }
 
   async function clearReadNotificationsAction() {
@@ -129,14 +164,18 @@ export function useNotifications() {
     } catch {
       return;
     }
-    const removed = await clearReadNotifications();
-    if (removed > 0) {
-      ElMessage.success(`已清空 ${removed} 条已读通知`);
-    } else {
-      ElMessage.info('没有可清空的已读通知');
+    try {
+      const removed = await clearReadNotifications();
+      if (removed > 0) {
+        ElMessage.success(`已清空 ${removed} 条已读通知`);
+      } else {
+        ElMessage.info('没有可清空的已读通知');
+      }
+      notificationPage.value.page = 1;
+      await loadNotifications(1);
+    } catch {
+      showNotificationServiceWarning('已读通知暂时无法清空，请稍后再试');
     }
-    notificationPage.value.page = 1;
-    await loadNotifications(1);
   }
 
   async function openNotificationLink(notification: NotificationView) {
@@ -149,11 +188,18 @@ export function useNotifications() {
   }
 
   function handleWindowFocus() {
+    if (!accessStore.accessToken) {
+      return;
+    }
     void loadUnreadNotificationCount();
   }
 
   async function startSseSubscription() {
-    closeSseSubscription();
+    if (sseReconnectTimer) {
+      clearTimeout(sseReconnectTimer);
+      sseReconnectTimer = null;
+    }
+    closeSseSourceOnly();
     if (!accessStore.accessToken) {
       return;
     }
@@ -175,6 +221,7 @@ export function useNotifications() {
       return;
     }
     sseSource.addEventListener('open', () => {
+      sseReconnectDelayMs = sseReconnectBaseDelayMs;
       void loadUnreadNotificationCount();
     });
     sseSource.addEventListener('notification', (event) => {
@@ -202,6 +249,7 @@ export function useNotifications() {
 
   function closeSseSubscription() {
     sseManualClose = true;
+    sseReconnectDelayMs = sseReconnectBaseDelayMs;
     if (sseReconnectTimer) {
       clearTimeout(sseReconnectTimer);
       sseReconnectTimer = null;
@@ -213,12 +261,14 @@ export function useNotifications() {
     if (sseReconnectTimer || sseManualClose) {
       return;
     }
+    const reconnectDelay = sseReconnectDelayMs;
+    sseReconnectDelayMs = Math.min(sseReconnectDelayMs * 2, sseReconnectMaxDelayMs);
     sseReconnectTimer = setTimeout(() => {
       sseReconnectTimer = null;
       if (!sseManualClose && accessStore.accessToken) {
         void startSseSubscription();
       }
-    }, 5000);
+    }, reconnectDelay);
   }
 
   function handleIncomingNotification(notification: NotificationView) {
