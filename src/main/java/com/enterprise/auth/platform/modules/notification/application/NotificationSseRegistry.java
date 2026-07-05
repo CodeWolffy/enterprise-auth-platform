@@ -61,6 +61,31 @@ public class NotificationSseRegistry {
     }
 
     /**
+     * 向指定租户下所有活跃连接广播一条通知。
+     */
+    public void sendTenant(String tenantId, NotificationView notification) {
+        String keyPrefix = tenantId + ":";
+        for (Map.Entry<String, Set<SseEmitter>> entry : emittersByUser.entrySet()) {
+            if (!entry.getKey().startsWith(keyPrefix)) {
+                continue;
+            }
+            Set<SseEmitter> emitters = entry.getValue();
+            if (emitters == null || emitters.isEmpty()) {
+                continue;
+            }
+            for (SseEmitter emitter : emitters) {
+                try {
+                    emitter.send(SseEmitter.event()
+                            .name("notification")
+                            .data(notification));
+                } catch (IOException | IllegalStateException ex) {
+                    discardEmitter(entry.getKey(), emitter, ex, "tenant-notification");
+                }
+            }
+        }
+    }
+
+    /**
      * 向所有活跃连接发送心跳，保持连接不被代理或浏览器断开。
      */
     public void heartbeat() {
@@ -95,6 +120,14 @@ public class NotificationSseRegistry {
      */
     public int activeConnectionCount() {
         return emittersByUser.values().stream().mapToInt(Set::size).sum();
+    }
+
+    /**
+     * 判断指定租户+用户是否存在活跃 SSE 连接。
+     */
+    public boolean hasActiveConnection(String tenantId, Long userId) {
+        Set<SseEmitter> emitters = emittersByUser.get(key(tenantId, userId));
+        return emitters != null && !emitters.isEmpty();
     }
 
     private void remove(String key, SseEmitter emitter) {

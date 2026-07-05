@@ -134,7 +134,7 @@ function formatDateTime(value?: null | string) {
           <span class="eyebrow">我的已办</span>
           <h3>审批记录</h3>
           <p class="muted-line">
-            审批处理结果按任务留痕，便于后续接入操作日志、催办、转签和完整审计链路。
+            审批处理结果按任务留痕，集中呈现处理人、意见、完成时间和实例关联。
           </p>
         </div>
         <ElButton size="small" :loading="loading" @click="loadTasks">

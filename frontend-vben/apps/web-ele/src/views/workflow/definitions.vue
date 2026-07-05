@@ -396,7 +396,7 @@ function definitionStatusTag(status: string): TagProps['type'] {
           <span class="eyebrow">工作流</span>
           <h3>流程定义</h3>
           <p class="muted-line">
-            定义、部署、停用和详情都已接入，后续补删除和版本管理也有位置放。
+            统一维护流程标识、审批节点、候选范围和驳回策略，部署后即可用于发起审批。
           </p>
         </div>
         <div class="panel-actions">

@@ -2,7 +2,11 @@
 import type { TagProps } from 'element-plus';
 
 import type { PageResult } from '#/types/api';
-import type { WorkflowTaskUrgeView, WorkflowTaskView } from '#/types/workflow';
+import type {
+  WorkflowActionResult,
+  WorkflowTaskUrgeView,
+  WorkflowTaskView,
+} from '#/types/workflow';
 
 import { computed, nextTick, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
@@ -199,17 +203,17 @@ async function submitAction() {
   submitting.value = true;
   try {
     if (actionType.value === 'approve') {
-      await approveWorkflowTask(
+      const result = await approveWorkflowTask(
         currentTask.value.id,
         comment.value.trim() || undefined,
       );
-      ElMessage.success('审批已通过');
+      ElMessage.success(formatActionResultMessage(result, 'approve'));
     } else {
-      await rejectWorkflowTask(
+      const result = await rejectWorkflowTask(
         currentTask.value.id,
         comment.value.trim() || undefined,
       );
-      ElMessage.success('任务已驳回');
+      ElMessage.success(formatActionResultMessage(result, 'reject'));
     }
     actionVisible.value = false;
     currentTask.value = null;
@@ -229,11 +233,17 @@ async function submitTransfer() {
   }
   submitting.value = true;
   try {
-    await transferWorkflowTask(currentTask.value.id, {
+    const result = await transferWorkflowTask(currentTask.value.id, {
       targetUserId: transferForm.targetUserId,
       comment: transferForm.comment.trim() || undefined,
     });
-    ElMessage.success('任务已转签');
+    ElMessage.success(
+      result.nextTask
+        ? `任务已转签给 ${
+            result.nextTask.assigneeUsername || `用户 ${transferForm.targetUserId}`
+          }`
+        : '任务已转签',
+    );
     transferVisible.value = false;
     currentTask.value = null;
     await loadTasks();
@@ -266,6 +276,34 @@ function taskStatusText(status: string) {
       } as Record<string, string>
     )[status] ?? status
   );
+}
+
+function instanceResultText(status: string) {
+  return (
+    (
+      {
+        APPROVED: '流程已通过',
+        REJECTED: '流程已驳回',
+        RUNNING: '流程继续流转',
+        TERMINATED: '流程已终止',
+        WITHDRAWN: '流程已撤回',
+      } as Record<string, string>
+    )[status] ?? status
+  );
+}
+
+function formatActionResultMessage(
+  result: WorkflowActionResult,
+  type: 'approve' | 'reject',
+) {
+  if (result.nextTask) {
+    return `${
+      type === 'approve' ? '审批已通过' : '任务已驳回'
+    }，下一节点：${result.nextTask.stepName}`;
+  }
+  return `${
+    type === 'approve' ? '审批已通过' : '任务已驳回'
+  }，${instanceResultText(result.instance.status)}`;
 }
 
 function taskStatusTag(status: string): TagProps['type'] {
@@ -599,6 +637,14 @@ function formatDateTime(value?: null | string) {
           <ElDescriptionsItem label="创建时间">
             {{ formatDateTime(detailItem.createdAt) }}
           </ElDescriptionsItem>
+          <ElDescriptionsItem label="处理人">
+            {{
+              detailItem.assigneeUsername || detailItem.assigneeUserId || '-'
+            }}
+          </ElDescriptionsItem>
+          <ElDescriptionsItem label="完成时间">
+            {{ formatDateTime(detailItem.completedAt) }}
+          </ElDescriptionsItem>
           <ElDescriptionsItem label="可处理">
             <ElTag
               :type="detailItem.actionable ? 'success' : 'info'"
@@ -606,6 +652,9 @@ function formatDateTime(value?: null | string) {
             >
               {{ detailItem.actionable ? '是' : '否' }}
             </ElTag>
+          </ElDescriptionsItem>
+          <ElDescriptionsItem label="催办次数">
+            {{ detailItem.urgeCount }}
           </ElDescriptionsItem>
           <ElDescriptionsItem label="处理意见" :span="2">
             {{ detailItem.comment || '-' }}

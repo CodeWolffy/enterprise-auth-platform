@@ -44,21 +44,26 @@ class NotificationControllerTest {
     private Long otherTenantId;
     private Long expiredId;
     private Long deletedId;
+    private Long broadcastNoticeId;
 
     @BeforeEach
     void setUp() {
         cleanNotifications();
+        cleanNotices();
+        hideExistingBroadcastNotices();
         visibleUnreadId = insertNotification(TENANT_A, USER_A, "可见未读通知", null, null, 0, DEDUP_PREFIX + "visible");
         insertNotification(TENANT_A, USER_A, "可见已读通知", "NOW()", null, 0, DEDUP_PREFIX + "read");
         otherUserId = insertNotification(TENANT_A, USER_B, "其他用户通知", null, null, 0, DEDUP_PREFIX + "other-user");
         otherTenantId = insertNotification(PLATFORM, USER_A, "其他租户通知", null, null, 0, DEDUP_PREFIX + "other-tenant");
         expiredId = insertNotification(TENANT_A, USER_A, "过期通知", null, "DATE_SUB(NOW(), INTERVAL 1 DAY)", 0, DEDUP_PREFIX + "expired");
         deletedId = insertNotification(TENANT_A, USER_A, "已删除通知", null, null, 1, DEDUP_PREFIX + "deleted");
+        broadcastNoticeId = insertNotice(TENANT_A, "站内广播公告", "<p>广播内容</p>");
     }
 
     @AfterEach
     void tearDown() {
         cleanNotifications();
+        cleanNotices();
     }
 
     @Test
@@ -69,8 +74,9 @@ class NotificationControllerTest {
                         .param("page", "1")
                         .param("size", "20"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.total").value(2))
+                .andExpect(jsonPath("$.data.total").value(3))
                 .andExpect(jsonPath("$.data.records[?(@.id==" + visibleUnreadId + ")]").exists())
+                .andExpect(jsonPath("$.data.records[?(@.id==" + -broadcastNoticeId + ")]").exists())
                 .andExpect(jsonPath("$.data.records[?(@.id==" + otherUserId + ")]").doesNotExist())
                 .andExpect(jsonPath("$.data.records[?(@.id==" + otherTenantId + ")]").doesNotExist())
                 .andExpect(jsonPath("$.data.records[?(@.id==" + expiredId + ")]").doesNotExist())
@@ -83,7 +89,7 @@ class NotificationControllerTest {
                         .with(bearer(principal(TENANT_A, USER_A), TENANT_A))
                         .header("X-Tenant-Id", TENANT_A))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value(1));
+                .andExpect(jsonPath("$.data").value(2));
     }
 
     @Test
@@ -94,7 +100,7 @@ class NotificationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(visibleUnreadId))
                 .andExpect(jsonPath("$.data.read").value(true))
-                .andExpect(jsonPath("$.data.readAt").isNumber());
+                .andExpect(jsonPath("$.data.readAt").isString());
 
         Integer unread = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM sys_user_notification WHERE id = ? AND read_at IS NULL",
@@ -114,6 +120,26 @@ class NotificationControllerTest {
     }
 
     @Test
+    void markReadShouldPersistBroadcastNoticeReadState() throws Exception {
+        mockMvc.perform(put("/api/notifications/{notificationId}/read", -broadcastNoticeId)
+                        .with(bearer(principal(TENANT_A, USER_A), TENANT_A))
+                        .header("X-Tenant-Id", TENANT_A))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(-broadcastNoticeId))
+                .andExpect(jsonPath("$.data.scenarioCode").value("SYSTEM_NOTICE_PUBLISHED"))
+                .andExpect(jsonPath("$.data.read").value(true));
+
+        Integer readState = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_notice_read_status WHERE tenant_id = ? AND user_id = ? AND notice_id = ? AND read_at IS NOT NULL AND cleared_at IS NULL",
+                Integer.class,
+                TENANT_A,
+                USER_A,
+                broadcastNoticeId
+        );
+        org.junit.jupiter.api.Assertions.assertEquals(1, readState);
+    }
+
+    @Test
     void markReadShouldRejectExpiredNotification() throws Exception {
         mockMvc.perform(put("/api/notifications/{notificationId}/read", expiredId)
                         .with(bearer(principal(TENANT_A, USER_A), TENANT_A))
@@ -128,7 +154,7 @@ class NotificationControllerTest {
                         .with(bearer(principal(TENANT_A, USER_A), TENANT_A))
                         .header("X-Tenant-Id", TENANT_A))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").value(1));
+                .andExpect(jsonPath("$.data").value(2));
 
         Integer currentUnread = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM sys_user_notification WHERE tenant_id = ? AND recipient_user_id = ? AND deleted = 0 AND read_at IS NULL AND (expires_at IS NULL OR expires_at > NOW()) AND dedup_key LIKE ?",
@@ -150,6 +176,14 @@ class NotificationControllerTest {
         org.junit.jupiter.api.Assertions.assertEquals(0, currentUnread);
         org.junit.jupiter.api.Assertions.assertEquals(1, otherUserUnread);
         org.junit.jupiter.api.Assertions.assertEquals(1, expiredUnread);
+        Integer broadcastUnread = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_notice_read_status WHERE tenant_id = ? AND user_id = ? AND notice_id = ? AND read_at IS NOT NULL",
+                Integer.class,
+                TENANT_A,
+                USER_A,
+                broadcastNoticeId
+        );
+        org.junit.jupiter.api.Assertions.assertEquals(1, broadcastUnread);
     }
 
     @Test
@@ -213,6 +247,46 @@ class NotificationControllerTest {
 
     private void cleanNotifications() {
         jdbcTemplate.update("DELETE FROM sys_user_notification WHERE dedup_key LIKE ?", DEDUP_PREFIX + "%");
+    }
+
+    private Long insertNotice(String tenantId, String title, String content) {
+        jdbcTemplate.update(
+                "INSERT INTO sys_notice (tenant_id, notice_title, notice_content, published, publish_time, created_by, updated_by, deleted) VALUES (?, ?, ?, 1, NULL, 'notification-ut', 'notification-ut', 0)",
+                tenantId,
+                title,
+                content
+        );
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_notice WHERE tenant_id = ? AND notice_title = ? ORDER BY id DESC LIMIT 1",
+                Long.class,
+                tenantId,
+                title
+        );
+    }
+
+    private void cleanNotices() {
+        jdbcTemplate.update("DELETE FROM sys_notice_read_status WHERE created_by = 'notification-ut'");
+        jdbcTemplate.update("DELETE FROM sys_notice WHERE tenant_id IN (?, ?) AND created_by = 'notification-ut'", TENANT_A, PLATFORM);
+    }
+
+    private void hideExistingBroadcastNotices() {
+        jdbcTemplate.update(
+                """
+                        INSERT IGNORE INTO sys_notice_read_status(
+                            tenant_id, notice_id, user_id, read_at, cleared_at,
+                            created_by, updated_by, deleted, created_at, updated_at
+                        )
+                        SELECT tenant_id, id, ?, NOW(3), NOW(3),
+                               'notification-ut', 'notification-ut', 0, NOW(3), NOW(3)
+                        FROM sys_notice
+                        WHERE tenant_id = ?
+                          AND deleted = 0
+                          AND published = 1
+                          AND (publish_time IS NULL OR publish_time <= NOW(3))
+                        """,
+                USER_A,
+                TENANT_A
+        );
     }
 
     private UserAccount principal(String tenantId, Long userId) {

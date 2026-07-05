@@ -3,7 +3,6 @@ package com.enterprise.auth.platform.modules.notification.application;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.context.TimeZoneContext;
 import com.enterprise.auth.platform.modules.user.application.UserAuthenticationFacade;
-import com.enterprise.auth.platform.modules.user.application.UserQueryFacade;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -20,19 +19,18 @@ public class NotificationScenarioPublisher {
     private static final String WORKFLOW_TODO_LINK = "/workflow/todo";
     private static final String WORKFLOW_INSTANCE_LINK = "/workflow/instances";
     private static final String ACCOUNT_PROFILE_LINK = "/account/profile";
-    private static final String SYSTEM_NOTICE_LINK = "/notices";
 
     private final NotificationPublisher notificationPublisher;
-    private final UserQueryFacade userQueryFacade;
+    private final NotificationSseRegistry sseRegistry;
     private final UserAuthenticationFacade userAuthenticationFacade;
 
     public NotificationScenarioPublisher(
             NotificationPublisher notificationPublisher,
-            UserQueryFacade userQueryFacade,
+            NotificationSseRegistry sseRegistry,
             UserAuthenticationFacade userAuthenticationFacade
     ) {
         this.notificationPublisher = notificationPublisher;
-        this.userQueryFacade = userQueryFacade;
+        this.sseRegistry = sseRegistry;
         this.userAuthenticationFacade = userAuthenticationFacade;
     }
 
@@ -231,31 +229,14 @@ public class NotificationScenarioPublisher {
         if (!StringUtils.hasText(tenantId) || noticeId == null) {
             return;
         }
-        Set<Long> recipientUserIds = userQueryFacade.listAllEnabledUserIds(tenantId);
-        if (recipientUserIds.isEmpty()) {
-            return;
-        }
-        publishAfterCommit(new NotificationPublishCommand(
+        Runnable publishTask = () -> sseRegistry.sendTenant(
                 tenantId,
-                "SYSTEM_NOTICE_PUBLISHED",
-                "SYSTEM_NOTICE",
-                String.valueOf(noticeId),
-                "SYSTEM_NOTICE",
-                String.valueOf(noticeId),
-                recipientUserIds,
-                Set.of(),
-                false,
-                Map.of("noticeId", noticeId),
-                "系统公告：" + fallback(title, "公告"),
-                limit(fallback(stripHtml(content), "请查看系统公告详情。"), 500),
-                "INFO",
-                SYSTEM_NOTICE_LINK + "/" + noticeId,
-                Map.of("route", SYSTEM_NOTICE_LINK, "noticeId", noticeId),
-                Map.of("noticeId", noticeId),
-                "SYSTEM_NOTICE_PUBLISHED:" + noticeId,
-                null,
-                operator
-        ));
+                NotificationView.systemNoticeBroadcast(
+                        noticeId,
+                        fallback(title, "公告"),
+                        limit(fallback(stripHtml(content), "请查看系统公告详情。"), 500),
+                        TimeSupport.now()));
+        runAfterCommit(publishTask);
     }
 
     private void workflowTaskDecision(WorkflowTaskDecisionEvent event, String scenarioCode, String titlePrefix, String actorLabel, String level) {
@@ -378,7 +359,10 @@ public class NotificationScenarioPublisher {
         if (command == null) {
             return;
         }
-        Runnable publishTask = () -> notificationPublisher.publish(command);
+        runAfterCommit(() -> notificationPublisher.publish(command));
+    }
+
+    private void runAfterCommit(Runnable publishTask) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             publishTask.run();
             return;

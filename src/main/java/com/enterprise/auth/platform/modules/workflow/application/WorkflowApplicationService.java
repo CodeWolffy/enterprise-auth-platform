@@ -10,6 +10,7 @@ import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.modules.notification.application.NotificationScenarioPublisher;
+import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.modules.role.application.RoleQueryFacade;
 import com.enterprise.auth.platform.modules.user.application.UserQueryFacade;
 import com.enterprise.auth.platform.modules.user.application.UserQueryFacade.EnabledUser;
@@ -56,6 +57,7 @@ public class WorkflowApplicationService {
     private final ObjectMapper objectMapper;
     private final WorkflowTaskUrgeService urgeService;
     private final NotificationScenarioPublisher notificationScenarioPublisher;
+    private final LogPublisher logPublisher;
 
     public WorkflowApplicationService(
             WfProcessDefinitionMapper definitionMapper,
@@ -66,7 +68,8 @@ public class WorkflowApplicationService {
             CurrentUserService currentUserService,
             ObjectMapper objectMapper,
             WorkflowTaskUrgeService urgeService,
-            NotificationScenarioPublisher notificationScenarioPublisher
+            NotificationScenarioPublisher notificationScenarioPublisher,
+            LogPublisher logPublisher
     ) {
         this.definitionMapper = definitionMapper;
         this.instanceMapper = instanceMapper;
@@ -77,6 +80,7 @@ public class WorkflowApplicationService {
         this.objectMapper = objectMapper;
         this.urgeService = urgeService;
         this.notificationScenarioPublisher = notificationScenarioPublisher;
+        this.logPublisher = logPublisher;
     }
 
     @Transactional
@@ -527,8 +531,10 @@ public class WorkflowApplicationService {
         );
         if (approved) {
             notificationScenarioPublisher.workflowTaskApproved(event);
+            publishWorkflowAudit("WORKFLOW_TASK_APPROVED", tenantId, operator, instance, task, null);
         } else {
             notificationScenarioPublisher.workflowTaskRejected(event);
+            publishWorkflowAudit("WORKFLOW_TASK_REJECTED", tenantId, operator, instance, task, null);
         }
     }
 
@@ -553,6 +559,11 @@ public class WorkflowApplicationService {
                 targetUser.username(),
                 operator
         ));
+        Map<String, Object> extra = new LinkedHashMap<>();
+        extra.put("targetUserId", targetUser.id());
+        extra.put("targetUsername", targetUser.username());
+        extra.put("newTaskId", newTask.getId());
+        publishWorkflowAudit("WORKFLOW_TASK_TRANSFERRED", tenantId, operator, instance, originalTask, extra);
     }
 
     private void publishWorkflowInstanceClosed(
@@ -578,9 +589,40 @@ public class WorkflowApplicationService {
         );
         if (withdrawn) {
             notificationScenarioPublisher.workflowInstanceWithdrawn(event);
+            publishWorkflowAudit("WORKFLOW_INSTANCE_WITHDRAWN", tenantId, operator, instance, null, null);
         } else {
             notificationScenarioPublisher.workflowInstanceTerminated(event);
+            publishWorkflowAudit("WORKFLOW_INSTANCE_TERMINATED", tenantId, operator, instance, null, null);
         }
+    }
+
+    private void publishWorkflowAudit(
+            String eventType,
+            String tenantId,
+            String operator,
+            WfProcessInstanceEntity instance,
+            WfTaskEntity task,
+            Map<String, Object> extra
+    ) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("instanceId", instance.getId());
+        details.put("definitionId", instance.getDefinitionId());
+        details.put("definitionKey", instance.getDefinitionKey());
+        details.put("definitionVersion", instance.getDefinitionVersion());
+        details.put("businessKey", instance.getBusinessKey());
+        details.put("title", instance.getTitle());
+        details.put("instanceStatus", instance.getStatus());
+        details.put("currentStepIndex", instance.getCurrentStepIndex());
+        if (task != null) {
+            details.put("taskId", task.getId());
+            details.put("stepIndex", task.getStepIndex());
+            details.put("stepName", task.getStepName());
+            details.put("taskStatus", task.getStatus());
+        }
+        if (extra != null && !extra.isEmpty()) {
+            details.putAll(extra);
+        }
+        logPublisher.publish(eventType, operator, tenantId, details);
     }
 
     private WorkflowNotificationRecipients pendingTaskRecipients(String tenantId, Long instanceId) {

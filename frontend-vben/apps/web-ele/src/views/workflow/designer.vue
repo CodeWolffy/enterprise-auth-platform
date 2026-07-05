@@ -378,7 +378,7 @@ function rejectStrategyLabel(value: DesignerStep['rejectStrategy']) {
         <span class="eyebrow">Workflow Designer</span>
         <h3>流程设计器</h3>
         <p class="muted-line">
-          顺序审批、候选人、候选组和驳回策略都能在这里配置，保存后直接生成流程定义。
+          用可视化表单编排顺序审批、候选范围和驳回策略，保存后生成可部署的流程定义。
         </p>
       </div>
       <div class="designer-hero__actions">
@@ -454,7 +454,7 @@ function rejectStrategyLabel(value: DesignerStep['rejectStrategy']) {
         </ElForm>
         <ElAlert
           class="designer-tip"
-          title="当前设计器输出会保存为流程步骤 JSON；流程执行仍沿用已有轻量状态机。"
+          title="设计器会生成标准流程步骤数据，审批执行由后端状态机统一处理。"
           type="info"
           :closable="false"
           show-icon

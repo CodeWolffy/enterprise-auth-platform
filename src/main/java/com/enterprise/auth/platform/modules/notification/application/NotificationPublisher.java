@@ -1,12 +1,15 @@
 package com.enterprise.auth.platform.modules.notification.application;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.modules.notification.infrastructure.entity.SysUserNotificationEntity;
 import com.enterprise.auth.platform.modules.notification.infrastructure.mapper.SysUserNotificationMapper;
 import com.enterprise.auth.platform.modules.role.application.RoleQueryFacade;
 import com.enterprise.auth.platform.modules.user.application.UserQueryFacade;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
@@ -22,6 +25,7 @@ import org.springframework.util.StringUtils;
 public class NotificationPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(NotificationPublisher.class);
+    private static final int BATCH_INSERT_SIZE = 500;
 
     private final SysUserNotificationMapper notificationMapper;
     private final RoleQueryFacade roleQueryFacade;
@@ -48,52 +52,68 @@ public class NotificationPublisher {
         if (command == null || !StringUtils.hasText(command.tenantId())) {
             return 0;
         }
+        String tenantId = command.tenantId().trim();
         String title = limit(command.title(), 128);
         if (!StringUtils.hasText(title)) {
             return 0;
         }
+        String scenarioCode = limit(command.scenarioCode(), 64);
+        String sourceType = limit(command.sourceType(), 64);
+        String sourceId = limit(command.sourceId(), 128);
+        String bizType = limit(command.bizType(), 64);
+        String bizId = limit(command.bizId(), 128);
         String content = limit(command.content(), 1000);
+        String level = limit(command.level(), 32);
         String link = limit(command.link(), 255);
+        String actionPayloadJson = toJson(command.actionPayload());
+        String metadataJson = toJson(command.metadata());
+        String dedupKey = limit(command.dedupKey(), 191);
+        String createdBy = limit(command.createdBy(), 64);
         Set<Long> recipientUserIds = resolveRecipients(command);
         if (recipientUserIds.isEmpty()) {
             return 0;
         }
         long published = 0;
+        List<SysUserNotificationEntity> pendingBatch = new ArrayList<>(Math.min(recipientUserIds.size(), BATCH_INSERT_SIZE));
+        Instant createdAt = TimeSupport.now();
         for (Long recipientUserId : recipientUserIds) {
-            if (recipientUserId == null || duplicated(command.tenantId(), recipientUserId, command.dedupKey())) {
+            if (recipientUserId == null) {
                 continue;
             }
-            SysUserNotificationEntity entity = new SysUserNotificationEntity();
-            entity.setTenantId(command.tenantId().trim());
-            entity.setRecipientUserId(recipientUserId);
-            entity.setScenarioCode(limit(command.scenarioCode(), 64));
-            entity.setSourceType(limit(command.sourceType(), 64));
-            entity.setSourceId(limit(command.sourceId(), 128));
-            entity.setBizType(limit(command.bizType(), 64));
-            entity.setBizId(limit(command.bizId(), 128));
-            entity.setTitle(title);
-            entity.setContent(content);
-            entity.setLevel(limit(command.level(), 32));
-            entity.setLink(link);
-            entity.setActionPayloadJson(toJson(command.actionPayload()));
-            entity.setMetadataJson(toJson(command.metadata()));
-            entity.setDedupKey(limit(command.dedupKey(), 191));
-            entity.setExpiresAt(command.expiresAt());
-            entity.setCreatedBy(limit(command.createdBy(), 64));
-            entity.setUpdatedBy(limit(command.createdBy(), 64));
-            try {
-                notificationMapper.insert(entity);
-                published++;
-                sseRegistry.send(command.tenantId(), recipientUserId, NotificationView.from(entity));
-            } catch (DuplicateKeyException ex) {
-                // 已由唯一约束兜底保证同一用户同一去重键只写入一次。
+            SysUserNotificationEntity entity = buildEntity(
+                    tenantId,
+                    recipientUserId,
+                    scenarioCode,
+                    sourceType,
+                    sourceId,
+                    bizType,
+                    bizId,
+                    title,
+                    content,
+                    level,
+                    link,
+                    actionPayloadJson,
+                    metadataJson,
+                    dedupKey,
+                    command.expiresAt(),
+                    createdBy,
+                    createdAt);
+            if (sseRegistry.hasActiveConnection(tenantId, recipientUserId)) {
+                published += insertAndPush(tenantId, recipientUserId, entity);
+                continue;
+            }
+            pendingBatch.add(entity);
+            if (pendingBatch.size() >= BATCH_INSERT_SIZE) {
+                published += batchInsertIgnore(pendingBatch);
+                pendingBatch.clear();
             }
         }
+        published += batchInsertIgnore(pendingBatch);
         return published;
     }
 
     private Set<Long> resolveRecipients(NotificationPublishCommand command) {
-        Set<Long> userIds = userQueryFacade.listEnabledUserIds(command.tenantId(), command.recipientUserIds());
+        Set<Long> userIds = new LinkedHashSet<>(userQueryFacade.listEnabledUserIds(command.tenantId(), command.recipientUserIds()));
         Set<String> roleCodes = new LinkedHashSet<>(command.recipientRoleCodes());
         if (command.tenantAdmins()) {
             roleCodes.add("TENANT_ADMIN");
@@ -114,16 +134,65 @@ public class NotificationPublisher {
         return userQueryFacade.listEnabledUserIds(tenantId, roleMemberIds);
     }
 
-    private boolean duplicated(String tenantId, Long recipientUserId, String dedupKey) {
-        if (!StringUtils.hasText(dedupKey)) {
-            return false;
+    private SysUserNotificationEntity buildEntity(
+            String tenantId,
+            Long recipientUserId,
+            String scenarioCode,
+            String sourceType,
+            String sourceId,
+            String bizType,
+            String bizId,
+            String title,
+            String content,
+            String level,
+            String link,
+            String actionPayloadJson,
+            String metadataJson,
+            String dedupKey,
+            Instant expiresAt,
+            String createdBy,
+            Instant createdAt
+    ) {
+        SysUserNotificationEntity entity = new SysUserNotificationEntity();
+        entity.setTenantId(tenantId);
+        entity.setRecipientUserId(recipientUserId);
+        entity.setScenarioCode(scenarioCode);
+        entity.setSourceType(sourceType);
+        entity.setSourceId(sourceId);
+        entity.setBizType(bizType);
+        entity.setBizId(bizId);
+        entity.setTitle(title);
+        entity.setContent(content);
+        entity.setLevel(level);
+        entity.setLink(link);
+        entity.setActionPayloadJson(actionPayloadJson);
+        entity.setMetadataJson(metadataJson);
+        entity.setDedupKey(dedupKey);
+        entity.setExpiresAt(expiresAt);
+        entity.setCreatedBy(createdBy);
+        entity.setUpdatedBy(createdBy);
+        entity.setDeleted(0);
+        entity.setCreatedAt(createdAt);
+        entity.setUpdatedAt(createdAt);
+        return entity;
+    }
+
+    private long insertAndPush(String tenantId, Long recipientUserId, SysUserNotificationEntity entity) {
+        try {
+            notificationMapper.insert(entity);
+            sseRegistry.send(tenantId, recipientUserId, NotificationView.from(entity));
+            return 1;
+        } catch (DuplicateKeyException ex) {
+            // 已由唯一约束兜底保证同一用户同一去重键只写入一次。
+            return 0;
         }
-        Long count = notificationMapper.selectCount(new LambdaQueryWrapper<SysUserNotificationEntity>()
-                .eq(SysUserNotificationEntity::getTenantId, tenantId)
-                .eq(SysUserNotificationEntity::getRecipientUserId, recipientUserId)
-                .eq(SysUserNotificationEntity::getDedupKey, dedupKey.trim())
-                .eq(SysUserNotificationEntity::getDeleted, 0));
-        return count != null && count > 0;
+    }
+
+    private long batchInsertIgnore(List<SysUserNotificationEntity> notifications) {
+        if (notifications == null || notifications.isEmpty()) {
+            return 0;
+        }
+        return notificationMapper.batchInsertIgnore(notifications);
     }
 
     private String toJson(Map<String, Object> value) {

@@ -10,6 +10,7 @@ import type {
 } from '#/types/workflow';
 
 import { computed, reactive, ref } from 'vue';
+import { useRouter } from 'vue-router';
 
 import {
   ElButton,
@@ -41,6 +42,7 @@ import {
 } from '#/api/modules';
 import { formatDateTime as formatInstantDateTime } from '#/utils/datetime';
 
+const router = useRouter();
 const loading = ref(false);
 const definitionLoading = ref(false);
 const submitting = ref(false);
@@ -196,11 +198,34 @@ async function submitStart() {
 
   submitting.value = true;
   try {
-    await startWorkflowInstance(payload);
-    ElMessage.success('流程已发起');
+    const result = await startWorkflowInstance(payload);
     startVisible.value = false;
     query.page = 1;
     await loadInstances();
+    if (result.currentTask) {
+      ElMessage.success(`流程已发起，当前节点：${result.currentTask.stepName}`);
+      const taskId = result.currentTask.id;
+      void ElMessageBox.confirm(
+        `已生成待办任务 #${taskId}，是否立即查看？`,
+        '发起成功',
+        {
+          confirmButtonText: '查看待办',
+          cancelButtonText: '留在此页',
+          type: 'success',
+        },
+      )
+        .then(() =>
+          router.push({
+            name: 'workflow-todo',
+            query: { taskId },
+          }),
+        )
+        .catch(() => {});
+    } else {
+      ElMessage.success(
+        `流程已发起，${instanceStatusText(result.instance.status)}`,
+      );
+    }
   } finally {
     submitting.value = false;
   }
@@ -271,6 +296,13 @@ function instanceStatusText(status: string) {
       } as Record<string, string>
     )[status] ?? status
   );
+}
+
+function currentStepText(value: number) {
+  if (value === -1) {
+    return '发起人重提';
+  }
+  return value >= 0 ? `第 ${value + 1} 步` : String(value);
 }
 
 function instanceStatusTag(status: string): TagProps['type'] {
@@ -486,19 +518,27 @@ function formatDateTime(value?: null | string) {
             {{ detailItem.businessKey }}
           </ElDescriptionsItem>
           <ElDescriptionsItem label="状态">
-            {{ instanceStatusText(detailItem.status) }}
+            <ElTag :type="instanceStatusTag(detailItem.status)" effect="plain">
+              {{ instanceStatusText(detailItem.status) }}
+            </ElTag>
           </ElDescriptionsItem>
           <ElDescriptionsItem label="定义">
             {{ detailItem.definitionKey }} v{{ detailItem.definitionVersion }}
           </ElDescriptionsItem>
           <ElDescriptionsItem label="当前步骤">
-            {{ detailItem.currentStepIndex }}
+            {{ currentStepText(detailItem.currentStepIndex) }}
+          </ElDescriptionsItem>
+          <ElDescriptionsItem label="租户">
+            {{ detailItem.tenantId }}
           </ElDescriptionsItem>
           <ElDescriptionsItem label="发起人">
             {{ detailItem.starterUsername }}
           </ElDescriptionsItem>
           <ElDescriptionsItem label="发起时间">
             {{ formatDateTime(detailItem.startedAt) }}
+          </ElDescriptionsItem>
+          <ElDescriptionsItem label="结束时间">
+            {{ formatDateTime(detailItem.endedAt) }}
           </ElDescriptionsItem>
         </ElDescriptions>
         <section class="snapshot-card">

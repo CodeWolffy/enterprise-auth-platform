@@ -2,14 +2,16 @@ package com.enterprise.auth.platform.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.enterprise.auth.platform.modules.notification.application.NotificationPublishCommand;
 import com.enterprise.auth.platform.modules.notification.application.NotificationPublisher;
 import com.enterprise.auth.platform.modules.notification.application.NotificationScenarioPublisher;
+import com.enterprise.auth.platform.modules.notification.application.NotificationSseRegistry;
 import com.enterprise.auth.platform.modules.user.application.UserAuthenticationFacade;
-import com.enterprise.auth.platform.modules.user.application.UserQueryFacade;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -19,7 +21,7 @@ import org.junit.jupiter.api.Test;
 class NotificationScenarioPublisherTest {
 
     private NotificationPublisher notificationPublisher;
-    private UserQueryFacade userQueryFacade;
+    private NotificationSseRegistry sseRegistry;
     private UserAuthenticationFacade userAuthenticationFacade;
     private NotificationScenarioPublisher publisher;
     private List<NotificationPublishCommand> publishedCommands;
@@ -27,14 +29,14 @@ class NotificationScenarioPublisherTest {
     @BeforeEach
     void setUp() {
         notificationPublisher = mock(NotificationPublisher.class);
-        userQueryFacade = mock(UserQueryFacade.class);
+        sseRegistry = mock(NotificationSseRegistry.class);
         userAuthenticationFacade = mock(UserAuthenticationFacade.class);
         publishedCommands = new ArrayList<>();
         when(notificationPublisher.publish(any())).thenAnswer(invocation -> {
             publishedCommands.add(invocation.getArgument(0, NotificationPublishCommand.class));
-            return null;
+            return 1L;
         });
-        publisher = new NotificationScenarioPublisher(notificationPublisher, userQueryFacade, userAuthenticationFacade);
+        publisher = new NotificationScenarioPublisher(notificationPublisher, sseRegistry, userAuthenticationFacade);
     }
 
     @Test
@@ -85,15 +87,10 @@ class NotificationScenarioPublisherTest {
     }
 
     @Test
-    void systemNoticePublishedShouldLinkToPublicNoticeDetailRoute() {
-        when(userQueryFacade.listAllEnabledUserIds("tenant-a")).thenReturn(Set.of(10L, 11L));
-
+    void systemNoticePublishedShouldBroadcastToActiveTenantConnectionsOnly() {
         publisher.systemNoticePublished("tenant-a", 42L, "系统维护", "<p>维护公告</p>", "admin");
 
-        assertThat(publishedCommands).hasSize(1);
-        NotificationPublishCommand command = publishedCommands.get(0);
-        assertThat(command.link()).isEqualTo("/notices/42");
-        assertThat(command.actionPayload()).containsEntry("route", "/notices");
-        assertThat(command.actionPayload()).containsEntry("noticeId", 42L);
+        assertThat(publishedCommands).isEmpty();
+        verify(sseRegistry).sendTenant(eq("tenant-a"), any());
     }
 }
