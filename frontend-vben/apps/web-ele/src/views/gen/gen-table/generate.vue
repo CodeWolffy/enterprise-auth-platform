@@ -57,6 +57,12 @@ type ColumnRow = {
   sort: number;
 };
 
+type PreviewFile = {
+  content: string;
+  language?: string;
+  path: string;
+};
+
 const route = useRoute();
 const router = useRouter();
 const loading = ref(false);
@@ -84,7 +90,7 @@ const columns = ref<ColumnRow[]>([]);
 const tableHeight = ref(`${document.documentElement.scrollHeight - 280}px`);
 const previewVisible = ref(false);
 const previewLoading = ref(false);
-const previewFiles = ref<Array<{ content: string; fileName: string }>>([]);
+const previewFiles = ref<PreviewFile[]>([]);
 const previewActiveFile = ref('');
 const generateLoading = ref(false);
 const generateResult = ref<any>(null);
@@ -111,6 +117,19 @@ function toCamel(value: string, upperFirst: boolean): string {
     return result.charAt(0).toLowerCase() + result.slice(1);
   }
   return result || 'Generated';
+}
+
+function getDownloadFileName(response: any, fallback: string): string {
+  const disposition = response?.headers?.['content-disposition'];
+  if (!disposition) {
+    return fallback;
+  }
+  const utf8Name = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+  if (utf8Name) {
+    return decodeURIComponent(utf8Name);
+  }
+  const plainName = /filename="?([^";]+)"?/i.exec(disposition)?.[1];
+  return plainName ? decodeURIComponent(plainName) : fallback;
 }
 
 function stripPrefix(value: string): string {
@@ -205,14 +224,21 @@ async function submitForm() {
       overwrite: state.form.overwrite,
       autoRegister: state.form.autoRegister,
     });
-    const blob =
+    const payload =
       response instanceof Blob
         ? response
-        : new Blob([response as any], { type: 'application/zip' });
+        : ((response as any)?.data ?? response);
+    const blob =
+      payload instanceof Blob
+        ? payload
+        : new Blob([payload], { type: 'application/zip' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${state.form.moduleName || 'codegen'}.zip`;
+    link.download = getDownloadFileName(
+      response,
+      `${state.form.moduleName || 'codegen'}.zip`,
+    );
     document.body.append(link);
     link.click();
     link.remove();
@@ -250,7 +276,7 @@ async function previewGenCode() {
     previewFiles.value = Array.isArray(res) ? res : (res?.files ?? []);
     const firstFile = previewFiles.value[0];
     if (firstFile) {
-      previewActiveFile.value = firstFile.fileName;
+      previewActiveFile.value = firstFile.path;
     }
   } catch {
     ElMessage.error('预览失败，请检查参数');
@@ -309,7 +335,7 @@ initPage();
 
 function getPreviewContent() {
   const file = previewFiles.value.find(
-    (f) => f.fileName === previewActiveFile.value,
+    (f) => f.path === previewActiveFile.value,
   );
   return file?.content ?? '// 请选择文件查看预览';
 }
@@ -636,7 +662,7 @@ function getPreviewContent() {
         >
           <div
             v-for="file in previewFiles"
-            :key="file.fileName"
+            :key="file.path"
             style="
               padding: 6px 10px;
               font-size: 13px;
@@ -645,15 +671,15 @@ function getPreviewContent() {
             "
             :style="{
               background:
-                previewActiveFile === file.fileName ? '#ecf5ff' : 'transparent',
+                previewActiveFile === file.path ? '#ecf5ff' : 'transparent',
               color:
-                previewActiveFile === file.fileName ? '#409eff' : '#606266',
+                previewActiveFile === file.path ? '#409eff' : '#606266',
               fontWeight:
-                previewActiveFile === file.fileName ? '600' : 'normal',
+                previewActiveFile === file.path ? '600' : 'normal',
             }"
-            @click="previewActiveFile = file.fileName"
+            @click="previewActiveFile = file.path"
           >
-            {{ file.fileName }}
+            {{ file.path }}
           </div>
         </div>
         <!-- 代码内容 -->
@@ -688,11 +714,11 @@ function getPreviewContent() {
           代码已成功生成
         </ElTag>
         <div
-          v-if="generateResult.generatedFiles?.length"
+          v-if="generateResult.files?.length"
           style="margin-bottom: 16px"
         >
           <h4 style="margin-bottom: 8px">
-            生成文件 ({{ generateResult.generatedFiles.length }})
+            生成文件 ({{ generateResult.files.length }})
           </h4>
           <div
             style="
@@ -704,7 +730,7 @@ function getPreviewContent() {
             "
           >
             <div
-              v-for="file in generateResult.generatedFiles"
+              v-for="file in generateResult.files"
               :key="file"
               style="padding: 2px 0; font-size: 13px; color: #606266"
             >
@@ -712,13 +738,13 @@ function getPreviewContent() {
             </div>
           </div>
         </div>
-        <div v-if="generateResult.registeredPermissions?.length">
+        <div v-if="generateResult.registeredResourceKeys?.length">
           <h4 style="margin-bottom: 8px">
-            注册权限 ({{ generateResult.registeredPermissions.length }})
+            注册权限 ({{ generateResult.registeredResourceKeys.length }})
           </h4>
           <div style="display: flex; flex-wrap: wrap; gap: 4px">
             <ElTag
-              v-for="perm in generateResult.registeredPermissions"
+              v-for="perm in generateResult.registeredResourceKeys"
               :key="perm"
               size="small"
               effect="plain"

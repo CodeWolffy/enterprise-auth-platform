@@ -69,6 +69,29 @@ const coreRoutes: RouteRecordRaw[] = [
     meta: {
       hideInBreadcrumb: true,
       hideInMenu: true,
+      hideInTab: true,
+      title: 'CodegenGenerate',
+    },
+    name: 'CodegenGeneratePage',
+    path: '/platform/codegen/generate',
+    children: [
+      {
+        name: 'CodegenGenerate',
+        path: '',
+        component: () => import('#/views/gen/gen-table/generate.vue'),
+        meta: {
+          title: '生成代码',
+          hideInMenu: true,
+          ignoreAccess: true,
+        },
+      },
+    ],
+  },
+  {
+    component: BasicLayout,
+    meta: {
+      hideInBreadcrumb: true,
+      hideInMenu: true,
       title: 'Notice',
     },
     name: 'Notice',

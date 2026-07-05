@@ -1,18 +1,16 @@
 <script lang="ts" setup>
 import type { FormInstance } from 'element-plus';
 
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 
 import {
+  ElAlert,
   ElButton,
   ElDialog,
   ElForm,
   ElFormItem,
   ElInput,
-  ElInputNumber,
   ElMessage,
-  ElRadio,
-  ElRadioGroup,
 } from 'element-plus';
 
 import { addObj, editObj, getById } from '#/api/upms/category';
@@ -23,15 +21,22 @@ const state = reactive({
   form: {
     code: '',
     name: '',
-    matchers: [] as string[],
     matchersText: '',
-    description: '',
-    sort: 0,
-    enabled: true,
   },
   rules: {
     code: [{ required: true, message: '请输入分类编码', trigger: 'change' }],
     name: [{ required: true, message: '请输入分类名称', trigger: 'change' }],
+    matchersText: [
+      {
+        validator: (_rule: unknown, value: string, callback: (error?: Error) => void) => {
+          const hasMatcher = String(value ?? '')
+            .split('\n')
+            .some((item) => item.trim());
+          callback(hasMatcher ? undefined : new Error('请至少填写一个匹配规则'));
+        },
+        trigger: 'blur',
+      },
+    ],
   },
 });
 
@@ -40,6 +45,10 @@ const loading = ref(false);
 const formRef = ref();
 const targetType = ref('dict');
 const isEdit = ref(false);
+
+const targetTypeLabel = computed(() =>
+  targetType.value === 'dict' ? '字典分类' : '参数分类',
+);
 
 const initForm = (type: string, row?: any) => {
   targetType.value = type;
@@ -57,12 +66,13 @@ const getDetail = (type: string, code: string) => {
   loading.value = true;
   getById(type, code)
     .then((response) => {
+      if (!response) {
+        ElMessage.error('分类配置不存在');
+        loading.value = false;
+        return;
+      }
       state.form.code = response.code;
       state.form.name = response.name;
-      state.form.description = response.description || '';
-      state.form.sort = response.sort || 0;
-      state.form.enabled = response.enabled ?? true;
-      state.form.matchers = response.matchers || [];
       state.form.matchersText = (response.matchers || []).join('\n');
       loading.value = false;
     })
@@ -78,11 +88,7 @@ const handleClose = () => {
 const resetForm = (formEl?: FormInstance) => {
   state.form.code = '';
   state.form.name = '';
-  state.form.matchers = [];
   state.form.matchersText = '';
-  state.form.description = '';
-  state.form.sort = 0;
-  state.form.enabled = true;
   loading.value = false;
   dialog.value = false;
   formEl?.resetFields();
@@ -151,63 +157,69 @@ defineExpose({
 <template>
   <ElDialog
     v-model="dialog"
-    :title="isEdit ? '修改分类' : '添加分类'"
-    width="50%"
+    :title="`${isEdit ? '修改' : '添加'}${targetTypeLabel}`"
+    width="640px"
     :before-close="handleClose"
   >
     <ElForm
       ref="formRef"
       :model="state.form"
-      label-width="120px"
+      label-position="top"
       :rules="state.rules"
     >
+      <ElAlert
+        class="category-form-tip"
+        type="info"
+        :closable="false"
+        show-icon
+        title="匹配规则支持精确匹配和前缀通配，例如 sys_status 或 sys_*。每行填写一条规则。"
+      />
+      <ElFormItem label="规则类型">
+        <ElInput :model-value="targetTypeLabel" disabled />
+      </ElFormItem>
       <ElFormItem label="分类编码" prop="code">
         <ElInput
           v-model="state.form.code"
           :disabled="isEdit"
+          placeholder="例如 system、menu、tenant"
           show-word-limit
           maxlength="50"
         />
       </ElFormItem>
       <ElFormItem label="分类名称" prop="name">
-        <ElInput v-model="state.form.name" show-word-limit maxlength="100" />
+        <ElInput
+          v-model="state.form.name"
+          placeholder="例如 系统字典"
+          show-word-limit
+          maxlength="100"
+        />
       </ElFormItem>
       <ElFormItem label="匹配规则" prop="matchersText">
         <ElInput
           v-model="state.form.matchersText"
           type="textarea"
-          :rows="4"
-          placeholder="每行一个匹配规则，例如 auth.*"
+          :rows="5"
+          :placeholder="'sys_*\\nmenu_*\\ntenant_package_*'"
         />
-      </ElFormItem>
-      <ElFormItem label="描述">
-        <ElInput
-          v-model="state.form.description"
-          type="textarea"
-          maxlength="200"
-        />
-      </ElFormItem>
-      <ElFormItem label="排序序号">
-        <ElInputNumber v-model="state.form.sort" :min="0" />
-      </ElFormItem>
-      <ElFormItem label="状态">
-        <ElRadioGroup v-model="state.form.enabled">
-          <ElRadio :value="true">正常</ElRadio>
-          <ElRadio :value="false">停用</ElRadio>
-        </ElRadioGroup>
       </ElFormItem>
     </ElForm>
     <template #footer>
       <span class="dialog-footer">
-        <ElButton @click="handleClose">关 闭</ElButton>
+        <ElButton @click="handleClose">取消</ElButton>
         <ElButton
           type="primary"
           @click="submitForm(formRef)"
           :loading="loading"
         >
-          确 认
+          保存
         </ElButton>
       </span>
     </template>
   </ElDialog>
 </template>
+
+<style scoped lang="scss">
+.category-form-tip {
+  margin-bottom: 16px;
+}
+</style>

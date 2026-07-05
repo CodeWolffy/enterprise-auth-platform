@@ -12,8 +12,6 @@ import com.enterprise.auth.platform.modules.codegen.application.CodegenMetadataS
 import com.enterprise.auth.platform.modules.codegen.application.CodegenPreviewResult;
 import com.enterprise.auth.platform.modules.codegen.application.CodegenTableDetailView;
 import com.enterprise.auth.platform.modules.codegen.application.CodegenTableView;
-import com.enterprise.auth.platform.modules.codegen.application.CodegenTemplateService;
-import com.enterprise.auth.platform.modules.codegen.application.CodegenTemplateView;
 import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -40,14 +38,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class CodegenController {
 
     private final CodegenApplicationService codegenApplicationService;
-    private final CodegenTemplateService templateService;
     private final CodegenMetadataService metadataService;
 
     public CodegenController(CodegenApplicationService codegenApplicationService,
-                             CodegenTemplateService templateService,
                              CodegenMetadataService metadataService) {
         this.codegenApplicationService = codegenApplicationService;
-        this.templateService = templateService;
         this.metadataService = metadataService;
     }
 
@@ -210,50 +205,4 @@ public class CodegenController {
         return new ResponseEntity<>(artifact.payload(), headers, org.springframework.http.HttpStatus.OK);
     }
 
-    @Operation(summary = "分页查询自定义模板")
-    @GetMapping("/templates")
-    @SaCheckPermission(PermissionCodes.CODEGEN_PAGE)
-    public ApiResponse<PageResult<CodegenTemplateView>> templates(
-            @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String templateCategory,
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size
-    ) {
-        return ApiResponse.ok(templateService.list(keyword, templateCategory, page, size));
-    }
-
-    @Operation(summary = "查询自定义模板详情")
-    @GetMapping("/templates/{templateId}")
-    @SaCheckPermission(PermissionCodes.CODEGEN_GET)
-    public ApiResponse<CodegenTemplateView> template(@PathVariable Long templateId) {
-        return ApiResponse.ok(templateService.detail(templateId));
-    }
-
-    @SysLog("新增自定义模板")
-    @Operation(summary = "新增自定义模板")
-    @PostMapping("/templates")
-    @SaCheckPermission(PermissionCodes.CODEGEN_ADD)
-    public ApiResponse<CodegenTemplateView> createTemplate(@Valid @RequestBody CodegenTemplateRequest request) {
-        return ApiResponse.ok(templateService.create(request.toView()));
-    }
-
-    @SysLog("修改自定义模板")
-    @Operation(summary = "修改自定义模板")
-    @PutMapping("/templates/{templateId}")
-    @SaCheckPermission(PermissionCodes.CODEGEN_EDIT)
-    public ApiResponse<CodegenTemplateView> updateTemplate(
-            @PathVariable Long templateId,
-            @Valid @RequestBody CodegenTemplateRequest request
-    ) {
-        return ApiResponse.ok(templateService.update(templateId, request.toView()));
-    }
-
-    @SysLog("删除自定义模板")
-    @Operation(summary = "删除自定义模板")
-    @DeleteMapping("/templates/{templateId}")
-    @SaCheckPermission(PermissionCodes.CODEGEN_DEL)
-    public ApiResponse<Void> deleteTemplate(@PathVariable Long templateId) {
-        templateService.delete(templateId);
-        return ApiResponse.ok();
-    }
 }

@@ -160,9 +160,7 @@ public class CodegenMetadataService {
         int safeSize = Math.min(Math.max(size, 1), 100);
         String normalizedKeyword = keyword == null ? "" : keyword.trim();
         List<Object> params = new ArrayList<>();
-        String filterSql = " WHERE table_schema = DATABASE()"
-                + " AND table_name IN (SELECT table_name FROM sys_codegen_allowlist WHERE tenant_id = ? AND enabled = 1 AND deleted = 0)";
-        params.add(currentTenantId());
+        String filterSql = " WHERE table_schema = DATABASE()";
         if (!normalizedKeyword.isBlank()) {
             filterSql += " AND (table_name LIKE ? OR table_comment LIKE ?)";
             String like = "%" + normalizedKeyword + "%";
@@ -194,7 +192,7 @@ public class CodegenMetadataService {
         List<ImportedTableView> imported = new ArrayList<>();
         for (String tableName : request.tableNames()) {
             String safeTableName = normalizeTableName(tableName);
-            CodegenTableView table = requireAllowlistedTable(safeTableName);
+            CodegenTableView table = requireSourceTable(safeTableName);
             Long tableId = upsertTableConfig(dataSource.id(), table, request.packageName(), request.author());
             upsertColumnConfigs(tableId, safeTableName);
             imported.add(tableConfig(tableId).table());
@@ -385,6 +383,7 @@ public class CodegenMetadataService {
         int sort = 0;
         for (CodegenColumnView column : columns) {
             boolean systemColumn = SYSTEM_COLUMNS.contains(column.columnName().toLowerCase(Locale.ROOT));
+            boolean businessColumn = !systemColumn && !column.primaryKey();
             jdbcTemplate.update("""
                             INSERT INTO codegen_table_column(tenant_id, table_id, column_name, column_comment, column_type, data_type, java_type, java_field, is_pk, is_required, is_insert, is_edit, is_list, is_query, query_type, html_type, dict_type, sort, created_by, updated_by)
                             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'system','system')
@@ -400,28 +399,40 @@ public class CodegenMetadataService {
                     column.javaField(),
                     column.primaryKey() ? 1 : 0,
                     column.required() ? 1 : 0,
-                    !systemColumn && !column.primaryKey() ? 1 : 0,
-                    !systemColumn && !column.primaryKey() ? 1 : 0,
+                    businessColumn ? 1 : 0,
+                    businessColumn ? 1 : 0,
                     !systemColumn ? 1 : 0,
-                    0,
-                    "EQ",
+                    defaultQueryColumn(column) ? 1 : 0,
+                    defaultQueryType(column),
                     defaultHtmlType(column),
                     null,
                     sort++);
         }
     }
 
-    private CodegenTableView requireAllowlistedTable(String tableName) {
-        Long count = jdbcTemplate.queryForObject("""
-                        SELECT COUNT(*) FROM sys_codegen_allowlist
-                        WHERE tenant_id = ? AND table_name = ? AND enabled = 1 AND deleted = 0
-                        """,
-                Long.class,
-                currentTenantId(),
-                tableName);
-        if (count == null || count == 0) {
-            throw new BusinessException("ACCESS_DENIED", "数据表未纳入代码生成白名单");
+    private boolean defaultQueryColumn(CodegenColumnView column) {
+        if (SYSTEM_COLUMNS.contains(column.columnName().toLowerCase(Locale.ROOT)) || column.primaryKey()) {
+            return false;
         }
+        return "String".equals(column.javaType()) || isTemporal(column.dataType());
+    }
+
+    private String defaultQueryType(CodegenColumnView column) {
+        if ("String".equals(column.javaType())) {
+            return "LIKE";
+        }
+        if (isTemporal(column.dataType())) {
+            return "BETWEEN";
+        }
+        return "EQ";
+    }
+
+    private boolean isTemporal(String dataType) {
+        String normalized = dataType == null ? "" : dataType.toLowerCase(Locale.ROOT);
+        return normalized.contains("date") || normalized.contains("time");
+    }
+
+    private CodegenTableView requireSourceTable(String tableName) {
         List<CodegenTableView> tables = jdbcTemplate.query("""
                         SELECT table_name, table_comment, engine, table_rows, data_length, index_length, create_time, update_time
                         FROM information_schema.tables

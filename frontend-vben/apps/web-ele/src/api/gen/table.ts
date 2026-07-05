@@ -73,19 +73,6 @@ export async function deleteImportedTable(tableId: number) {
   });
 }
 
-// ==================== 原始表查询（白名单） ====================
-
-/**
- * 分页查询白名单内的可生成表
- * 后端：GET /api/codegen/tables
- */
-export async function getAllowlistTables(query: any) {
-  return requestClient.get('/codegen/tables', {
-    params: query,
-    headers: { isSwitchTenant: false },
-  });
-}
-
 /**
  * 查询数据表字段详情
  * 后端：GET /api/codegen/tables/{tableName}
@@ -138,74 +125,7 @@ export async function downloadCode(data: {
       'Content-Type': 'application/json',
     },
     responseReturn: 'raw',
-  });
-}
-
-// ==================== 自定义模板管理 ====================
-
-/**
- * 分页查询自定义模板
- * 后端：GET /api/codegen/templates
- */
-export async function getTemplates(query: any) {
-  return requestClient.get('/codegen/templates', {
-    params: query,
-    headers: { isSwitchTenant: false },
-  });
-}
-
-/**
- * 创建自定义模板
- * 后端：POST /api/codegen/templates
- */
-export async function createTemplate(payload: {
-  content: string;
-  language: string;
-  name: string;
-  pathMatchRegex: string;
-  templateCategory: string;
-}) {
-  return requestClient.post('/codegen/templates', payload, {
-    headers: { isSwitchTenant: false },
-  });
-}
-
-/**
- * 更新自定义模板
- * 后端：PUT /api/codegen/templates/{templateId}
- */
-export async function updateTemplate(
-  templateId: number,
-  payload: {
-    content: string;
-    language: string;
-    name: string;
-    pathMatchRegex: string;
-    templateCategory: string;
-  },
-) {
-  return requestClient.put(`/codegen/templates/${templateId}`, payload, {
-    headers: { isSwitchTenant: false },
-  });
-}
-
-/**
- * 查询单个自定义模板详情
- * 后端：GET /api/codegen/templates/{templateId}
- */
-export async function getTemplate(templateId: number) {
-  return requestClient.get(`/codegen/templates/${templateId}`, {
-    headers: { isSwitchTenant: false },
-  });
-}
-
-/**
- * 删除自定义模板
- * 后端：DELETE /api/codegen/templates/{templateId}
- */
-export async function deleteTemplate(templateId: number) {
-  return requestClient.delete(`/codegen/templates/${templateId}`, {
-    headers: { isSwitchTenant: false },
+    responseType: 'blob',
   });
 }
 

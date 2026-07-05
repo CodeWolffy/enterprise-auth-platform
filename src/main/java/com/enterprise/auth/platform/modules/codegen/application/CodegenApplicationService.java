@@ -12,7 +12,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -38,7 +37,6 @@ public class CodegenApplicationService {
 
     private final JdbcTemplate jdbcTemplate;
     private final Path outputRoot;
-    private final CodegenTemplateService templateService;
     private final CodegenResourceRegistrationService registrationService;
     private final CodegenMetadataService metadataService;
 
@@ -49,13 +47,11 @@ public class CodegenApplicationService {
     public CodegenApplicationService(
             DataSource dataSource,
             @Value("${platform.codegen.output-root:target/generated-codegen}") String outputRoot,
-            CodegenTemplateService templateService,
             CodegenResourceRegistrationService registrationService,
             CodegenMetadataService metadataService
     ) {
         this.jdbcTemplate = new JdbcTemplate(dataSource);
         this.outputRoot = Path.of(outputRoot).toAbsolutePath().normalize();
-        this.templateService = templateService;
         this.registrationService = registrationService;
         this.metadataService = metadataService;
     }
@@ -66,25 +62,32 @@ public class CodegenApplicationService {
         int safeSize = Math.min(Math.max(size, 1), 100);
         String normalizedKeyword = keyword == null ? "" : keyword.trim();
         List<Object> params = new ArrayList<>();
-        String filterSql = " WHERE table_schema = DATABASE()"
-                + " AND table_name IN (SELECT table_name FROM sys_codegen_allowlist WHERE tenant_id = ? AND enabled = 1 AND deleted = 0)";
+        String filterSql = """
+                 WHERE t.table_schema = DATABASE()
+                   AND EXISTS (
+                       SELECT 1 FROM codegen_table c
+                       WHERE c.tenant_id = ?
+                         AND c.table_name = t.table_name
+                         AND c.deleted = 0
+                   )
+                """;
         params.add(currentTenantId());
         if (!normalizedKeyword.isBlank()) {
-            filterSql += " AND (table_name LIKE ? OR table_comment LIKE ?)";
+            filterSql += " AND (t.table_name LIKE ? OR t.table_comment LIKE ?)";
             String like = "%" + normalizedKeyword + "%";
             params.add(like);
             params.add(like);
         }
 
-        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM information_schema.tables" + filterSql, Long.class, params.toArray());
+        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM information_schema.tables t" + filterSql, Long.class, params.toArray());
         List<Object> pageParams = new ArrayList<>(params);
         pageParams.add((safePage - 1) * safeSize);
         pageParams.add(safeSize);
         List<CodegenTableView> records = jdbcTemplate.query(
-                "SELECT table_name, table_comment, engine, table_rows, data_length, index_length, create_time, update_time "
-                        + "FROM information_schema.tables"
+                "SELECT t.table_name, t.table_comment, t.engine, t.table_rows, t.data_length, t.index_length, t.create_time, t.update_time "
+                        + "FROM information_schema.tables t"
                         + filterSql
-                        + " ORDER BY table_name LIMIT ?, ?",
+                        + " ORDER BY t.table_name LIMIT ?, ?",
                 (rs, rowNum) -> tableView(rs),
                 pageParams.toArray()
         );
@@ -244,7 +247,7 @@ public class CodegenApplicationService {
 
     private CodegenTableView requireTable(String tableName) {
         String safeTableName = normalizeTableName(tableName);
-        ensureAllowedTable(safeTableName);
+        ensureImportedTable(safeTableName);
         List<CodegenTableView> tables = jdbcTemplate.query(
                 "SELECT table_name, table_comment, engine, table_rows, data_length, index_length, create_time, update_time "
                         + "FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?",
@@ -301,15 +304,15 @@ public class CodegenApplicationService {
         );
     }
 
-    private void ensureAllowedTable(String tableName) {
+    private void ensureImportedTable(String tableName) {
         Long count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM sys_codegen_allowlist WHERE tenant_id = ? AND table_name = ? AND enabled = 1 AND deleted = 0",
+                "SELECT COUNT(*) FROM codegen_table WHERE tenant_id = ? AND table_name = ? AND deleted = 0",
                 Long.class,
                 currentTenantId(),
                 tableName
         );
         if (count == null || count == 0) {
-            throw new BusinessException("ACCESS_DENIED", "数据表未纳入代码生成白名单");
+            throw new BusinessException("ACCESS_DENIED", "数据表未导入代码生成配置");
         }
     }
 
@@ -321,44 +324,22 @@ public class CodegenApplicationService {
     private List<CodegenFilePreview> renderFiles(CodegenModel model, boolean includeBackend, boolean includeFrontend) {
         List<CodegenFilePreview> files = new ArrayList<>();
         if (includeBackend) {
-            files.add(new CodegenFilePreview(backendPath(model, "infrastructure/entity", model.className() + "Entity.java"), "java", renderWithTemplate("java", backendPath(model, "infrastructure/entity", model.className() + "Entity.java"), renderEntity(model), templateVariables(model))));
-            files.add(new CodegenFilePreview(backendPath(model, "infrastructure/mapper", model.className() + "Mapper.java"), "java", renderWithTemplate("java", backendPath(model, "infrastructure/mapper", model.className() + "Mapper.java"), renderMapper(model), templateVariables(model))));
-            files.add(new CodegenFilePreview(backendPath(model, "interfaces", model.className() + "CreateRequest.java"), "java", renderWithTemplate("java", backendPath(model, "interfaces", model.className() + "CreateRequest.java"), renderCreateRequest(model), templateVariables(model))));
-            files.add(new CodegenFilePreview(backendPath(model, "interfaces", model.className() + "UpdateRequest.java"), "java", renderWithTemplate("java", backendPath(model, "interfaces", model.className() + "UpdateRequest.java"), renderUpdateRequest(model), templateVariables(model))));
-            files.add(new CodegenFilePreview(backendPath(model, "interfaces", model.className() + "QueryRequest.java"), "java", renderWithTemplate("java", backendPath(model, "interfaces", model.className() + "QueryRequest.java"), renderQueryRequest(model), templateVariables(model))));
-            files.add(new CodegenFilePreview(backendPath(model, "application", model.className() + "ApplicationService.java"), "java", renderWithTemplate("java", backendPath(model, "application", model.className() + "ApplicationService.java"), renderService(model), templateVariables(model))));
-            files.add(new CodegenFilePreview(backendPath(model, "interfaces", model.className() + "Controller.java"), "java", renderWithTemplate("java", backendPath(model, "interfaces", model.className() + "Controller.java"), renderController(model), templateVariables(model))));
+            files.add(new CodegenFilePreview(backendPath(model, "infrastructure/entity", model.className() + "Entity.java"), "java", renderEntity(model)));
+            files.add(new CodegenFilePreview(backendPath(model, "infrastructure/mapper", model.className() + "Mapper.java"), "java", renderMapper(model)));
+            files.add(new CodegenFilePreview(backendPath(model, "interfaces", model.className() + "CreateRequest.java"), "java", renderCreateRequest(model)));
+            files.add(new CodegenFilePreview(backendPath(model, "interfaces", model.className() + "UpdateRequest.java"), "java", renderUpdateRequest(model)));
+            files.add(new CodegenFilePreview(backendPath(model, "interfaces", model.className() + "QueryRequest.java"), "java", renderQueryRequest(model)));
+            files.add(new CodegenFilePreview(backendPath(model, "application", model.className() + "ApplicationService.java"), "java", renderService(model)));
+            files.add(new CodegenFilePreview(backendPath(model, "interfaces", model.className() + "Controller.java"), "java", renderController(model)));
         }
         if (includeFrontend) {
             String frontendModulePath = model.tableName().startsWith("sys_") ? "upms/" + model.kebabName() : model.kebabName();
-            files.add(new CodegenFilePreview("frontend-vben/apps/web-ele/src/api/" + frontendModulePath + ".ts", "typescript", renderWithTemplate("typescript", frontendModulePath + ".ts", renderApi(model), templateVariables(model))));
-            files.add(new CodegenFilePreview("frontend-vben/apps/web-ele/src/types/" + model.moduleName() + ".ts", "typescript", renderWithTemplate("typescript", model.moduleName() + ".ts", renderTypes(model), templateVariables(model))));
-            files.add(new CodegenFilePreview("frontend-vben/apps/web-ele/src/views/" + frontendModulePath + "/index.vue", "vue", renderWithTemplate("vue", model.className() + "Index.vue", renderIndexView(model), templateVariables(model))));
-            files.add(new CodegenFilePreview("frontend-vben/apps/web-ele/src/views/" + frontendModulePath + "/form.vue", "vue", renderWithTemplate("vue", model.className() + "Form.vue", renderFormView(model), templateVariables(model))));
+            files.add(new CodegenFilePreview("frontend-vben/apps/web-ele/src/api/" + frontendModulePath + ".ts", "typescript", renderApi(model)));
+            files.add(new CodegenFilePreview("frontend-vben/apps/web-ele/src/types/" + model.moduleName() + ".ts", "typescript", renderTypes(model)));
+            files.add(new CodegenFilePreview("frontend-vben/apps/web-ele/src/views/" + frontendModulePath + "/index.vue", "vue", renderIndexView(model)));
+            files.add(new CodegenFilePreview("frontend-vben/apps/web-ele/src/views/" + frontendModulePath + "/form.vue", "vue", renderFormView(model)));
         }
         return files;
-    }
-
-    private String renderWithTemplate(String language, String path, String defaultContent, Map<String, Object> variables) {
-        Map<String, Object> renderVariables = new LinkedHashMap<>(variables);
-        renderVariables.put("defaultContent", defaultContent);
-        return templateService.renderBody(language, path, defaultContent, renderVariables);
-    }
-
-    private Map<String, Object> templateVariables(CodegenModel model) {
-        Map<String, Object> variables = new LinkedHashMap<>();
-        variables.put("tableName", model.tableName());
-        variables.put("moduleName", model.moduleName());
-        variables.put("className", model.className());
-        variables.put("lowerClassName", model.lowerClassName());
-        variables.put("kebabName", model.kebabName());
-        variables.put("title", model.title());
-        variables.put("packageName", model.packageName());
-        variables.put("primaryKeyColumn", model.primaryKeyColumn());
-        variables.put("primaryKeyField", model.primaryKeyField());
-        variables.put("primaryKeyJavaType", model.primaryKeyJavaType());
-        variables.put("generatedAt", Instant.now().toString());
-        return variables;
     }
 
     private String renderEntity(CodegenModel model) {
@@ -571,7 +552,7 @@ public class CodegenApplicationService {
         String createRequest = model.className() + "CreateRequest";
         String updateRequest = model.className() + "UpdateRequest";
         String queryRequest = model.className() + "QueryRequest";
-        String permissionModule = model.tableName().startsWith("sys_") ? "sys" + model.moduleName() : model.moduleName().toLowerCase();
+        String permissionModule = model.moduleName();
         return "package " + model.packageName() + ".modules." + model.moduleName() + ".interfaces;\n\n"
                 + "import cn.dev33.satoken.annotation.SaCheckPermission;\n"
                 + "import com.enterprise.auth.platform.common.web.ApiResponse;\n"
@@ -601,25 +582,25 @@ public class CodegenApplicationService {
                 + "    }\n\n"
                 + "    @Operation(summary = \"分页查询" + escapeJava(model.title()) + "\")\n"
                 + "    @GetMapping\n"
-                + "    @SaCheckPermission(\"upms:" + permissionModule + ":page\")\n"
+                + "    @SaCheckPermission(\"" + permissionModule + ":page\")\n"
                 + "    public ApiResponse<PageResult<" + entity + ">> page(@ModelAttribute " + queryRequest + " request) {\n"
                 + "        return ApiResponse.ok(service.page(request));\n"
                 + "    }\n\n"
                 + "    @Operation(summary = \"查询" + escapeJava(model.title()) + "详情\")\n"
                 + "    @GetMapping(\"/{id}\")\n"
-                + "    @SaCheckPermission(\"upms:" + permissionModule + ":get\")\n"
+                + "    @SaCheckPermission(\"" + permissionModule + ":get\")\n"
                 + "    public ApiResponse<" + entity + "> detail(@Parameter(description = \"主键\") @PathVariable " + model.primaryKeyJavaType() + " id) {\n"
                 + "        return ApiResponse.ok(service.detail(id));\n"
                 + "    }\n\n"
                 + "    @Operation(summary = \"新增" + escapeJava(model.title()) + "\")\n"
                 + "    @PostMapping\n"
-                + "    @SaCheckPermission(\"upms:" + permissionModule + ":add\")\n"
+                + "    @SaCheckPermission(\"" + permissionModule + ":add\")\n"
                 + "    public ApiResponse<" + entity + "> create(@Valid @RequestBody " + createRequest + " request) {\n"
                 + "        return ApiResponse.ok(service.create(request));\n"
                 + "    }\n\n"
                 + "    @Operation(summary = \"修改" + escapeJava(model.title()) + "\")\n"
                 + "    @PutMapping(\"/{id}\")\n"
-                + "    @SaCheckPermission(\"upms:" + permissionModule + ":edit\")\n"
+                + "    @SaCheckPermission(\"" + permissionModule + ":edit\")\n"
                 + "    public ApiResponse<" + entity + "> update(\n"
                 + "            @Parameter(description = \"主键\") @PathVariable " + model.primaryKeyJavaType() + " id,\n"
                 + "            @Valid @RequestBody " + updateRequest + " request\n"
@@ -628,7 +609,7 @@ public class CodegenApplicationService {
                 + "    }\n\n"
                 + "    @Operation(summary = \"删除" + escapeJava(model.title()) + "\")\n"
                 + "    @DeleteMapping(\"/{id}\")\n"
-                + "    @SaCheckPermission(\"upms:" + permissionModule + ":del\")\n"
+                + "    @SaCheckPermission(\"" + permissionModule + ":del\")\n"
                 + "    public ApiResponse<Void> delete(@Parameter(description = \"主键\") @PathVariable " + model.primaryKeyJavaType() + " id) {\n"
                 + "        service.delete(id);\n"
                 + "        return ApiResponse.ok();\n"
@@ -713,9 +694,13 @@ public class CodegenApplicationService {
                 + "          <el-button v-permission=\"'" + model.moduleName() + ":add'\" type=\"primary\" @click=\"openForm()\">新增</el-button>\n"
                 + "        </div>\n"
                 + "      </div>\n\n"
-                + "      <AdvancedSearch @search=\"handleSearch\" @reset=\"resetSearch\">\n"
+                + "      <el-form :inline=\"true\" :model=\"query\" class=\"codegen-search\">\n"
                 + renderVueSearchItems(model)
-                + "      </AdvancedSearch>\n\n"
+                + "        <el-form-item>\n"
+                + "          <el-button type=\"primary\" @click=\"handleSearch\">查询</el-button>\n"
+                + "          <el-button @click=\"resetSearch\">重置</el-button>\n"
+                + "        </el-form-item>\n"
+                + "      </el-form>\n\n"
                 + "      <el-table v-loading=\"loading\" :data=\"records\" stripe>\n"
                 + renderVueColumns(model)
                 + "        <el-table-column fixed=\"right\" label=\"操作\" width=\"180\">\n"
@@ -760,9 +745,8 @@ public class CodegenApplicationService {
                 + "import { reactive, ref, toRefs } from 'vue'\n"
                 + "import { ElMessage, ElMessageBox } from 'element-plus'\n"
                 + "import type { FormInstance, FormRules } from 'element-plus'\n"
-                + "import AdvancedSearch from '@/components/common/AdvancedSearch.vue'\n"
-                + "import { create" + model.className() + ", delete" + model.className() + ", query" + model.className() + "Page, update" + model.className() + " } from '@/api/modules/" + model.moduleName() + "'\n"
-                + "import type { " + model.className() + "CreateRequest, " + model.className() + "QueryParams, " + model.className() + "UpdateRequest, " + model.className() + "View } from '@/types/" + model.moduleName() + "'\n\n"
+                + "import { create" + model.className() + ", delete" + model.className() + ", query" + model.className() + "Page, update" + model.className() + " } from '#/api/" + model.kebabName() + "'\n"
+                + "import type { " + model.className() + "CreateRequest, " + model.className() + "QueryParams, " + model.className() + "UpdateRequest, " + model.className() + "View } from '#/types/" + model.moduleName() + "'\n\n"
                 + "const loading = ref(false)\n"
                 + "const formVisible = ref(false)\n"
                 + "const detailVisible = ref(false)\n"
@@ -853,24 +837,28 @@ public class CodegenApplicationService {
     }
 
     private String renderIndexView(CodegenModel model) {
-        String permissionModule = model.tableName().startsWith("sys_") ? "sys" + model.moduleName() : model.moduleName().toLowerCase();
+        String permissionModule = model.moduleName();
         return "<template>\n"
                 + "  <div class=\"hx-layout-container\">\n"
                 + "    <div class=\"hx-layout-container-auto hx-layout-container-view\">\n"
                 + "      <div class=\"hx-table-toolbar\" style=\"display: flex; gap: 8px; margin-bottom: 12px\">\n"
-                + "        <el-button v-access:code=\"'upms:" + permissionModule + ":add'\" :icon=\"Plus\" type=\"primary\" @click=\"openForm()\">新增</el-button>\n"
+                + "        <el-button v-access:code=\"'" + permissionModule + ":add'\" :icon=\"Plus\" type=\"primary\" @click=\"openForm()\">新增</el-button>\n"
                 + "        <el-button :icon=\"Refresh\" @click=\"load\">刷新</el-button>\n"
                 + "      </div>\n"
-                + "      <AdvancedSearch @search=\"handleSearch\" @reset=\"resetSearch\">\n"
+                + "      <el-form :inline=\"true\" :model=\"query\" class=\"codegen-search\">\n"
                 + renderVueSearchItems(model)
-                + "      </AdvancedSearch>\n"
+                + "        <el-form-item>\n"
+                + "          <el-button type=\"primary\" @click=\"handleSearch\">查询</el-button>\n"
+                + "          <el-button @click=\"resetSearch\">重置</el-button>\n"
+                + "        </el-form-item>\n"
+                + "      </el-form>\n"
                 + "      <el-table v-loading=\"loading\" :data=\"records\" stripe>\n"
                 + renderVueColumns(model)
                 + "        <el-table-column align=\"center\" fixed=\"right\" label=\"操作\" width=\"180\">\n"
                 + "          <template #default=\"{ row }\">\n"
-                + "            <el-button v-access:code=\"'upms:" + permissionModule + ":get'\" link type=\"primary\" @click=\"openDetail(row)\">详情</el-button>\n"
-                + "            <el-button v-access:code=\"'upms:" + permissionModule + ":edit'\" link type=\"primary\" @click=\"openForm(row)\">修改</el-button>\n"
-                + "            <el-button v-access:code=\"'upms:" + permissionModule + ":del'\" link type=\"danger\" @click=\"remove(row)\">删除</el-button>\n"
+                + "            <el-button v-access:code=\"'" + permissionModule + ":get'\" link type=\"primary\" @click=\"openDetail(row)\">详情</el-button>\n"
+                + "            <el-button v-access:code=\"'" + permissionModule + ":edit'\" link type=\"primary\" @click=\"openForm(row)\">修改</el-button>\n"
+                + "            <el-button v-access:code=\"'" + permissionModule + ":del'\" link type=\"danger\" @click=\"remove(row)\">删除</el-button>\n"
                 + "          </template>\n"
                 + "        </el-table-column>\n"
                 + "        <template #empty><el-empty description=\"暂无数据\" /></template>\n"
@@ -898,11 +886,9 @@ public class CodegenApplicationService {
                 + "<script setup lang=\"ts\">\n"
                 + "import { reactive, ref } from 'vue'\n"
                 + "import { ElMessage, ElMessageBox } from 'element-plus'\n"
-                + "import type { FormInstance } from 'element-plus'\n"
                 + "import { Refresh, Plus } from '@element-plus/icons-vue'\n"
-                + "import AdvancedSearch from '@/components/common/AdvancedSearch.vue'\n"
-                + "import { query" + model.className() + "Page, delete" + model.className() + " } from '@/api/" + model.kebabName() + "'\n"
-                + "import type { " + model.className() + "QueryParams, " + model.className() + "View } from '@/types/" + model.moduleName() + "'\n"
+                + "import { query" + model.className() + "Page, delete" + model.className() + " } from '#/api/" + model.kebabName() + "'\n"
+                + "import type { " + model.className() + "QueryParams, " + model.className() + "View } from '#/types/" + model.moduleName() + "'\n"
                 + "import Form from './form.vue'\n\n"
                 + "const loading = ref(false)\n"
                 + "const detailVisible = ref(false)\n"
@@ -912,7 +898,7 @@ public class CodegenApplicationService {
                 + "const page = ref(1)\n"
                 + "const size = ref(20)\n"
                 + "const total = ref(0)\n"
-                + "const formRef = ref<FormInstance>()\n\n"
+                + "const formRef = ref<InstanceType<typeof Form>>()\n\n"
                 + "void load()\n\n"
                 + "async function load() {\n"
                 + "  loading.value = true\n"
@@ -963,7 +949,6 @@ public class CodegenApplicationService {
     }
 
     private String renderFormView(CodegenModel model) {
-        String permissionModule = model.tableName().startsWith("sys_") ? "sys" + model.moduleName() : model.moduleName().toLowerCase();
         return "<template>\n"
                 + "  <el-dialog v-model=\"dialog\" :before-close=\"handleClose\" :title=\"editingId ? '编辑' : '新增'\" width=\"640px\">\n"
                 + "    <el-form ref=\"formRef\" label-width=\"120px\" :model=\"form\" :rules=\"rules\">\n"
@@ -979,10 +964,10 @@ public class CodegenApplicationService {
                 + "</template>\n\n"
                 + "<script setup lang=\"ts\">\n"
                 + "import type { FormInstance, FormRules } from 'element-plus'\n"
-                + "import { reactive, ref } from 'vue'\n"
+                + "import { reactive, ref, toRefs } from 'vue'\n"
                 + "import { ElMessage } from 'element-plus'\n"
-                + "import { create" + model.className() + ", update" + model.className() + " } from '@/api/" + model.kebabName() + "'\n"
-                + "import type { " + model.className() + "CreateRequest, " + model.className() + "UpdateRequest, " + model.className() + "View } from '@/types/" + model.moduleName() + "'\n\n"
+                + "import { create" + model.className() + ", update" + model.className() + " } from '#/api/" + model.kebabName() + "'\n"
+                + "import type { " + model.className() + "CreateRequest, " + model.className() + "UpdateRequest, " + model.className() + "View } from '#/types/" + model.moduleName() + "'\n\n"
                 + "const emit = defineEmits(['initPage'])\n\n"
                 + "function defaultForm(): " + model.className() + "CreateRequest & " + model.className() + "UpdateRequest {\n"
                 + "  return " + renderTsInitialForm(model) + "\n"
@@ -1006,6 +991,7 @@ public class CodegenApplicationService {
                 + "  }\n"
                 + "  dialog.value = true\n"
                 + "}\n\n"
+                + "defineExpose({ initForm })\n\n"
                 + "const handleClose = () => {\n"
                 + "  dialog.value = false\n"
                 + "  formRef.value?.resetFields()\n"
@@ -1092,7 +1078,7 @@ public class CodegenApplicationService {
 
     private String renderVueSearchItems(CodegenModel model) {
         if (model.queryColumns().isEmpty()) {
-            return "        <el-empty description=\"暂无查询字段\" />\n";
+            return "";
         }
         StringBuilder builder = new StringBuilder();
         for (CodegenColumnView column : model.queryColumns()) {

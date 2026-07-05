@@ -1,8 +1,9 @@
 <script lang="ts" setup>
 import type { CategoryAnalysis, CategoryOption } from '#/types/system';
 
-import { computed, defineAsyncComponent, nextTick, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, nextTick, ref } from 'vue';
 
+import { Page } from '@vben/common-ui';
 import { useTablePreferences } from '@vben/hooks';
 
 import { Delete, Edit, Plus, Refresh, Search } from '@element-plus/icons-vue';
@@ -12,9 +13,7 @@ import { getInstanceByDom, init, use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import {
   ElButton,
-  ElCard,
   ElCheckbox,
-  ElCol,
   ElDescriptions,
   ElDescriptionsItem,
   ElDrawer,
@@ -24,15 +23,11 @@ import {
   ElInput,
   ElMessage,
   ElMessageBox,
+  ElOption,
   ElPopover,
-  ElRadioButton,
-  ElRadioGroup,
-  ElRow,
-  ElStatistic,
+  ElSelect,
   ElTable,
   ElTableColumn,
-  ElTabPane,
-  ElTabs,
   ElTag,
   ElTimeline,
   ElTimelineItem,
@@ -58,16 +53,6 @@ const formMounted = ref(false);
 const queryRef = ref();
 const keyword = ref('');
 
-watch(
-  () => queryRef.value?.model?.keyword,
-  (val) => {
-    if (val !== undefined) {
-      keyword.value = val;
-    }
-  },
-  { immediate: true },
-);
-
 const analysisVisible = ref(false);
 const analysis = ref<CategoryAnalysis | null>(null);
 const trendChartRef = ref<HTMLElement | null>(null);
@@ -79,9 +64,28 @@ const categoryTablePrefs = useTablePreferences('table:system-categories', [
   { key: 'actions', label: '操作', width: 180 },
 ]);
 
-const matcherCount = computed(() =>
-  tableData.value.reduce((sum, item) => sum + item.matchers.length, 0),
+const targetTypeLabel = computed(() =>
+  activeTab.value === 'dict' ? '字典分类' : '参数分类',
 );
+
+const filteredTableData = computed(() => {
+  const value = keyword.value.trim().toLowerCase();
+  if (!value) {
+    return tableData.value;
+  }
+  return tableData.value.filter((item) =>
+    [item.code, item.name, ...item.matchers].some((text) =>
+      text.toLowerCase().includes(value),
+    ),
+  );
+});
+
+const ruleSummary = computed(() => {
+  if (keyword.value.trim()) {
+    return `共 ${tableData.value.length} 条规则，命中 ${filteredTableData.value.length} 条`;
+  }
+  return `当前 ${targetTypeLabel.value}共 ${tableData.value.length} 条规则`;
+});
 
 const initPage = async () => {
   loading.value = true;
@@ -170,205 +174,172 @@ const renderTrendChart = () => {
 };
 
 const resetQuery = () => {
-  queryRef.value.resetFields();
+  queryRef.value?.resetFields();
   keyword.value = '';
-  initPage();
 };
 
 initPage();
 </script>
 
 <template>
-  <div class="hx-layout-container">
-    <div class="hx-layout-container-auto hx-layout-container-view">
-      <!-- 统计卡片 -->
-      <ElRow :gutter="12" class="mb-4">
-        <ElCol :span="12">
-          <ElCard shadow="hover">
-            <ElStatistic title="分类" :value="tableData.length">
-              <template #suffix>
-                <span class="text-xs text-gray-500">当前分类条目总数</span>
-              </template>
-            </ElStatistic>
-          </ElCard>
-        </ElCol>
-        <ElCol :span="12">
-          <ElCard shadow="hover">
-            <ElStatistic title="匹配器" :value="matcherCount">
-              <template #suffix>
-                <span class="text-xs text-gray-500">当前页匹配规则总数</span>
-              </template>
-            </ElStatistic>
-          </ElCard>
-        </ElCol>
-      </ElRow>
+  <Page auto-content-height>
+    <div class="category-page">
+      <!-- 搜索 -->
+      <ElForm ref="queryRef" :inline="true" v-show="showSearch">
+        <ElFormItem label="分类类型">
+          <ElSelect
+            v-model="activeTab"
+            style="width: 180px"
+            @change="handleTabChange"
+          >
+            <ElOption label="字典分类" value="dict" />
+            <ElOption label="参数分类" value="config" />
+          </ElSelect>
+        </ElFormItem>
+        <ElFormItem label="关键字" prop="keyword">
+          <ElInput v-model="keyword" clearable placeholder="请输入编码或名称" />
+        </ElFormItem>
+        <ElFormItem>
+          <ElButton type="primary" @click="initPage" :icon="Search">
+            搜索
+          </ElButton>
+          <ElButton @click="resetQuery" :icon="Refresh"> 重置 </ElButton>
+        </ElFormItem>
+      </ElForm>
 
-      <!-- 分类配置管理 -->
-      <ElCard shadow="never">
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <span class="eyebrow">分类</span>
-            <h3>分类配置管理</h3>
-          </div>
-          <ElButton type="primary" @click="add">
-            <template #icon>
-              <Plus />
-            </template>
+      <!-- 工具栏 -->
+      <div class="hx-table-toolbar">
+        <div>
+          <ElButton
+            v-access:code="'upms:syscategory:add'"
+            type="primary"
+            @click="add"
+            :icon="Plus"
+          >
             新增分类
           </ElButton>
+          <span class="rule-summary">{{ ruleSummary }}</span>
         </div>
-
-        <!-- 标签页 -->
-        <ElTabs v-model="activeTab" @tab-change="handleTabChange">
-          <ElTabPane label="字典分类" name="dict" />
-          <ElTabPane label="参数分类" name="config" />
-        </ElTabs>
-
-        <!-- 搜索 -->
-        <ElForm ref="queryRef" :inline="true" v-show="showSearch" class="mb-4">
-          <ElFormItem label="关键字" prop="keyword">
-            <ElInput
-              v-model="keyword"
-              clearable
-              placeholder="请输入编码或名称"
-            />
-          </ElFormItem>
-          <ElFormItem>
-            <ElButton type="primary" @click="initPage" :icon="Search">
-              搜索
-            </ElButton>
-            <ElButton @click="resetQuery" :icon="Refresh"> 重置 </ElButton>
-          </ElFormItem>
-        </ElForm>
-
-        <!-- 工具栏 -->
-        <div class="flex items-center justify-between mb-4">
-          <div class="flex items-center gap-2">
-            <ElRadioGroup v-model="categoryTablePrefs.density" size="small">
-              <ElRadioButton value="compact">紧凑</ElRadioButton>
-              <ElRadioButton value="default">默认</ElRadioButton>
-              <ElRadioButton value="comfortable">宽松</ElRadioButton>
-            </ElRadioGroup>
-            <ElPopover placement="bottom-end" width="240" trigger="click">
-              <template #reference>
-                <ElButton size="small">列显示</ElButton>
-              </template>
-              <div class="column-chooser">
-                <ElCheckbox
-                  v-for="item in categoryTablePrefs.columns"
-                  :key="item.key"
-                  :model-value="categoryTablePrefs.visibleColumnMap[item.key]"
-                  @change="
-                    (value) =>
-                      categoryTablePrefs.setColumnVisible(
-                        item.key,
-                        Boolean(value),
-                      )
-                  "
-                >
-                  {{ item.label }}
-                </ElCheckbox>
-              </div>
-            </ElPopover>
-            <ElButton size="small" @click="categoryTablePrefs.reset()">
-              恢复默认
-            </ElButton>
-          </div>
-          <RightToolbar
-            :search-btn="true"
-            :refresh-btn="true"
-            @search="showSearch = !showSearch"
-            @refresh="initPage"
-          />
+        <div>
+          <ElPopover placement="bottom-end" width="240" trigger="click">
+            <template #reference>
+              <ElButton>列显示</ElButton>
+            </template>
+            <div class="column-chooser">
+              <ElCheckbox
+                v-for="item in categoryTablePrefs.columns"
+                :key="item.key"
+                :model-value="categoryTablePrefs.visibleColumnMap[item.key]"
+                @change="
+                  (value) =>
+                    categoryTablePrefs.setColumnVisible(
+                      item.key,
+                      Boolean(value),
+                    )
+                "
+              >
+                {{ item.label }}
+              </ElCheckbox>
+            </div>
+          </ElPopover>
+          <ElButton @click="categoryTablePrefs.reset()"> 恢复默认 </ElButton>
         </div>
+        <RightToolbar
+          :search-btn="true"
+          :refresh-btn="true"
+          @search="showSearch = !showSearch"
+          @refresh="initPage"
+        />
+      </div>
 
-        <!-- 列表 -->
-        <ElTable
-          v-loading="loading"
-          :data="tableData"
-          stripe
-          :class="`table-density-${categoryTablePrefs.density}`"
-          @header-dragend="
-            (newWidth: number, _oldWidth: number, column: any) => {
-              const key = String(column.columnKey || column.property || '');
-              if (key) {
-                categoryTablePrefs.setColumnWidth(key, newWidth);
-              }
+      <!-- 列表 -->
+      <ElTable
+        v-loading="loading"
+        :data="filteredTableData"
+        border
+        @header-dragend="
+          (newWidth: number, _oldWidth: number, column: any) => {
+            const key = String(column.columnKey || column.property || '');
+            if (key) {
+              categoryTablePrefs.setColumnWidth(key, newWidth);
             }
-          "
+          }
+        "
+      >
+        <ElTableColumn
+          v-if="categoryTablePrefs.visibleColumnMap.code"
+          column-key="code"
+          prop="code"
+          label="分类编码"
+          :min-width="160"
+          :width="categoryTablePrefs.getColumnWidth('code')"
+        />
+        <ElTableColumn
+          v-if="categoryTablePrefs.visibleColumnMap.name"
+          column-key="name"
+          prop="name"
+          label="分类名称"
+          :min-width="180"
+          :width="categoryTablePrefs.getColumnWidth('name')"
+        />
+        <ElTableColumn
+          v-if="categoryTablePrefs.visibleColumnMap.matchers"
+          column-key="matchers"
+          label="匹配规则"
+          :min-width="320"
+          :width="categoryTablePrefs.getColumnWidth('matchers')"
         >
-          <ElTableColumn
-            v-if="categoryTablePrefs.visibleColumnMap.code"
-            column-key="code"
-            prop="code"
-            label="分类编码"
-            :min-width="160"
-            :width="categoryTablePrefs.getColumnWidth('code')"
-          />
-          <ElTableColumn
-            v-if="categoryTablePrefs.visibleColumnMap.name"
-            column-key="name"
-            prop="name"
-            label="分类名称"
-            :min-width="180"
-            :width="categoryTablePrefs.getColumnWidth('name')"
-          />
-          <ElTableColumn
-            v-if="categoryTablePrefs.visibleColumnMap.matchers"
-            column-key="matchers"
-            label="匹配规则"
-            :min-width="320"
-            :width="categoryTablePrefs.getColumnWidth('matchers')"
-          >
-            <template #default="{ row }">
-              <ElTag
-                v-for="matcher in row.matchers"
-                :key="matcher"
-                class="scope-tag"
-                size="small"
-              >
-                {{ matcher }}
-              </ElTag>
-            </template>
-          </ElTableColumn>
-          <ElTableColumn
-            v-if="categoryTablePrefs.visibleColumnMap.actions"
-            column-key="actions"
-            fixed="right"
-            label="操作"
-            :width="categoryTablePrefs.getColumnWidth('actions') || 180"
-          >
-            <template #default="{ row }">
-              <ElButton
-                link
-                type="primary"
-                @click="openAnalysis(asCategoryOption(row))"
-              >
-                分析
-              </ElButton>
-              <ElButton
-                link
-                type="primary"
-                @click="edit(asCategoryOption(row))"
-                :icon="Edit"
-              >
-                修改
-              </ElButton>
-              <ElButton
-                link
-                type="danger"
-                @click="del(row.code)"
-                :icon="Delete"
-              >
-                删除
-              </ElButton>
-            </template>
-          </ElTableColumn>
-          <template #empty>
-            <ElEmpty description="暂无分类数据" />
+          <template #default="{ row }">
+            <ElTag
+              v-for="matcher in row.matchers"
+              :key="matcher"
+              class="scope-tag"
+              size="small"
+            >
+              {{ matcher }}
+            </ElTag>
           </template>
-        </ElTable>
-      </ElCard>
+        </ElTableColumn>
+        <ElTableColumn
+          v-if="categoryTablePrefs.visibleColumnMap.actions"
+          column-key="actions"
+          fixed="right"
+          label="操作"
+          :width="categoryTablePrefs.getColumnWidth('actions') || 180"
+        >
+          <template #default="{ row }">
+            <ElButton
+              v-access:code="'upms:syscategory:get'"
+              link
+              type="primary"
+              @click="openAnalysis(asCategoryOption(row))"
+            >
+              分析
+            </ElButton>
+            <ElButton
+              v-access:code="'upms:syscategory:edit'"
+              link
+              type="primary"
+              @click="edit(asCategoryOption(row))"
+              :icon="Edit"
+            >
+              修改
+            </ElButton>
+            <ElButton
+              v-access:code="'upms:syscategory:del'"
+              link
+              type="danger"
+              @click="del(row.code)"
+              :icon="Delete"
+            >
+              删除
+            </ElButton>
+          </template>
+        </ElTableColumn>
+        <template #empty>
+          <ElEmpty description="暂无分类数据" />
+        </template>
+      </ElTable>
 
       <Form v-if="formMounted" ref="refForm" @init-page="initPage" />
 
@@ -449,10 +420,36 @@ initPage();
         </template>
       </ElDrawer>
     </div>
-  </div>
+  </Page>
 </template>
 
 <style scoped lang="scss">
+.category-page {
+  box-sizing: border-box;
+  min-height: 100%;
+  padding: 8px;
+  background: hsl(var(--card));
+  border-radius: 8px;
+}
+
+.hx-table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.hx-table-toolbar > div {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.rule-summary {
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+
 .scope-tag {
   margin-right: 6px;
   margin-bottom: 6px;

@@ -11,11 +11,14 @@ import com.enterprise.auth.platform.modules.codegen.application.CodegenMetadataD
 import com.enterprise.auth.platform.modules.codegen.application.CodegenMetadataService;
 import com.enterprise.auth.platform.modules.codegen.interfaces.CodegenController;
 import com.enterprise.auth.platform.modules.codegen.interfaces.CodegenRequest;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,22 +59,30 @@ class CodegenApplicationServiceP2Test {
                   PRIMARY KEY (id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='P2 代码生成订单测试'
                 """);
-        jdbcTemplate.update("""
-                INSERT INTO sys_codegen_allowlist (tenant_id, table_name, description, enabled, created_by, updated_by, deleted)
-                VALUES ('platform', ?, '代码生成单测白名单', 1, 'test', 'test', 0)
-                ON DUPLICATE KEY UPDATE enabled = VALUES(enabled), deleted = VALUES(deleted), updated_by = VALUES(updated_by)
-                """, TABLE_NAME);
+        importTestTable();
     }
 
     @AfterEach
     void tearDown() throws IOException {
         jdbcTemplate.update("DELETE FROM codegen_table_column WHERE table_id IN (SELECT id FROM codegen_table WHERE table_name = ?)", TABLE_NAME);
         jdbcTemplate.update("DELETE FROM codegen_table WHERE table_name = ?", TABLE_NAME);
-        jdbcTemplate.update("DELETE FROM sys_codegen_allowlist WHERE table_name = ?", TABLE_NAME);
         cleanupGeneratedMenus();
         jdbcTemplate.execute("DROP TABLE IF EXISTS " + TABLE_NAME);
         cleanupOutput();
         TenantContext.clear();
+    }
+
+    private void importTestTable() {
+        var dataSource = codegenMetadataService.dataSources().stream()
+                .filter(item -> "LOCAL".equals(item.jdbcUrl()))
+                .findFirst()
+                .orElseThrow();
+        codegenMetadataService.importTables(new CodegenMetadataDtos.ImportTableRequest(
+                dataSource.id(),
+                List.of(TABLE_NAME),
+                "com.enterprise.auth.platform.generated",
+                "tester"
+        ));
     }
 
     @Test
@@ -151,11 +162,11 @@ class CodegenApplicationServiceP2Test {
                 .contains("@PostMapping")
                 .contains("@PutMapping(\"/{id}\")")
                 .contains("@DeleteMapping(\"/{id}\")")
-                .contains("@SaCheckPermission(\"upms:ordergen:page\")")
-                .contains("@SaCheckPermission(\"upms:ordergen:get\")")
-                .contains("@SaCheckPermission(\"upms:ordergen:add\")")
-                .contains("@SaCheckPermission(\"upms:ordergen:edit\")")
-                .contains("@SaCheckPermission(\"upms:ordergen:del\")");
+                .contains("@SaCheckPermission(\"orderGen:page\")")
+                .contains("@SaCheckPermission(\"orderGen:get\")")
+                .contains("@SaCheckPermission(\"orderGen:add\")")
+                .contains("@SaCheckPermission(\"orderGen:edit\")")
+                .contains("@SaCheckPermission(\"orderGen:del\")");
         assertThat(fileContent(preview, "frontend-vben/apps/web-ele/src/api/order-gen.ts"))
                 .contains("createOrderGen")
                 .contains("updateOrderGen")
@@ -167,15 +178,24 @@ class CodegenApplicationServiceP2Test {
                 .contains("export interface OrderGenQueryParams");
         assertThat(fileContent(preview, "frontend-vben/apps/web-ele/src/views/order-gen/index.vue"))
                 .contains("openForm")
-                .contains("remove(row)");
+                .contains("remove(row)")
+                .contains("v-access:code=\"'orderGen:add'\"")
+                .contains("from '#/api/order-gen'")
+                .contains("ref<InstanceType<typeof Form>>")
+                .doesNotContain("AdvancedSearch")
+                .doesNotContain("@/");
         assertThat(fileContent(preview, "frontend-vben/apps/web-ele/src/views/order-gen/form.vue"))
                 .contains("submitForm")
                 .contains("createOrderGen")
-                .contains("updateOrderGen");
+                .contains("updateOrderGen")
+                .contains("import { reactive, ref, toRefs } from 'vue'")
+                .contains("defineExpose({ initForm })")
+                .contains("from '#/api/order-gen'")
+                .doesNotContain("@/");
     }
 
     @Test
-    void shouldRejectTableOutsideCurrentTenantAllowlist() {
+    void shouldRejectTableOutsideCurrentTenantImports() {
         TenantContext.setTenantId("tenant-a");
 
         var tables = codegenApplicationService.tables("codegen_order", 1, 20);
@@ -185,7 +205,7 @@ class CodegenApplicationServiceP2Test {
                 .doesNotContain(TABLE_NAME);
         assertThatThrownBy(() -> codegenApplicationService.table(TABLE_NAME))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("数据表未纳入代码生成白名单");
+                .hasMessageContaining("数据表未导入代码生成配置");
     }
 
     @Test
@@ -273,8 +293,8 @@ class CodegenApplicationServiceP2Test {
     }
 
     @Test
-    void shouldExposeZipDownloadAsAttachment() {
-        var controller = new CodegenController(codegenApplicationService, null, null);
+    void shouldExposeZipDownloadAsAttachment() throws IOException {
+        var controller = new CodegenController(codegenApplicationService, null);
         var response = controller.download(new CodegenRequest(
                 TABLE_NAME,
                 "orderGen",
@@ -290,7 +310,18 @@ class CodegenApplicationServiceP2Test {
         assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
                 .contains("attachment")
                 .contains("filename*=UTF-8''orderGen-OrderGen.zip");
-        assertThat(response.getBody()).isNotEmpty();
+        byte[] body = response.getBody();
+        assertThat(body).isNotEmpty();
+        var entryNames = new java.util.ArrayList<String>();
+        try (var zip = new ZipInputStream(new ByteArrayInputStream(body))) {
+            ZipEntry entry;
+            while ((entry = zip.getNextEntry()) != null) {
+                entryNames.add(entry.getName());
+                zip.closeEntry();
+            }
+        }
+        assertThat(entryNames)
+                .contains("backend/src/main/java/com/enterprise/auth/platform/generated/modules/orderGen/infrastructure/entity/OrderGenEntity.java");
     }
 
     @Test
@@ -459,6 +490,7 @@ class CodegenApplicationServiceP2Test {
                 .contains("rules: {")
                 .contains("bizOrderNo: [{ required: true")
                 .contains("const { form, rules } = toRefs(state)")
+                .contains("defineExpose({ initForm })")
                 .contains("function buildPayload()")
                 .doesNotContain("dictApi");
         assertThat(form.substring(form.indexOf("function buildPayload"), form.indexOf("const submitForm")))

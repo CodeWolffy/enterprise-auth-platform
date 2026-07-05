@@ -16,8 +16,6 @@ import {
   ElMessage,
   ElMessageBox,
   ElOption,
-  ElRadioButton,
-  ElRadioGroup,
   ElSelect,
   ElTable,
   ElTableColumn,
@@ -54,7 +52,7 @@ const state = reactive({
 const showSearch = ref(true);
 const loading = ref(false);
 const uploadRef = ref();
-const uploadVisibility = ref('OWNER');
+const defaultUploadVisibility = 'OWNER';
 
 const initPage = async () => {
   loading.value = true;
@@ -85,7 +83,7 @@ const resetSearch = () => {
 
 const handleUpload = async (file: File) => {
   loading.value = true;
-  await upload(file, uploadVisibility.value)
+  await upload(file, defaultUploadVisibility)
     .then(() => {
       ElMessage.success('上传成功');
       initPage();
@@ -208,12 +206,6 @@ initPage();
               (e: any) => e.target.files[0] && handleUpload(e.target.files[0])
             "
           />
-          <span style="font-size: 13px; color: #64748b">上传可见性:</span>
-          <ElRadioGroup v-model="uploadVisibility" size="small">
-            <ElRadioButton value="OWNER">仅自己</ElRadioButton>
-            <ElRadioButton value="TENANT">租户内</ElRadioButton>
-            <ElRadioButton value="PUBLIC">公开</ElRadioButton>
-          </ElRadioGroup>
         </div>
         <RightToolbar
           :search-btn="true"

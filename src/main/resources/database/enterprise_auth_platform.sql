@@ -110,32 +110,6 @@ CREATE TABLE `codegen_table_column`  (
 ) ENGINE = InnoDB AUTO_INCREMENT = 91 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '代码生成字段配置' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
--- Table structure for codegen_template
--- ----------------------------
-DROP TABLE IF EXISTS `codegen_template`;
-CREATE TABLE `codegen_template`  (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `tenant_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '所属租户',
-  `name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '模板名称',
-  `language` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '语言：java/typescript/vue',
-  `template_category` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'backend' COMMENT '模板分类：backend/frontend/api/type/view',
-  `path_pattern` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '匹配生成路径的正则或关键字',
-  `content` mediumtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '模板内容（{{className}} 等占位）',
-  `description` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '描述',
-  `builtin` tinyint NOT NULL DEFAULT 0 COMMENT '是否内置（不可删除）',
-  `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '创建人',
-  `updated_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '更新人',
-  `deleted` tinyint NOT NULL DEFAULT 0 COMMENT '逻辑删除标记',
-  `created_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
-  `updated_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE INDEX `uk_codegen_template_tenant_name`(`tenant_id` ASC, `name` ASC) USING BTREE,
-  INDEX `idx_codegen_template_tenant_lang_pattern`(`tenant_id` ASC, `language` ASC, `path_pattern` ASC) USING BTREE,
-  INDEX `idx_codegen_template_tenant_category`(`tenant_id` ASC, `template_category` ASC, `deleted` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 2 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '代码生成自定义模板' ROW_FORMAT = DYNAMIC;
-
-
--- ----------------------------
 -- Table structure for sys_category_rule
 -- ----------------------------
 DROP TABLE IF EXISTS `sys_category_rule`;
@@ -154,26 +128,6 @@ CREATE TABLE `sys_category_rule`  (
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_sys_category_rule_tenant_target_code`(`tenant_id` ASC, `target_type` ASC, `category_code` ASC) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 90 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '系统分类规则表' ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Table structure for sys_codegen_allowlist
--- ----------------------------
-DROP TABLE IF EXISTS `sys_codegen_allowlist`;
-CREATE TABLE `sys_codegen_allowlist`  (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `tenant_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '所属租户',
-  `table_name` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '允许生成的数据表名',
-  `description` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '说明',
-  `enabled` tinyint NOT NULL DEFAULT 1 COMMENT '是否启用',
-  `created_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '创建人',
-  `updated_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '更新人',
-  `deleted` tinyint NOT NULL DEFAULT 0 COMMENT '逻辑删除标记',
-  `created_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) COMMENT '创建时间',
-  `updated_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3) COMMENT '更新时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE INDEX `uk_codegen_allowlist_tenant_table`(`tenant_id` ASC, `table_name` ASC) USING BTREE,
-  INDEX `idx_codegen_allowlist_tenant_enabled`(`tenant_id` ASC, `enabled` ASC, `deleted` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 177 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '代码生成表白名单' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for sys_config
@@ -903,8 +857,11 @@ INSERT INTO `sys_config` (`id`, `tenant_id`, `config_key`, `config_value`, `conf
 (4, 'platform', 'registration.default_role_codes', 'USER', '注册默认角色', 'system', 'system', 0);
 
 INSERT INTO `sys_category_rule` (`id`, `tenant_id`, `target_type`, `category_code`, `category_name`, `matchers`, `created_by`, `updated_by`, `deleted`) VALUES
-(1, 'platform', 'dict', 'system', '系统字典', 'sys_*,menu_*,tenant_*', 'system', 'system', 0),
-(2, 'platform', 'config', 'registration', '注册参数', 'registration.*', 'system', 'system', 0);
+(1, 'platform', 'dict', 'system', '系统字典', 'sys_*', 'system', 'system', 0),
+(2, 'platform', 'config', 'registration', '注册参数', 'registration.*', 'system', 'system', 0),
+(3, 'platform', 'dict', 'menu', '菜单字典', 'menu_*', 'system', 'system', 0),
+(4, 'platform', 'dict', 'tenant', '租户字典', 'tenant_*,tenant_package_*', 'system', 'system', 0),
+(5, 'platform', 'config', 'system', '系统参数', 'system.*', 'system', 'system', 0);
 
 INSERT INTO `sys_menu` (`id`, `parent_id`, `name`, `permission`, `path`, `component`, `sort`, `type`, `redirect`, `icon`, `outer_status`, `application_key`, `del_flag`, `create_by`, `update_by`, `deleted`) VALUES
 (100, NULL, '运行总览', NULL, '/dashboard', 'dashboard/platform/index', 10, '0', NULL, 'carbon:dashboard', 0, 'base', '0', 'system', 'system', 0),

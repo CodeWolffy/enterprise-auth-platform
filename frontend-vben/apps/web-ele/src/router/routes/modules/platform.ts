@@ -76,22 +76,6 @@ const routes: RouteRecordRaw[] = [
             component: () => import('#/views/gen/gen-table/index.vue'),
             meta: { title: '数据表管理', icon: 'carbon:data-table' },
           },
-          {
-            name: 'platform-codegen-template',
-            path: 'template',
-            component: () => import('#/views/gen/gen-template/index.vue'),
-            meta: { title: '自定义模板' },
-          },
-          {
-            name: 'platform-codegen-generate',
-            path: 'generate',
-            component: () => import('#/views/gen/gen-table/generate.vue'),
-            meta: {
-              title: '生成代码',
-              hideInMenu: true,
-              ignoreAccess: true,
-            },
-          },
         ],
       },
     ],
