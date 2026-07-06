@@ -18,7 +18,7 @@ import {
   ElTag,
 } from 'element-plus';
 
-import { queryWorkflowDoneTasks } from '#/api/modules';
+import { queryWorkflowDoneTasks } from '#/api/workflow';
 import { formatDateTime as formatInstantDateTime } from '#/utils/datetime';
 
 const loading = ref(false);

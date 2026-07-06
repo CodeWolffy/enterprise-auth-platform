@@ -1,8 +1,11 @@
-package com.enterprise.auth.platform.modules.codegen.application;
+package com.enterprise.auth.platform.modules.codegen.domain.model;
 
 import java.util.List;
 
-record CodegenModel(
+/**
+ * 模板渲染上下文：一次代码生成所需的全部命名信息与列集合。
+ */
+public record RenderContext(
         String tableName,
         String moduleName,
         String packageName,
@@ -13,14 +16,14 @@ record CodegenModel(
         String primaryKeyColumn,
         String primaryKeyField,
         String primaryKeyJavaType,
-        List<CodegenColumnView> columns,
-        List<CodegenColumnView> editableColumns,
-        List<CodegenColumnView> insertColumns,
-        List<CodegenColumnView> editColumns,
-        List<CodegenColumnView> listColumns,
-        List<CodegenColumnView> queryColumns
+        List<ColumnDefinition> columns,
+        List<ColumnDefinition> editableColumns,
+        List<ColumnDefinition> insertColumns,
+        List<ColumnDefinition> editColumns,
+        List<ColumnDefinition> listColumns,
+        List<ColumnDefinition> queryColumns
 ) {
-    CodegenModel {
+    public RenderContext {
         columns = columns == null ? List.of() : List.copyOf(columns);
         editableColumns = editableColumns == null ? List.of() : List.copyOf(editableColumns);
         insertColumns = insertColumns == null ? List.of() : List.copyOf(insertColumns);

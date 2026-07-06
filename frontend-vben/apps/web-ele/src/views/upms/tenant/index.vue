@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import { PERMS } from '#/constants/permissions';
+
 import { computed, defineAsyncComponent, reactive, ref } from 'vue';
 
 import {
@@ -358,7 +360,7 @@ const upMenu = (id: string) => {
         <div>
           <ElButton
             type="primary"
-            v-access:code="'upms:systenant:add'"
+            v-access:code="PERMS.upms.tenant.add"
             @click="add"
             :icon="Plus"
           >
@@ -423,7 +425,7 @@ const upMenu = (id: string) => {
             <ElButton
               link
               type="primary"
-              v-access:code="'upms:systenant:edit'"
+              v-access:code="PERMS.upms.tenant.edit"
               :icon="View"
               @click="openDetail(scope.row)"
             >
@@ -432,7 +434,7 @@ const upMenu = (id: string) => {
             <ElButton
               link
               type="primary"
-              v-access:code="'upms:systenant:edit'"
+              v-access:code="PERMS.upms.tenant.edit"
               :icon="Edit"
               @click="edit(scope.row)"
             >
@@ -442,7 +444,7 @@ const upMenu = (id: string) => {
               link
               type="primary"
               v-if="scope.row.tenantId !== '1881232176465358849'"
-              v-access:code="'upms:systenant:add'"
+              v-access:code="PERMS.upms.tenant.add"
               :icon="Edit"
               @click="upMenu(scope.row.tenantId)"
             >
@@ -454,7 +456,7 @@ const upMenu = (id: string) => {
             <ElButton
               link
               type="danger"
-              v-access:code="'upms:systenant:del'"
+              v-access:code="PERMS.upms.tenant.del"
               :icon="Delete"
               @click="del(scope.row)"
             >

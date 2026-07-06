@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.modules.user.interfaces;
 
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
-import com.enterprise.auth.platform.modules.resource.application.CatalogService;
+import com.enterprise.auth.platform.modules.catalog.application.CatalogService;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;

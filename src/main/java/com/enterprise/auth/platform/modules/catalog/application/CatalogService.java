@@ -1,15 +1,17 @@
-package com.enterprise.auth.platform.modules.resource.application;
+package com.enterprise.auth.platform.modules.catalog.application;
 
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.web.PageResult;
+import com.enterprise.auth.platform.common.web.PaginationSupport;
 import com.enterprise.auth.platform.modules.dept.application.DeptCatalogFacade;
 import com.enterprise.auth.platform.modules.role.application.RoleCatalogFacade;
 import com.enterprise.auth.platform.modules.role.application.RolePayloadCodec;
 import com.enterprise.auth.platform.modules.tenant.application.TenantProfileFacade;
 import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -60,8 +62,8 @@ public class CatalogService {
     }
 
     public PageResult<RoleView> rolesPage(String keyword, String dataScopeType, String tenantId, int page, int size) {
-        int safePage = Math.max(page, 1);
-        int safeSize = Math.max(size, 1);
+        int safePage = PaginationSupport.normalizePage(page);
+        int safeSize = PaginationSupport.normalizeSize(size);
         String normalizedKeyword = StringUtils.hasText(keyword) ? keyword.trim().toLowerCase() : null;
         String normalizedScope = StringUtils.hasText(dataScopeType) ? dataScopeType.trim() : null;
         String normalizedTenantId = StringUtils.hasText(tenantId) ? tenantId.trim() : null;
@@ -176,8 +178,7 @@ public class CatalogService {
     }
 
     private String currentTenantId() {
-        String tenantId = TenantContext.getTenantId();
-        return StringUtils.hasText(tenantId) ? tenantId : "platform";
+        return TenantContextSupport.currentTenantIdOrPlatform();
     }
 
     private boolean isGlobalScope() {

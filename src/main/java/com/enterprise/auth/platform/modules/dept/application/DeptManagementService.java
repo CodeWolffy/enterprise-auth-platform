@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.plugins.IgnoreStrategy;
 import com.baomidou.mybatisplus.core.plugins.InterceptorIgnoreHelper;
 import com.enterprise.auth.platform.modules.log.application.LogPublisher;
-import com.enterprise.auth.platform.modules.resource.application.CatalogService;
+import com.enterprise.auth.platform.modules.catalog.application.CatalogService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.dept.interfaces.DeptCrudRequest;
 import com.enterprise.auth.platform.modules.dept.infrastructure.entity.SysDeptEntity;
@@ -13,7 +13,7 @@ import com.enterprise.auth.platform.modules.tenant.application.TenantProfileFaca
 import com.enterprise.auth.platform.modules.user.application.UserQueryFacade;
 import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.common.authz.SecuritySupport;
-import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -152,8 +152,7 @@ public class DeptManagementService {
     }
 
     private String currentTenantId() {
-        String tenantId = TenantContext.getTenantId();
-        return StringUtils.hasText(tenantId) ? tenantId : "platform";
+        return TenantContextSupport.currentTenantIdOrPlatform();
     }
 
     private String resolveTargetTenantId(String requestedTenantId) {

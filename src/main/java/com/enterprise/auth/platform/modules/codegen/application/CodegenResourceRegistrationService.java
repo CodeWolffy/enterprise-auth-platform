@@ -2,6 +2,7 @@ package com.enterprise.auth.platform.modules.codegen.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
 import com.enterprise.auth.platform.modules.menu.application.MenuTemplateMutationFacade;
@@ -79,8 +80,7 @@ public class CodegenResourceRegistrationService {
     }
 
     private String activeTenantId() {
-        String tenantId = TenantContext.getTenantId();
-        return StringUtils.hasText(tenantId) ? tenantId : platformTenantId();
+        return TenantContextSupport.currentTenantIdOr(platformTenantId());
     }
 
     private String platformTenantId() {

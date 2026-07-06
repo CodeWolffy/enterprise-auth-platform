@@ -1,346 +1,37 @@
-import type { NotificationView } from '#/api/notification';
+import { onBeforeUnmount, onMounted } from 'vue';
 
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { storeToRefs } from 'pinia';
 
-import { useAccessStore } from '@vben/stores';
+import { useNotificationStore } from '#/store/notification';
 
-import { ElMessage, ElMessageBox } from 'element-plus';
-
-import {
-  buildNotificationStreamUrl,
-  clearReadNotifications,
-  createNotificationStreamTicket,
-  markAllNotificationsRead,
-  markNotificationRead as markNotificationReadRequest,
-  queryNotifications,
-  queryUnreadNotificationCount,
-} from '#/api/notification';
-
+/**
+ * 站内通知薄包装 composable。
+ *
+ * 状态与业务逻辑已迁移到 Pinia store（#/store/notification），
+ * 本包装保留原有同名 API 并负责组件生命周期内的
+ * SSE 订阅启动/断开与窗口聚焦刷新，行为与迁移前一致。
+ */
 export function useNotifications() {
-  const router = useRouter();
-  const accessStore = useAccessStore();
-  const notificationsVisible = ref(false);
-  const notificationsLoading = ref(false);
-  const unreadNotificationCount = ref(0);
-  const notificationReadFilter = ref<'all' | 'unread'>('all');
-  const notificationPage = ref<{
-    page: number;
-    records: NotificationView[];
-    size: number;
-    total: number;
-  }>({
-    total: 0,
-    page: 1,
-    size: 8,
-    records: [],
-  });
+  const store = useNotificationStore();
 
-  const notificationServiceUnavailableMessage =
-    '站内通知暂时无法同步，不影响当前操作';
-  const notificationErrorThrottleMs = 15_000;
-
-  let lastNotificationErrorAt = 0;
-
-  const notificationSummaryText = computed(() => {
-    if (notificationReadFilter.value === 'unread') {
-      return `未读 ${notificationPage.value.total} 条 / 全部未读 ${unreadNotificationCount.value} 条`;
-    }
-    return `共 ${notificationPage.value.total} 条通知，未读 ${unreadNotificationCount.value} 条`;
-  });
-
-  const readNotificationCount = computed(() =>
-    Math.max(notificationPage.value.total - unreadNotificationCount.value, 0),
-  );
-
-  let sseSource: EventSource | null = null;
-  let sseReconnectTimer: null | ReturnType<typeof setTimeout> = null;
-  let sseManualClose = false;
-  const sseReconnectBaseDelayMs = 5000;
-  const sseReconnectMaxDelayMs = 60_000;
-  let sseReconnectDelayMs = sseReconnectBaseDelayMs;
-
-  function showNotificationServiceWarning(
-    message = notificationServiceUnavailableMessage,
-  ) {
-    const now = Date.now();
-    if (now - lastNotificationErrorAt < notificationErrorThrottleMs) {
-      return;
-    }
-    lastNotificationErrorAt = now;
-    ElMessage({
-      type: 'warning',
-      message,
-      duration: 3000,
-      grouping: true,
-      offset: 24,
-    });
-  }
-
-  async function loadUnreadNotificationCount() {
-    try {
-      unreadNotificationCount.value = await queryUnreadNotificationCount();
-    } catch {
-      unreadNotificationCount.value = 0;
-    }
-  }
-
-  async function openNotifications() {
-    notificationsVisible.value = true;
-    notificationPage.value.page = 1;
-    await loadNotifications();
-  }
-
-  async function loadNotifications(page = notificationPage.value.page) {
-    notificationsLoading.value = true;
-    try {
-      notificationPage.value = await queryNotifications({
-        page,
-        size: notificationPage.value.size,
-        read: notificationReadFilter.value === 'unread' ? false : undefined,
-      });
-      await loadUnreadNotificationCount();
-    } catch {
-      showNotificationServiceWarning('站内通知暂时无法加载，请稍后再试');
-    } finally {
-      notificationsLoading.value = false;
-    }
-  }
-
-  async function changeNotificationReadFilter(filter: 'all' | 'unread') {
-    notificationReadFilter.value = filter;
-    notificationPage.value.page = 1;
-    await loadNotifications(1);
-  }
-
-  async function handleNotificationPageChange(page: number) {
-    notificationPage.value.page = page;
-    await loadNotifications(page);
-  }
-
-  async function markNotificationRead(notification: NotificationView) {
-    if (notification.read) {
-      return true;
-    }
-    try {
-      const updated = await markNotificationReadRequest(notification.id);
-      if (notificationReadFilter.value === 'unread') {
-        notificationPage.value.records = notificationPage.value.records.filter(
-          (item) => item.id !== updated.id,
-        );
-        notificationPage.value.total = Math.max(
-          notificationPage.value.total - 1,
-          0,
-        );
-      } else {
-        notificationPage.value.records = notificationPage.value.records.map(
-          (item) => (item.id === updated.id ? updated : item),
-        );
-      }
-      await loadUnreadNotificationCount();
-      return true;
-    } catch {
-      showNotificationServiceWarning('通知状态暂时无法更新，请稍后再试');
-      return false;
-    }
-  }
-
-  async function markAllNotificationsReadAction() {
-    try {
-      const changed = await markAllNotificationsRead();
-      if (changed > 0) {
-        ElMessage.success('站内通知已全部标记为已读');
-      }
-      notificationPage.value.page = 1;
-      await loadNotifications(1);
-    } catch {
-      showNotificationServiceWarning('通知状态暂时无法更新，请稍后再试');
-    }
-  }
-
-  async function clearReadNotificationsAction() {
-    try {
-      await ElMessageBox.confirm(
-        '确定要彻底删除所有已读通知吗？删除后将无法恢复。',
-        '清空已读通知',
-        {
-          confirmButtonText: '彻底删除',
-          cancelButtonText: '取消',
-          type: 'warning',
-          confirmButtonClass: 'el-button--danger',
-        },
-      );
-    } catch {
-      return;
-    }
-    try {
-      const removed = await clearReadNotifications();
-      if (removed > 0) {
-        ElMessage.success(`已清空 ${removed} 条已读通知`);
-      } else {
-        ElMessage.info('没有可清空的已读通知');
-      }
-      notificationPage.value.page = 1;
-      await loadNotifications(1);
-    } catch {
-      showNotificationServiceWarning('已读通知暂时无法清空，请稍后再试');
-    }
-  }
-
-  async function openNotificationLink(notification: NotificationView) {
-    await markNotificationRead(notification);
-    if (!notification.link) {
-      return;
-    }
-    notificationsVisible.value = false;
-    await router.push(notification.link);
-  }
-
-  function handleWindowFocus() {
-    if (!accessStore.accessToken) {
-      return;
-    }
-    void loadUnreadNotificationCount();
-  }
-
-  async function startSseSubscription() {
-    if (sseReconnectTimer) {
-      clearTimeout(sseReconnectTimer);
-      sseReconnectTimer = null;
-    }
-    closeSseSourceOnly();
-    if (!accessStore.accessToken) {
-      return;
-    }
-    sseManualClose = false;
-    let streamTicket: string;
-    try {
-      const ticketResponse = await createNotificationStreamTicket();
-      streamTicket = ticketResponse.ticket;
-    } catch {
-      scheduleSseReconnect();
-      return;
-    }
-    if (sseManualClose || !accessStore.accessToken) {
-      return;
-    }
-    try {
-      sseSource = new EventSource(buildNotificationStreamUrl(streamTicket));
-    } catch {
-      scheduleSseReconnect();
-      return;
-    }
-    sseSource.addEventListener('open', () => {
-      sseReconnectDelayMs = sseReconnectBaseDelayMs;
-      void loadUnreadNotificationCount();
-    });
-    sseSource.addEventListener('notification', (event) => {
-      try {
-        const notification = JSON.parse(
-          (event as MessageEvent).data,
-        ) as NotificationView;
-        handleIncomingNotification(notification);
-      } catch {
-        // ignore malformed event
-      }
-    });
-    sseSource.addEventListener('error', () => {
-      closeSseSourceOnly();
-      if (!sseManualClose) {
-        scheduleSseReconnect();
-      }
-    });
-  }
-
-  function closeSseSourceOnly() {
-    if (sseSource) {
-      sseSource.close();
-      sseSource = null;
-    }
-  }
-
-  function closeSseSubscription() {
-    sseManualClose = true;
-    sseReconnectDelayMs = sseReconnectBaseDelayMs;
-    if (sseReconnectTimer) {
-      clearTimeout(sseReconnectTimer);
-      sseReconnectTimer = null;
-    }
-    closeSseSourceOnly();
-  }
-
-  function scheduleSseReconnect() {
-    if (sseReconnectTimer || sseManualClose) {
-      return;
-    }
-    const reconnectDelay = sseReconnectDelayMs;
-    sseReconnectDelayMs = Math.min(
-      sseReconnectDelayMs * 2,
-      sseReconnectMaxDelayMs,
-    );
-    sseReconnectTimer = setTimeout(() => {
-      sseReconnectTimer = null;
-      if (!sseManualClose && accessStore.accessToken) {
-        void startSseSubscription();
-      }
-    }, reconnectDelay);
-  }
-
-  function handleIncomingNotification(notification: NotificationView) {
-    unreadNotificationCount.value += 1;
-    if (notificationsVisible.value && notificationReadFilter.value === 'all') {
-      const exists = notificationPage.value.records.some(
-        (item) => item.id === notification.id,
-      );
-      if (!exists) {
-        notificationPage.value.records = [
-          notification,
-          ...notificationPage.value.records,
-        ].slice(0, notificationPage.value.size);
-        notificationPage.value.total += 1;
-      }
-    }
-    showNotificationToast(notification);
-  }
-
-  function showNotificationToast(notification: NotificationView) {
-    const level = notification.level;
-    let type: 'error' | 'info' | 'success' | 'warning' = 'info';
-    switch (level) {
-      case 'ERROR': {
-        type = 'error';
-
-        break;
-      }
-      case 'SUCCESS': {
-        type = 'success';
-
-        break;
-      }
-      case 'WARNING': {
-        type = 'warning';
-
-        break;
-      }
-      // No default
-    }
-    ElMessage({
-      type,
-      message: notification.title,
-      duration: 4500,
-      grouping: true,
-      offset: 24,
-    });
-  }
+  const {
+    notificationsVisible,
+    notificationsLoading,
+    unreadNotificationCount,
+    readNotificationCount,
+    notificationReadFilter,
+    notificationSummaryText,
+    notificationPage,
+  } = storeToRefs(store);
 
   onMounted(() => {
-    window.addEventListener('focus', handleWindowFocus);
-    void startSseSubscription();
+    window.addEventListener('focus', store.handleWindowFocus);
+    void store.startSseSubscription();
   });
 
   onBeforeUnmount(() => {
-    window.removeEventListener('focus', handleWindowFocus);
-    closeSseSubscription();
+    window.removeEventListener('focus', store.handleWindowFocus);
+    store.closeSseSubscription();
   });
 
   return {
@@ -351,16 +42,16 @@ export function useNotifications() {
     notificationReadFilter,
     notificationSummaryText,
     notificationPage,
-    loadUnreadNotificationCount,
-    openNotifications,
-    loadNotifications,
-    changeNotificationReadFilter,
-    handleNotificationPageChange,
-    markNotificationRead,
-    markAllNotificationsReadAction,
-    clearReadNotificationsAction,
-    openNotificationLink,
-    startSseSubscription,
-    closeSseSubscription,
+    loadUnreadNotificationCount: store.loadUnreadNotificationCount,
+    openNotifications: store.openNotifications,
+    loadNotifications: store.loadNotifications,
+    changeNotificationReadFilter: store.changeNotificationReadFilter,
+    handleNotificationPageChange: store.handleNotificationPageChange,
+    markNotificationRead: store.markNotificationRead,
+    markAllNotificationsReadAction: store.markAllNotificationsReadAction,
+    clearReadNotificationsAction: store.clearReadNotificationsAction,
+    openNotificationLink: store.openNotificationLink,
+    startSseSubscription: store.startSseSubscription,
+    closeSseSubscription: store.closeSseSubscription,
   };
 }

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { PERMS } from '#/constants/permissions';
+
 import { defineAsyncComponent, reactive, ref } from 'vue';
 
 import { Delete, Edit, Plus, Refresh } from '@element-plus/icons-vue';
@@ -61,7 +63,7 @@ initPage();
         style="display: flex; gap: 8px; margin-bottom: 12px"
       >
         <ElButton
-          v-access:code="'upms:tenantpackage:add'"
+          v-access:code="PERMS.upms.tenantPackage.add"
           :icon="Plus"
           type="primary"
           @click="add"
@@ -89,7 +91,7 @@ initPage();
         <ElTableColumn align="center" fixed="right" label="操作" width="200">
           <template #default="scope">
             <ElButton
-              v-access:code="'upms:tenantpackage:edit'"
+              v-access:code="PERMS.upms.tenantPackage.edit"
               :icon="Edit"
               link
               type="primary"
@@ -98,7 +100,7 @@ initPage();
               修改
             </ElButton>
             <ElButton
-              v-access:code="'upms:tenantpackage:del'"
+              v-access:code="PERMS.upms.tenantPackage.del"
               :icon="Delete"
               link
               type="danger"

@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.modules.file.application;
 
+import com.enterprise.auth.platform.common.web.PaginationSupport;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(description = "文件分页查询条件")
@@ -12,10 +13,10 @@ public record FileQuery(
         @Schema(description = "每页数量") int size
 ) {
     public int normalizedPage() {
-        return Math.max(page, 1);
+        return PaginationSupport.normalizePage(page);
     }
 
     public int normalizedSize() {
-        return Math.min(Math.max(size, 1), 100);
+        return PaginationSupport.normalizeSize(size, 100);
     }
 }

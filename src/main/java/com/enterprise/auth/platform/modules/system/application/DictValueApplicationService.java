@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.common.cache.CacheNames;
-import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysDictEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysDictValueEntity;
@@ -230,7 +230,6 @@ public class DictValueApplicationService {
     }
 
     private String currentTenantId() {
-        String tenantId = TenantContext.getTenantId();
-        return StringUtils.hasText(tenantId) ? tenantId : "platform";
+        return TenantContextSupport.currentTenantIdOrPlatform();
     }
 }

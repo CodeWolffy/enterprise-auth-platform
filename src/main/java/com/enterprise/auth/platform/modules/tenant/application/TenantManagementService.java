@@ -3,11 +3,12 @@ package com.enterprise.auth.platform.modules.tenant.application;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.PageResult;
+import com.enterprise.auth.platform.common.web.PaginationSupport;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
 import com.enterprise.auth.platform.modules.dept.application.DeptTenantDataFacade;
-import com.enterprise.auth.platform.modules.resource.application.CatalogService;
+import com.enterprise.auth.platform.modules.catalog.application.CatalogService;
 import com.enterprise.auth.platform.modules.role.application.RoleTenantDataFacade;
 import com.enterprise.auth.platform.modules.security.application.SecurityPolicyApplicationService;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantEntity;
@@ -194,8 +195,8 @@ public class TenantManagementService {
     public PageResult<CatalogService.TenantView> page(String keyword, Boolean platformLevel, Integer tenantStatus, int page, int size) {
         boolean platformSuperAdmin = isPlatformSuperAdmin();
         String operatorTenantId = currentTenantId();
-        int safePage = Math.max(page, 1);
-        int safeSize = Math.max(size, 1);
+        int safePage = PaginationSupport.normalizePage(page);
+        int safeSize = PaginationSupport.normalizeSize(size);
         LambdaQueryWrapper<SysTenantEntity> query = new LambdaQueryWrapper<SysTenantEntity>()
                 .eq(SysTenantEntity::getDeleted, 0)
                 .eq(!platformSuperAdmin, SysTenantEntity::getTenantId, operatorTenantId)

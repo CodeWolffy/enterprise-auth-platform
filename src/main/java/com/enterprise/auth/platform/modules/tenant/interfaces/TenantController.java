@@ -7,7 +7,7 @@ import com.enterprise.auth.platform.modules.tenant.application.TenantChangeLogAp
 import com.enterprise.auth.platform.modules.tenant.application.TenantDirectoryApplicationService;
 import com.enterprise.auth.platform.modules.tenant.application.TenantLifecycleApplicationService;
 import com.enterprise.auth.platform.modules.tenant.application.TenantMenuService;
-import com.enterprise.auth.platform.modules.resource.application.CatalogService;
+import com.enterprise.auth.platform.modules.catalog.application.CatalogService;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.common.context.TenantContext;

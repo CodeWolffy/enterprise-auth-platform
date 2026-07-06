@@ -1,11 +1,11 @@
 <p align="center">
 	<img height="150" width="150" alt="logo" src="/logo.png" />
 </p>
-<h1 align="center" style="margin: 20px 0 20px 0px; font-weight: bold;">企业认证平台</h1>
+<h1 align="center" style="margin: 20px 0 20px 0px; font-weight: bold;">企业级管理后台基座</h1>
 
 ## 🚀 项目介绍
 
-**企业认证平台（Enterprise Auth Platform）** 是一套基于 **Java 17 + Spring Boot 3 + Sa-Token + MyBatis-Plus** 构建的企业级权限管理平台。系统支持多租户架构，提供完整的用户、角色、菜单、部门等基座模块管理能力。
+**企业级管理后台基座（Enterprise Admin Base）** 是一套基于 **Java 17 + Spring Boot 3 + Sa-Token + MyBatis-Plus** 构建的企业级管理后台基座。定位是快速孵化各类企业管理后台的通用底座：内置认证、RBAC、多租户、组织架构、系统管理、日志、通知、文件、工作流、代码生成等横向能力，业务系统在此之上做增量开发。
 
 ---
 

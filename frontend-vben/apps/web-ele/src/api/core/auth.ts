@@ -110,12 +110,14 @@ export async function switchTenantApi(tenantId: string) {
 }
 
 /**
- * 获取登录滑块验证码
+ * 获取登录验证码
  * 后端：GET /api/auth/captcha
+ * 传入 username 后，后端会根据该账号近期失败情况决定下发滑块或文字点选(风险升级)。
  */
-export async function getCaptchaApi() {
+export async function getCaptchaApi(username?: string) {
   return requestClient.get<any>('/auth/captcha', {
     headers: { isToken: false, isSwitchTenant: false },
+    params: username ? { username } : undefined,
   });
 }
 

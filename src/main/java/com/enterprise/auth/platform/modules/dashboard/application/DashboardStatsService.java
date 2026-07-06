@@ -3,12 +3,20 @@ package com.enterprise.auth.platform.modules.dashboard.application;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
-import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.context.TimeZoneContext;
 import com.enterprise.auth.platform.modules.log.application.LogStatsFacade;
 import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import com.enterprise.auth.platform.modules.auth.application.SessionIndexService;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
+import com.enterprise.auth.platform.modules.dashboard.domain.DashboardMetrics;
+import com.enterprise.auth.platform.modules.dashboard.domain.DashboardMetrics.ActivitySummary;
+import com.enterprise.auth.platform.modules.dashboard.domain.DashboardMetrics.AuditEvent;
+import com.enterprise.auth.platform.modules.dashboard.domain.DashboardMetrics.DailyActivity;
+import com.enterprise.auth.platform.modules.dashboard.domain.DashboardMetrics.DirectoryCounts;
+import com.enterprise.auth.platform.modules.dashboard.domain.DashboardMetrics.OnlineSessions;
+import com.enterprise.auth.platform.modules.dashboard.domain.DashboardMetrics.StatsScope;
+import com.enterprise.auth.platform.modules.dashboard.domain.DashboardMetrics.StorageUsage;
 import com.enterprise.auth.platform.modules.dashboard.interfaces.DashboardStatsResponse;
 import com.enterprise.auth.platform.modules.dashboard.interfaces.DashboardStatsResponse.DailyTrendPoint;
 import com.enterprise.auth.platform.modules.dashboard.interfaces.DashboardStatsResponse.RecentAuditEvent;
@@ -65,6 +73,12 @@ public class DashboardStatsService {
         String activeTenantId = activeTenantId(user);
         boolean platformScope = platformAdminSupport.isPlatformSuperAdmin(user) && "platform".equals(activeTenantId);
         String scope = platformScope ? "PLATFORM" : user.dataScopeType().name().equals("ALL") ? "TENANT" : "VISIBLE";
+
+        DashboardMetrics metrics = collectMetrics(scope, activeTenantId, platformScope);
+        return toResponse(metrics);
+    }
+
+    private DashboardMetrics collectMetrics(String scope, String activeTenantId, boolean platformScope) {
         Optional<Set<Long>> visibleUserIds = platformScope ? Optional.empty() : dataScopeService.visibleUserIds(activeTenantId);
         Optional<Set<String>> visibleUsernames = platformScope ? Optional.empty() : dataScopeService.visibleUsernames(activeTenantId);
 
@@ -79,54 +93,70 @@ public class DashboardStatsService {
         Instant todayStart = TimeSupport.startOfDay(TimeSupport.today(zone), zone);
         long todayLoginCount = logStatsFacade.countLoginLogs(activeTenantId, platformScope, visibleUsernames, "SUCCESS", todayStart, null);
         Optional<Long> onlineUserSnapshot = sessionIndexService.countVisible(activeTenantId, platformScope, visibleUserIds);
-        long onlineUserCount = onlineUserSnapshot.orElse(0L);
         long todayOperationLogCount = logStatsFacade.countOperationLogs(activeTenantId, platformScope, visibleUsernames, todayStart, null);
         long todayLoginFailedCount = logStatsFacade.countLoginLogs(activeTenantId, platformScope, visibleUsernames, "FAILED", todayStart, null);
         long todayRiskEventCount = logStatsFacade.countLoginLogs(activeTenantId, platformScope, visibleUsernames, "LOCKED", todayStart, null);
-        List<DailyTrendPoint> dailyTrend = logStatsFacade.dailyTrend(activeTenantId, platformScope, visibleUsernames);
-        List<ServiceHealthItem> serviceHealth = serviceHealth(onlineUserSnapshot, fileCount, storageBytes);
-        List<RecentAuditEvent> recentAuditEvents = logStatsFacade.recentAuditEvents(activeTenantId, platformScope, visibleUsernames);
 
-        return new DashboardStatsResponse(
-                scope,
-                platformScope ? null : activeTenantId,
-                userCount,
-                roleCount,
-                tenantCount,
-                fileCount,
-                storageBytes,
-                operationLogCount,
-                recentOperationLogCount,
-                todayLoginCount,
-                onlineUserCount,
-                todayOperationLogCount,
-                todayLoginFailedCount,
-                todayRiskEventCount,
-                dailyTrend,
-                serviceHealth,
-                recentAuditEvents
+        return new DashboardMetrics(
+                new StatsScope(scope, platformScope ? null : activeTenantId),
+                new DirectoryCounts(userCount, roleCount, tenantCount),
+                new StorageUsage(fileCount, storageBytes),
+                new ActivitySummary(
+                        operationLogCount,
+                        recentOperationLogCount,
+                        todayLoginCount,
+                        todayOperationLogCount,
+                        todayLoginFailedCount,
+                        todayRiskEventCount
+                ),
+                new OnlineSessions(onlineUserSnapshot.orElse(null)),
+                toDailyActivities(logStatsFacade.dailyTrend(activeTenantId, platformScope, visibleUsernames)),
+                toAuditEvents(logStatsFacade.recentAuditEvents(activeTenantId, platformScope, visibleUsernames))
         );
     }
 
-    private List<ServiceHealthItem> serviceHealth(Optional<Long> onlineUserSnapshot, long fileCount, long storageBytes) {
-        return List.of(
-                new ServiceHealthItem("backend", "后端服务", "UP", "接口响应正常"),
-                new ServiceHealthItem("database", "数据库", "UP", "统计查询正常"),
-                new ServiceHealthItem(
-                        "redis",
-                        "Redis 会话",
-                        onlineUserSnapshot.isPresent() ? "UP" : "DEGRADED",
-                        onlineUserSnapshot.map(count -> "在线会话 " + count + " 个").orElse("会话索引暂不可读")
-                ),
-                new ServiceHealthItem("storage", "文件存储", "UP", "文件 " + fileCount + " 个 · " + storageBytes + " B")
+    private DashboardStatsResponse toResponse(DashboardMetrics metrics) {
+        return new DashboardStatsResponse(
+                metrics.scope().scope(),
+                metrics.scope().tenantId(),
+                metrics.directory().userCount(),
+                metrics.directory().roleCount(),
+                metrics.directory().tenantCount(),
+                metrics.storage().fileCount(),
+                metrics.storage().totalBytes(),
+                metrics.activity().operationLogCount(),
+                metrics.activity().recentOperationLogCount(),
+                metrics.activity().todayLoginCount(),
+                metrics.sessions().onlineUserCount(),
+                metrics.activity().todayOperationLogCount(),
+                metrics.activity().todayLoginFailedCount(),
+                metrics.activity().todayRiskEventCount(),
+                metrics.dailyTrend().stream()
+                        .map(point -> new DailyTrendPoint(point.date(), point.loginCount(), point.operationCount(), point.loginFailedCount()))
+                        .toList(),
+                metrics.serviceHealth().stream()
+                        .map(item -> new ServiceHealthItem(item.code(), item.name(), item.status(), item.message()))
+                        .toList(),
+                metrics.recentAuditEvents().stream()
+                        .map(event -> new RecentAuditEvent(event.eventType(), event.operator(), event.tenantId(), event.clientIp(), event.occurredAt()))
+                        .toList()
         );
+    }
+
+    private List<DailyActivity> toDailyActivities(List<DailyTrendPoint> points) {
+        return points.stream()
+                .map(point -> new DailyActivity(point.date(), point.loginCount(), point.operationCount(), point.loginFailedCount()))
+                .toList();
+    }
+
+    private List<AuditEvent> toAuditEvents(List<RecentAuditEvent> events) {
+        return events.stream()
+                .map(event -> new AuditEvent(event.eventType(), event.operator(), event.tenantId(), event.clientIp(), event.occurredAt()))
+                .toList();
     }
 
     private String activeTenantId(UserAccount user) {
-        String tenantId = TenantContext.getTenantId();
-        if (StringUtils.hasText(tenantId)) {
-            return tenantId;
-        }
-        return StringUtils.hasText(user.tenantId()) ? user.tenantId() : "platform";
+        String fallback = StringUtils.hasText(user.tenantId()) ? user.tenantId() : TenantContextSupport.PLATFORM_TENANT_ID;
+        return TenantContextSupport.currentTenantIdOr(fallback);
     }
 }

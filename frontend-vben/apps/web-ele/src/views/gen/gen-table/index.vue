@@ -1,4 +1,6 @@
 <script lang="ts" setup name="genTable">
+import { PERMS } from '#/constants/permissions';
+
 import type { DataSourceView } from '#/api/codegen';
 
 import { computed, ref } from 'vue';
@@ -394,7 +396,7 @@ loadDataSources();
                   link
                   type="primary"
                   :icon="Download"
-                  v-access:code="'gen:gen-table:add'"
+                  v-access:code="PERMS.gen.table.add"
                   @click="doImport(scope.row.tableName)"
                 >
                   导入配置
@@ -489,7 +491,7 @@ loadDataSources();
                   link
                   type="primary"
                   :icon="Edit"
-                  v-access:code="'gen:gen-table:edit'"
+                  v-access:code="PERMS.gen.table.edit"
                   @click="openColumnConfig(asImportedRow(scope.row))"
                 >
                   配置字段
@@ -498,7 +500,7 @@ loadDataSources();
                   link
                   type="success"
                   :icon="Download"
-                  v-access:code="'gen:gen-table:download'"
+                  v-access:code="PERMS.gen.table.download"
                   @click="openGenerate(asImportedRow(scope.row))"
                 >
                   生成代码
@@ -507,7 +509,7 @@ loadDataSources();
                   link
                   type="danger"
                   :icon="Delete"
-                  v-access:code="'gen:gen-table:del'"
+                  v-access:code="PERMS.gen.table.del"
                   @click="deleteImported(asImportedRow(scope.row))"
                 >
                   删除

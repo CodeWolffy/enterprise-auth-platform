@@ -11,6 +11,8 @@ import cloud.tianai.captcha.common.constant.CaptchaTypeConstant;
 import cloud.tianai.captcha.common.response.ApiResponse;
 import cloud.tianai.captcha.spring.autoconfiguration.SpringImageCaptchaProperties;
 import com.enterprise.auth.platform.modules.auth.application.CaptchaService;
+import com.enterprise.auth.platform.modules.auth.application.LoginAttemptService;
+import com.enterprise.auth.platform.modules.user.application.UserAuthenticationFacade;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -18,7 +20,9 @@ import org.junit.jupiter.api.Test;
 class CaptchaServiceRedisTest {
 
     private CaptchaService createService(ImageCaptchaApplication imageCaptchaApplication) {
-        return new CaptchaService(imageCaptchaApplication, new ObjectMapper(), new SpringImageCaptchaProperties());
+        LoginAttemptService loginAttemptService = mock(LoginAttemptService.class);
+        UserAuthenticationFacade userAuthenticationFacade = mock(UserAuthenticationFacade.class);
+        return new CaptchaService(imageCaptchaApplication, new ObjectMapper(), new SpringImageCaptchaProperties(), loginAttemptService, userAuthenticationFacade);
     }
 
     @Test

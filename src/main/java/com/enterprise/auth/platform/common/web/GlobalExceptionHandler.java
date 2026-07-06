@@ -4,7 +4,7 @@ import cn.dev33.satoken.exception.NotLoginException;
 import cn.dev33.satoken.exception.NotPermissionException;
 import cn.dev33.satoken.exception.SaTokenException;
 import com.enterprise.auth.platform.common.context.RequestContext;
-import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.ApiResponse.ErrorDetail;
 import com.enterprise.auth.platform.common.web.RateLimitInterceptor.RateLimitExceededException;
@@ -220,7 +220,7 @@ public class GlobalExceptionHandler {
             } else {
                 operator = "anonymous";
             }
-            String tenantId = StringUtils.hasText(TenantContext.getTenantId()) ? TenantContext.getTenantId() : "platform";
+            String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
             Map<String, Object> payload = Map.of(
                     "method", request.getMethod(),
                     "path", request.getRequestURI(),

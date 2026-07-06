@@ -16,6 +16,7 @@ import com.enterprise.auth.platform.modules.auth.application.RegistrationPolicyS
 import com.enterprise.auth.platform.common.web.RateLimit;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.common.context.AuthContextHolder;
+import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import com.enterprise.auth.platform.modules.auth.interfaces.RegisterRequest;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
@@ -76,8 +77,9 @@ public class AuthController {
     @Operation(summary = "获取登录验证码")
     @RateLimit(key = "captcha", strategy = RateLimit.Strategy.IP)
     @GetMapping("/captcha")
-    public ApiResponse<CaptchaService.CaptchaChallenge> captcha() {
-        return ApiResponse.ok(captchaService.create());
+    public ApiResponse<CaptchaService.CaptchaChallenge> captcha(
+            @Parameter(description = "登录用户名，用于失败后升级验证码类型") @RequestParam(required = false) String username) {
+        return ApiResponse.ok(captchaService.createForLogin(TenantContext.getTenantId(), username));
     }
 
     @Operation(summary = "校验滑块验证码，成功后返回登录阶段二次校验所需的令牌")

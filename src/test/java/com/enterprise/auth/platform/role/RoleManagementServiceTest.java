@@ -9,7 +9,7 @@ import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
-import com.enterprise.auth.platform.modules.resource.application.CatalogService;
+import com.enterprise.auth.platform.modules.catalog.application.CatalogService;
 import com.enterprise.auth.platform.modules.role.application.RoleManagementService;
 import com.enterprise.auth.platform.modules.role.interfaces.CreateRoleRequest;
 import java.util.Set;

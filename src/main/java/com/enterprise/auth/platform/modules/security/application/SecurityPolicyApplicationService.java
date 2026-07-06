@@ -2,7 +2,7 @@ package com.enterprise.auth.platform.modules.security.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.authz.SecuritySupport;
-import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.modules.security.domain.EffectiveSecurityPolicy;
@@ -19,8 +19,6 @@ import org.springframework.util.StringUtils;
 
 @Service
 public class SecurityPolicyApplicationService {
-
-    private static final String PLATFORM_TENANT_ID = "platform";
 
     private final SysPlatformSecurityPolicyMapper platformPolicyMapper;
     private final SysTenantSecurityPolicyMapper tenantPolicyMapper;
@@ -201,8 +199,7 @@ public class SecurityPolicyApplicationService {
     }
 
     private String resolveTenantId() {
-        String tenantId = TenantContext.getTenantId();
-        return StringUtils.hasText(tenantId) ? tenantId : PLATFORM_TENANT_ID;
+        return TenantContextSupport.currentTenantIdOrPlatform();
     }
 
     private int value(Integer candidate, int fallback) {

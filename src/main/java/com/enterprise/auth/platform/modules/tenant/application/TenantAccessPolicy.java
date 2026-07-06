@@ -1,13 +1,12 @@
 package com.enterprise.auth.platform.modules.tenant.application;
 
 import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
-import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
 @Service
 public class TenantAccessPolicy {
@@ -28,8 +27,7 @@ public class TenantAccessPolicy {
     }
 
     public String currentTenantId() {
-        String tenantId = TenantContext.getTenantId();
-        return StringUtils.hasText(tenantId) ? tenantId : "platform";
+        return TenantContextSupport.currentTenantIdOrPlatform();
     }
 
     public void ensureTenantReadable(String tenantId) {

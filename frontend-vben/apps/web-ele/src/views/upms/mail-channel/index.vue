@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { PERMS } from '#/constants/permissions';
+
 import type { FormInstance, FormRules } from 'element-plus';
 
 import type { MailChannel, MailChannelPreset } from '#/types/system';
@@ -375,7 +377,7 @@ onMounted(async () => {
           <div class="panel-header-actions">
             <ElButton
               v-if="hasOwnChannel"
-              v-access:code="'upms:sysmail:del'"
+              v-access:code="PERMS.upms.mail.del"
               type="danger"
               plain
               :icon="Delete"
@@ -491,7 +493,7 @@ onMounted(async () => {
 
           <ElFormItem>
             <ElButton
-              v-access:code="'upms:sysmail:edit'"
+              v-access:code="PERMS.upms.mail.edit"
               type="primary"
               @click="submitForm"
               :loading="saving"

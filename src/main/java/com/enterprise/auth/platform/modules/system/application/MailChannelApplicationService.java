@@ -3,6 +3,7 @@ package com.enterprise.auth.platform.modules.system.application;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysMailChannelEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysMailChannelMapper;
@@ -253,7 +254,7 @@ public class MailChannelApplicationService {
     }
 
     private String currentTenantId() {
-        return normalizeTenantId(TenantContext.getTenantId());
+        return TenantContextSupport.currentTenantIdTrimmedOr(platformTenantId());
     }
 
     private String normalizeTenantId(String tenantId) {

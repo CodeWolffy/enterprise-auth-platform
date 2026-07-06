@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.modules.tenant.application;
 
 import com.enterprise.auth.platform.modules.tenant.interfaces.CreateTenantRequest;
-import com.enterprise.auth.platform.modules.resource.application.CatalogService;
+import com.enterprise.auth.platform.modules.catalog.application.CatalogService;
 import com.enterprise.auth.platform.modules.tenant.application.TenantManagementService;
 import org.springframework.stereotype.Service;
 

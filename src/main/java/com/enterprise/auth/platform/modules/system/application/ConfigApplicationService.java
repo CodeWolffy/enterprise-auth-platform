@@ -7,12 +7,14 @@ import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.common.authz.SecuritySupport;
 import com.enterprise.auth.platform.common.cache.CacheNames;
 import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysCategoryRuleEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysConfigEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysCategoryRuleMapper;
 import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysConfigMapper;
 import com.enterprise.auth.platform.common.web.PageResult;
+import com.enterprise.auth.platform.common.web.PaginationSupport;
 import com.enterprise.auth.platform.modules.system.interfaces.ConfigCrudRequest;
 import java.util.List;
 import java.util.Map;
@@ -155,8 +157,7 @@ public class ConfigApplicationService {
     }
 
     public String currentTenantId() {
-        String tenantId = TenantContext.getTenantId();
-        return StringUtils.hasText(tenantId) ? tenantId : "platform";
+        return TenantContextSupport.currentTenantIdOrPlatform();
     }
 
     public String generateCacheKey(Object... params) {
@@ -219,8 +220,8 @@ public class ConfigApplicationService {
             SFunction<E, ?> orderField,
             String direction
     ) {
-        int safePage = Math.max(page, 1);
-        int safeSize = Math.max(size, 1);
+        int safePage = PaginationSupport.normalizePage(page);
+        int safeSize = PaginationSupport.normalizeSize(size);
         long total = counter.apply(countQuery);
         if (total == 0) {
             return PageResult.of(0, safePage, safeSize, List.of());

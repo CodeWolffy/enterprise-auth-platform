@@ -64,12 +64,6 @@ const routes: RouteRecordRaw[] = [
         component: () => import('#/views/upms/login-log/index.vue'),
         meta: { title: '登录日志' },
       },
-      {
-        name: 'system-mail-channel',
-        path: 'mail-channel',
-        component: () => import('#/views/upms/mail-channel/index.vue'),
-        meta: { title: '邮件配置' },
-      },
     ],
   },
 ];

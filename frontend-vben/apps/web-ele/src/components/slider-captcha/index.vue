@@ -309,6 +309,9 @@ function normalizeTrack(points: Array<{ t: number; x: number; y: number }>) {
     return deduped;
   }
 
+  // 1) 填充过大的间隔：保证相邻点位移不超过阈值（满足后端"相邻跳变过大即判机器"的检测）。
+  //    插值点的 t 按相邻真实采样线性推算，从而【保留真实的速度/加速度曲线】——
+  //    这正是行为验证码判定人机的依据，切勿在此把整条轨迹拉成匀速直线。
   const interpolated: Array<{ t: number; x: number; y: number }> = [
     firstDeduped,
   ];
@@ -335,25 +338,39 @@ function normalizeTrack(points: Array<{ t: number; x: number; y: number }>) {
     }
   }
 
-  const targetLength = Math.min(
-    Math.max(interpolated.length, MIN_TRACK_POINTS),
-    MAX_TRACK_POINTS,
-  );
-
-  const first = interpolated[0];
-  const last = interpolated.at(-1);
-  if (!first || !last) {
-    return interpolated;
+  // 2) 点数不足时沿真实轨迹二次细分补足最少点数（仅在原有点之间插入中点，
+  //    不改变轨迹形状与时序，避免后端因轨迹点太少而拒绝）。
+  let result = interpolated;
+  while (result.length < MIN_TRACK_POINTS && result.length >= 2) {
+    const densified: Array<{ t: number; x: number; y: number }> = [result[0]!];
+    for (let index = 1; index < result.length; index += 1) {
+      const from = result[index - 1]!;
+      const to = result[index]!;
+      densified.push(
+        {
+          x: (from.x + to.x) / 2,
+          y: (from.y + to.y) / 2,
+          t: (from.t + to.t) / 2,
+        },
+        to,
+      );
+    }
+    result = densified;
   }
 
-  return Array.from({ length: targetLength }, (_, index) => {
-    const progress = index / (targetLength - 1);
-    return {
-      x: first.x + (last.x - first.x) * progress,
-      y: first.y + (last.y - first.y) * progress,
-      t: first.t + (last.t - first.t) * progress,
-    };
-  });
+  // 3) 上限保护：点数过多时等距抽稀（保留首尾、保持时序单调），控制请求体大小。
+  if (result.length > MAX_TRACK_POINTS) {
+    const sampled: Array<{ t: number; x: number; y: number }> = [];
+    for (let index = 0; index < MAX_TRACK_POINTS; index += 1) {
+      const sourceIndex = Math.round(
+        (index * (result.length - 1)) / (MAX_TRACK_POINTS - 1),
+      );
+      sampled.push(result[sourceIndex]!);
+    }
+    result = sampled;
+  }
+
+  return result;
 }
 
 onUnmounted(() => {

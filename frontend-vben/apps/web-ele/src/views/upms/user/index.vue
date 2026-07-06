@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { PERMS } from '#/constants/permissions';
+
 import { computed, defineAsyncComponent, reactive, ref } from 'vue';
 
 import {
@@ -248,7 +250,7 @@ initPage();
 
       <div class="hx-table-toolbar" style="margin-bottom: 12px">
         <ElButton
-          v-access:code="'upms:sysuser:add'"
+          v-access:code="PERMS.upms.user.add"
           :icon="Plus"
           type="primary"
           @click="add"
@@ -294,7 +296,7 @@ initPage();
         <ElTableColumn align="center" fixed="right" label="操作" width="320">
           <template #default="scope">
             <ElButton
-              v-access:code="'upms:sysuser:edit'"
+              v-access:code="PERMS.upms.user.edit"
               :icon="View"
               link
               type="primary"
@@ -303,7 +305,7 @@ initPage();
               详情
             </ElButton>
             <ElButton
-              v-access:code="'upms:sysuser:edit'"
+              v-access:code="PERMS.upms.user.edit"
               :icon="Edit"
               link
               type="primary"
@@ -318,7 +320,7 @@ initPage();
               改密
             </ElButton>
             <ElButton
-              v-access:code="'upms:sysuser:del'"
+              v-access:code="PERMS.upms.user.del"
               :icon="Delete"
               link
               type="danger"

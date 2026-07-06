@@ -6,6 +6,7 @@ import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
 import com.enterprise.auth.platform.common.context.AuthContextHolder;
 import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.auth.application.PermissionSnapshotApplicationService;
 import com.enterprise.auth.platform.modules.auth.application.SessionIndexService;
@@ -98,11 +99,7 @@ public class TenantSwitchApplicationService {
     }
 
     public List<SwitchableTenantView> switchableTenants(UserAccount currentUser) {
-        String resolvedActiveTenantId = TenantContext.getTenantId();
-        if (!StringUtils.hasText(resolvedActiveTenantId)) {
-            resolvedActiveTenantId = currentUser.tenantId();
-        }
-        final String activeTenantId = resolvedActiveTenantId;
+        final String activeTenantId = TenantContextSupport.currentTenantIdOr(currentUser.tenantId());
         String originTenantId = currentUser.tenantId();
         Instant now = TimeSupport.now();
 

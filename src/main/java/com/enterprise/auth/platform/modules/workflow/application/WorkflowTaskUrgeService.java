@@ -3,10 +3,11 @@ package com.enterprise.auth.platform.modules.workflow.application;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
-import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.context.TimeZoneContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.PageResult;
+import com.enterprise.auth.platform.common.web.PaginationSupport;
 import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.notification.application.NotificationPublishCommand;
@@ -143,8 +144,8 @@ public class WorkflowTaskUrgeService {
         UserAccount user = currentUserService.requireCurrentUser();
         String tenantId = currentTenantId(user);
         ensureInstanceUrgesVisible(tenantId, instanceId, user);
-        int safePage = Math.max(page, 1);
-        int safeSize = Math.min(Math.max(size, 1), 100);
+        int safePage = PaginationSupport.normalizePage(page);
+        int safeSize = PaginationSupport.normalizeSize(size, 100);
         long total = urgeMapper.selectCount(new LambdaQueryWrapper<WfTaskUrgeEntity>()
                 .eq(WfTaskUrgeEntity::getTenantId, tenantId)
                 .eq(WfTaskUrgeEntity::getInstanceId, instanceId)
@@ -379,7 +380,6 @@ public class WorkflowTaskUrgeService {
     }
 
     private String currentTenantId(UserAccount user) {
-        String tenantId = TenantContext.getTenantId();
-        return StringUtils.hasText(tenantId) ? tenantId : user.tenantId();
+        return TenantContextSupport.currentTenantIdOr(user.tenantId());
     }
 }

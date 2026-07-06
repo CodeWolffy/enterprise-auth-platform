@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { PERMS } from '#/constants/permissions';
+
 import { defineAsyncComponent, reactive, ref } from 'vue';
 
 import { Delete } from '@element-plus/icons-vue';
@@ -131,7 +133,7 @@ initPage();
               v-if="!scope.row.currentSession"
               link
               type="danger"
-              v-access:code="'upms:onlineuser:forced'"
+              v-access:code="PERMS.upms.onlineUser.forced"
               @click="forced(scope.row.sessionId)"
               :icon="Delete"
             >

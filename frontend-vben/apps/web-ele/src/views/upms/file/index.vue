@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import { PERMS } from '#/constants/permissions';
+
 import { defineAsyncComponent, reactive, ref } from 'vue';
 
 import {
@@ -194,7 +196,7 @@ initPage();
             type="primary"
             @click="uploadRef?.click()"
             :icon="Upload"
-            v-access:code="'upms:file:add'"
+            v-access:code="PERMS.upms.file.add"
           >
             上传文件
           </ElButton>
@@ -261,7 +263,7 @@ initPage();
               link
               type="danger"
               @click="del(scope.row.fileKey)"
-              v-access:code="'upms:file:del'"
+              v-access:code="PERMS.upms.file.del"
             >
               删除
             </ElButton>

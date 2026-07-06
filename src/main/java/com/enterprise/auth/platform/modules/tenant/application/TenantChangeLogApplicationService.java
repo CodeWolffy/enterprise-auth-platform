@@ -5,6 +5,7 @@ import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantChangeLogEntity;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantChangeLogMapper;
 import com.enterprise.auth.platform.common.web.PageResult;
+import com.enterprise.auth.platform.common.web.PaginationSupport;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
@@ -37,8 +38,8 @@ public class TenantChangeLogApplicationService {
             int size
     ) {
         tenantAccessPolicy.ensureTenantReadable(tenantId);
-        int safePage = Math.max(page, 1);
-        int safeSize = Math.max(size, 1);
+        int safePage = PaginationSupport.normalizePage(page);
+        int safeSize = PaginationSupport.normalizeSize(size);
         LambdaQueryWrapper<SysTenantChangeLogEntity> query = buildHistoryQuery(
                 tenantId, changeType, fieldKey, operator, from, to
         ).orderByDesc(SysTenantChangeLogEntity::getOccurredAt)

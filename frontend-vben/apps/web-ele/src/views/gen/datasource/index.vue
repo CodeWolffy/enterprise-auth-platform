@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { PERMS } from '#/constants/permissions';
+
 import type { DataSourceView } from '#/api/codegen';
 
 import { computed, onMounted, ref } from 'vue';
@@ -148,7 +150,7 @@ onMounted(() => {
           <ElButton
             type="primary"
             :icon="Plus"
-            v-access:code="'gen:datasource:add'"
+            v-access:code="PERMS.gen.datasource.add"
             @click="openCreate"
           >
             新增
@@ -190,7 +192,7 @@ onMounted(() => {
               link
               type="primary"
               :icon="Edit"
-              v-access:code="'gen:datasource:edit'"
+              v-access:code="PERMS.gen.datasource.edit"
               @click="openEdit(asDataSourceRow(scope.row))"
             >
               修改
@@ -199,7 +201,7 @@ onMounted(() => {
               link
               type="primary"
               @click="onTest(asDataSourceRow(scope.row))"
-              v-access:code="'gen:datasource:get'"
+              v-access:code="PERMS.gen.datasource.get"
             >
               测试
             </ElButton>
@@ -208,7 +210,7 @@ onMounted(() => {
               link
               type="warning"
               @click="onAuthorize(asDataSourceRow(scope.row))"
-              v-access:code="'gen:datasource:edit'"
+              v-access:code="PERMS.gen.datasource.edit"
             >
               授权
             </ElButton>
@@ -217,7 +219,7 @@ onMounted(() => {
               type="danger"
               :icon="Delete"
               @click="onDelete(asDataSourceRow(scope.row))"
-              v-access:code="'gen:datasource:del'"
+              v-access:code="PERMS.gen.datasource.del"
             >
               删除
             </ElButton>

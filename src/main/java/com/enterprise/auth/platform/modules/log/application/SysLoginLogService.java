@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.web.PageResult;
+import com.enterprise.auth.platform.common.web.PaginationSupport;
 import com.enterprise.auth.platform.modules.log.infrastructure.entity.SysLoginLogEntity;
 import com.enterprise.auth.platform.modules.log.infrastructure.mapper.SysLoginLogMapper;
 import org.springframework.stereotype.Service;
@@ -23,8 +24,8 @@ public class SysLoginLogService {
     public PageResult<SysLoginLogEntity> page(String tenantId, String userName, String status,
                                               String clientIp, Instant from, Instant to,
                                               int page, int size) {
-        int safePage = Math.max(page, 1);
-        int safeSize = Math.min(Math.max(size, 1), 200);
+        int safePage = PaginationSupport.normalizePage(page);
+        int safeSize = PaginationSupport.normalizeSize(size, 200);
         String effectiveTenantId = effectiveTenantId(tenantId);
         LambdaQueryWrapper<SysLoginLogEntity> wrapper = new LambdaQueryWrapper<>();
         wrapper.like(StringUtils.hasText(effectiveTenantId), SysLoginLogEntity::getTenantId, effectiveTenantId)

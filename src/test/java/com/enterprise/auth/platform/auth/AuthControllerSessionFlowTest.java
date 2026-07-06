@@ -1,5 +1,6 @@
 package com.enterprise.auth.platform.auth;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
@@ -102,14 +103,15 @@ class AuthControllerSessionFlowTest {
                 "admin"
         );
 
-        when(captchaService.create()).thenReturn(new CaptchaService.CaptchaChallenge(
+        when(captchaService.createForLogin(any(), any())).thenReturn(new CaptchaService.CaptchaChallenge(
                 CAPTCHA_ID,
                 "background-base64",
                 "slider-base64",
                 320,
                 180,
                 64,
-                180
+                180,
+                "SLIDER"
         ));
         doAnswer(invocation -> null).when(captchaService).secondaryVerify(anyString());
         when(captchaService.secondaryVerifyWithoutRemoval(anyString())).thenReturn(true);

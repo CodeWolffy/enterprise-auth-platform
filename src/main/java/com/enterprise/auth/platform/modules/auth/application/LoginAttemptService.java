@@ -80,6 +80,25 @@ public class LoginAttemptService {
         return new LoginFailureResult(false, remaining);
     }
 
+    /**
+     * 读取指定账号当前窗口内的登录失败次数(不含锁定态)。用于验证码风险升级判定。
+     * 未启用限流或无记录时返回 0。
+     */
+    public long currentFailures(String tenantId, String username) {
+        if (!rateLimitProperties.enabled() || tenantId == null || username == null || username.isBlank()) {
+            return 0;
+        }
+        String value = stringRedisTemplate.opsForValue().get(failKey(tenantId, username));
+        if (value == null) {
+            return 0;
+        }
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
     public void clearFailures(String tenantId, String username) {
         if (!rateLimitProperties.enabled()) {
             return;

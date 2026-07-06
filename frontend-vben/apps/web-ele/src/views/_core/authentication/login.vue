@@ -4,6 +4,7 @@ import type { VbenFormSchema } from '@vben/common-ui';
 import type {
   CaptchaStatus,
   CaptchaTrackPayload,
+  CaptchaType,
 } from '#/components/slider-captcha/types';
 
 import { computed, reactive, ref } from 'vue';
@@ -14,6 +15,7 @@ import { $t } from '@vben/locales';
 import { ElDialog, ElMessage } from 'element-plus';
 
 import { getCaptchaApi, verifyCaptchaApi } from '#/api/core/auth';
+import PointCaptcha from '#/components/slider-captcha/point-captcha.vue';
 import SliderCaptcha from '#/components/slider-captcha/index.vue';
 import { useAuthStore } from '#/store';
 
@@ -33,6 +35,8 @@ const loginUser = reactive({
 const captchaDialogVisible = ref(false);
 const captchaLoading = ref(false);
 const captchaStatus = ref<CaptchaStatus>('ready');
+const captchaType = ref<CaptchaType>('SLIDER');
+const isPointCaptcha = computed(() => captchaType.value === 'WORD_IMAGE_CLICK');
 const captcha = reactive({
   background: '',
   slider: '',
@@ -79,8 +83,10 @@ function delay(ms: number) {
 async function reloadCaptcha() {
   captchaLoading.value = true;
   try {
-    const c = await getCaptchaApi();
+    // 传入用户名：后端据其近期失败情况决定下发滑块或文字点选(风险升级)
+    const c = await getCaptchaApi(loginUser.username || undefined);
     loginUser.captchaId = c?.captchaId ?? '';
+    captchaType.value = c?.type === 'WORD_IMAGE_CLICK' ? 'WORD_IMAGE_CLICK' : 'SLIDER';
     captcha.background = toDataUrl(c?.backgroundImage, 'image/jpeg');
     captcha.slider = toDataUrl(c?.sliderImage, 'image/png');
     captcha.bgWidth = c?.backgroundImageWidth ?? 0;
@@ -148,7 +154,9 @@ async function doLogin() {
       await reloadCaptcha();
       captchaDialogVisible.value = true;
     } else {
-      // 密码错误等其他错误，保留验证码，让用户直接修改密码重试
+      // 密码等其他错误：清空验证码令牌，强制下次提交重新取码，
+      // 使后端能按最新失败次数重新决定验证码类型(风险升级)。
+      loginUser.captchaCode = '';
       ElMessage.error(errorMsg || '用户名或密码错误');
     }
   }
@@ -175,19 +183,37 @@ async function doLogin() {
       width="min(420px, calc(100vw - 32px))"
     >
       <div class="captcha-dialog__body">
-        <p class="captcha-dialog__tip">拖动拼图完成本次登录确认</p>
-        <SliderCaptcha
-          v-if="!captchaLoading && captcha.background && captcha.slider"
-          :background-height="captcha.bgHeight"
-          :background-image="captcha.background"
-          :background-width="captcha.bgWidth"
-          :slider-height="captcha.sliderHeight"
-          :slider-image="captcha.slider"
-          :slider-width="captcha.sliderWidth"
-          :status="captchaStatus"
-          @refresh="reloadCaptcha"
-          @verify="handleVerify"
-        />
+        <p class="captcha-dialog__tip">
+          {{
+            isPointCaptcha
+              ? '请按提示依次点击文字完成本次登录确认'
+              : '拖动拼图完成本次登录确认'
+          }}
+        </p>
+        <template v-if="!captchaLoading && captcha.background">
+          <PointCaptcha
+            v-if="isPointCaptcha"
+            :background-height="captcha.bgHeight"
+            :background-image="captcha.background"
+            :background-width="captcha.bgWidth"
+            :status="captchaStatus"
+            :tip-image="captcha.slider"
+            @refresh="reloadCaptcha"
+            @verify="handleVerify"
+          />
+          <SliderCaptcha
+            v-else-if="captcha.slider"
+            :background-height="captcha.bgHeight"
+            :background-image="captcha.background"
+            :background-width="captcha.bgWidth"
+            :slider-height="captcha.sliderHeight"
+            :slider-image="captcha.slider"
+            :slider-width="captcha.sliderWidth"
+            :status="captchaStatus"
+            @refresh="reloadCaptcha"
+            @verify="handleVerify"
+          />
+        </template>
         <div v-else class="captcha-dialog__loading">验证码加载中…</div>
       </div>
     </ElDialog>

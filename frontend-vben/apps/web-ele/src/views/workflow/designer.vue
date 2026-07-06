@@ -22,7 +22,7 @@ import {
 import {
   createWorkflowDefinition,
   deployWorkflowDefinition,
-} from '#/api/modules';
+} from '#/api/workflow';
 
 type DesignerRejectStrategy =
   | 'END'

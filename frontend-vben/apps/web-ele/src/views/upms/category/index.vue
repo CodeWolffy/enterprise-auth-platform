@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import { PERMS } from '#/constants/permissions';
+
 import type { CategoryAnalysis, CategoryOption } from '#/types/system';
 
 import { computed, defineAsyncComponent, nextTick, ref } from 'vue';
@@ -211,7 +213,7 @@ initPage();
       <div class="hx-table-toolbar">
         <div>
           <ElButton
-            v-access:code="'upms:syscategory:add'"
+            v-access:code="PERMS.upms.category.add"
             type="primary"
             @click="add"
             :icon="Plus"
@@ -309,7 +311,7 @@ initPage();
         >
           <template #default="{ row }">
             <ElButton
-              v-access:code="'upms:syscategory:get'"
+              v-access:code="PERMS.upms.category.get"
               link
               type="primary"
               @click="openAnalysis(asCategoryOption(row))"
@@ -317,7 +319,7 @@ initPage();
               分析
             </ElButton>
             <ElButton
-              v-access:code="'upms:syscategory:edit'"
+              v-access:code="PERMS.upms.category.edit"
               link
               type="primary"
               @click="edit(asCategoryOption(row))"
@@ -326,7 +328,7 @@ initPage();
               修改
             </ElButton>
             <ElButton
-              v-access:code="'upms:syscategory:del'"
+              v-access:code="PERMS.upms.category.del"
               link
               type="danger"
               @click="del(row.code)"

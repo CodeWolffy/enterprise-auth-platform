@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import { PERMS } from '#/constants/permissions';
+
 import type { VxeTableGridOptions } from '#/adapter/vxe-table';
 
 import { Page, useVbenDrawer } from '@vben/common-ui';
@@ -94,7 +96,7 @@ function onDelete(row: any) {
         <ElButton
           type="primary"
           @click="onCreate"
-          v-access:code="'upms:sysmenu:add'"
+          v-access:code="PERMS.upms.menu.add"
         >
           <Plus class="size-5" />
           {{ $t('ui.actionTitle.create', ['菜单']) }}
@@ -124,7 +126,7 @@ function onDelete(row: any) {
         <ElButton
           @click="onEdit(row)"
           link
-          v-access:code="'upms:sysmenu:edit'"
+          v-access:code="PERMS.upms.menu.edit"
           type="primary"
         >
           修改菜单
@@ -132,7 +134,7 @@ function onDelete(row: any) {
         <ElButton
           link
           @click="onDelete(row)"
-          v-access:code="'upms:sysmenu:del'"
+          v-access:code="PERMS.upms.menu.del"
           type="primary"
         >
           删除菜单
@@ -140,7 +142,7 @@ function onDelete(row: any) {
         <ElButton
           link
           @click="onAppend(row)"
-          v-access:code="'upms:sysmenu:add'"
+          v-access:code="PERMS.upms.menu.add"
           type="primary"
         >
           新增下级

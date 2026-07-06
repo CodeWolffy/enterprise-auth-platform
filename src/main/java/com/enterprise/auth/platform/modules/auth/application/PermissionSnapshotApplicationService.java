@@ -4,7 +4,7 @@ import cn.dev33.satoken.exception.SaTokenContextException;
 import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
 import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
-import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.auth.interfaces.MenuNode;
 import com.enterprise.auth.platform.modules.auth.interfaces.PermissionSnapshotResponse;
@@ -33,10 +33,7 @@ public class PermissionSnapshotApplicationService {
     }
 
     public PermissionSnapshotResponse build(UserAccount user) {
-        String activeTenantId = TenantContext.getTenantId();
-        if (!StringUtils.hasText(activeTenantId)) {
-            activeTenantId = user.tenantId();
-        }
+        String activeTenantId = TenantContextSupport.currentTenantIdOr(user.tenantId());
         boolean superAdmin = platformAdminSupport.isPlatformSuperAdmin(user);
         Set<String> grants = roleGrantQueryFacade.resolveGrantKeys(activeTenantId, user.roles(), superAdmin);
         List<MenuNode> menus = roleGrantQueryFacade.resolveMenuTree(activeTenantId, user.roles(), superAdmin);

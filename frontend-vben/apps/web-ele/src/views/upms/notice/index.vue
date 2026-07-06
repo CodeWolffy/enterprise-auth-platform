@@ -1,4 +1,6 @@
-<script lang="ts" setup>
+<script setup lang="ts">
+import { PERMS } from '#/constants/permissions';
+
 import { defineAsyncComponent, reactive, ref } from 'vue';
 
 import {
@@ -165,7 +167,7 @@ const resetQuery = () => {
             type="primary"
             @click="add"
             :icon="Plus"
-            v-access:code="'upms:sysnotice:add'"
+            v-access:code="PERMS.upms.notice.add"
           >
             新增
           </ElButton>
@@ -228,7 +230,7 @@ const resetQuery = () => {
               type="primary"
               @click="edit(scope.row)"
               :icon="Edit"
-              v-access:code="'upms:sysnotice:edit'"
+              v-access:code="PERMS.upms.notice.edit"
             >
               修改
             </ElButton>
@@ -237,7 +239,7 @@ const resetQuery = () => {
               type="danger"
               @click="del(scope.row.id)"
               :icon="Delete"
-              v-access:code="'upms:sysnotice:del'"
+              v-access:code="PERMS.upms.notice.del"
             >
               删除
             </ElButton>

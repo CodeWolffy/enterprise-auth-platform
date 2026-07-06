@@ -7,35 +7,89 @@ import cloud.tianai.captcha.spring.autoconfiguration.SpringImageCaptchaPropertie
 import cloud.tianai.captcha.spring.plugins.secondary.SecondaryVerificationApplication;
 import cloud.tianai.captcha.validator.common.model.dto.ImageCaptchaTrack;
 import com.enterprise.auth.platform.modules.auth.interfaces.CaptchaVerifyRequest;
-import com.enterprise.auth.platform.modules.auth.interfaces.SliderCaptchaResponse;
+import com.enterprise.auth.platform.modules.user.application.UserAuthenticationFacade;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 @Service
 public class CaptchaService {
 
+    /** 同一账号在失败窗口内累计失败达到该阈值后，验证码由滑块升级为文字点选(打码成本更高)。 */
+    private static final long ESCALATE_AFTER_FAILURES = 2;
+
     private final ImageCaptchaApplication imageCaptchaApplication;
     private final ObjectMapper objectMapper;
     private final SpringImageCaptchaProperties captchaProperties;
+    private final LoginAttemptService loginAttemptService;
+    private final UserAuthenticationFacade userAuthenticationFacade;
 
-    public CaptchaService(ImageCaptchaApplication imageCaptchaApplication, ObjectMapper objectMapper, SpringImageCaptchaProperties captchaProperties) {
+    public CaptchaService(ImageCaptchaApplication imageCaptchaApplication,
+                          ObjectMapper objectMapper,
+                          SpringImageCaptchaProperties captchaProperties,
+                          LoginAttemptService loginAttemptService,
+                          UserAuthenticationFacade userAuthenticationFacade) {
         this.imageCaptchaApplication = imageCaptchaApplication;
         this.objectMapper = objectMapper;
         this.captchaProperties = captchaProperties;
+        this.loginAttemptService = loginAttemptService;
+        this.userAuthenticationFacade = userAuthenticationFacade;
     }
 
+    /** 默认滑块验证码(注册/重置等无风险升级场景使用)。 */
     public CaptchaChallenge create() {
-        SliderCaptchaResponse sliderCaptcha = createSliderCaptcha();
+        return create(CaptchaTypeConstant.SLIDER);
+    }
+
+    /**
+     * 登录场景生成验证码：按账号近期失败情况决定类型——
+     * 失败达到阈值升级为文字点选，否则使用滑块。
+     */
+    public CaptchaChallenge createForLogin(String tenantId, String username) {
+        return create(resolveLoginType(tenantId, username));
+    }
+
+    public CaptchaChallenge create(String type) {
+        ImageCaptchaVO vo = generate(type);
         return new CaptchaChallenge(
-            sliderCaptcha.captchaId(),
-            sliderCaptcha.backgroundImage(),
-            sliderCaptcha.sliderImage(),
-            sliderCaptcha.backgroundImageWidth(),
-            sliderCaptcha.backgroundImageHeight(),
-            sliderCaptcha.sliderImageWidth(),
-            sliderCaptcha.sliderImageHeight()
+            vo.getId(),
+            vo.getBackgroundImage(),
+            vo.getTemplateImage(),
+            vo.getBackgroundImageWidth(),
+            vo.getBackgroundImageHeight(),
+            vo.getTemplateImageWidth(),
+            vo.getTemplateImageHeight(),
+            vo.getType()
         );
+    }
+
+    private String resolveLoginType(String headerTenantId, String username) {
+        long failures = loginAttemptService.currentFailures(resolveFailureTenantId(headerTenantId, username), username);
+        return failures >= ESCALATE_AFTER_FAILURES
+            ? CaptchaTypeConstant.WORD_IMAGE_CLICK
+            : CaptchaTypeConstant.SLIDER;
+    }
+
+    /**
+     * 解析失败计数所在的租户，须与 {@code LoginApplicationService} 记录侧一致：
+     * 优先按用户名解析出的唯一真实租户，否则回退请求头租户。
+     * 与登录侧不同，这里对冲突/无匹配一律回退而非抛异常(取码阶段不应因此失败)。
+     */
+    private String resolveFailureTenantId(String headerTenantId, String username) {
+        if (username == null || username.isBlank()) {
+            return headerTenantId;
+        }
+        try {
+            List<String> matched = userAuthenticationFacade.activeTenantIdsByUsername(username);
+            if (matched.size() == 1) {
+                return matched.get(0);
+            }
+        } catch (Exception ignored) {
+            // 取码阶段容错：解析失败时回退请求头租户
+        }
+        return headerTenantId;
     }
 
     public CaptchaVerificationToken verify(String captchaId, String captchaData) {
@@ -86,9 +140,9 @@ public class CaptchaService {
         return false;
     }
 
-    private SliderCaptchaResponse createSliderCaptcha() {
+    private ImageCaptchaVO generate(String type) {
         cloud.tianai.captcha.common.response.ApiResponse<ImageCaptchaVO> response =
-            imageCaptchaApplication.generateCaptcha(CaptchaTypeConstant.SLIDER);
+            imageCaptchaApplication.generateCaptcha(type);
         if (response == null || !response.isSuccess()) {
             throw new IllegalStateException("验证码生成失败");
         }
@@ -96,16 +150,7 @@ public class CaptchaService {
         if (vo == null) {
             throw new IllegalStateException("验证码数据为空");
         }
-        return new SliderCaptchaResponse(
-            vo.getId(),
-            vo.getBackgroundImage(),
-            vo.getTemplateImage(),
-            vo.getBackgroundImageWidth(),
-            vo.getBackgroundImageHeight(),
-            vo.getTemplateImageWidth(),
-            vo.getTemplateImageHeight(),
-            vo.getType()
-        );
+        return vo;
     }
 
     private void validateTrack(CaptchaVerifyRequest request) {
@@ -133,7 +178,8 @@ public class CaptchaService {
         Integer backgroundImageWidth,
         Integer backgroundImageHeight,
         Integer sliderImageWidth,
-        Integer sliderImageHeight
+        Integer sliderImageHeight,
+        String type
     ) {
     }
 

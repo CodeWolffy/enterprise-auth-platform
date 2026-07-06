@@ -38,7 +38,7 @@ import {
   rejectWorkflowTask,
   transferWorkflowTask,
   urgeWorkflowTask,
-} from '#/api/modules';
+} from '#/api/workflow';
 import { formatDateTime as formatInstantDateTime } from '#/utils/datetime';
 
 const route = useRoute();

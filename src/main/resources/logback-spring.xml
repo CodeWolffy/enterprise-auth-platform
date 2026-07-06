@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  结构化日志配置：
+  - 非 prod（local/dev/staging 及未指定 profile）：沿用 Spring Boot 默认控制台输出。
+    application.yml 中的 logging.pattern.console 与 logging.level.* 继续生效
+    （defaults.xml 会把 logging.pattern.console 映射到 CONSOLE_LOG_PATTERN）。
+  - prod：控制台输出 JSON（logstash-logback-encoder），字段包含
+    timestamp / level / logger / thread / message / stackTrace，并透传 MDC。
+  - Loki 推送（loki-logback-appender）预留在 Maven 的 future-components profile 中，此处不涉及。
+-->
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <springProfile name="!prod">
+        <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <springProfile name="prod">
+        <springProperty scope="context" name="APP_NAME" source="spring.application.name"
+                        defaultValue="enterprise-auth-platform"/>
+        <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <timeZone>UTC</timeZone>
+                <customFields>{"app":"${APP_NAME}"}</customFields>
+                <includeMdc>true</includeMdc>
+                <includeContext>false</includeContext>
+                <fieldNames>
+                    <timestamp>timestamp</timestamp>
+                    <version>[ignore]</version>
+                    <logger>logger</logger>
+                    <thread>thread</thread>
+                    <levelValue>[ignore]</levelValue>
+                    <stackTrace>stackTrace</stackTrace>
+                </fieldNames>
+            </encoder>
+        </appender>
+        <root level="INFO">
+            <appender-ref ref="JSON_CONSOLE"/>
+        </root>
+    </springProfile>
+</configuration>

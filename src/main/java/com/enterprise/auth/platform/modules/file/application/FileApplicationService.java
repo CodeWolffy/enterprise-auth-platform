@@ -3,7 +3,7 @@ package com.enterprise.auth.platform.modules.file.application;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
-import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
@@ -410,11 +410,8 @@ public class FileApplicationService {
     }
 
     private String currentTenantId(UserAccount user) {
-        String activeTenantId = TenantContext.getTenantId();
-        if (StringUtils.hasText(activeTenantId)) {
-            return activeTenantId;
-        }
-        return StringUtils.hasText(user.tenantId()) ? user.tenantId() : "platform";
+        String fallback = StringUtils.hasText(user.tenantId()) ? user.tenantId() : TenantContextSupport.PLATFORM_TENANT_ID;
+        return TenantContextSupport.currentTenantIdOr(fallback);
     }
 
     private boolean hasFileRead(UserAccount user) {

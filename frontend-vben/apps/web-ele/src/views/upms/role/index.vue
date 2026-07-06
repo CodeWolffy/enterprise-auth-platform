@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { PERMS } from '#/constants/permissions';
+
 import { defineAsyncComponent, reactive, ref } from 'vue';
 
 import { Delete, Edit, Plus, Refresh, Search } from '@element-plus/icons-vue';
@@ -149,7 +151,7 @@ initPage();
 
       <div class="hx-table-toolbar" style="margin-bottom: 12px">
         <ElButton
-          v-access:code="'upms:sysrole:add'"
+          v-access:code="PERMS.upms.role.add"
           :icon="Plus"
           type="primary"
           @click="add"
@@ -183,7 +185,7 @@ initPage();
           <template #default="scope">
             <ElButton
               v-if="scope.row.code !== 'ADMIN'"
-              v-access:code="'upms:sysrole:edit'"
+              v-access:code="PERMS.upms.role.edit"
               :icon="Edit"
               link
               type="primary"
@@ -193,7 +195,7 @@ initPage();
             </ElButton>
             <ElButton
               v-if="scope.row.code !== 'ADMIN'"
-              v-access:code="'upms:sysrole:del'"
+              v-access:code="PERMS.upms.role.del"
               :icon="Delete"
               link
               type="danger"
@@ -202,7 +204,7 @@ initPage();
               删除
             </ElButton>
             <ElButton
-              v-access:code="'upms:sysrole:edit'"
+              v-access:code="PERMS.upms.role.edit"
               :icon="Plus"
               link
               type="primary"

@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import { PERMS } from '#/constants/permissions';
+
 import { defineAsyncComponent, reactive, ref } from 'vue';
 
 import { Delete, Edit, Plus } from '@element-plus/icons-vue';
@@ -95,7 +97,7 @@ initPage();
       <div>
         <ElButton
           type="primary"
-          v-access:code="'upms:sysdict:add'"
+          v-access:code="PERMS.upms.dict.add"
           @click="add"
           :icon="Plus"
         >
@@ -148,7 +150,7 @@ initPage();
           <ElButton
             link
             type="primary"
-            v-access:code="'upms:sysdict:edit'"
+            v-access:code="PERMS.upms.dict.edit"
             @click="edit(scope.row)"
             :icon="Edit"
           >
@@ -157,7 +159,7 @@ initPage();
           <ElButton
             link
             type="danger"
-            v-access:code="'upms:sysdict:del'"
+            v-access:code="PERMS.upms.dict.del"
             @click="del(scope.row.id)"
             :icon="Delete"
           >

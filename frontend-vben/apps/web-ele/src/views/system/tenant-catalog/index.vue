@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import { PERMS } from '#/constants/permissions';
+
 import type { VxeTableGridOptions } from '#/adapter/vxe-table';
 import type { TenantPackageView } from '#/types/tenant';
 
@@ -104,7 +106,7 @@ function appKeys(value?: null | string) {
     <Grid>
       <template #toolbar-tools>
         <ElButton
-          v-access:code="'upms:tenantpackage:add'"
+          v-access:code="PERMS.upms.tenantPackage.add"
           type="primary"
           @click="onCreate"
         >
@@ -140,7 +142,7 @@ function appKeys(value?: null | string) {
       <template #operation="{ row }">
         <ElButton link type="primary" @click="onDetail(row)"> 详情 </ElButton>
         <ElButton
-          v-access:code="'upms:tenantpackage:edit'"
+          v-access:code="PERMS.upms.tenantPackage.edit"
           link
           type="primary"
           @click="onEdit(row)"
@@ -148,7 +150,7 @@ function appKeys(value?: null | string) {
           编辑
         </ElButton>
         <ElButton
-          v-access:code="'upms:tenantpackage:del'"
+          v-access:code="PERMS.upms.tenantPackage.del"
           link
           type="danger"
           @click="onDelete(row)"

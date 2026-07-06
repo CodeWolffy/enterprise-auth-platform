@@ -93,12 +93,19 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
   health:
     db:
       enabled: true
     mail:
       enabled: false
+    redis:
+      enabled: true
+    fileStorage:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
 mybatis-plus:
   configuration:
@@ -135,7 +142,9 @@ captcha:
   local-cache-size: 20
   secondary:
     enabled: true
-    expire: 300000
+    # 二次校验令牌有效期(毫秒),即登录验证码的可复用窗口:
+    # 15s 内密码可重试免重滑,超时后端自动判定失效,前端捕获 CAPTCHA_INVALID 并重新弹出滑块
+    expire: 15000
     keyPrefix: "eap:captcha:secondary"
 
 app:

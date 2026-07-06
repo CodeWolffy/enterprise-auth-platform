@@ -39,7 +39,7 @@ import {
   startWorkflowInstance,
   terminateWorkflowInstance,
   withdrawWorkflowInstance,
-} from '#/api/modules';
+} from '#/api/workflow';
 import { formatDateTime as formatInstantDateTime } from '#/utils/datetime';
 
 const router = useRouter();

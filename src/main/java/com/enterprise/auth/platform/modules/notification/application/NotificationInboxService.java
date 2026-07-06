@@ -4,9 +4,10 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.authz.SecuritySupport;
-import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.PageResult;
+import com.enterprise.auth.platform.common.web.PaginationSupport;
 import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.notification.infrastructure.mapper.SysNoticeReadStatusMapper;
@@ -18,7 +19,6 @@ import java.util.Comparator;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 @Service
 public class NotificationInboxService {
@@ -40,8 +40,8 @@ public class NotificationInboxService {
     public PageResult<NotificationView> myNotifications(int page, int size, Boolean read) {
         UserAccount user = currentUserService.requireCurrentUser();
         String tenantId = currentTenantId(user);
-        int safePage = Math.max(page, 1);
-        int safeSize = Math.min(Math.max(size, 1), 100);
+        int safePage = PaginationSupport.normalizePage(page);
+        int safeSize = PaginationSupport.normalizeSize(size, 100);
         Instant now = TimeSupport.now();
         LambdaQueryWrapper<SysUserNotificationEntity> countWrapper = visibleMineWrapper(tenantId, user.id(), read);
         long directTotal = notificationMapper.selectCount(countWrapper);
@@ -180,8 +180,7 @@ public class NotificationInboxService {
     }
 
     private String currentTenantId(UserAccount user) {
-        String tenantId = TenantContext.getTenantId();
-        return StringUtils.hasText(tenantId) ? tenantId : user.tenantId();
+        return TenantContextSupport.currentTenantIdOr(user.tenantId());
     }
 
     private Comparator<NotificationView> notificationOrder() {

@@ -14,6 +14,7 @@ import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserRo
 import com.enterprise.auth.platform.modules.role.application.RoleGrantQueryFacade;
 import com.enterprise.auth.platform.common.authz.DataScopeService;
 import com.enterprise.auth.platform.common.context.TenantContext;
+import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.modules.user.interfaces.UserSummary;
 import java.util.List;
 import java.util.Map;
@@ -200,8 +201,7 @@ public class UserDirectoryService {
     }
 
     private String currentTenantId() {
-        String tenantId = TenantContext.getTenantId();
-        return StringUtils.hasText(tenantId) ? tenantId : "platform";
+        return TenantContextSupport.currentTenantIdOrPlatform();
     }
 
     private boolean isGlobalScope() {
