@@ -12,6 +12,7 @@ import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEn
 import com.enterprise.auth.platform.modules.dept.infrastructure.mapper.SysDeptMapper;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
+import com.enterprise.auth.platform.test.SaTokenGlobalStateTestExecutionListener;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,9 +25,14 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.TestExecutionListeners;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@TestExecutionListeners(
+        listeners = SaTokenGlobalStateTestExecutionListener.class,
+        mergeMode = TestExecutionListeners.MergeMode.MERGE_WITH_DEFAULTS
+)
 class UserControllerTest {
 
     private static final String SCOPE_USER = "uc_scope_ut";

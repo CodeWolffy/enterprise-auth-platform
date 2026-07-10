@@ -1,35 +1,30 @@
 package com.enterprise.auth.platform.modules.workflow.application;
 
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
+import com.enterprise.auth.platform.modules.workflow.domain.WorkflowDefinition;
+import com.enterprise.auth.platform.modules.workflow.domain.WorkflowInstance;
 import com.enterprise.auth.platform.modules.workflow.domain.WorkflowRejectStrategy;
-import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfProcessDefinitionEntity;
-import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfProcessInstanceEntity;
-import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfTaskEntity;
+import com.enterprise.auth.platform.modules.workflow.domain.WorkflowStepDefinition;
+import com.enterprise.auth.platform.modules.workflow.domain.WorkflowTask;
 import com.enterprise.auth.platform.modules.workflow.domain.WorkflowTaskStatus;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
-/**
- * 工作流实体到视图对象的映射：流程定义、流程实例、任务。
- * 任务视图的催办计数与可处理标记分别委托催办服务与候选处理人判定。
- */
 @Component
 class WorkflowViewMapper {
 
-    private final WorkflowCodec codec;
     private final WorkflowStore store;
     private final WorkflowTaskUrgeService urgeService;
 
-    WorkflowViewMapper(WorkflowCodec codec, WorkflowStore store, WorkflowTaskUrgeService urgeService) {
-        this.codec = codec;
+    WorkflowViewMapper(WorkflowStore store, WorkflowTaskUrgeService urgeService) {
         this.store = store;
         this.urgeService = urgeService;
     }
 
-    WorkflowDefinitionView toDefinitionView(WfProcessDefinitionEntity entity) {
-        List<WorkflowStepDefinition> steps = codec.readSteps(entity.getStepsJson());
+    WorkflowDefinitionView toDefinitionView(WorkflowDefinition definition) {
         List<WorkflowStepView> stepViews = new ArrayList<>();
+        List<WorkflowStepDefinition> steps = definition.getSteps();
         for (int i = 0; i < steps.size(); i++) {
             WorkflowStepDefinition step = steps.get(i);
             stepViews.add(new WorkflowStepView(
@@ -42,57 +37,56 @@ class WorkflowViewMapper {
             ));
         }
         return new WorkflowDefinitionView(
-                entity.getId(),
-                entity.getTenantId(),
-                entity.getDefinitionKey(),
-                entity.getDefinitionName(),
-                entity.getVersion(),
-                entity.getStatus(),
+                definition.getId(),
+                definition.getTenantId(),
+                definition.getDefinitionKey(),
+                definition.getDefinitionName(),
+                definition.getVersion(),
+                definition.getStatus().name(),
                 stepViews,
-                entity.getRemark(),
-                entity.getCreatedAt(),
-                entity.getUpdatedAt()
+                definition.getRemark(),
+                definition.getCreatedAt(),
+                definition.getUpdatedAt()
         );
     }
 
-    WorkflowInstanceView toInstanceView(WfProcessInstanceEntity entity) {
+    WorkflowInstanceView toInstanceView(WorkflowInstance instance) {
         return new WorkflowInstanceView(
-                entity.getId(),
-                entity.getTenantId(),
-                entity.getDefinitionId(),
-                entity.getDefinitionKey(),
-                entity.getDefinitionVersion(),
-                entity.getBusinessKey(),
-                entity.getTitle(),
-                entity.getStatus(),
-                entity.getStarterUserId(),
-                entity.getStarterUsername(),
-                entity.getCurrentStepIndex(),
-                codec.readMap(entity.getVariablesSnapshotJson()),
-                entity.getStartedAt(),
-                entity.getEndedAt()
+                instance.getId(),
+                instance.getTenantId(),
+                instance.getDefinitionId(),
+                instance.getDefinitionKey(),
+                instance.getDefinitionVersion(),
+                instance.getBusinessKey(),
+                instance.getTitle(),
+                instance.getStatus().name(),
+                instance.getStarterUserId(),
+                instance.getStarterUsername(),
+                instance.getCurrentStepIndex(),
+                instance.getVariablesSnapshot(),
+                instance.getStartedAt(),
+                instance.getEndedAt()
         );
     }
 
-    WorkflowTaskView toTaskView(WfTaskEntity entity, UserAccount user) {
-        int urgeCount = urgeService.countUrges(entity.getTenantId(), entity.getId());
+    WorkflowTaskView toTaskView(WorkflowTask task, UserAccount user) {
         return new WorkflowTaskView(
-                entity.getId(),
-                entity.getTenantId(),
-                entity.getInstanceId(),
-                entity.getDefinitionId(),
-                entity.getStepIndex(),
-                entity.getStepName(),
-                entity.getStatus(),
-                codec.readLongSet(entity.getCandidateUserIdsJson()),
-                codec.readStringSet(entity.getCandidateGroupCodesJson()),
-                entity.getAssigneeUserId(),
-                entity.getAssigneeUsername(),
-                entity.getComment(),
-                entity.getCreatedAt(),
-                entity.getCompletedAt(),
-                WorkflowTaskStatus.PENDING.name().equals(entity.getStatus()) && store.isActionable(entity, user),
-                urgeCount
+                task.getId(),
+                task.getTenantId(),
+                task.getInstanceId(),
+                task.getDefinitionId(),
+                task.getStepIndex(),
+                task.getStepName(),
+                task.getStatus().name(),
+                task.getCandidateUserIds(),
+                task.getCandidateGroupCodes(),
+                task.getAssigneeUserId(),
+                task.getAssigneeUsername(),
+                task.getComment(),
+                task.getCreatedAt(),
+                task.getCompletedAt(),
+                task.getStatus() == WorkflowTaskStatus.PENDING && store.isActionable(task, user),
+                urgeService.countUrges(task.getTenantId(), task.getId())
         );
     }
 }

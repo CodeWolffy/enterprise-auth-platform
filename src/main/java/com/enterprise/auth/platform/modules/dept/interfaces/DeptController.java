@@ -1,7 +1,8 @@
 package com.enterprise.auth.platform.modules.dept.interfaces;
 
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
-import com.enterprise.auth.platform.modules.catalog.application.CatalogService;
+import com.enterprise.auth.platform.modules.dept.application.DepartmentView;
+import com.enterprise.auth.platform.modules.dept.application.DeptCatalogFacade;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
 import com.enterprise.auth.platform.modules.dept.interfaces.DeptCrudRequest;
@@ -26,26 +27,26 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/depts")
 public class DeptController {
 
-    private final CatalogService catalogService;
+    private final DeptCatalogFacade deptCatalogFacade;
     private final DeptManagementService deptManagementService;
 
-    public DeptController(CatalogService catalogService, DeptManagementService deptManagementService) {
-        this.catalogService = catalogService;
+    public DeptController(DeptCatalogFacade deptCatalogFacade, DeptManagementService deptManagementService) {
+        this.deptCatalogFacade = deptCatalogFacade;
         this.deptManagementService = deptManagementService;
     }
 
     @Operation(summary = "查询部门列表")
     @GetMapping
     @SaCheckPermission(PermissionCodes.SYSDEPT_PAGE)
-    public ApiResponse<List<CatalogService.DepartmentView>> list() {
-        return ApiResponse.ok(catalogService.departments());
+    public ApiResponse<List<DepartmentView>> list() {
+        return ApiResponse.ok(deptCatalogFacade.departments());
     }
 
     @SysLog("新增部门")
     @Operation(summary = "新增部门")
     @PostMapping
     @SaCheckPermission(PermissionCodes.SYSDEPT_ADD)
-    public ApiResponse<CatalogService.DepartmentView> create(@Valid @RequestBody DeptCrudRequest request) {
+    public ApiResponse<DepartmentView> create(@Valid @RequestBody DeptCrudRequest request) {
         return ApiResponse.ok(deptManagementService.create(request));
     }
 
@@ -53,7 +54,7 @@ public class DeptController {
     @Operation(summary = "修改部门")
     @PutMapping("/{deptId}")
     @SaCheckPermission(PermissionCodes.SYSDEPT_EDIT)
-    public ApiResponse<CatalogService.DepartmentView> update(
+    public ApiResponse<DepartmentView> update(
             @Parameter(description = "部门 ID") @PathVariable Long deptId,
             @Valid @RequestBody DeptCrudRequest request
     ) {

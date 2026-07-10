@@ -74,7 +74,7 @@ public class ConfigApplicationService {
             String sortBy,
             String sortDirection
     ) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         boolean globalScope = TenantContext.isGlobalScope();
         Optional<Set<String>> visibleCreators = globalScope ? Optional.empty() : dataScopeService.visibleUsernames(tenantId);
         return pageQuery(
@@ -92,7 +92,7 @@ public class ConfigApplicationService {
     @Transactional
     @CacheEvict(value = {CacheNames.SYSTEM_CONFIGS, CacheNames.SYSTEM_CATEGORIES_ALL, CacheNames.SYSTEM_CATEGORIES_TARGET, CacheNames.REGISTRATION_POLICY}, allEntries = true)
     public SystemViewModels.ConfigView createConfig(ConfigCrudRequest request) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         String configKey = normalizeCode(request.configKey(), "参数键不能为空", CONFIG_KEY_MAX_LENGTH, "参数键长度不能超过128个字符");
         ensureConfigKeyUnique(tenantId, configKey, null);
         SysConfigEntity entity = new SysConfigEntity();
@@ -105,7 +105,7 @@ public class ConfigApplicationService {
     @Transactional
     @CacheEvict(value = {CacheNames.SYSTEM_CONFIGS, CacheNames.SYSTEM_CATEGORIES_ALL, CacheNames.SYSTEM_CATEGORIES_TARGET, CacheNames.REGISTRATION_POLICY}, allEntries = true)
     public SystemViewModels.ConfigView updateConfig(Long id, ConfigCrudRequest request) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         SysConfigEntity entity = getConfig(id, tenantId);
         String configKey = normalizeCode(request.configKey(), "参数键不能为空", CONFIG_KEY_MAX_LENGTH, "参数键长度不能超过128个字符");
         ensureConfigKeyUnique(tenantId, configKey, id);
@@ -115,7 +115,7 @@ public class ConfigApplicationService {
     }
 
     public SystemViewModels.ConfigDetailView detail(Long id) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         SysConfigEntity entity = getConfig(id, tenantId);
         return new SystemViewModels.ConfigDetailView(
                 toConfigView(entity),
@@ -130,7 +130,7 @@ public class ConfigApplicationService {
     @Transactional
     @CacheEvict(value = {CacheNames.SYSTEM_CONFIGS, CacheNames.SYSTEM_CATEGORIES_ALL, CacheNames.SYSTEM_CATEGORIES_TARGET, CacheNames.REGISTRATION_POLICY}, allEntries = true)
     public void deleteConfig(Long id) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         SysConfigEntity entity = getConfig(id, tenantId);
         if (Boolean.TRUE.equals(entity.getBuiltin())) {
             throw new BusinessException("内置参数不允许删除");
@@ -156,12 +156,8 @@ public class ConfigApplicationService {
         return "OK";
     }
 
-    public String currentTenantId() {
-        return TenantContextSupport.currentTenantIdOrPlatform();
-    }
-
     public String generateCacheKey(Object... params) {
-        StringBuilder key = new StringBuilder(currentTenantId())
+        StringBuilder key = new StringBuilder(TenantContextSupport.currentTenantIdOrPlatform())
                 .append(':')
                 .append(currentScopeCacheKey());
         for (Object param : params) {
@@ -174,7 +170,7 @@ public class ConfigApplicationService {
         return new SystemViewModels.ConfigView(
                 entity.getId(),
                 entity.getConfigKey(),
-                deriveCategory(currentTenantId(), entity.getConfigKey()),
+                deriveCategory(TenantContextSupport.currentTenantIdOrPlatform(), entity.getConfigKey()),
                 entity.getConfigName(),
                 entity.getConfigValue(),
                 normalizeConfigType(entity.getConfigType()),

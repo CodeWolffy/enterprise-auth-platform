@@ -1,6 +1,5 @@
-package com.enterprise.auth.platform.modules.workflow.application;
+package com.enterprise.auth.platform.modules.workflow.domain;
 
-import com.enterprise.auth.platform.modules.workflow.domain.WorkflowRejectStrategy;
 import java.util.Set;
 
 public record WorkflowStepDefinition(

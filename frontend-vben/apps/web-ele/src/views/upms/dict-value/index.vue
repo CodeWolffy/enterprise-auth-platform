@@ -1,172 +1,144 @@
 <script lang="ts" setup>
 import { PERMS } from '#/constants/permissions';
 
-import { defineAsyncComponent, reactive, ref } from 'vue';
+import type { VxeTableGridOptions } from '#/adapter/vxe-table';
 
-import { Delete, Edit, Plus } from '@element-plus/icons-vue';
-import {
-  ElButton,
-  ElMessage,
-  ElMessageBox,
-  ElTable,
-  ElTableColumn,
-  ElTag,
-} from 'element-plus';
+import { defineAsyncComponent, ref } from 'vue';
 
+import { Plus } from '@vben/icons';
+
+import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus';
+
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { delObj, getList } from '#/api/upms/dict-value';
 import { useDictStore } from '#/store/dict';
 import { invokeWhenComponentReady } from '#/utils/component-ready';
 import { formatDateTime } from '#/utils/datetime';
 
-const props = defineProps({
-  dictId: {
-    type: String,
-    default: '',
-  },
-  dictType: {
-    type: String,
-    default: '',
-  },
-});
+import { useColumns } from './data';
 
-const RightToolbar = defineAsyncComponent(
-  () => import('#/components/right-toolbar/index.vue'),
+const props = withDefaults(
+  defineProps<{
+    dictId?: string;
+    dictType?: string;
+  }>(),
+  {
+    dictId: '',
+    dictType: '',
+  },
 );
+
 const Form = defineAsyncComponent(() => import('./form.vue'));
 
-const state = reactive({
-  queryParams: {},
-  tableData: [],
-});
-const showSearch = ref(true);
-const loading = ref(false);
 const formRef = ref();
 const formMounted = ref(false);
 
-const initPage = async () => {
-  if (props.dictId) {
-    loading.value = true;
-    await getList(props.dictId)
-      .then((response) => {
-        state.tableData = response ?? [];
-        loading.value = false;
-      })
-      .catch(() => {
-        loading.value = false;
-      });
-  }
-};
+const [Grid, gridApi] = useVbenVxeGrid({
+  gridOptions: {
+    columns: useColumns(),
+    height: 'auto',
+    keepSource: true,
+    pagerConfig: {
+      enabled: false,
+    },
+    proxyConfig: {
+      ajax: {
+        query: async () => {
+          return props.dictId ? await getList(props.dictId) : [];
+        },
+      },
+    },
+    rowConfig: {
+      keyField: 'id',
+    },
+    toolbarConfig: {
+      refresh: true,
+      refreshOptions: { code: 'query' },
+      zoom: false,
+    },
+  } as VxeTableGridOptions,
+});
 
-const openForm = (row: any) => {
+function onRefresh() {
+  gridApi.query();
+}
+
+function openForm(row: any) {
   formMounted.value = true;
   void invokeWhenComponentReady(formRef, (form: any) => form.initForm(row));
-};
+}
 
-/** 新增按钮 */
-const add = () => {
+function onCreate() {
   openForm({ dictId: props.dictId, dictType: props.dictType });
-};
+}
 
-/** 修改按钮 */
-const edit = (row: any) => openForm(row);
-
-/** 删除按钮 */
-const del = (id: string) => {
-  ElMessageBox.confirm('此操作将删除该字典键值，是否继续?', '提示', {
-    confirmButtonText: '确认',
-    cancelButtonText: '取消',
-    type: 'warning',
-  }).then(() => {
-    delObj(id)
-      .then(() => {
-        useDictStore().removeDict(props.dictType);
-        ElMessage.success('删除成功');
-        initPage();
-      })
-      .catch(() => {});
-  });
-};
-
-initPage();
+async function onDelete(row: any) {
+  try {
+    await ElMessageBox.confirm('此操作将删除该字典键值，是否继续?', '提示', {
+      cancelButtonText: '取消',
+      confirmButtonText: '确认',
+      type: 'warning',
+    });
+    await delObj(row.id);
+    useDictStore().removeDict(props.dictType);
+    ElMessage.success('删除成功');
+    onRefresh();
+  } catch {
+    // Cancelled confirmations require no further action.
+  }
+}
 </script>
 
 <template>
-  <div class="layout-padding-auto layout-padding-view">
-    <!-- 工具栏 -->
-    <div class="hx-table-toolbar">
-      <div>
+  <div class="h-full">
+    <Form v-if="formMounted" ref="formRef" @init-page="onRefresh" />
+
+    <Grid>
+      <template #toolbar-tools>
         <ElButton
-          type="primary"
           v-access:code="PERMS.upms.dict.add"
-          @click="add"
-          :icon="Plus"
+          type="primary"
+          @click="onCreate"
         >
+          <Plus class="size-5" />
           新增
         </ElButton>
-      </div>
-      <RightToolbar
-        :search-btn="false"
-        :refresh-btn="true"
-        @search="showSearch = !showSearch"
-        @refresh="initPage"
-      />
-    </div>
-    <Form v-if="formMounted" ref="formRef" @init-page="initPage" />
-    <!-- 列表 -->
-    <ElTable v-loading="loading" :data="state.tableData" border>
-      <ElTableColumn prop="dictLabel" label="字典标签" align="center" />
-      <ElTableColumn prop="dictValue" label="字典键值" align="center" />
-      <ElTableColumn
-        prop="showClass"
-        label="回显样式"
-        align="center"
-        width="110"
-      >
-        <template #default="scope">
-          <ElTag
-            :type="scope.row.showClass === 'default' ? '' : scope.row.showClass"
-          >
-            {{ scope.row.showClass || 'default' }}
-          </ElTag>
-        </template>
-      </ElTableColumn>
-      <ElTableColumn prop="remarks" label="备注" align="center" />
+      </template>
 
-      <ElTableColumn prop="enabled" label="状态" align="center">
-        <template #default="scope">
-          <ElTag :type="scope.row.enabled ? 'success' : 'danger'">
-            {{ scope.row.enabled ? '正常' : '停用' }}
-          </ElTag>
-        </template>
-      </ElTableColumn>
-      <ElTableColumn prop="sort" label="排序" align="center" />
-      <ElTableColumn label="更新时间" width="180">
-        <template #default="scope">
-          {{ formatDateTime(scope.row.updatedAt) }}
-        </template>
-      </ElTableColumn>
-      <ElTableColumn label="操作" width="180" align="center">
-        <template #default="scope">
-          <ElButton
-            link
-            type="primary"
-            v-access:code="PERMS.upms.dict.edit"
-            @click="edit(scope.row)"
-            :icon="Edit"
-          >
-            修改
-          </ElButton>
-          <ElButton
-            link
-            type="danger"
-            v-access:code="PERMS.upms.dict.del"
-            @click="del(scope.row.id)"
-            :icon="Delete"
-          >
-            删除
-          </ElButton>
-        </template>
-      </ElTableColumn>
-    </ElTable>
+      <template #showClass="{ row }">
+        <ElTag :type="row.showClass === 'default' ? '' : row.showClass">
+          {{ row.showClass || 'default' }}
+        </ElTag>
+      </template>
+
+      <template #status="{ row }">
+        <ElTag :type="row.enabled ? 'success' : 'danger'">
+          {{ row.enabled ? '正常' : '停用' }}
+        </ElTag>
+      </template>
+
+      <template #updatedAt="{ row }">
+        {{ formatDateTime(row.updatedAt) }}
+      </template>
+
+      <template #operation="{ row }">
+        <ElButton
+          v-access:code="PERMS.upms.dict.edit"
+          link
+          type="primary"
+          @click="openForm(row)"
+        >
+          修改
+        </ElButton>
+        <ElButton
+          v-access:code="PERMS.upms.dict.del"
+          link
+          type="danger"
+          @click="onDelete(row)"
+        >
+          删除
+        </ElButton>
+      </template>
+    </Grid>
   </div>
 </template>

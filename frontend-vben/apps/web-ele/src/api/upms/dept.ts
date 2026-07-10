@@ -1,20 +1,36 @@
 import { requestClient } from '#/api/request';
 
+export interface DeptTreeItem {
+  children?: DeptTreeItem[];
+  code?: string;
+  enabled?: number;
+  id: number | string;
+  leaderName?: string;
+  leaderPhone?: string;
+  leaderUserId?: null | number;
+  name: string;
+  orderNo?: number;
+  parentId?: null | number | string;
+}
+
 /** 把后端扁平部门列表(DepartmentView[]) 按 parentId 构建为树 */
-function buildTree(list: any[]): any[] {
-  const map = new Map<any, any>();
-  const roots: any[] = [];
+function buildTree(list: DeptTreeItem[]): DeptTreeItem[] {
+  const map = new Map<DeptTreeItem['id'], DeptTreeItem>();
+  const roots: DeptTreeItem[] = [];
   (list ?? []).forEach((d) => map.set(d.id, { ...d, children: [] }));
   map.forEach((node) => {
     const pid = node.parentId;
     if (pid !== null && pid !== undefined && map.has(pid)) {
-      map.get(pid).children.push(node);
+      const parent = map.get(pid);
+      if (parent) {
+        (parent.children ??= []).push(node);
+      }
     } else {
       roots.push(node);
     }
   });
   map.forEach((n) => {
-    if (n.children.length === 0) delete n.children;
+    if ((n.children?.length ?? 0) === 0) delete n.children;
   });
   return roots;
 }
@@ -24,8 +40,8 @@ function buildTree(list: any[]): any[] {
  * 后端：GET /api/depts -> List<DepartmentView>（扁平，前端构树）
  */
 export async function getTreeList() {
-  const list: any = await requestClient.get('/depts');
-  return buildTree(list as any[]);
+  const list = await requestClient.get<DeptTreeItem[]>('/depts');
+  return buildTree(list);
 }
 
 /**

@@ -157,7 +157,7 @@ class CodegenApplicationServiceP2Test {
                 .contains("public OrderGenEntity update(Long id, OrderGenUpdateRequest request)")
                 .contains("private LambdaQueryWrapper<OrderGenEntity> baseQuery(OrderGenQueryRequest request)")
                 .contains("public void delete(Long id)")
-                .contains("query.eq(OrderGenEntity::getTenantId, currentTenantId())");
+                .contains("query.eq(OrderGenEntity::getTenantId, TenantContextSupport.currentTenantIdOrPlatform())");
         assertThat(fileContent(preview, "OrderGenController.java"))
                 .contains("@PostMapping")
                 .contains("@PutMapping(\"/{id}\")")

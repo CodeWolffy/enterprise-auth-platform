@@ -3,9 +3,9 @@ package com.enterprise.auth.platform.modules.workflow.application;
 import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.modules.notification.application.NotificationScenarioPublisher;
 import com.enterprise.auth.platform.modules.user.application.UserQueryFacade.EnabledUser;
+import com.enterprise.auth.platform.modules.workflow.domain.WorkflowInstance;
 import com.enterprise.auth.platform.modules.workflow.domain.WorkflowInstanceStatus;
-import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfProcessInstanceEntity;
-import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfTaskEntity;
+import com.enterprise.auth.platform.modules.workflow.domain.WorkflowTask;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -13,10 +13,6 @@ import java.util.Objects;
 import java.util.Set;
 import org.springframework.stereotype.Component;
 
-/**
- * 工作流通知与审计发布：待办创建、审批决策、转签、实例关闭四类场景通知，
- * 以及对应的操作审计日志落库。
- */
 @Component
 class WorkflowNotifier {
 
@@ -34,39 +30,20 @@ class WorkflowNotifier {
         this.store = store;
     }
 
-    void publishWorkflowTodoCreated(String tenantId, WfProcessInstanceEntity instance, WfTaskEntity task, String operator) {
+    void publishWorkflowTodoCreated(String tenantId, WorkflowInstance instance, WorkflowTask task, String operator) {
         WorkflowRecipients recipients = store.notificationRecipients(task);
         notificationScenarioPublisher.workflowTodoCreated(new NotificationScenarioPublisher.WorkflowTodoCreatedEvent(
-                tenantId,
-                instance.getId(),
-                instance.getTitle(),
-                instance.getBusinessKey(),
-                task.getId(),
-                task.getStepName(),
-                recipients.userIds(),
-                recipients.roleCodes(),
-                operator
-        ));
+                tenantId, instance.getId(), instance.getTitle(), instance.getBusinessKey(),
+                task.getId(), task.getStepName(), recipients.userIds(), recipients.roleCodes(), operator));
     }
 
     void publishWorkflowTaskDecision(
-            String tenantId,
-            WfProcessInstanceEntity instance,
-            WfTaskEntity task,
-            String operator,
-            boolean approved
-    ) {
-        NotificationScenarioPublisher.WorkflowTaskDecisionEvent event = new NotificationScenarioPublisher.WorkflowTaskDecisionEvent(
-                tenantId,
-                instance.getId(),
-                instance.getTitle(),
-                instance.getBusinessKey(),
-                instance.getStarterUserId(),
-                task.getId(),
-                task.getStepName(),
-                operator,
-                !WorkflowInstanceStatus.RUNNING.name().equals(instance.getStatus())
-        );
+            String tenantId, WorkflowInstance instance, WorkflowTask task, String operator, boolean approved) {
+        NotificationScenarioPublisher.WorkflowTaskDecisionEvent event =
+                new NotificationScenarioPublisher.WorkflowTaskDecisionEvent(
+                        tenantId, instance.getId(), instance.getTitle(), instance.getBusinessKey(),
+                        instance.getStarterUserId(), task.getId(), task.getStepName(), operator,
+                        instance.getStatus() != WorkflowInstanceStatus.RUNNING);
         if (approved) {
             notificationScenarioPublisher.workflowTaskApproved(event);
             publishWorkflowAudit("WORKFLOW_TASK_APPROVED", tenantId, operator, instance, task, null);
@@ -78,25 +55,17 @@ class WorkflowNotifier {
 
     void publishWorkflowTaskTransferred(
             String tenantId,
-            WfProcessInstanceEntity instance,
-            WfTaskEntity originalTask,
-            WfTaskEntity newTask,
+            WorkflowInstance instance,
+            WorkflowTask originalTask,
+            WorkflowTask newTask,
             EnabledUser targetUser,
             String operator
     ) {
-        notificationScenarioPublisher.workflowTaskTransferred(new NotificationScenarioPublisher.WorkflowTaskTransferEvent(
-                tenantId,
-                instance.getId(),
-                instance.getTitle(),
-                instance.getBusinessKey(),
-                instance.getStarterUserId(),
-                originalTask.getId(),
-                newTask.getId(),
-                newTask.getStepName(),
-                targetUser.id(),
-                targetUser.username(),
-                operator
-        ));
+        notificationScenarioPublisher.workflowTaskTransferred(
+                new NotificationScenarioPublisher.WorkflowTaskTransferEvent(
+                        tenantId, instance.getId(), instance.getTitle(), instance.getBusinessKey(),
+                        instance.getStarterUserId(), originalTask.getId(), newTask.getId(), newTask.getStepName(),
+                        targetUser.id(), targetUser.username(), operator));
         Map<String, Object> extra = new LinkedHashMap<>();
         extra.put("targetUserId", targetUser.id());
         extra.put("targetUsername", targetUser.username());
@@ -106,7 +75,7 @@ class WorkflowNotifier {
 
     void publishWorkflowInstanceClosed(
             String tenantId,
-            WfProcessInstanceEntity instance,
+            WorkflowInstance instance,
             WorkflowRecipients recipients,
             Long operatorUserId,
             String operator,
@@ -116,15 +85,10 @@ class WorkflowNotifier {
         if (instance.getStarterUserId() != null && !Objects.equals(instance.getStarterUserId(), operatorUserId)) {
             userIds.add(instance.getStarterUserId());
         }
-        NotificationScenarioPublisher.WorkflowInstanceClosedEvent event = new NotificationScenarioPublisher.WorkflowInstanceClosedEvent(
-                tenantId,
-                instance.getId(),
-                instance.getTitle(),
-                instance.getBusinessKey(),
-                userIds,
-                recipients.roleCodes(),
-                operator
-        );
+        NotificationScenarioPublisher.WorkflowInstanceClosedEvent event =
+                new NotificationScenarioPublisher.WorkflowInstanceClosedEvent(
+                        tenantId, instance.getId(), instance.getTitle(), instance.getBusinessKey(),
+                        userIds, recipients.roleCodes(), operator);
         if (withdrawn) {
             notificationScenarioPublisher.workflowInstanceWithdrawn(event);
             publishWorkflowAudit("WORKFLOW_INSTANCE_WITHDRAWN", tenantId, operator, instance, null, null);
@@ -138,8 +102,8 @@ class WorkflowNotifier {
             String eventType,
             String tenantId,
             String operator,
-            WfProcessInstanceEntity instance,
-            WfTaskEntity task,
+            WorkflowInstance instance,
+            WorkflowTask task,
             Map<String, Object> extra
     ) {
         Map<String, Object> details = new LinkedHashMap<>();
@@ -149,13 +113,13 @@ class WorkflowNotifier {
         details.put("definitionVersion", instance.getDefinitionVersion());
         details.put("businessKey", instance.getBusinessKey());
         details.put("title", instance.getTitle());
-        details.put("instanceStatus", instance.getStatus());
+        details.put("instanceStatus", instance.getStatus().name());
         details.put("currentStepIndex", instance.getCurrentStepIndex());
         if (task != null) {
             details.put("taskId", task.getId());
             details.put("stepIndex", task.getStepIndex());
             details.put("stepName", task.getStepName());
-            details.put("taskStatus", task.getStatus());
+            details.put("taskStatus", task.getStatus().name());
         }
         if (extra != null && !extra.isEmpty()) {
             details.putAll(extra);

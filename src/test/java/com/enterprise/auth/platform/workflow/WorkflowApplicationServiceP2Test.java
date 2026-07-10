@@ -16,7 +16,7 @@ import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMa
 import com.enterprise.auth.platform.modules.workflow.application.WorkflowApplicationService;
 import com.enterprise.auth.platform.modules.workflow.application.WorkflowDefinitionCommand;
 import com.enterprise.auth.platform.modules.workflow.application.WorkflowStartCommand;
-import com.enterprise.auth.platform.modules.workflow.application.WorkflowStepDefinition;
+import com.enterprise.auth.platform.modules.workflow.domain.WorkflowStepDefinition;
 import com.enterprise.auth.platform.modules.workflow.application.WorkflowTaskCommand;
 import com.enterprise.auth.platform.modules.workflow.application.WorkflowTaskUrgeService;
 import com.enterprise.auth.platform.modules.workflow.domain.WorkflowRejectStrategy;

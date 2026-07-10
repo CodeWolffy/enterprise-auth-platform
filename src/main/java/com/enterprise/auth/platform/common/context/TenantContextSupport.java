@@ -33,4 +33,10 @@ public final class TenantContextSupport {
     public static String currentTenantIdOrPlatform() {
         return currentTenantIdOr(PLATFORM_TENANT_ID);
     }
+
+    /** 上下文租户号为空时优先回退调用方租户号，再回退平台租户号。 */
+    public static String currentTenantIdOrPlatform(String fallbackTenantId) {
+        String fallback = StringUtils.hasText(fallbackTenantId) ? fallbackTenantId : PLATFORM_TENANT_ID;
+        return currentTenantIdOr(fallback);
+    }
 }

@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.modules.workflow.interfaces;
 
 import com.enterprise.auth.platform.modules.workflow.application.WorkflowDefinitionCommand;
-import com.enterprise.auth.platform.modules.workflow.application.WorkflowStepDefinition;
+import com.enterprise.auth.platform.modules.workflow.domain.WorkflowStepDefinition;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;

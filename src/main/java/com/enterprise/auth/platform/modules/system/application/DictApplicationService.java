@@ -18,6 +18,7 @@ import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysDict
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.common.web.PaginationSupport;
 import com.enterprise.auth.platform.modules.system.interfaces.DictCrudRequest;
+import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -43,17 +44,20 @@ public class DictApplicationService {
     private final SysDictValueMapper sysDictValueMapper;
     private final SysCategoryRuleMapper sysCategoryRuleMapper;
     private final DataScopeService dataScopeService;
+    private final LogPublisher logPublisher;
 
     public DictApplicationService(
             SysDictMapper sysDictMapper,
             SysDictValueMapper sysDictValueMapper,
             SysCategoryRuleMapper sysCategoryRuleMapper,
-            DataScopeService dataScopeService
+            DataScopeService dataScopeService,
+            LogPublisher logPublisher
     ) {
         this.sysDictMapper = sysDictMapper;
         this.sysDictValueMapper = sysDictValueMapper;
         this.sysCategoryRuleMapper = sysCategoryRuleMapper;
         this.dataScopeService = dataScopeService;
+        this.logPublisher = logPublisher;
     }
 
     @Cacheable(value = CacheNames.SYSTEM_DICTS, key = "#root.target.generateCacheKey(new Object[]{#dictType, #category, #keyword, #page, #size, #sortBy, #sortDirection})")
@@ -66,7 +70,7 @@ public class DictApplicationService {
             String sortBy,
             String sortDirection
     ) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         boolean globalScope = TenantContext.isGlobalScope();
         Optional<Set<String>> visibleCreators = globalScope ? Optional.empty() : dataScopeService.visibleUsernames(tenantId);
         String normalizedDictType = blankToNull(dictType);
@@ -87,7 +91,7 @@ public class DictApplicationService {
     @Transactional
     @CacheEvict(value = {CacheNames.SYSTEM_DICTS, CacheNames.SYSTEM_CATEGORIES_ALL, CacheNames.SYSTEM_CATEGORIES_TARGET}, allEntries = true)
     public SystemViewModels.DictView createDict(DictCrudRequest request) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         String operator = SecuritySupport.currentOperator();
         String dictType = normalizeCode(request.dictType(), "字典类型不能为空", DICT_TYPE_MAX_LENGTH, "字典类型长度不能超过64个字符");
         ensureDictTypeUnique(tenantId, dictType, null);
@@ -96,13 +100,15 @@ public class DictApplicationService {
         entity.setTenantId(tenantId);
         applyDictProfile(entity, request, dictType);
         sysDictMapper.insert(entity);
+        logPublisher.publish("DICT_CREATED", operator, tenantId,
+                Map.of("dictId", entity.getId(), "dictType", entity.getDictType()));
         return toDictView(entity);
     }
 
     @Transactional
     @CacheEvict(value = {CacheNames.SYSTEM_DICTS, CacheNames.SYSTEM_CATEGORIES_ALL, CacheNames.SYSTEM_CATEGORIES_TARGET}, allEntries = true)
     public SystemViewModels.DictView updateDict(Long id, DictCrudRequest request) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         SysDictEntity entity = getDict(id, tenantId);
         String dictType = normalizeCode(request.dictType(), "字典类型不能为空", DICT_TYPE_MAX_LENGTH, "字典类型长度不能超过64个字符");
         ensureDictTypeUnique(tenantId, dictType, id);
@@ -112,11 +118,13 @@ public class DictApplicationService {
         if (!oldType.equals(dictType)) {
             syncValueTypes(tenantId, id, dictType);
         }
+        logPublisher.publish("DICT_UPDATED", SecuritySupport.currentOperator(), tenantId,
+                Map.of("dictId", id, "dictType", entity.getDictType()));
         return toDictView(entity);
     }
 
     public SystemViewModels.DictDetailView detail(Long id) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         SysDictEntity entity = getDict(id, tenantId);
         return new SystemViewModels.DictDetailView(toDictView(entity), valueViews(listValues(tenantId, entity.getId(), false)));
     }
@@ -124,7 +132,7 @@ public class DictApplicationService {
     @Transactional
     @CacheEvict(value = {CacheNames.SYSTEM_DICTS, CacheNames.SYSTEM_CATEGORIES_ALL, CacheNames.SYSTEM_CATEGORIES_TARGET}, allEntries = true)
     public void deleteDict(Long id) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         SysDictEntity entity = getDict(id, tenantId);
         for (SysDictValueEntity value : listValues(tenantId, entity.getId(), false)) {
             releaseDeletedValueIdentity(value);
@@ -134,14 +142,12 @@ public class DictApplicationService {
         releaseDeletedDictIdentity(entity);
         sysDictMapper.updateById(entity);
         sysDictMapper.deleteById(entity.getId());
-    }
-
-    public String currentTenantId() {
-        return TenantContextSupport.currentTenantIdOrPlatform();
+        logPublisher.publish("DICT_DELETED", SecuritySupport.currentOperator(), tenantId,
+                Map.of("dictId", id, "dictType", entity.getDictType()));
     }
 
     public String generateCacheKey(Object... params) {
-        StringBuilder key = new StringBuilder(currentTenantId())
+        StringBuilder key = new StringBuilder(TenantContextSupport.currentTenantIdOrPlatform())
                 .append(':')
                 .append(currentScopeCacheKey());
         for (Object param : params) {
@@ -151,7 +157,7 @@ public class DictApplicationService {
     }
 
     private SystemViewModels.DictView toDictView(SysDictEntity entity) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         return new SystemViewModels.DictView(
                 entity.getId(),
                 entity.getDictType(),

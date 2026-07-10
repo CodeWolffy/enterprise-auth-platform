@@ -7,7 +7,8 @@ import com.baomidou.mybatisplus.core.plugins.InterceptorIgnoreHelper;
 import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.modules.auth.application.SessionIndexService;
 import com.enterprise.auth.platform.modules.dept.application.DeptQueryFacade;
-import com.enterprise.auth.platform.modules.catalog.application.CatalogService;
+import com.enterprise.auth.platform.modules.role.application.RoleCatalogFacade;
+import com.enterprise.auth.platform.modules.role.application.RoleView;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.PasswordValidator;
@@ -48,7 +49,7 @@ public class UserManagementService {
     private final DeptQueryFacade deptQueryFacade;
     private final PasswordHasher passwordHasher;
     private final UserDirectoryService userDirectoryService;
-    private final CatalogService catalogService;
+    private final RoleCatalogFacade roleCatalogFacade;
     private final LogPublisher logPublisher;
     private final DataScopeService dataScopeService;
     private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
@@ -64,7 +65,7 @@ public class UserManagementService {
             DeptQueryFacade deptQueryFacade,
             PasswordHasher passwordHasher,
             UserDirectoryService userDirectoryService,
-            CatalogService catalogService,
+            RoleCatalogFacade roleCatalogFacade,
             LogPublisher logPublisher,
             DataScopeService dataScopeService,
             AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
@@ -79,7 +80,7 @@ public class UserManagementService {
         this.deptQueryFacade = deptQueryFacade;
         this.passwordHasher = passwordHasher;
         this.userDirectoryService = userDirectoryService;
-        this.catalogService = catalogService;
+        this.roleCatalogFacade = roleCatalogFacade;
         this.logPublisher = logPublisher;
         this.dataScopeService = dataScopeService;
         this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
@@ -179,7 +180,7 @@ public class UserManagementService {
         return loadSummary(userId, tenantId);
     }
 
-    public List<CatalogService.RoleView> listAssignedRoles(Long userId) {
+    public List<RoleView> listAssignedRoles(Long userId) {
         SysUserEntity entity = getUser(userId);
         String tenantId = entity.getTenantId();
         List<Long> roleIds = sysUserRoleMapper.selectList(new LambdaQueryWrapper<SysUserRoleEntity>()
@@ -192,7 +193,7 @@ public class UserManagementService {
             return List.of();
         }
         Set<Long> assignedRoleIds = roleIds.stream().collect(Collectors.toCollection(LinkedHashSet::new));
-        return catalogService.tenantRoles(tenantId).stream()
+        return roleCatalogFacade.tenantRoles(tenantId).stream()
                 .filter(role -> assignedRoleIds.contains(role.id()))
                 .toList();
     }
@@ -327,7 +328,7 @@ public class UserManagementService {
         } else {
             entity = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>()
                     .eq(SysUserEntity::getId, userId)
-                    .eq(SysUserEntity::getTenantId, currentTenantId())
+                .eq(SysUserEntity::getTenantId, TenantContextSupport.currentTenantIdOrPlatform())
                     .eq(SysUserEntity::getDeleted, 0)
                     .last("limit 1"));
         }
@@ -355,7 +356,7 @@ public class UserManagementService {
     }
 
     private void validatePassword(String password) {
-        validatePassword(password, currentTenantId());
+        validatePassword(password, TenantContextSupport.currentTenantIdOrPlatform());
     }
 
     private void validatePassword(String password, String tenantId) {
@@ -388,12 +389,8 @@ public class UserManagementService {
         }
     }
 
-    private String currentTenantId() {
-        return TenantContextSupport.currentTenantIdOrPlatform();
-    }
-
     private String resolveTargetTenantId(String requestedTenantId) {
-        String currentTenantId = currentTenantId();
+        String currentTenantId = TenantContextSupport.currentTenantIdOrPlatform();
         if (!dataScopeService.isPlatformSuperAdmin()) {
             return currentTenantId;
         }

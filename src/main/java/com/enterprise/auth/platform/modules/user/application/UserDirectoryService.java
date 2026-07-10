@@ -89,7 +89,7 @@ public class UserDirectoryService {
             int size,
             boolean globalScope
     ) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         String normalizedTenantFilter = StringUtils.hasText(tenantIdFilter) ? tenantIdFilter.trim() : null;
 
         LambdaQueryWrapper<SysUserEntity> query = new LambdaQueryWrapper<SysUserEntity>()
@@ -198,10 +198,6 @@ public class UserDirectoryService {
                             .computeIfAbsent(key, item -> roleGrantQueryFacade.resolveGrantKeys(effectiveTenantId, item, false));
                 }
         ));
-    }
-
-    private String currentTenantId() {
-        return TenantContextSupport.currentTenantIdOrPlatform();
     }
 
     private boolean isGlobalScope() {

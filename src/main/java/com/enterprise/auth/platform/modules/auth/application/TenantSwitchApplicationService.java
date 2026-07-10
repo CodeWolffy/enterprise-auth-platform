@@ -13,10 +13,12 @@ import com.enterprise.auth.platform.modules.auth.application.SessionIndexService
 import com.enterprise.auth.platform.modules.auth.domain.SessionPrincipal;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.auth.interfaces.PermissionSnapshotResponse;
+import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.modules.tenant.application.TenantProfileFacade;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantEntity;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -24,17 +26,20 @@ import org.springframework.util.StringUtils;
 public class TenantSwitchApplicationService {
 
     private final PlatformAdminSupport platformAdminSupport;
+    private final LogPublisher logPublisher;
     private final PermissionSnapshotApplicationService permissionSnapshotApplicationService;
     private final SessionIndexService sessionIndexService;
     private final TenantProfileFacade tenantProfileFacade;
 
     public TenantSwitchApplicationService(
             PlatformAdminSupport platformAdminSupport,
+            LogPublisher logPublisher,
             PermissionSnapshotApplicationService permissionSnapshotApplicationService,
             SessionIndexService sessionIndexService,
             TenantProfileFacade tenantProfileFacade
     ) {
         this.platformAdminSupport = platformAdminSupport;
+        this.logPublisher = logPublisher;
         this.permissionSnapshotApplicationService = permissionSnapshotApplicationService;
         this.sessionIndexService = sessionIndexService;
         this.tenantProfileFacade = tenantProfileFacade;
@@ -79,6 +84,12 @@ public class TenantSwitchApplicationService {
             ));
             PermissionSnapshotResponse snapshot = permissionSnapshotApplicationService.build(currentUser);
             sessionIndexService.updateActiveTenant(sessionId, normalizedTargetTenantId);
+            logPublisher.publish("TENANT_SWITCH", currentUser.username(), normalizedTargetTenantId, Map.of(
+                    "sessionId", sessionId,
+                    "operatorTenantId", currentUser.tenantId(),
+                    "fromTenantId", fromTenantId,
+                    "targetTenantId", normalizedTargetTenantId
+            ));
             return snapshot;
         } catch (RuntimeException ex) {
             if (switched) {

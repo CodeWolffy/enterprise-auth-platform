@@ -48,9 +48,10 @@ public class CategoryRuleApplicationService {
         this.dataScopeService = dataScopeService;
     }
 
-    @Cacheable(value = CacheNames.SYSTEM_CATEGORIES_ALL, key = "#root.target.currentTenantId()")
+    @Cacheable(value = CacheNames.SYSTEM_CATEGORIES_ALL,
+            key = "T(com.enterprise.auth.platform.common.context.TenantContextSupport).currentTenantIdOrPlatform()")
     public Map<String, List<SystemViewModels.CategoryOption>> categories() {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         return Map.of(
                 "dict", loadCategoryOptions(tenantId, DICT_CATEGORY_PREFIX),
                 "config", loadCategoryOptions(tenantId, CONFIG_CATEGORY_PREFIX)
@@ -59,11 +60,11 @@ public class CategoryRuleApplicationService {
 
     @Cacheable(value = CacheNames.SYSTEM_CATEGORIES_TARGET, key = "#root.target.generateCacheKey(new Object[]{#targetType})")
     public List<SystemViewModels.CategoryOption> categoryOptions(String targetType) {
-        return loadCategoryOptions(currentTenantId(), prefixForTargetType(targetType));
+        return loadCategoryOptions(TenantContextSupport.currentTenantIdOrPlatform(), prefixForTargetType(targetType));
     }
 
     public SystemViewModels.CategoryAnalysis analyzeCategoryOption(String targetType, String code) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         SysCategoryRuleEntity entity = getCategoryConfig(tenantId, targetType, code);
         List<String> matchers = splitMatchers(entity.getMatchers());
         int referenceCount = "dict".equalsIgnoreCase(targetType)
@@ -89,7 +90,7 @@ public class CategoryRuleApplicationService {
     @Transactional
     @CacheEvict(value = {CacheNames.SYSTEM_CATEGORIES_ALL, CacheNames.SYSTEM_CATEGORIES_TARGET, CacheNames.SYSTEM_DICTS, CacheNames.SYSTEM_CONFIGS}, allEntries = true)
     public SystemViewModels.CategoryOption createCategoryOption(String targetType, CategoryConfigRequest request) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         if (sysCategoryRuleMapper.selectCount(new LambdaQueryWrapper<SysCategoryRuleEntity>()
                 .eq(SysCategoryRuleEntity::getTenantId, tenantId)
                 .eq(SysCategoryRuleEntity::getTargetType, targetType.toLowerCase())
@@ -110,7 +111,7 @@ public class CategoryRuleApplicationService {
     @Transactional
     @CacheEvict(value = {CacheNames.SYSTEM_CATEGORIES_ALL, CacheNames.SYSTEM_CATEGORIES_TARGET, CacheNames.SYSTEM_DICTS, CacheNames.SYSTEM_CONFIGS}, allEntries = true)
     public SystemViewModels.CategoryOption updateCategoryOption(String targetType, String code, CategoryConfigRequest request) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         SysCategoryRuleEntity entity = getCategoryConfig(tenantId, targetType, code);
         entity.setCategoryName(request.name());
         entity.setMatchers(normalizeMatchers(request.matchers()));
@@ -121,17 +122,13 @@ public class CategoryRuleApplicationService {
     @Transactional
     @CacheEvict(value = {CacheNames.SYSTEM_CATEGORIES_ALL, CacheNames.SYSTEM_CATEGORIES_TARGET, CacheNames.SYSTEM_DICTS, CacheNames.SYSTEM_CONFIGS}, allEntries = true)
     public void deleteCategoryOption(String targetType, String code) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         SysCategoryRuleEntity entity = getCategoryConfig(tenantId, targetType, code);
         sysCategoryRuleMapper.deleteById(entity.getId());
     }
 
-    public String currentTenantId() {
-        return TenantContextSupport.currentTenantIdOrPlatform();
-    }
-
     public String generateCacheKey(Object... params) {
-        StringBuilder key = new StringBuilder(currentTenantId());
+        StringBuilder key = new StringBuilder(TenantContextSupport.currentTenantIdOrPlatform());
         for (Object param : params) {
             key.append(':').append(param == null ? "" : param);
         }

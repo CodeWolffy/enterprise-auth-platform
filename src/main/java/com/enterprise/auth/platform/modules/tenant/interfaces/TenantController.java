@@ -7,7 +7,7 @@ import com.enterprise.auth.platform.modules.tenant.application.TenantChangeLogAp
 import com.enterprise.auth.platform.modules.tenant.application.TenantDirectoryApplicationService;
 import com.enterprise.auth.platform.modules.tenant.application.TenantLifecycleApplicationService;
 import com.enterprise.auth.platform.modules.tenant.application.TenantMenuService;
-import com.enterprise.auth.platform.modules.catalog.application.CatalogService;
+import com.enterprise.auth.platform.modules.tenant.application.TenantView;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.common.context.TenantContext;
@@ -60,7 +60,7 @@ public class TenantController {
     @Operation(summary = "租户列表")
     @GetMapping
     @SaCheckPermission(PermissionCodes.SYSTENANT_PAGE)
-    public ApiResponse<PageResult<CatalogService.TenantView>> list(
+    public ApiResponse<PageResult<TenantView>> list(
             @Parameter(description = "按租户编码或名称搜索关键词") @RequestParam(required = false) String keyword,
             @Parameter(description = "是否平台级租户，支持 true/false 或 PLATFORM/BUSINESS") @RequestParam(required = false) String platformLevel,
             @Parameter(description = "租户状态：1 启用，0 禁用") @RequestParam(required = false) Integer tenantStatus,
@@ -73,7 +73,7 @@ public class TenantController {
     @Operation(summary = "租户详情")
     @GetMapping("/{tenantId}")
     @SaCheckPermission(PermissionCodes.SYSTENANT_GET)
-    public ApiResponse<CatalogService.TenantView> detail(
+    public ApiResponse<TenantView> detail(
             @Parameter(description = "租户编码") @PathVariable String tenantId
     ) {
         return ApiResponse.ok(tenantDirectoryApplicationService.detail(tenantId));
@@ -129,7 +129,7 @@ public class TenantController {
     @Operation(summary = "创建租户")
     @PostMapping
     @SaCheckPermission(PermissionCodes.SYSTENANT_ADD)
-    public ApiResponse<CatalogService.TenantView> create(@Valid @RequestBody CreateTenantRequest request) {
+    public ApiResponse<TenantView> create(@Valid @RequestBody CreateTenantRequest request) {
         return ApiResponse.ok(platformScope(() -> tenantLifecycleApplicationService.create(request)));
     }
 
@@ -137,7 +137,7 @@ public class TenantController {
     @Operation(summary = "更新租户")
     @PutMapping("/{tenantId}")
     @SaCheckPermission(PermissionCodes.SYSTENANT_EDIT)
-    public ApiResponse<CatalogService.TenantView> update(
+    public ApiResponse<TenantView> update(
             @Parameter(description = "租户编码") @PathVariable String tenantId,
             @Valid @RequestBody CreateTenantRequest request
     ) {

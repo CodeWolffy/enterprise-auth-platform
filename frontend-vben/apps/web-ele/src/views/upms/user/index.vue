@@ -1,16 +1,13 @@
 <script setup lang="ts">
 import { PERMS } from '#/constants/permissions';
 
+import type { VxeTableGridOptions } from '#/adapter/vxe-table';
+
 import { computed, defineAsyncComponent, reactive, ref } from 'vue';
 
-import {
-  Delete,
-  Edit,
-  Plus,
-  Refresh,
-  Search,
-  View,
-} from '@element-plus/icons-vue';
+import { Page } from '@vben/common-ui';
+import { Plus } from '@vben/icons';
+
 import {
   ElButton,
   ElCard,
@@ -18,90 +15,42 @@ import {
   ElDescriptions,
   ElDescriptionsItem,
   ElDrawer,
-  ElForm,
-  ElFormItem,
-  ElInput,
   ElMessage,
   ElMessageBox,
-  ElOption,
   ElRow,
-  ElSelect,
   ElStatistic,
-  ElTable,
-  ElTableColumn,
   ElTag,
 } from 'element-plus';
 
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { delObj, getAssignedRoles, getPage } from '#/api/upms/user';
 import { useAuthStore } from '#/store/auth';
-import { invokeWhenComponentReady } from '#/utils/component-ready';
 import { formatDateTime } from '#/utils/datetime';
+import { invokeWhenComponentReady } from '#/utils/component-ready';
 
-const Pagination = defineAsyncComponent(
-  () => import('#/components/pagination/index.vue'),
-);
+import { useColumns, useGridFormSchema } from './data';
+
 const Form = defineAsyncComponent(() => import('./form.vue'));
 const UserDialogs = defineAsyncComponent(() => import('./info/dialogs.vue'));
 
 const authStore = useAuthStore();
 
-const state = reactive({
-  queryParams: { username: '', mobile: '', email: '', enabled: '' },
-  page: { total: 0, currentPage: 1, pageSize: 10 },
-  tableData: [] as any[],
-});
-const loading = ref(false);
 const formRef = ref();
 const formMounted = ref(false);
 const loginLogVisible = ref(false);
 const operationLogVisible = ref(false);
 const resetPwdVisible = ref(false);
 const activeUser = ref<any>(null);
-
-// ---- 统计卡片 ----
-const statData = computed(() => {
-  const all = state.tableData;
-  const enabled = all.filter((u: any) => u.enabled);
-  const disabled = all.filter((u: any) => !u.enabled);
-  const avgRoles =
-    all.length > 0
-      ? Number(
-          (
-            all.reduce(
-              (sum: number, u: any) => sum + (u.roles?.length ?? 0),
-              0,
-            ) / all.length
-          ).toFixed(1),
-        )
-      : 0;
-  return {
-    total: state.page.total,
-    enabled: enabled.length,
-    disabled: disabled.length,
-    avgRoles,
-  };
+const pageStats = reactive({
+  total: 0,
+  enabled: 0,
+  disabled: 0,
+  avgRoles: 0,
 });
 
-// ---- 详情抽屉 ----
 const detailVisible = ref(false);
 const detailData = ref<any>(null);
 const detailRoles = ref<string[]>([]);
-
-const openDetail = async (row: any) => {
-  detailVisible.value = true;
-  detailData.value = row;
-  detailRoles.value = [];
-  try {
-    const roles = await getAssignedRoles(row.id);
-    detailRoles.value = Array.isArray(roles)
-      ? roles.map((r: any) =>
-          typeof r === 'string' ? r : r?.code || r?.name || '',
-        )
-      : [];
-  } catch {
-    detailRoles.value = row.roles ?? [];
-  }
-};
 
 const DATA_SCOPE_LABELS: Record<string, string> = {
   ALL: '全部数据',
@@ -111,238 +60,214 @@ const DATA_SCOPE_LABELS: Record<string, string> = {
   CUSTOM: '自定义',
 };
 
-const initPage = async () => {
-  loading.value = true;
-  try {
-    const response: any = await getPage({
-      page: state.page.currentPage,
-      size: state.page.pageSize,
-      username: state.queryParams.username,
-      mobile: state.queryParams.mobile,
-      email: state.queryParams.email,
-      enabled: state.queryParams.enabled,
-    });
-    state.tableData = response?.records ?? [];
-    state.page.total = response?.total ?? 0;
-  } finally {
-    loading.value = false;
-  }
-};
-const resetQuery = () => {
-  state.queryParams.username = '';
-  state.queryParams.mobile = '';
-  state.queryParams.email = '';
-  state.queryParams.enabled = '';
-  state.page.currentPage = 1;
-  initPage();
-};
-const openForm = (row?: any) => {
+const statData = computed(() => pageStats);
+
+const [Grid, gridApi] = useVbenVxeGrid({
+  formOptions: {
+    schema: useGridFormSchema(),
+    submitOnChange: false,
+  },
+  gridOptions: {
+    columns: useColumns(),
+    height: 'auto',
+    keepSource: true,
+    pagerConfig: {
+      enabled: true,
+      pageSize: 10,
+    },
+    proxyConfig: {
+      ajax: {
+        query: async ({ page }, formValues) => {
+          const response: any = await getPage({
+            ...formValues,
+            page: page.currentPage,
+            size: page.pageSize,
+          });
+          const records = response?.records ?? [];
+          const enabled = records.filter((user: any) => user.enabled).length;
+          pageStats.total = response?.total ?? 0;
+          pageStats.enabled = enabled;
+          pageStats.disabled = records.length - enabled;
+          pageStats.avgRoles =
+            records.length === 0
+              ? 0
+              : Number(
+                  (
+                    records.reduce(
+                      (sum: number, user: any) =>
+                        sum + (user.roles?.length ?? 0),
+                      0,
+                    ) / records.length
+                  ).toFixed(1),
+                );
+          return { list: records, total: pageStats.total };
+        },
+      },
+    },
+    rowConfig: {
+      keyField: 'id',
+    },
+    toolbarConfig: {
+      refresh: true,
+      refreshOptions: { code: 'query' },
+      search: true,
+      zoom: false,
+    },
+  } as VxeTableGridOptions,
+});
+
+function onRefresh() {
+  gridApi.query();
+}
+
+function openForm(row?: any) {
   formMounted.value = true;
   void invokeWhenComponentReady(formRef, (form: any) => form.initForm(row));
-};
-const add = () => openForm();
-const edit = (row: any) => openForm(row);
-const openLoginLog = (row: any) => {
+}
+
+function openLoginLog(row: any) {
   activeUser.value = row;
   loginLogVisible.value = true;
-};
-const openResetPwd = (row: any) => {
+}
+
+function openResetPwd(row: any) {
   activeUser.value = row;
   resetPwdVisible.value = true;
-};
-const del = (row: any) => {
-  // 自我保护：不能删除自己
+}
+
+async function openDetail(row: any) {
+  detailVisible.value = true;
+  detailData.value = row;
+  detailRoles.value = [];
+  try {
+    const roles = await getAssignedRoles(row.id);
+    detailRoles.value = Array.isArray(roles)
+      ? roles.map((role: any) =>
+          typeof role === 'string' ? role : role?.code || role?.name || '',
+        )
+      : [];
+  } catch {
+    detailRoles.value = row.roles ?? [];
+  }
+}
+
+async function onDelete(row: any) {
   if (authStore.snapshot?.username === row.username) {
     ElMessage.warning('不能删除当前登录用户');
     return;
   }
-  ElMessageBox.confirm('此操作将删除该用户，是否继续?', '提示', {
-    cancelButtonText: '取消',
-    confirmButtonText: '确认',
-    type: 'warning',
-  }).then(() => {
-    delObj(row.id)
-      .then(() => {
-        ElMessage.success('删除成功');
-        initPage();
-      })
-      .catch(() => {});
-  });
-};
-
-initPage();
+  try {
+    await ElMessageBox.confirm('此操作将删除该用户，是否继续?', '提示', {
+      cancelButtonText: '取消',
+      confirmButtonText: '确认',
+      type: 'warning',
+    });
+    await delObj(row.id);
+    ElMessage.success('删除成功');
+    onRefresh();
+  } catch {
+    // Cancelled confirmations require no further action.
+  }
+}
 </script>
 
 <template>
-  <div class="hx-layout-container">
-    <div class="hx-layout-container-auto hx-layout-container-view">
-      <!-- 统计卡片 -->
-      <ElRow :gutter="16" style="margin-bottom: 16px">
-        <ElCol :span="6">
-          <ElCard shadow="hover">
-            <ElStatistic title="用户总数" :value="statData.total" />
-          </ElCard>
-        </ElCol>
-        <ElCol :span="6">
-          <ElCard shadow="hover">
-            <ElStatistic title="启用" :value="statData.enabled" />
-          </ElCard>
-        </ElCol>
-        <ElCol :span="6">
-          <ElCard shadow="hover">
-            <ElStatistic title="停用" :value="statData.disabled" />
-          </ElCard>
-        </ElCol>
-        <ElCol :span="6">
-          <ElCard shadow="hover">
-            <ElStatistic
-              title="平均角色数"
-              :value="statData.avgRoles"
-              :precision="1"
-            />
-          </ElCard>
-        </ElCol>
-      </ElRow>
+  <Page auto-content-height>
+    <ElRow :gutter="16" class="mb-4">
+      <ElCol :span="6">
+        <ElCard shadow="hover">
+          <ElStatistic :value="statData.total" title="用户总数" />
+        </ElCard>
+      </ElCol>
+      <ElCol :span="6">
+        <ElCard shadow="hover">
+          <ElStatistic :value="statData.enabled" title="当前页启用" />
+        </ElCard>
+      </ElCol>
+      <ElCol :span="6">
+        <ElCard shadow="hover">
+          <ElStatistic :value="statData.disabled" title="当前页停用" />
+        </ElCard>
+      </ElCol>
+      <ElCol :span="6">
+        <ElCard shadow="hover">
+          <ElStatistic
+            :precision="1"
+            :value="statData.avgRoles"
+            title="当前页平均角色数"
+          />
+        </ElCard>
+      </ElCol>
+    </ElRow>
 
-      <ElForm :inline="true" :model="state.queryParams">
-        <ElFormItem label="用户名">
-          <ElInput
-            v-model="state.queryParams.username"
-            clearable
-            placeholder="用户名"
-            @keyup.enter="initPage"
-          />
-        </ElFormItem>
-        <ElFormItem label="手机号">
-          <ElInput
-            v-model="state.queryParams.mobile"
-            clearable
-            placeholder="手机号"
-            @keyup.enter="initPage"
-          />
-        </ElFormItem>
-        <ElFormItem label="邮箱">
-          <ElInput
-            v-model="state.queryParams.email"
-            clearable
-            placeholder="邮箱"
-            @keyup.enter="initPage"
-          />
-        </ElFormItem>
-        <ElFormItem label="状态">
-          <ElSelect
-            v-model="state.queryParams.enabled"
-            clearable
-            placeholder="全部"
-            style="width: 100px"
-          >
-            <ElOption label="启用" value="true" />
-            <ElOption label="停用" value="false" />
-          </ElSelect>
-        </ElFormItem>
-        <ElFormItem>
-          <ElButton :icon="Search" type="primary" @click="initPage">
-            搜索
-          </ElButton>
-          <ElButton :icon="Refresh" @click="resetQuery"> 重置 </ElButton>
-        </ElFormItem>
-      </ElForm>
+    <Form v-if="formMounted" ref="formRef" @init-page="onRefresh" />
+    <UserDialogs
+      v-model:login-log-visible="loginLogVisible"
+      v-model:operation-log-visible="operationLogVisible"
+      v-model:reset-pwd-visible="resetPwdVisible"
+      :active-user="activeUser"
+    />
 
-      <div class="hx-table-toolbar" style="margin-bottom: 12px">
+    <Grid>
+      <template #toolbar-tools>
         <ElButton
           v-access:code="PERMS.upms.user.add"
-          :icon="Plus"
           type="primary"
-          @click="add"
+          @click="openForm()"
         >
+          <Plus class="size-5" />
           新增
         </ElButton>
-      </div>
+      </template>
 
-      <Form v-if="formMounted" ref="formRef" @init-page="initPage" />
+      <template #roles="{ row }">
+        <ElTag v-for="role in row.roles" :key="role" class="mr-1" size="small">
+          {{ role }}
+        </ElTag>
+      </template>
 
-      <UserDialogs
-        v-model:login-log-visible="loginLogVisible"
-        v-model:operation-log-visible="operationLogVisible"
-        v-model:reset-pwd-visible="resetPwdVisible"
-        :active-user="activeUser"
-      />
+      <template #status="{ row }">
+        <ElTag :type="row.enabled ? 'success' : 'info'">
+          {{ row.enabled ? '启用' : '停用' }}
+        </ElTag>
+      </template>
 
-      <ElTable v-loading="loading" :data="state.tableData" border>
-        <ElTableColumn label="用户名" prop="username" />
-        <ElTableColumn label="显示名称" prop="displayName" />
-        <ElTableColumn label="手机号" prop="mobile" />
-        <ElTableColumn label="邮箱" prop="email" show-overflow-tooltip />
-        <ElTableColumn label="部门" prop="deptName" show-overflow-tooltip />
-        <ElTableColumn label="角色" show-overflow-tooltip>
-          <template #default="scope">
-            <ElTag
-              v-for="r in scope.row.roles"
-              :key="r"
-              size="small"
-              style="margin-right: 4px"
-            >
-              {{ r }}
-            </ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="状态" width="90">
-          <template #default="scope">
-            <ElTag :type="scope.row.enabled ? 'success' : 'info'">
-              {{ scope.row.enabled ? '启用' : '停用' }}
-            </ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn align="center" fixed="right" label="操作" width="320">
-          <template #default="scope">
-            <ElButton
-              v-access:code="PERMS.upms.user.edit"
-              :icon="View"
-              link
-              type="primary"
-              @click="openDetail(scope.row)"
-            >
-              详情
-            </ElButton>
-            <ElButton
-              v-access:code="PERMS.upms.user.edit"
-              :icon="Edit"
-              link
-              type="primary"
-              @click="edit(scope.row)"
-            >
-              修改
-            </ElButton>
-            <ElButton link type="primary" @click="openLoginLog(scope.row)">
-              日志
-            </ElButton>
-            <ElButton link type="primary" @click="openResetPwd(scope.row)">
-              改密
-            </ElButton>
-            <ElButton
-              v-access:code="PERMS.upms.user.del"
-              :icon="Delete"
-              link
-              type="danger"
-              @click="del(scope.row)"
-            >
-              删除
-            </ElButton>
-          </template>
-        </ElTableColumn>
-      </ElTable>
+      <template #operation="{ row }">
+        <ElButton
+          v-access:code="PERMS.upms.user.edit"
+          link
+          type="primary"
+          @click="openDetail(row)"
+        >
+          详情
+        </ElButton>
+        <ElButton
+          v-access:code="PERMS.upms.user.edit"
+          link
+          type="primary"
+          @click="openForm(row)"
+        >
+          修改
+        </ElButton>
+        <ElButton link type="primary" @click="openLoginLog(row)">
+          日志
+        </ElButton>
+        <ElButton link type="primary" @click="openResetPwd(row)">
+          改密
+        </ElButton>
+        <ElButton
+          v-access:code="PERMS.upms.user.del"
+          link
+          type="danger"
+          @click="onDelete(row)"
+        >
+          删除
+        </ElButton>
+      </template>
+    </Grid>
 
-      <Pagination
-        v-model:current="state.page.currentPage"
-        v-model:size="state.page.pageSize"
-        :total="state.page.total"
-        @change="initPage"
-      />
-    </div>
-
-    <!-- 用户详情抽屉 -->
-    <ElDrawer v-model="detailVisible" title="用户详情" size="500px">
-      <ElDescriptions :column="1" border v-if="detailData">
+    <ElDrawer v-model="detailVisible" size="500px" title="用户详情">
+      <ElDescriptions v-if="detailData" :column="1" border>
         <ElDescriptionsItem label="用户ID">
           {{ detailData.id }}
         </ElDescriptionsItem>
@@ -371,15 +296,15 @@ initPage();
           </ElTag>
         </ElDescriptionsItem>
         <ElDescriptionsItem label="角色">
-          <div style="display: flex; flex-wrap: wrap; gap: 4px">
+          <div class="flex flex-wrap gap-1">
             <ElTag
-              v-for="r in detailRoles"
-              :key="r"
+              v-for="role in detailRoles"
+              :key="role"
+              effect="plain"
               size="small"
               type="success"
-              effect="plain"
             >
-              {{ r }}
+              {{ role }}
             </ElTag>
             <span v-if="detailRoles.length === 0">-</span>
           </div>
@@ -400,5 +325,5 @@ initPage();
         </ElDescriptionsItem>
       </ElDescriptions>
     </ElDrawer>
-  </div>
+  </Page>
 </template>

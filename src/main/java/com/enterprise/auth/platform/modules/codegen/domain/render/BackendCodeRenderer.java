@@ -136,9 +136,10 @@ class BackendCodeRenderer {
         String mapper = model.className() + "Mapper";
         return "package " + model.packageName() + ".modules." + model.moduleName() + ".application;\n\n"
                 + "import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;\n"
-                + "import com.enterprise.auth.platform.common.context.TenantContext;\n"
+                + "import com.enterprise.auth.platform.common.context.TenantContextSupport;\n"
                 + "import com.enterprise.auth.platform.common.exception.BusinessException;\n"
                 + "import com.enterprise.auth.platform.common.web.PageResult;\n"
+                + "import com.enterprise.auth.platform.common.web.PaginationSupport;\n"
                 + "import " + model.packageName() + ".modules." + model.moduleName() + ".infrastructure.entity." + entity + ";\n"
                 + "import " + model.packageName() + ".modules." + model.moduleName() + ".infrastructure.mapper." + mapper + ";\n"
                 + "import " + model.packageName() + ".modules." + model.moduleName() + ".interfaces." + createRequest + ";\n"
@@ -155,8 +156,8 @@ class BackendCodeRenderer {
                 + "    }\n\n"
                 + "    @Transactional(readOnly = true)\n"
                 + "    public PageResult<" + entity + "> page(" + queryRequest + " request) {\n"
-                + "        int safePage = Math.max(request == null || request.page() == null ? 1 : request.page(), 1);\n"
-                + "        int safeSize = Math.min(Math.max(request == null || request.size() == null ? 20 : request.size(), 1), 100);\n"
+                + "        int safePage = PaginationSupport.normalizePage(request == null || request.page() == null ? 1 : request.page());\n"
+                + "        int safeSize = PaginationSupport.normalizeSize(request == null || request.size() == null ? 20 : request.size(), 20, 100);\n"
                 + "        LambdaQueryWrapper<" + entity + "> countQuery = baseQuery(request);\n"
                 + "        Long total = mapper.selectCount(countQuery);\n"
                 + "        if (total == null || total == 0) {\n"
@@ -209,10 +210,6 @@ class BackendCodeRenderer {
                 + "    }\n\n"
                 + "    private void applyDefaultOrder(LambdaQueryWrapper<" + entity + "> query) {\n"
                 + renderDefaultOrder(model)
-                + "    }\n\n"
-                + "    private String currentTenantId() {\n"
-                + "        String tenantId = TenantContext.getTenantId();\n"
-                + "        return StringUtils.hasText(tenantId) ? tenantId : \"platform\";\n"
                 + "    }\n"
                 + "}\n";
     }
@@ -289,7 +286,7 @@ class BackendCodeRenderer {
 
     private String renderTenantAssignment(RenderContext model) {
         return model.columns().stream().anyMatch(column -> isColumn(column, "tenant_id"))
-                ? "        entity.setTenantId(currentTenantId());\n"
+                ? "        entity.setTenantId(TenantContextSupport.currentTenantIdOrPlatform());\n"
                 : "";
     }
 
@@ -304,7 +301,7 @@ class BackendCodeRenderer {
     private String renderTenantFilter(RenderContext model) {
         String entity = model.className() + "Entity";
         return model.columns().stream().anyMatch(column -> isColumn(column, "tenant_id"))
-                ? "        query.eq(" + entity + "::getTenantId, currentTenantId());\n"
+                ? "        query.eq(" + entity + "::getTenantId, TenantContextSupport.currentTenantIdOrPlatform());\n"
                 : "";
     }
 

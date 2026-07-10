@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.modules.user.interfaces;
 
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
-import com.enterprise.auth.platform.modules.catalog.application.CatalogService;
+import com.enterprise.auth.platform.modules.role.application.RoleView;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
@@ -55,7 +55,7 @@ public class UserController {
     @Operation(summary = "查询用户已分配角色")
     @GetMapping("/{userId}/roles")
     @SaCheckPermission(PermissionCodes.SYSUSER_GET)
-    public ApiResponse<List<CatalogService.RoleView>> assignedRoles(@Parameter(description = "用户 ID") @PathVariable Long userId) {
+    public ApiResponse<List<RoleView>> assignedRoles(@Parameter(description = "用户 ID") @PathVariable Long userId) {
         return ApiResponse.ok(userManagementService.listAssignedRoles(userId));
     }
 

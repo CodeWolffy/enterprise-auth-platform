@@ -57,7 +57,7 @@ public class NoticeApplicationService {
             String sortBy,
             String sortDirection
     ) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         boolean globalScope = TenantContext.isGlobalScope();
         Optional<Set<String>> visibleCreators = globalScope ? Optional.empty() : dataScopeService.visibleUsernames(tenantId);
         return pageQuery(
@@ -75,7 +75,7 @@ public class NoticeApplicationService {
     @Transactional
     @CacheEvict(value = CacheNames.SYSTEM_NOTICES, allEntries = true)
     public SystemViewModels.NoticeView createNotice(NoticeCrudRequest request) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         String operator = SecuritySupport.currentOperator();
         SysNoticeEntity entity = new SysNoticeEntity();
         entity.setTenantId(tenantId);
@@ -91,7 +91,7 @@ public class NoticeApplicationService {
     @Transactional
     @CacheEvict(value = CacheNames.SYSTEM_NOTICES, allEntries = true)
     public SystemViewModels.NoticeView updateNotice(Long id, NoticeCrudRequest request) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         SysNoticeEntity entity = getNotice(id, tenantId);
         boolean wasActivePublished = activePublished(entity);
         entity.setNoticeTitle(request.noticeTitle());
@@ -106,13 +106,13 @@ public class NoticeApplicationService {
     @Transactional
     @CacheEvict(value = CacheNames.SYSTEM_NOTICES, allEntries = true)
     public void deleteNotice(Long id) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         SysNoticeEntity entity = getNotice(id, tenantId);
         sysNoticeMapper.deleteById(entity.getId());
     }
 
     public SystemViewModels.NoticeView publishedNotice(Long id) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         SysNoticeEntity entity = sysNoticeMapper.selectOne(new LambdaQueryWrapper<SysNoticeEntity>()
                 .eq(SysNoticeEntity::getId, id)
                 .eq(SysNoticeEntity::getTenantId, tenantId)
@@ -125,17 +125,13 @@ public class NoticeApplicationService {
     }
 
     public SystemViewModels.NoticeView noticeDetail(Long id) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         SysNoticeEntity entity = getNotice(id, tenantId);
         return toNoticeView(entity);
     }
 
-    public String currentTenantId() {
-        return TenantContextSupport.currentTenantIdOrPlatform();
-    }
-
     public String generateCacheKey(Object... params) {
-        StringBuilder key = new StringBuilder(currentTenantId())
+        StringBuilder key = new StringBuilder(TenantContextSupport.currentTenantIdOrPlatform())
                 .append(':')
                 .append(currentScopeCacheKey());
         for (Object param : params) {

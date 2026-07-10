@@ -1,7 +1,5 @@
 package com.enterprise.auth.platform.modules.codegen.application;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
@@ -9,8 +7,7 @@ import com.enterprise.auth.platform.modules.menu.application.MenuTemplateMutatio
 import com.enterprise.auth.platform.modules.menu.application.MenuTemplateMutationFacade.MenuTemplateMutation;
 import com.enterprise.auth.platform.modules.menu.application.MenuTemplateMutationFacade.MenuTemplateNode;
 import com.enterprise.auth.platform.modules.role.application.RoleMenuMutationFacade;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantMenuEntity;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantMenuMapper;
+import com.enterprise.auth.platform.modules.tenant.application.TenantMenuService;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -37,20 +34,20 @@ public class CodegenResourceRegistrationService {
 
     private final MenuTemplateMutationFacade menuTemplateMutationFacade;
     private final RoleMenuMutationFacade roleMenuMutationFacade;
-    private final SysTenantMenuMapper sysTenantMenuMapper;
+    private final TenantMenuService tenantMenuService;
     private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
     private final TenantProperties tenantProperties;
 
     public CodegenResourceRegistrationService(
             MenuTemplateMutationFacade menuTemplateMutationFacade,
             RoleMenuMutationFacade roleMenuMutationFacade,
-            SysTenantMenuMapper sysTenantMenuMapper,
+            TenantMenuService tenantMenuService,
             AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
             TenantProperties tenantProperties
     ) {
         this.menuTemplateMutationFacade = menuTemplateMutationFacade;
         this.roleMenuMutationFacade = roleMenuMutationFacade;
-        this.sysTenantMenuMapper = sysTenantMenuMapper;
+        this.tenantMenuService = tenantMenuService;
         this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
         this.tenantProperties = tenantProperties;
     }
@@ -73,7 +70,7 @@ public class CodegenResourceRegistrationService {
         directMenuIds.add(menuId);
         directMenuIds.addAll(actionIds);
         Set<Long> assignedMenuIds = expandWithAncestors(directMenuIds);
-        assignToTenant(grantTenantId, assignedMenuIds);
+        tenantMenuService.addTenantMenus(grantTenantId, assignedMenuIds);
         assignToAdminRole(grantTenantId, assignedMenuIds);
         permissionSnapshotInvalidationService.invalidateAll();
         return grantKeys;
@@ -182,30 +179,6 @@ public class CodegenResourceRegistrationService {
             expandedMenuIds.add(node.id());
         }
         return expandedMenuIds;
-    }
-
-    private void assignToTenant(String tenantId, Collection<Long> menuIds) {
-        if (!StringUtils.hasText(tenantId) || menuIds == null || menuIds.isEmpty()) {
-            return;
-        }
-        TenantContext.runWithTenant(tenantId, () -> {
-            for (Long menuId : menuIds) {
-                if (menuId == null) {
-                    continue;
-                }
-                Long existing = sysTenantMenuMapper.selectCount(new LambdaQueryWrapper<SysTenantMenuEntity>()
-                        .eq(SysTenantMenuEntity::getTenantId, tenantId)
-                        .eq(SysTenantMenuEntity::getMenuId, menuId));
-                if (existing != null && existing > 0) {
-                    continue;
-                }
-                SysTenantMenuEntity relation = new SysTenantMenuEntity();
-                relation.setTenantId(tenantId);
-                relation.setMenuId(menuId);
-                sysTenantMenuMapper.insert(relation);
-            }
-            return null;
-        });
     }
 
     private void assignToAdminRole(String tenantId, Collection<Long> menuIds) {

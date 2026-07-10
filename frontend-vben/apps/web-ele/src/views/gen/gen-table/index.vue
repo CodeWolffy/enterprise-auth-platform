@@ -1,29 +1,21 @@
 <script lang="ts" setup name="genTable">
 import { PERMS } from '#/constants/permissions';
 
+import type { VxeTableGridOptions } from '#/adapter/vxe-table';
 import type { DataSourceView } from '#/api/codegen';
 
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
-import {
-  Delete,
-  Download,
-  Edit,
-  Refresh,
-  Search,
-} from '@element-plus/icons-vue';
+import { Page } from '@vben/common-ui';
+
 import {
   ElButton,
   ElDialog,
-  ElEmpty,
-  ElForm,
-  ElFormItem,
   ElInput,
   ElMessage,
   ElMessageBox,
   ElOption,
-  ElPagination,
   ElSelect,
   ElTable,
   ElTableColumn,
@@ -32,6 +24,7 @@ import {
   ElTag,
 } from 'element-plus';
 
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { getDataSources } from '#/api/codegen';
 import {
   deleteImportedTable,
@@ -41,6 +34,13 @@ import {
   importTables,
   saveTableColumns,
 } from '#/api/gen/table';
+
+import {
+  useImportedColumns,
+  useImportedFormSchema,
+  useSourceColumns,
+  useSourceFormSchema,
+} from './data';
 
 const router = useRouter();
 
@@ -87,25 +87,10 @@ type ColumnRow = {
 };
 
 const activeTab = ref('source');
-const loading = ref(false);
 const dsList = ref<DataSourceView[]>([]);
 const selectedDsId = ref<null | number>(null);
-const tableKeyword = ref('');
-const importKeyword = ref('');
+const currentSourceRows = ref<TableRow[]>([]);
 
-// 数据源表
-const sourceTables = ref<TableRow[]>([]);
-const sourceTotal = ref(0);
-const sourcePage = ref(1);
-const sourceSize = ref(20);
-
-// 已导入表
-const importedTables = ref<ImportedRow[]>([]);
-const importTotal = ref(0);
-const importPage = ref(1);
-const importSize = ref(20);
-
-// 列配置编辑弹窗
 const columnDialogVisible = ref(false);
 const columnDialogLoading = ref(false);
 const columnTableId = ref(0);
@@ -114,134 +99,153 @@ const columns = ref<ColumnRow[]>([]);
 
 const dsOptions = computed(() =>
   dsList.value
-    .filter((ds) => ds.enabled)
-    .map((ds) => ({ label: ds.name, value: ds.id })),
+    .filter((dataSource) => dataSource.enabled)
+    .map((dataSource) => ({ label: dataSource.name, value: dataSource.id })),
 );
 
-const asImportedRow = (row: unknown) => row as ImportedRow;
+const [SourceGrid, sourceGridApi] = useVbenVxeGrid({
+  formOptions: {
+    schema: useSourceFormSchema(),
+    submitOnChange: false,
+  },
+  gridOptions: {
+    columns: useSourceColumns(),
+    height: 'auto',
+    keepSource: true,
+    pagerConfig: { enabled: true, pageSize: 20 },
+    proxyConfig: {
+      ajax: {
+        query: async ({ page }, formValues) => {
+          if (!selectedDsId.value) return { list: [], total: 0 };
+          const response: any = await getDataSourceTables(selectedDsId.value, {
+            keyword: formValues.keyword || undefined,
+            page: page.currentPage,
+            size: page.pageSize,
+          });
+          currentSourceRows.value = response?.records ?? [];
+          return {
+            list: currentSourceRows.value,
+            total: response?.total ?? 0,
+          };
+        },
+      },
+    },
+    rowConfig: { keyField: 'tableName' },
+    toolbarConfig: {
+      refresh: true,
+      refreshOptions: { code: 'query' },
+      search: true,
+      zoom: false,
+    },
+  } as VxeTableGridOptions<TableRow>,
+});
 
-// 初始化数据源列表
+const [ImportedGrid, importedGridApi] = useVbenVxeGrid({
+  formOptions: {
+    schema: useImportedFormSchema(),
+    submitOnChange: false,
+  },
+  gridOptions: {
+    columns: useImportedColumns(),
+    height: 'auto',
+    keepSource: true,
+    pagerConfig: { enabled: true, pageSize: 20 },
+    proxyConfig: {
+      ajax: {
+        query: async ({ page }, formValues) => {
+          const response: any = await getImportedTables({
+            keyword: formValues.keyword || undefined,
+            page: page.currentPage,
+            size: page.pageSize,
+          });
+          return {
+            list: response?.records ?? [],
+            total: response?.total ?? 0,
+          };
+        },
+      },
+    },
+    rowConfig: { keyField: 'id' },
+    toolbarConfig: {
+      refresh: true,
+      refreshOptions: { code: 'query' },
+      search: true,
+      zoom: false,
+    },
+  } as VxeTableGridOptions<ImportedRow>,
+});
+
 async function loadDataSources() {
   try {
     dsList.value = await getDataSources();
-    const firstDataSource = dsList.value[0];
+    const firstDataSource = dsList.value.find((item) => item.enabled);
     if (firstDataSource && !selectedDsId.value) {
       selectedDsId.value = firstDataSource.id;
-      await loadSourceTables();
     }
+    await sourceGridApi.query();
   } catch {
     ElMessage.error('数据源加载失败');
   }
 }
 
-// 加载数据源表
-async function loadSourceTables() {
-  if (!selectedDsId.value) return;
-  loading.value = true;
-  try {
-    const res: any = await getDataSourceTables(selectedDsId.value, {
-      keyword: tableKeyword.value || undefined,
-      page: sourcePage.value,
-      size: sourceSize.value,
-    });
-    sourceTables.value = res.records ?? [];
-    sourceTotal.value = res.total ?? 0;
-  } finally {
-    loading.value = false;
-  }
-}
-
-// 加载已导入表
-async function loadImportedTables() {
-  loading.value = true;
-  try {
-    const res: any = await getImportedTables({
-      keyword: importKeyword.value || undefined,
-      page: importPage.value,
-      size: importSize.value,
-    });
-    importedTables.value = res.records ?? [];
-    importTotal.value = res.total ?? 0;
-  } finally {
-    loading.value = false;
-  }
-}
-
-// 导入表配置
-async function doImport(tableName: string) {
+async function doImport(row: TableRow) {
   const dataSourceId = selectedDsId.value;
   if (!dataSourceId) {
     ElMessage.warning('请选择数据源');
     return;
   }
-
   try {
     await ElMessageBox.confirm(
-      `确认导入表「${tableName}」及其字段配置？`,
+      `确认导入表「${row.tableName}」及其字段配置？`,
       '导入确认',
       { type: 'info' },
     );
+    await importTables({ dataSourceId, tableNames: [row.tableName] });
+    ElMessage.success(`表「${row.tableName}」已导入`);
+    importedGridApi.query();
   } catch {
-    return;
-  }
-  loading.value = true;
-  try {
-    await importTables({
-      dataSourceId,
-      tableNames: [tableName],
-    });
-    ElMessage.success(`表「${tableName}」已导入`);
-  } catch {
-    ElMessage.error(`表「${tableName}」导入失败`);
-  } finally {
-    loading.value = false;
+    // Cancelled confirmations or failed imports require no extra action.
   }
 }
 
-// 批量导入
 async function doBatchImport() {
   const dataSourceId = selectedDsId.value;
   if (!dataSourceId) {
     ElMessage.warning('请选择数据源');
     return;
   }
-
-  try {
-    await ElMessageBox.confirm('确认导入当前所有数据源表？', '批量导入确认', {
-      type: 'info',
-    });
-  } catch {
+  if (currentSourceRows.value.length === 0) {
+    ElMessage.warning('当前页没有可导入的数据表');
     return;
   }
-  loading.value = true;
   try {
+    await ElMessageBox.confirm('确认导入当前页全部数据源表？', '批量导入确认', {
+      type: 'info',
+    });
     await importTables({
       dataSourceId,
-      tableNames: sourceTables.value.map((t) => t.tableName),
+      tableNames: currentSourceRows.value.map((table) => table.tableName),
     });
-    ElMessage.success(`已批量导入 ${sourceTables.value.length} 张表`);
+    ElMessage.success(`已批量导入 ${currentSourceRows.value.length} 张表`);
+    importedGridApi.query();
   } catch {
-    ElMessage.error('批量导入失败');
-  } finally {
-    loading.value = false;
+    // Cancelled confirmations or failed imports require no extra action.
   }
 }
 
-// 打开列配置
 async function openColumnConfig(row: ImportedRow) {
   columnTableId.value = row.id;
   columnTableName.value = row.tableName;
   columnDialogVisible.value = true;
   columnDialogLoading.value = true;
   try {
-    const res: any = await getTableConfig(row.id);
-    columns.value = res.columns ?? [];
+    const response: any = await getTableConfig(row.id);
+    columns.value = response.columns ?? [];
   } finally {
     columnDialogLoading.value = false;
   }
 }
 
-// 保存列配置
 async function saveColumnConfig() {
   columnDialogLoading.value = true;
   try {
@@ -252,7 +256,6 @@ async function saveColumnConfig() {
   }
 }
 
-// 打开生成页面
 function openGenerate(row: ImportedRow) {
   router.push({
     path: '/platform/codegen/generate',
@@ -260,7 +263,6 @@ function openGenerate(row: ImportedRow) {
   });
 }
 
-// 删除导入表配置
 async function deleteImported(row: ImportedRow) {
   try {
     await ElMessageBox.confirm(
@@ -268,284 +270,111 @@ async function deleteImported(row: ImportedRow) {
       '提示',
       { type: 'warning' },
     );
-  } catch {
-    return;
-  }
-  loading.value = true;
-  try {
     await deleteImportedTable(row.id);
     ElMessage.success(`表「${row.tableName}」的导入配置已删除`);
-    if (importedTables.value.length === 1 && importPage.value > 1) {
-      importPage.value -= 1;
-    }
-    await loadImportedTables();
-  } finally {
-    loading.value = false;
+    importedGridApi.query();
+  } catch {
+    // Cancelled confirmations require no further action.
   }
 }
 
 function handleDsChange() {
-  sourcePage.value = 1;
-  sourceTables.value = [];
-  sourceTotal.value = 0;
-  void loadSourceTables();
+  currentSourceRows.value = [];
+  sourceGridApi.reload();
 }
 
 function onTabChange(name: number | string) {
-  if (name === 'source') {
-    void loadSourceTables();
-  } else {
-    void loadImportedTables();
-  }
+  if (name === 'source') sourceGridApi.query();
+  else importedGridApi.query();
 }
 
-loadDataSources();
+onMounted(() => {
+  void loadDataSources();
+});
 </script>
 
 <template>
-  <div class="hx-layout-container">
-    <div class="hx-layout-container-auto hx-layout-container-view">
-      <!-- 数据源选择 -->
-      <div
-        style="
-          display: flex;
-          gap: 12px;
-          align-items: center;
-          margin-bottom: 12px;
-        "
+  <Page auto-content-height>
+    <div class="mb-3 flex items-center gap-3">
+      <span class="whitespace-nowrap font-semibold">数据源：</span>
+      <ElSelect
+        v-model="selectedDsId"
+        class="w-[280px]"
+        @change="handleDsChange"
       >
-        <span style="font-weight: 600; white-space: nowrap">数据源：</span>
-        <ElSelect
-          v-model="selectedDsId"
-          style="width: 280px"
-          @change="handleDsChange"
-        >
-          <ElOption
-            v-for="ds in dsOptions"
-            :key="ds.value"
-            :label="ds.label"
-            :value="ds.value"
-          />
-        </ElSelect>
-      </div>
-
-      <ElTabs v-model="activeTab" @tab-change="onTabChange">
-        <!-- Tab 1：数据源表（可导入） -->
-        <ElTabPane label="数据源表" name="source">
-          <ElForm :inline="true">
-            <ElFormItem label="表名称">
-              <ElInput
-                v-model="tableKeyword"
-                clearable
-                placeholder="请输入表名称或表注释"
-                @keyup.enter="
-                  sourcePage = 1;
-                  loadSourceTables();
-                "
-              />
-            </ElFormItem>
-            <ElFormItem>
-              <ElButton
-                type="primary"
-                :icon="Search"
-                @click="
-                  sourcePage = 1;
-                  loadSourceTables();
-                "
-              >
-                搜索
-              </ElButton>
-              <ElButton
-                :icon="Refresh"
-                @click="
-                  tableKeyword = '';
-                  sourcePage = 1;
-                  loadSourceTables();
-                "
-              >
-                重置
-              </ElButton>
-              <ElButton
-                type="success"
-                :disabled="sourceTables.length === 0"
-                @click="doBatchImport"
-              >
-                批量导入
-              </ElButton>
-            </ElFormItem>
-          </ElForm>
-
-          <ElTable v-loading="loading" :data="sourceTables" border>
-            <ElTableColumn prop="tableName" label="表名称" min-width="180" />
-            <ElTableColumn
-              prop="tableComment"
-              label="表描述"
-              min-width="200"
-              show-overflow-tooltip
-            />
-            <ElTableColumn prop="engine" label="引擎" width="100" />
-            <ElTableColumn prop="tableRows" label="行数" width="100" />
-            <ElTableColumn
-              label="操作"
-              width="120"
-              align="center"
-              fixed="right"
-            >
-              <template #default="scope">
-                <ElButton
-                  link
-                  type="primary"
-                  :icon="Download"
-                  v-access:code="PERMS.gen.table.add"
-                  @click="doImport(scope.row.tableName)"
-                >
-                  导入配置
-                </ElButton>
-              </template>
-            </ElTableColumn>
-            <template #empty>
-              <ElEmpty description="暂无数据表" />
-            </template>
-          </ElTable>
-
-          <div
-            v-if="sourceTotal > 0"
-            style="margin-top: 16px; text-align: right"
-          >
-            <ElPagination
-              v-model:current-page="sourcePage"
-              v-model:page-size="sourceSize"
-              :total="sourceTotal"
-              :page-sizes="[10, 20, 50]"
-              background
-              layout="total, sizes, prev, pager, next, jumper"
-              @current-change="loadSourceTables"
-              @size-change="loadSourceTables"
-            />
-          </div>
-        </ElTabPane>
-
-        <!-- Tab 2：已导入表（管理配置） -->
-        <ElTabPane label="已导入表" name="imported">
-          <ElForm :inline="true">
-            <ElFormItem label="关键字">
-              <ElInput
-                v-model="importKeyword"
-                clearable
-                placeholder="表名/注释/类名"
-                @keyup.enter="
-                  importPage = 1;
-                  loadImportedTables();
-                "
-              />
-            </ElFormItem>
-            <ElFormItem>
-              <ElButton
-                type="primary"
-                :icon="Search"
-                @click="
-                  importPage = 1;
-                  loadImportedTables();
-                "
-              >
-                搜索
-              </ElButton>
-              <ElButton
-                :icon="Refresh"
-                @click="
-                  importKeyword = '';
-                  importPage = 1;
-                  loadImportedTables();
-                "
-              >
-                重置
-              </ElButton>
-            </ElFormItem>
-          </ElForm>
-
-          <ElTable v-loading="loading" :data="importedTables" border>
-            <ElTableColumn prop="tableName" label="表名称" min-width="180" />
-            <ElTableColumn
-              prop="tableComment"
-              label="表描述"
-              min-width="180"
-              show-overflow-tooltip
-            />
-            <ElTableColumn prop="className" label="类名" width="160" />
-            <ElTableColumn prop="moduleName" label="模块" width="120" />
-            <ElTableColumn prop="functionAuthor" label="作者" width="100" />
-            <ElTableColumn
-              prop="columnCount"
-              label="字段数"
-              width="80"
-              align="center"
-            />
-            <ElTableColumn
-              label="操作"
-              width="280"
-              align="center"
-              fixed="right"
-            >
-              <template #default="scope">
-                <ElButton
-                  link
-                  type="primary"
-                  :icon="Edit"
-                  v-access:code="PERMS.gen.table.edit"
-                  @click="openColumnConfig(asImportedRow(scope.row))"
-                >
-                  配置字段
-                </ElButton>
-                <ElButton
-                  link
-                  type="success"
-                  :icon="Download"
-                  v-access:code="PERMS.gen.table.download"
-                  @click="openGenerate(asImportedRow(scope.row))"
-                >
-                  生成代码
-                </ElButton>
-                <ElButton
-                  link
-                  type="danger"
-                  :icon="Delete"
-                  v-access:code="PERMS.gen.table.del"
-                  @click="deleteImported(asImportedRow(scope.row))"
-                >
-                  删除
-                </ElButton>
-              </template>
-            </ElTableColumn>
-            <template #empty>
-              <ElEmpty description="暂无已导入表" />
-            </template>
-          </ElTable>
-
-          <div
-            v-if="importTotal > 0"
-            style="margin-top: 16px; text-align: right"
-          >
-            <ElPagination
-              v-model:current-page="importPage"
-              v-model:page-size="importSize"
-              :total="importTotal"
-              :page-sizes="[10, 20, 50]"
-              background
-              layout="total, sizes, prev, pager, next, jumper"
-              @current-change="loadImportedTables"
-              @size-change="loadImportedTables"
-            />
-          </div>
-        </ElTabPane>
-      </ElTabs>
+        <ElOption
+          v-for="dataSource in dsOptions"
+          :key="dataSource.value"
+          :label="dataSource.label"
+          :value="dataSource.value"
+        />
+      </ElSelect>
     </div>
 
-    <!-- 列配置编辑弹窗 -->
+    <ElTabs v-model="activeTab" @tab-change="onTabChange">
+      <ElTabPane label="数据源表" name="source">
+        <SourceGrid>
+          <template #toolbar-tools>
+            <ElButton
+              v-access:code="PERMS.gen.table.add"
+              :disabled="currentSourceRows.length === 0"
+              type="success"
+              @click="doBatchImport"
+            >
+              批量导入当前页
+            </ElButton>
+          </template>
+
+          <template #operation="{ row }">
+            <ElButton
+              v-access:code="PERMS.gen.table.add"
+              link
+              type="primary"
+              @click="doImport(row)"
+            >
+              导入配置
+            </ElButton>
+          </template>
+        </SourceGrid>
+      </ElTabPane>
+
+      <ElTabPane label="已导入表" name="imported">
+        <ImportedGrid>
+          <template #operation="{ row }">
+            <ElButton
+              v-access:code="PERMS.gen.table.edit"
+              link
+              type="primary"
+              @click="openColumnConfig(row)"
+            >
+              配置字段
+            </ElButton>
+            <ElButton
+              v-access:code="PERMS.gen.table.download"
+              link
+              type="success"
+              @click="openGenerate(row)"
+            >
+              生成代码
+            </ElButton>
+            <ElButton
+              v-access:code="PERMS.gen.table.del"
+              link
+              type="danger"
+              @click="deleteImported(row)"
+            >
+              删除
+            </ElButton>
+          </template>
+        </ImportedGrid>
+      </ElTabPane>
+    </ElTabs>
+
     <ElDialog
       v-model="columnDialogVisible"
       :title="`字段配置 - ${columnTableName}`"
-      width="95%"
       top="40px"
+      width="95%"
     >
       <div v-loading="columnDialogLoading">
         <ElTable :data="columns" border max-height="60vh">
@@ -555,8 +384,8 @@ loadDataSources();
             <template #default="scope">
               <ElInput
                 v-model="scope.row.columnComment"
-                size="small"
                 placeholder="字段注释"
+                size="small"
               />
             </template>
           </ElTableColumn>
@@ -580,47 +409,25 @@ loadDataSources();
               <ElInput v-model="scope.row.javaField" size="small" />
             </template>
           </ElTableColumn>
-          <ElTableColumn label="插入" width="65" align="center">
+          <ElTableColumn
+            v-for="flag in [
+              { field: 'insert', label: '插入' },
+              { field: 'edit', label: '编辑' },
+              { field: 'list', label: '列表' },
+              { field: 'query', label: '查询' },
+            ]"
+            :key="flag.field"
+            :label="flag.label"
+            align="center"
+            width="65"
+          >
             <template #default="scope">
               <ElTag
-                :type="scope.row.insert ? 'success' : 'info'"
-                style="cursor: pointer"
-                @click="scope.row.insert = !scope.row.insert"
+                :type="scope.row[flag.field] ? 'success' : 'info'"
+                class="cursor-pointer"
+                @click="scope.row[flag.field] = !scope.row[flag.field]"
               >
-                {{ scope.row.insert ? '是' : '否' }}
-              </ElTag>
-            </template>
-          </ElTableColumn>
-          <ElTableColumn label="编辑" width="65" align="center">
-            <template #default="scope">
-              <ElTag
-                :type="scope.row.edit ? 'success' : 'info'"
-                style="cursor: pointer"
-                @click="scope.row.edit = !scope.row.edit"
-              >
-                {{ scope.row.edit ? '是' : '否' }}
-              </ElTag>
-            </template>
-          </ElTableColumn>
-          <ElTableColumn label="列表" width="65" align="center">
-            <template #default="scope">
-              <ElTag
-                :type="scope.row.list ? 'success' : 'info'"
-                style="cursor: pointer"
-                @click="scope.row.list = !scope.row.list"
-              >
-                {{ scope.row.list ? '是' : '否' }}
-              </ElTag>
-            </template>
-          </ElTableColumn>
-          <ElTableColumn label="查询" width="65" align="center">
-            <template #default="scope">
-              <ElTag
-                :type="scope.row.query ? 'success' : 'info'"
-                style="cursor: pointer"
-                @click="scope.row.query = !scope.row.query"
-              >
-                {{ scope.row.query ? '是' : '否' }}
+                {{ scope.row[flag.field] ? '是' : '否' }}
               </ElTag>
             </template>
           </ElTableColumn>
@@ -638,11 +445,11 @@ loadDataSources();
               </ElSelect>
             </template>
           </ElTableColumn>
-          <ElTableColumn label="必填" width="65" align="center">
+          <ElTableColumn label="必填" align="center" width="65">
             <template #default="scope">
               <ElTag
                 :type="scope.row.required ? 'danger' : 'info'"
-                style="cursor: pointer"
+                class="cursor-pointer"
                 @click="scope.row.required = !scope.row.required"
               >
                 {{ scope.row.required ? '是' : '否' }}
@@ -666,8 +473,8 @@ loadDataSources();
             <template #default="scope">
               <ElInput
                 v-model="scope.row.dictType"
-                size="small"
                 placeholder="字典编码"
+                size="small"
               />
             </template>
           </ElTableColumn>
@@ -676,13 +483,13 @@ loadDataSources();
       <template #footer>
         <ElButton @click="columnDialogVisible = false">关闭</ElButton>
         <ElButton
-          type="primary"
           :loading="columnDialogLoading"
+          type="primary"
           @click="saveColumnConfig"
         >
           保存配置
         </ElButton>
       </template>
     </ElDialog>
-  </div>
+  </Page>
 </template>

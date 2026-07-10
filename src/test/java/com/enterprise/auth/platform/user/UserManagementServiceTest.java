@@ -8,12 +8,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.authz.DataScopeType;
+import com.enterprise.auth.platform.modules.dept.infrastructure.entity.SysDeptEntity;
+import com.enterprise.auth.platform.modules.dept.infrastructure.mapper.SysDeptMapper;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
 import com.enterprise.auth.platform.modules.role.infrastructure.entity.SysRoleEntity;
 import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMapper;
 import com.enterprise.auth.platform.common.context.TenantContext;
-import com.enterprise.auth.platform.modules.user.interfaces.CreateUserRequest;
 import com.enterprise.auth.platform.modules.user.interfaces.CreateUserRequest;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.user.application.UserManagementService;
@@ -34,6 +35,7 @@ class UserManagementServiceTest {
     private static final String CROSS_TENANT_USER = "user_cross_tenant_ut";
     private static final String ADMIN_ROLE = "USER_SELF_ADMIN_UT";
     private static final String STAFF_ROLE = "USER_SELF_STAFF_UT";
+    private static final String HIDDEN_DEPT_CODE = "USER_HIDDEN_DEPT_UT";
 
     @Autowired
     private UserManagementService userManagementService;
@@ -43,6 +45,9 @@ class UserManagementServiceTest {
 
     @Autowired
     private SysRoleMapper sysRoleMapper;
+
+    @Autowired
+    private SysDeptMapper sysDeptMapper;
 
     @Autowired
     private PasswordHasher passwordHasher;
@@ -85,12 +90,18 @@ class UserManagementServiceTest {
                 "platform",
                 CROSS_TENANT_USER
         );
+        jdbcTemplate.update(
+                "DELETE FROM sys_dept WHERE tenant_id = ? AND dept_code = ?",
+                "tenant-a",
+                HIDDEN_DEPT_CODE
+        );
     }
 
     @Test
     void shouldRejectCreatingUserInHiddenDepartment() {
         TenantContext.setTenantId("tenant-a");
-        Long scopeUserId = ensureUser("tenant-a", SCOPE_USER, 2L);
+        Long scopeUserId = ensureUser("tenant-a", SCOPE_USER, tenantRootDeptId());
+        Long hiddenDeptId = ensureHiddenDept();
         authenticateScopedUser(scopeUserId, "upms:sysuser:edit");
 
         assertThatThrownBy(() -> userManagementService.create(new CreateUserRequest(
@@ -99,7 +110,7 @@ class UserManagementServiceTest {
                 null,
                 null,
                 "UserTest@123",
-                3L,
+                hiddenDeptId,
                 true,
                 Set.of()
         )))
@@ -110,8 +121,9 @@ class UserManagementServiceTest {
     @Test
     void shouldRejectUpdatingHiddenUser() {
         TenantContext.setTenantId("tenant-a");
-        Long scopeUserId = ensureUser("tenant-a", SCOPE_USER, 2L);
-        Long hiddenUserId = ensureUser("tenant-a", HIDDEN_USER, 3L);
+        Long scopeUserId = ensureUser("tenant-a", SCOPE_USER, tenantRootDeptId());
+        Long hiddenDeptId = ensureHiddenDept();
+        Long hiddenUserId = ensureUser("tenant-a", HIDDEN_USER, hiddenDeptId);
         authenticateScopedUser(scopeUserId, "upms:sysuser:edit");
 
         assertThatThrownBy(() -> userManagementService.update(hiddenUserId, new CreateUserRequest(
@@ -120,7 +132,7 @@ class UserManagementServiceTest {
                 null,
                 null,
                 null,
-                3L,
+                hiddenDeptId,
                 true,
                 null
         )))
@@ -132,7 +144,8 @@ class UserManagementServiceTest {
     void shouldRejectCreatingUserWhenUsernameExistsInAnotherTenant() {
         TenantContext.setTenantId("tenant-a");
         ensureUser("platform", CROSS_TENANT_USER, 1L);
-        Long scopeUserId = ensureUser("tenant-a", SCOPE_USER, 2L);
+        Long tenantRootDeptId = tenantRootDeptId();
+        Long scopeUserId = ensureUser("tenant-a", SCOPE_USER, tenantRootDeptId);
         authenticateScopedUser(scopeUserId, "upms:sysuser:edit");
 
         assertThatThrownBy(() -> userManagementService.create(new CreateUserRequest(
@@ -141,7 +154,7 @@ class UserManagementServiceTest {
                 null,
                 null,
                 "UserTest@123",
-                2L,
+                tenantRootDeptId,
                 true,
                 Set.of()
         )))
@@ -154,7 +167,7 @@ class UserManagementServiceTest {
     @Test
     void shouldRejectDeletingCurrentUser() {
         TenantContext.setTenantId("tenant-a");
-        Long currentUserId = ensureUser("tenant-a", SCOPE_USER, 2L);
+        Long currentUserId = ensureUser("tenant-a", SCOPE_USER, tenantRootDeptId());
         authenticateScopedUser(currentUserId, "upms:sysuser:edit");
 
         assertThatThrownBy(() -> userManagementService.delete(currentUserId))
@@ -165,7 +178,8 @@ class UserManagementServiceTest {
     @Test
     void shouldRejectDisablingCurrentUser() {
         TenantContext.setTenantId("tenant-a");
-        Long currentUserId = ensureUser("tenant-a", SCOPE_USER, 2L);
+        Long tenantRootDeptId = tenantRootDeptId();
+        Long currentUserId = ensureUser("tenant-a", SCOPE_USER, tenantRootDeptId);
         authenticateScopedUser(currentUserId, "upms:sysuser:edit");
 
         assertThatThrownBy(() -> userManagementService.update(currentUserId, new CreateUserRequest(
@@ -174,7 +188,7 @@ class UserManagementServiceTest {
                 null,
                 null,
                 null,
-                2L,
+                tenantRootDeptId,
                 false,
                 null
         )))
@@ -185,7 +199,7 @@ class UserManagementServiceTest {
     @Test
     void shouldRejectRemovingAllRolesFromCurrentUser() {
         TenantContext.setTenantId("tenant-a");
-        Long currentUserId = ensureUser("tenant-a", SCOPE_USER, 2L);
+        Long currentUserId = ensureUser("tenant-a", SCOPE_USER, tenantRootDeptId());
         ensureRole("tenant-a", ADMIN_ROLE);
         authenticateScopedUser(currentUserId, "upms:sysuser:edit");
 
@@ -197,7 +211,7 @@ class UserManagementServiceTest {
     @Test
     void platformAdminShouldAssignAndLoadRolesFromTargetTenant() {
         TenantContext.setGlobalScope("platform");
-        Long tenantUserId = ensureUser("tenant-a", CROSS_TENANT_USER, 2L);
+        Long tenantUserId = ensureUser("tenant-a", CROSS_TENANT_USER, tenantRootDeptId());
         Long tenantRoleId = ensureRole("tenant-a", STAFF_ROLE);
         Long platformRoleId = ensureRole("platform", STAFF_ROLE);
         authenticatePlatformAdmin();
@@ -217,6 +231,7 @@ class UserManagementServiceTest {
     @Test
     void platformAdminShouldCreateUserInRequestedTenant() {
         TenantContext.setGlobalScope("platform");
+        Long tenantRootDeptId = tenantRootDeptId();
         ensureRole("tenant-a", STAFF_ROLE);
         authenticatePlatformAdmin();
 
@@ -226,7 +241,7 @@ class UserManagementServiceTest {
                 null,
                 null,
                 "UserTest@123",
-                2L,
+                tenantRootDeptId,
                 true,
                 Set.of(STAFF_ROLE),
                 "tenant-a"
@@ -266,6 +281,29 @@ class UserManagementServiceTest {
         entity.setRoleName(roleCode);
         entity.setDataScopeType(DataScopeType.ALL.name());
         sysRoleMapper.insert(entity);
+        return entity.getId();
+    }
+
+    private Long tenantRootDeptId() {
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_dept WHERE tenant_id = ? AND parent_id IS NULL AND deleted = 0 ORDER BY id LIMIT 1",
+                Long.class,
+                "tenant-a"
+        );
+    }
+
+    private Long ensureHiddenDept() {
+        jdbcTemplate.update(
+                "DELETE FROM sys_dept WHERE tenant_id = ? AND dept_code = ?",
+                "tenant-a",
+                HIDDEN_DEPT_CODE
+        );
+        SysDeptEntity entity = new SysDeptEntity();
+        entity.setTenantId("tenant-a");
+        entity.setParentId(tenantRootDeptId());
+        entity.setDeptCode(HIDDEN_DEPT_CODE);
+        entity.setDeptName("用户测试隐藏部门");
+        sysDeptMapper.insert(entity);
         return entity.getId();
     }
 

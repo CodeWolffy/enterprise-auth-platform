@@ -1,6 +1,5 @@
 package com.enterprise.auth.platform.modules.workflow.application;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
@@ -12,19 +11,12 @@ import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.notification.application.NotificationPublishCommand;
 import com.enterprise.auth.platform.modules.notification.application.NotificationPublisher;
-import com.enterprise.auth.platform.modules.workflow.domain.WorkflowTaskStatus;
-import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfProcessInstanceEntity;
-import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfTaskEntity;
-import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfTaskUrgeEntity;
-import com.enterprise.auth.platform.modules.workflow.infrastructure.mapper.WfProcessInstanceMapper;
-import com.enterprise.auth.platform.modules.workflow.infrastructure.mapper.WfTaskMapper;
-import com.enterprise.auth.platform.modules.workflow.infrastructure.mapper.WfTaskUrgeMapper;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.enterprise.auth.platform.modules.workflow.domain.WorkflowInstance;
+import com.enterprise.auth.platform.modules.workflow.domain.WorkflowRepository;
+import com.enterprise.auth.platform.modules.workflow.domain.WorkflowTask;
+import com.enterprise.auth.platform.modules.workflow.domain.WorkflowTaskUrge;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -45,258 +37,175 @@ public class WorkflowTaskUrgeService {
     private static final int SAME_TASK_COOLDOWN_MINUTES = 1;
     private static final int DAILY_TASK_LIMIT = 5;
 
-    private final WfTaskUrgeMapper urgeMapper;
-    private final WfTaskMapper taskMapper;
-    private final WfProcessInstanceMapper instanceMapper;
+    private final WorkflowRepository repository;
+    private final WorkflowStore store;
     private final CurrentUserService currentUserService;
-    private final ObjectMapper objectMapper;
     private final NotificationPublisher notificationPublisher;
-    private static final TypeReference<java.util.Set<Long>> LONG_SET_TYPE = new TypeReference<>() { };
-    private static final TypeReference<java.util.Set<String>> STRING_SET_TYPE = new TypeReference<>() { };
 
     public WorkflowTaskUrgeService(
-            WfTaskUrgeMapper urgeMapper,
-            WfTaskMapper taskMapper,
-            WfProcessInstanceMapper instanceMapper,
+            WorkflowRepository repository,
+            WorkflowStore store,
             CurrentUserService currentUserService,
-            ObjectMapper objectMapper,
             NotificationPublisher notificationPublisher
     ) {
-        this.urgeMapper = urgeMapper;
-        this.taskMapper = taskMapper;
-        this.instanceMapper = instanceMapper;
+        this.repository = repository;
+        this.store = store;
         this.currentUserService = currentUserService;
-        this.objectMapper = objectMapper;
         this.notificationPublisher = notificationPublisher;
     }
 
     @Transactional
     public WorkflowTaskUrgeResult urge(Long taskId, WorkflowTaskCommand command) {
         UserAccount user = currentUserService.requireCurrentUser();
-        String tenantId = currentTenantId(user);
-        WfTaskEntity task = taskMapper.selectOne(new LambdaQueryWrapper<WfTaskEntity>()
-                .eq(WfTaskEntity::getId, taskId)
-                .eq(WfTaskEntity::getTenantId, tenantId)
-                .eq(WfTaskEntity::getStatus, WorkflowTaskStatus.PENDING.name())
-                .eq(WfTaskEntity::getDeleted, 0)
-                .last("limit 1"));
-        if (task == null) {
-            throw new BusinessException("NOT_FOUND", "待办任务不存在或已结束");
-        }
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform(user.tenantId());
+        WorkflowTask task = repository.findPendingTask(tenantId, taskId)
+                .orElseThrow(() -> new BusinessException("NOT_FOUND", "待办任务不存在或已结束"));
         if (!canUrge(task, user)) {
             throw new BusinessException("ACCESS_DENIED", "无权催办该任务");
         }
         enforceUrgeFrequency(tenantId, task.getId(), user.id());
 
-        WfTaskUrgeEntity entity = new WfTaskUrgeEntity();
-        entity.setTenantId(tenantId);
-        entity.setTaskId(task.getId());
-        entity.setInstanceId(task.getInstanceId());
-        entity.setUrgedByUserId(user.id());
-        entity.setUrgedByUsername(user.username());
-        entity.setComment(StringUtils.hasText(command.comment()) ? command.comment().trim() : null);
-        entity.setUrgedAt(TimeSupport.now());
-        urgeMapper.insert(entity);
+        WorkflowTaskUrge urge = new WorkflowTaskUrge();
+        urge.setTenantId(tenantId);
+        urge.setTaskId(task.getId());
+        urge.setInstanceId(task.getInstanceId());
+        urge.setUrgedByUserId(user.id());
+        urge.setUrgedByUsername(user.username());
+        urge.setComment(WorkflowSupport.normalizeText(command.comment()));
+        urge.setUrgedAt(TimeSupport.now());
+        repository.insertUrge(urge);
 
         Set<String> targets = urgeTargets(task);
-        publishAfterCommit(buildUrgeNotification(tenantId, task, entity, user));
-        WorkflowTaskUrgeView view = WorkflowTaskUrgeView.from(entity, targets);
-        int total = countUrges(task.getTenantId(), task.getId());
-        return new WorkflowTaskUrgeResult(view, total, null);
+        publishAfterCommit(buildUrgeNotification(tenantId, task, urge, user));
+        WorkflowTaskUrgeView view = WorkflowTaskUrgeView.from(urge, targets);
+        return new WorkflowTaskUrgeResult(view, countUrges(task.getTenantId(), task.getId()), null);
     }
 
     public List<WorkflowTaskUrgeView> listUrges(Long taskId) {
         UserAccount user = currentUserService.requireCurrentUser();
-        String tenantId = currentTenantId(user);
-        WfTaskEntity task = taskMapper.selectOne(new LambdaQueryWrapper<WfTaskEntity>()
-                .eq(WfTaskEntity::getId, taskId)
-                .eq(WfTaskEntity::getTenantId, tenantId)
-                .eq(WfTaskEntity::getDeleted, 0)
-                .last("limit 1"));
-        if (task == null) {
-            throw new BusinessException("NOT_FOUND", "任务不存在");
-        }
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform(user.tenantId());
+        WorkflowTask task = store.requireTask(tenantId, taskId);
         if (!canViewUrges(task, user)) {
             throw new BusinessException("ACCESS_DENIED", "无权查看该任务催办历史");
         }
-        List<WfTaskUrgeEntity> records = urgeMapper.selectList(new LambdaQueryWrapper<WfTaskUrgeEntity>()
-                .eq(WfTaskUrgeEntity::getTenantId, tenantId)
-                .eq(WfTaskUrgeEntity::getTaskId, taskId)
-                .eq(WfTaskUrgeEntity::getDeleted, 0)
-                .orderByDesc(WfTaskUrgeEntity::getUrgedAt)
-                .orderByDesc(WfTaskUrgeEntity::getId));
-        List<WorkflowTaskUrgeView> views = new ArrayList<>();
-        for (WfTaskUrgeEntity entity : records) {
-            views.add(WorkflowTaskUrgeView.from(entity, urgeTargets(task)));
-        }
-        return views;
+        Set<String> targets = urgeTargets(task);
+        return repository.findUrgesByTask(tenantId, taskId).stream()
+                .map(urge -> WorkflowTaskUrgeView.from(urge, targets))
+                .toList();
     }
 
     public int countUrges(String tenantId, Long taskId) {
-        Long count = urgeMapper.selectCount(new LambdaQueryWrapper<WfTaskUrgeEntity>()
-                .eq(WfTaskUrgeEntity::getTenantId, tenantId)
-                .eq(WfTaskUrgeEntity::getTaskId, taskId)
-                .eq(WfTaskUrgeEntity::getDeleted, 0));
-        return count == null ? 0 : count.intValue();
+        return Math.toIntExact(repository.countUrges(tenantId, taskId));
     }
 
     public PageResult<WorkflowTaskUrgeView> listUrgesByInstance(Long instanceId, int page, int size) {
         UserAccount user = currentUserService.requireCurrentUser();
-        String tenantId = currentTenantId(user);
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform(user.tenantId());
         ensureInstanceUrgesVisible(tenantId, instanceId, user);
         int safePage = PaginationSupport.normalizePage(page);
         int safeSize = PaginationSupport.normalizeSize(size, 100);
-        long total = urgeMapper.selectCount(new LambdaQueryWrapper<WfTaskUrgeEntity>()
-                .eq(WfTaskUrgeEntity::getTenantId, tenantId)
-                .eq(WfTaskUrgeEntity::getInstanceId, instanceId)
-                .eq(WfTaskUrgeEntity::getDeleted, 0));
+        long total = repository.countUrgesByInstance(tenantId, instanceId);
         int offset = (safePage - 1) * safeSize;
-        List<WfTaskUrgeEntity> records = urgeMapper.selectList(new LambdaQueryWrapper<WfTaskUrgeEntity>()
-                .eq(WfTaskUrgeEntity::getTenantId, tenantId)
-                .eq(WfTaskUrgeEntity::getInstanceId, instanceId)
-                .eq(WfTaskUrgeEntity::getDeleted, 0)
-                .orderByDesc(WfTaskUrgeEntity::getUrgedAt)
-                .orderByDesc(WfTaskUrgeEntity::getId)
-                .last("limit " + offset + "," + safeSize));
-        List<WorkflowTaskUrgeView> views = new ArrayList<>();
-        for (WfTaskUrgeEntity entity : records) {
-            views.add(WorkflowTaskUrgeView.from(entity, Set.of("当前处理人")));
-        }
-        return PageResult.of(total, safePage, safeSize, views);
+        List<WorkflowTaskUrgeView> records = repository
+                .findUrgesByInstance(tenantId, instanceId, offset, safeSize)
+                .stream()
+                .map(urge -> WorkflowTaskUrgeView.from(urge, Set.of("当前处理人")))
+                .toList();
+        return PageResult.of(total, safePage, safeSize, records);
     }
 
-    private boolean canUrge(WfTaskEntity task, UserAccount user) {
+    private boolean canUrge(WorkflowTask task, UserAccount user) {
         if (user.permissions().contains(PermissionCodes.WORKFLOW_TODO_EDIT)) {
             return true;
         }
-        WfProcessInstanceEntity instance = instanceMapper.selectOne(new LambdaQueryWrapper<WfProcessInstanceEntity>()
-                .eq(WfProcessInstanceEntity::getTenantId, task.getTenantId())
-                .eq(WfProcessInstanceEntity::getId, task.getInstanceId())
-                .eq(WfProcessInstanceEntity::getDeleted, 0)
-                .last("limit 1"));
-        return instance != null && Objects.equals(instance.getStarterUserId(), user.id());
+        return repository.findInstance(task.getTenantId(), task.getInstanceId())
+                .map(instance -> Objects.equals(instance.getStarterUserId(), user.id()))
+                .orElse(false);
     }
 
     private void enforceUrgeFrequency(String tenantId, Long taskId, Long userId) {
         Instant now = TimeSupport.now();
-        Long recentCount = urgeMapper.selectCount(new LambdaQueryWrapper<WfTaskUrgeEntity>()
-                .eq(WfTaskUrgeEntity::getTenantId, tenantId)
-                .eq(WfTaskUrgeEntity::getTaskId, taskId)
-                .eq(WfTaskUrgeEntity::getUrgedByUserId, userId)
-                .eq(WfTaskUrgeEntity::getDeleted, 0)
-                .ge(WfTaskUrgeEntity::getUrgedAt, now.minus(Duration.ofMinutes(SAME_TASK_COOLDOWN_MINUTES))));
-        if (recentCount != null && recentCount > 0) {
+        if (repository.countUserUrgesSince(
+                tenantId, taskId, userId, now.minus(Duration.ofMinutes(SAME_TASK_COOLDOWN_MINUTES))) > 0) {
             throw new BusinessException("RATE_LIMITED", "催办过于频繁，请稍后再试");
         }
-        Long dailyCount = urgeMapper.selectCount(new LambdaQueryWrapper<WfTaskUrgeEntity>()
-                .eq(WfTaskUrgeEntity::getTenantId, tenantId)
-                .eq(WfTaskUrgeEntity::getTaskId, taskId)
-                .eq(WfTaskUrgeEntity::getUrgedByUserId, userId)
-                .eq(WfTaskUrgeEntity::getDeleted, 0)
-                .ge(WfTaskUrgeEntity::getUrgedAt, TimeSupport.startOfDay(TimeSupport.today(TimeZoneContext.getZone()), TimeZoneContext.getZone())));
-        if (dailyCount != null && dailyCount >= DAILY_TASK_LIMIT) {
+        Instant todayStart = TimeSupport.startOfDay(
+                TimeSupport.today(TimeZoneContext.getZone()), TimeZoneContext.getZone());
+        if (repository.countUserUrgesSince(tenantId, taskId, userId, todayStart) >= DAILY_TASK_LIMIT) {
             throw new BusinessException("RATE_LIMITED", "该任务今日催办次数已达上限");
         }
     }
 
-    private boolean canViewUrges(WfTaskEntity task, UserAccount user) {
-        if (user.permissions().contains(PermissionCodes.WORKFLOW_TODO_EDIT) || user.permissions().contains(PermissionCodes.WORKFLOW_TODO_GET)) {
+    private boolean canViewUrges(WorkflowTask task, UserAccount user) {
+        if (user.permissions().contains(PermissionCodes.WORKFLOW_TODO_EDIT)
+                || user.permissions().contains(PermissionCodes.WORKFLOW_TODO_GET)) {
             return true;
         }
-        WfProcessInstanceEntity instance = instanceMapper.selectOne(new LambdaQueryWrapper<WfProcessInstanceEntity>()
-                .eq(WfProcessInstanceEntity::getTenantId, task.getTenantId())
-                .eq(WfProcessInstanceEntity::getId, task.getInstanceId())
-                .eq(WfProcessInstanceEntity::getDeleted, 0)
-                .last("limit 1"));
-        if (instance != null && Objects.equals(instance.getStarterUserId(), user.id())) {
+        if (repository.findInstance(task.getTenantId(), task.getInstanceId())
+                .map(instance -> Objects.equals(instance.getStarterUserId(), user.id()))
+                .orElse(false)) {
             return true;
         }
-        if (task.getAssigneeUserId() != null && Objects.equals(task.getAssigneeUserId(), user.id())) {
+        if (Objects.equals(task.getAssigneeUserId(), user.id()) || task.getCandidateUserIds().contains(user.id())) {
             return true;
         }
-        Set<Long> candidateUserIds = parseLongSet(task.getCandidateUserIdsJson());
-        if (candidateUserIds.contains(user.id())) {
-            return true;
-        }
-        Set<String> candidateGroupCodes = parseStringSet(task.getCandidateGroupCodesJson());
-        return user.roles().stream().anyMatch(candidateGroupCodes::contains);
+        return user.roles().stream().anyMatch(task.getCandidateGroupCodes()::contains);
     }
 
     private void ensureInstanceUrgesVisible(String tenantId, Long instanceId, UserAccount user) {
-        Long taskCount = taskMapper.selectCount(new LambdaQueryWrapper<WfTaskEntity>()
-                .eq(WfTaskEntity::getTenantId, tenantId)
-                .eq(WfTaskEntity::getInstanceId, instanceId)
-                .eq(WfTaskEntity::getDeleted, 0));
-        if (taskCount == null || taskCount == 0) {
+        List<WorkflowTask> tasks = repository.findInstanceTasks(tenantId, instanceId);
+        if (tasks.isEmpty()) {
             throw new BusinessException("NOT_FOUND", "流程实例催办记录不存在");
         }
-        if (user.permissions().contains(PermissionCodes.WORKFLOW_TODO_EDIT) || user.permissions().contains(PermissionCodes.WORKFLOW_TODO_GET)) {
+        if (user.permissions().contains(PermissionCodes.WORKFLOW_TODO_EDIT)
+                || user.permissions().contains(PermissionCodes.WORKFLOW_TODO_GET)) {
             return;
         }
-        WfProcessInstanceEntity instance = instanceMapper.selectOne(new LambdaQueryWrapper<WfProcessInstanceEntity>()
-                .eq(WfProcessInstanceEntity::getTenantId, tenantId)
-                .eq(WfProcessInstanceEntity::getId, instanceId)
-                .eq(WfProcessInstanceEntity::getDeleted, 0)
-                .last("limit 1"));
-        if (instance != null && Objects.equals(instance.getStarterUserId(), user.id())) {
+        if (repository.findInstance(tenantId, instanceId)
+                .map(instance -> Objects.equals(instance.getStarterUserId(), user.id()))
+                .orElse(false)) {
             return;
         }
-        boolean visible = taskMapper.selectList(new LambdaQueryWrapper<WfTaskEntity>()
-                        .eq(WfTaskEntity::getTenantId, tenantId)
-                        .eq(WfTaskEntity::getInstanceId, instanceId)
-                        .eq(WfTaskEntity::getDeleted, 0))
-                .stream()
-                .anyMatch(task -> canViewUrges(task, user));
-        if (!visible) {
+        if (tasks.stream().noneMatch(task -> canViewUrges(task, user))) {
             throw new BusinessException("ACCESS_DENIED", "无权查看该流程实例催办记录");
         }
     }
 
-    private Set<String> urgeTargets(WfTaskEntity task) {
+    private Set<String> urgeTargets(WorkflowTask task) {
         Set<String> targets = new LinkedHashSet<>();
         if (StringUtils.hasText(task.getAssigneeUsername())) {
             targets.add(task.getAssigneeUsername().trim());
         }
-        Set<Long> candidateUserIds = parseLongSet(task.getCandidateUserIdsJson());
-        if (!candidateUserIds.isEmpty()) {
-            targets.add("候选人 " + candidateUserIds.size() + " 人");
+        if (!task.getCandidateUserIds().isEmpty()) {
+            targets.add("候选人 " + task.getCandidateUserIds().size() + " 人");
         }
-        Set<String> candidateGroupCodes = parseStringSet(task.getCandidateGroupCodesJson());
-        for (String groupCode : candidateGroupCodes) {
-            targets.add("候选组 " + groupCode);
-        }
+        task.getCandidateGroupCodes().forEach(groupCode -> targets.add("候选组 " + groupCode));
         if (targets.isEmpty()) {
             targets.add("当前处理人");
         }
         return targets;
     }
 
-    private NotificationPublishCommand buildUrgeNotification(String tenantId, WfTaskEntity task, WfTaskUrgeEntity urge, UserAccount sender) {
+    private NotificationPublishCommand buildUrgeNotification(
+            String tenantId, WorkflowTask task, WorkflowTaskUrge urge, UserAccount sender) {
         Set<Long> recipientUserIds = new LinkedHashSet<>();
         Set<String> recipientRoleCodes = new LinkedHashSet<>();
         if (task.getAssigneeUserId() != null) {
             recipientUserIds.add(task.getAssigneeUserId());
         } else {
-            recipientUserIds.addAll(parseLongSet(task.getCandidateUserIdsJson()));
-            recipientRoleCodes.addAll(parseStringSet(task.getCandidateGroupCodesJson()));
+            recipientUserIds.addAll(task.getCandidateUserIds());
+            recipientRoleCodes.addAll(task.getCandidateGroupCodes());
         }
         if (recipientUserIds.isEmpty() && recipientRoleCodes.isEmpty()) {
             return null;
         }
-        WfProcessInstanceEntity instance = instanceMapper.selectOne(new LambdaQueryWrapper<WfProcessInstanceEntity>()
-                .eq(WfProcessInstanceEntity::getTenantId, tenantId)
-                .eq(WfProcessInstanceEntity::getId, task.getInstanceId())
-                .eq(WfProcessInstanceEntity::getDeleted, 0)
-                .last("limit 1"));
-        String instanceTitle = instance == null || !StringUtils.hasText(instance.getTitle()) ? "流程实例" : instance.getTitle().trim();
-        String businessKey = instance == null || !StringUtils.hasText(instance.getBusinessKey()) ? String.valueOf(task.getInstanceId()) : instance.getBusinessKey().trim();
+        WorkflowInstance instance = repository.findInstance(tenantId, task.getInstanceId()).orElse(null);
+        String instanceTitle = instance == null || !StringUtils.hasText(instance.getTitle())
+                ? "流程实例" : instance.getTitle().trim();
+        String businessKey = instance == null || !StringUtils.hasText(instance.getBusinessKey())
+                ? String.valueOf(task.getInstanceId()) : instance.getBusinessKey().trim();
         String reason = StringUtils.hasText(urge.getComment()) ? urge.getComment().trim() : "无";
         String stepName = StringUtils.hasText(task.getStepName()) ? task.getStepName().trim() : "当前节点";
-        String title = "流程待办催办：" + instanceTitle;
-        String content = "流程编号：" + businessKey
-                + "\n催办人：" + sender.username()
-                + "\n当前节点：" + stepName
-                + "\n催办原因：" + reason;
         return new NotificationPublishCommand(
                 tenantId,
                 "WORKFLOW_TASK_URGE",
@@ -317,8 +226,11 @@ public class WorkflowTaskUrgeService {
                         "senderName", sender.username(),
                         "reason", reason
                 ),
-                title,
-                content,
+                "流程待办催办：" + instanceTitle,
+                "流程编号：" + businessKey
+                        + "\n催办人：" + sender.username()
+                        + "\n当前节点：" + stepName
+                        + "\n催办原因：" + reason,
                 "WARNING",
                 "/workflow/todo?taskId=" + task.getId(),
                 Map.of("route", "/workflow/todo", "taskId", task.getId()),
@@ -336,9 +248,9 @@ public class WorkflowTaskUrgeService {
         Runnable publishTask = () -> {
             try {
                 notificationPublisher.publish(command);
-            } catch (Exception ex) {
+            } catch (Exception exception) {
                 log.warn("流程催办通知发布失败。tenantId={}，bizId={}，dedupKey={}",
-                        command.tenantId(), command.bizId(), command.dedupKey(), ex);
+                        command.tenantId(), command.bizId(), command.dedupKey(), exception);
             }
         };
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -351,35 +263,5 @@ public class WorkflowTaskUrgeService {
                 publishTask.run();
             }
         });
-    }
-
-    private Set<Long> parseLongSet(String json) {
-        if (json == null || json.isBlank()) {
-            return Set.of();
-        }
-        try {
-            Set<Long> values = objectMapper.readValue(json, LONG_SET_TYPE);
-            return values == null ? Set.of() : values;
-        } catch (JsonProcessingException ex) {
-            log.debug("流程候选用户 ID 解析失败，返回空集合。error={}", ex.getMessage());
-            return Set.of();
-        }
-    }
-
-    private Set<String> parseStringSet(String json) {
-        if (json == null || json.isBlank()) {
-            return Set.of();
-        }
-        try {
-            Set<String> values = objectMapper.readValue(json, STRING_SET_TYPE);
-            return values == null ? Set.of() : values;
-        } catch (JsonProcessingException ex) {
-            log.debug("流程候选组编码解析失败，返回空集合。error={}", ex.getMessage());
-            return Set.of();
-        }
-    }
-
-    private String currentTenantId(UserAccount user) {
-        return TenantContextSupport.currentTenantIdOr(user.tenantId());
     }
 }

@@ -108,4 +108,31 @@ public class TenantProfileFacade {
                                String lifecycleNote, String packageCode) {}
 
     public record PackageRecord(String packageCode, String packageName) {}
+
+    public List<TenantView> tenants() {
+        List<TenantRecord> tenants = listTenantRecords();
+        List<String> packageCodes = tenants.stream()
+                .map(TenantRecord::packageCode)
+                .filter(org.springframework.util.StringUtils::hasText)
+                .distinct()
+                .toList();
+        Map<String, PackageRecord> packages = loadPackageRecords(packageCodes);
+        return tenants.stream().map(tenant -> {
+            PackageRecord pkg = packages.get(tenant.packageCode());
+            return new TenantView(
+                    tenant.tenantId(), tenant.tenantName(),
+                    tenant.platformLevel() != null && tenant.platformLevel() == 1,
+                    tenant.tenantStatus(), tenant.authBeginAt(), tenant.expireAt(),
+                    tenant.packageCode(), pkg == null ? null : pkg.packageName(),
+                    tenant.logoUrl(), tenant.contactName(), tenant.contactPhone(), tenant.contactEmail(),
+                    tenant.website(), tenant.address(), tenant.lifecycleNote());
+        }).toList();
+    }
+
+    public TenantView tenant(String tenantId) {
+        return tenants().stream()
+                .filter(tenant -> tenant.tenantId().equals(tenantId))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException("租户不存在"));
+    }
 }

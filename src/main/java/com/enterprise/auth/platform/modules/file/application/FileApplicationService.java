@@ -170,7 +170,7 @@ public class FileApplicationService {
         FileVisibility resolvedVisibility = visibility == null ? FileVisibility.OWNER : visibility;
         assertVisibilityWritable(user, resolvedVisibility, requirePublicWritePermission);
 
-        String tenantId = currentTenantId(user);
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform(user.tenantId());
         String fileKey = newFileKey();
         String objectKey = buildObjectKey(tenantId, fileKey, file.getOriginalFilename());
         ObjectStorageService.StoredObject storedObject;
@@ -323,7 +323,7 @@ public class FileApplicationService {
     }
 
     private FileReadScope readableScope(UserAccount user) {
-        String activeTenantId = currentTenantId(user);
+        String activeTenantId = TenantContextSupport.currentTenantIdOrPlatform(user.tenantId());
         boolean platformScope = canAccessAllTenants(user);
         boolean restrictReadable = !platformScope && !hasFileRead(user);
         return new FileReadScope(activeTenantId, platformScope, restrictReadable, user.id());
@@ -331,7 +331,7 @@ public class FileApplicationService {
 
     private void assertReadable(SysStorageFileEntity entity, UserAccount user) {
         FileVisibility visibility = FileVisibility.from(entity.getVisibility());
-        String activeTenantId = currentTenantId(user);
+        String activeTenantId = TenantContextSupport.currentTenantIdOrPlatform(user.tenantId());
         switch (visibility) {
             case PUBLIC -> {
             }
@@ -361,7 +361,8 @@ public class FileApplicationService {
 
     private void assertDeletable(SysStorageFileEntity entity, UserAccount user) {
         boolean owner = entity.getOwnerUserId() != null && entity.getOwnerUserId().equals(user.id());
-        boolean sameTenantAdmin = entity.getTenantId().equals(currentTenantId(user)) && hasFileWrite(user);
+        boolean sameTenantAdmin = entity.getTenantId().equals(TenantContextSupport.currentTenantIdOrPlatform(user.tenantId()))
+                && hasFileWrite(user);
         boolean platformAdmin = canAccessAllTenants(user);
         if (!owner && !sameTenantAdmin && !platformAdmin) {
             throw new BusinessException("ACCESS_DENIED", "无权删除文件");
@@ -369,7 +370,9 @@ public class FileApplicationService {
     }
 
     private boolean canAccessAllTenants(UserAccount user) {
-        return platformAdminSupport.isPlatformSuperAdmin(user) && "platform".equals(currentTenantId(user));
+        return platformAdminSupport.isPlatformSuperAdmin(user)
+                && TenantContextSupport.PLATFORM_TENANT_ID.equals(
+                        TenantContextSupport.currentTenantIdOrPlatform(user.tenantId()));
     }
 
     private SysStorageFileEntity loadByFileKey(String fileKey) {
@@ -409,11 +412,6 @@ public class FileApplicationService {
         }
     }
 
-    private String currentTenantId(UserAccount user) {
-        String fallback = StringUtils.hasText(user.tenantId()) ? user.tenantId() : TenantContextSupport.PLATFORM_TENANT_ID;
-        return TenantContextSupport.currentTenantIdOr(fallback);
-    }
-
     private boolean hasFileRead(UserAccount user) {
         return user.permissions().contains(PermissionCodes.FILE_PAGE)
                 || user.permissions().contains(PermissionCodes.FILE_GET);
@@ -443,7 +441,8 @@ public class FileApplicationService {
 
     private String buildObjectKey(String tenantId, String fileKey, String originalFilename) {
         String extension = safeExtension(originalFilename);
-        return String.join("/", "tenant", tenantId, PATH_DATE.format(TimeSupport.now()), fileKey + extension);
+        String datePath = PATH_DATE.format(TimeSupport.now().atZone(TimeSupport.UTC));
+        return String.join("/", "tenant", tenantId, datePath, fileKey + extension);
     }
 
     private String safeExtension(String originalFilename) {

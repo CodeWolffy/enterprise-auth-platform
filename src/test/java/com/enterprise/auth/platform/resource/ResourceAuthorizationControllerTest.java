@@ -16,6 +16,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.auth.infrastructure.AuthPrincipalCacheService;
+import com.enterprise.auth.platform.test.SaTokenGlobalStateTestExecutionListener;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -32,11 +33,16 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import org.springframework.test.context.TestExecutionListeners;
 
 @SpringBootTest(properties = {
         "app.security.redis.session-enabled=false"
 })
 @AutoConfigureMockMvc
+@TestExecutionListeners(
+        listeners = SaTokenGlobalStateTestExecutionListener.class,
+        mergeMode = TestExecutionListeners.MergeMode.MERGE_WITH_DEFAULTS
+)
 class ResourceAuthorizationControllerTest {
 
     private static final String TEMP_ROLE_PREFIX = "RESOURCE_AUTH_V2_UT_";
@@ -78,7 +84,7 @@ class ResourceAuthorizationControllerTest {
 
     @Test
     void updateSystemMenuShouldRejectIdentityFieldChanges() throws Exception {
-        mockMvc.perform(put("/api/menus/{menuId}", 20L)
+        mockMvc.perform(put("/api/menus/{menuId}", systemMenuId())
                         .with(bearer(principal("platform", Set.of("upms:sysmenu:edit"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -104,13 +110,15 @@ class ResourceAuthorizationControllerTest {
 
     @Test
     void createMenuShouldRejectDuplicatePath() throws Exception {
+        Long systemMenuId = systemMenuId();
+
         mockMvc.perform(post("/api/menus")
                         .with(bearer(principal("platform", Set.of("upms:sysmenu:add"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "parentId": 20,
+                                  "parentId": %d,
                                   "type": "0",
                                   "name": "UT Duplicate Route",
                                   "permission": null,
@@ -122,7 +130,7 @@ class ResourceAuthorizationControllerTest {
                                   "outerStatus": false,
                                   "applicationKey": null
                                 }
-                                """))
+                                """.formatted(systemMenuId)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"))
                 .andExpect(jsonPath("$.message").value("访问路径已存在"));
@@ -130,13 +138,16 @@ class ResourceAuthorizationControllerTest {
 
     @Test
     void updateMenuShouldRejectDescendantAsParent() throws Exception {
-        mockMvc.perform(put("/api/menus/{menuId}", 20L)
+        Long systemMenuId = systemMenuId();
+        Long userMenuId = userMenuId();
+
+        mockMvc.perform(put("/api/menus/{menuId}", systemMenuId)
                         .with(bearer(principal("platform", Set.of("upms:sysmenu:edit"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "parentId": 21,
+                                  "parentId": %d,
                                   "type": "0",
                                   "name": "系统模块",
                                   "permission": null,
@@ -148,7 +159,7 @@ class ResourceAuthorizationControllerTest {
                                   "outerStatus": false,
                                   "applicationKey": null
                                 }
-                                """))
+                                """.formatted(userMenuId)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"))
                 .andExpect(jsonPath("$.message").exists());
@@ -156,13 +167,15 @@ class ResourceAuthorizationControllerTest {
 
     @Test
     void createButtonShouldRejectPermissionOnMenuNode() throws Exception {
+        Long systemMenuId = systemMenuId();
+
         mockMvc.perform(post("/api/menus")
                         .with(bearer(principal("platform", Set.of("upms:sysmenu:add"))))
                         .header("X-Tenant-Id", "platform")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "parentId": 20,
+                                  "parentId": %d,
                                   "type": "0",
                                   "name": "UT Menu With Permission",
                                   "permission": "upms:sysuser:get",
@@ -174,7 +187,7 @@ class ResourceAuthorizationControllerTest {
                                   "outerStatus": false,
                                   "applicationKey": null
                                 }
-                                """))
+                                """.formatted(systemMenuId)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"))
                 .andExpect(jsonPath("$.message").exists());
@@ -183,6 +196,7 @@ class ResourceAuthorizationControllerTest {
     @Test
     void createButtonShouldEvictPermissionSnapshots() throws Exception {
         AtomicReference<String> tokenRef = new AtomicReference<>();
+        Long userMenuId = userMenuId();
 
         mockMvc.perform(post("/api/menus")
                         .with(bearerWithSnapshotCapture(principal("platform", Set.of("upms:sysmenu:add")), tokenRef))
@@ -190,7 +204,7 @@ class ResourceAuthorizationControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "parentId": 21,
+                                  "parentId": %d,
                                   "type": "1",
                                   "name": "UT Reuse Button",
                                   "permission": "upms:resourceauth:reuse",
@@ -202,7 +216,7 @@ class ResourceAuthorizationControllerTest {
                                   "outerStatus": false,
                                   "applicationKey": null
                                 }
-                                """))
+                                """.formatted(userMenuId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.permission").value("upms:resourceauth:reuse"));
 
@@ -292,13 +306,15 @@ class ResourceAuthorizationControllerTest {
 
     @Test
     void tenantCannotMutatePlatformMenuTemplate() throws Exception {
+        Long userMenuId = userMenuId();
+
         mockMvc.perform(post("/api/menus")
                         .with(bearer(principal("tenant-a", Set.of("upms:sysmenu:add"))))
                         .header("X-Tenant-Id", "tenant-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "parentId": 21,
+                                  "parentId": %d,
                                   "type": "1",
                                   "name": "UT Tenant Boundary",
                                   "permission": "upms:sysuser:get",
@@ -310,7 +326,7 @@ class ResourceAuthorizationControllerTest {
                                   "outerStatus": false,
                                   "applicationKey": null
                                 }
-                                """))
+                                """.formatted(userMenuId)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"))
                 .andExpect(jsonPath("$.message").value("仅平台租户允许维护菜单模板"));
@@ -319,6 +335,8 @@ class ResourceAuthorizationControllerTest {
     @Test
     void assignRoleMenusShouldAutoFillAncestors() throws Exception {
         Long roleId = createTempRole("tenant-a");
+        Long systemMenuId = systemMenuId();
+        Long userMenuId = userMenuId();
 
         mockMvc.perform(put("/api/roles/{roleId}/menus", roleId)
                         .with(bearer(principal("tenant-a", Set.of("upms:sysrole:edit"))))
@@ -326,25 +344,27 @@ class ResourceAuthorizationControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "menuIds": [21]
+                                  "menuIds": [%d]
                                 }
-                                """))
+                                """.formatted(userMenuId)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[?(@==20)]").exists())
-                .andExpect(jsonPath("$.data[?(@==21)]").exists());
+                .andExpect(jsonPath("$.data[?(@==%d)]".formatted(systemMenuId)).exists())
+                .andExpect(jsonPath("$.data[?(@==%d)]".formatted(userMenuId)).exists());
 
         mockMvc.perform(get("/api/roles/{roleId}/menus", roleId)
                         .with(bearer(principal("tenant-a", Set.of("upms:sysrole:get"))))
                         .header("X-Tenant-Id", "tenant-a"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[?(@==20)]").exists())
-                .andExpect(jsonPath("$.data[?(@==21)]").exists());
+                .andExpect(jsonPath("$.data[?(@==%d)]".formatted(systemMenuId)).exists())
+                .andExpect(jsonPath("$.data[?(@==%d)]".formatted(userMenuId)).exists());
     }
 
     @Test
     void assignMenuShouldNotGrantChildButtonsUnlessSelected() throws Exception {
         Long roleId = createTempRole("tenant-a");
-        List<Long> childButtonIds = childButtonIdsUnder(21L);
+        Long systemMenuId = systemMenuId();
+        Long userMenuId = userMenuId();
+        List<Long> childButtonIds = childButtonIdsUnder(userMenuId);
 
         mockMvc.perform(put("/api/roles/{roleId}/menus", roleId)
                         .with(bearer(principal("tenant-a", Set.of("upms:sysrole:edit"))))
@@ -352,12 +372,12 @@ class ResourceAuthorizationControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "menuIds": [21]
+                                  "menuIds": [%d]
                                 }
-                                """))
+                                """.formatted(userMenuId)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[?(@==20)]").exists())
-                .andExpect(jsonPath("$.data[?(@==21)]").exists());
+                .andExpect(jsonPath("$.data[?(@==%d)]".formatted(systemMenuId)).exists())
+                .andExpect(jsonPath("$.data[?(@==%d)]".formatted(userMenuId)).exists());
 
         List<Long> assignedIds = jdbcTemplate.queryForList(
                 "SELECT menu_id FROM sys_role_menu WHERE tenant_id = ? AND role_id = ?",
@@ -365,15 +385,17 @@ class ResourceAuthorizationControllerTest {
                 "tenant-a",
                 roleId
         );
-        assertThat(assignedIds).contains(20L, 21L);
+        assertThat(assignedIds).contains(systemMenuId, userMenuId);
         assertThat(assignedIds).doesNotContain(childButtonIds.toArray(new Long[0]));
     }
 
     @Test
     void assignButtonShouldAutoFillAncestorMenuOnly() throws Exception {
         Long roleId = createTempRole("tenant-a");
-        Long buttonId = firstChildButtonIdUnder(21L);
-        List<Long> siblingButtonIds = childButtonIdsUnder(21L).stream()
+        Long systemMenuId = systemMenuId();
+        Long userMenuId = userMenuId();
+        Long buttonId = firstChildButtonIdUnder(userMenuId);
+        List<Long> siblingButtonIds = childButtonIdsUnder(userMenuId).stream()
                 .filter(id -> !id.equals(buttonId))
                 .toList();
 
@@ -387,8 +409,8 @@ class ResourceAuthorizationControllerTest {
                                 }
                                 """.formatted(buttonId)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[?(@==20)]").exists())
-                .andExpect(jsonPath("$.data[?(@==21)]").exists())
+                .andExpect(jsonPath("$.data[?(@==%d)]".formatted(systemMenuId)).exists())
+                .andExpect(jsonPath("$.data[?(@==%d)]".formatted(userMenuId)).exists())
                 .andExpect(jsonPath("$.data[?(@==%d)]".formatted(buttonId)).exists());
 
         List<Long> assignedIds = jdbcTemplate.queryForList(
@@ -397,7 +419,7 @@ class ResourceAuthorizationControllerTest {
                 "tenant-a",
                 roleId
         );
-        assertThat(assignedIds).contains(20L, 21L, buttonId);
+        assertThat(assignedIds).contains(systemMenuId, userMenuId, buttonId);
         assertThat(assignedIds).doesNotContain(siblingButtonIds.toArray(new Long[0]));
     }
 
@@ -417,6 +439,22 @@ class ResourceAuthorizationControllerTest {
         return ids.get(0);
     }
 
+    private Long systemMenuId() {
+        return menuIdByPath("/system");
+    }
+
+    private Long userMenuId() {
+        return menuIdByPath("/system/users");
+    }
+
+    private Long menuIdByPath(String path) {
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_menu WHERE path = ? AND type = '0' AND deleted = 0 ORDER BY id LIMIT 1",
+                Long.class,
+                path
+        );
+    }
+
     private Long createTempMenu() {
         jdbcTemplate.update("DELETE FROM sys_menu WHERE permission LIKE ?", "upms:utbatch:%");
         jdbcTemplate.update("DELETE FROM sys_menu WHERE permission LIKE ?", "ut:batch:%");
@@ -427,7 +465,7 @@ class ResourceAuthorizationControllerTest {
                     outer_status, application_key, deleted
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, '0', 0, ?, 0)
                 """,
-                20L,
+                systemMenuId(),
                 "UT 批量按钮菜单",
                 "upms:utbatch:read",
                 "/ut/batch-actions",

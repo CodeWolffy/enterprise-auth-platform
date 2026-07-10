@@ -9,7 +9,8 @@ import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
-import com.enterprise.auth.platform.modules.catalog.application.CatalogService;
+import com.enterprise.auth.platform.modules.role.application.RoleCatalogFacade;
+import com.enterprise.auth.platform.modules.role.application.RoleView;
 import com.enterprise.auth.platform.modules.role.application.RoleManagementService;
 import com.enterprise.auth.platform.modules.role.interfaces.CreateRoleRequest;
 import java.util.Set;
@@ -31,7 +32,7 @@ class RoleManagementServiceTest {
     private RoleManagementService roleManagementService;
 
     @Autowired
-    private CatalogService catalogService;
+    private RoleCatalogFacade roleCatalogFacade;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -153,7 +154,7 @@ class RoleManagementServiceTest {
         TenantContext.setTenantId(TENANT);
         bind(tenantAdmin("platform", Set.of("upms:sysrole:get")));
 
-        assertThat(catalogService.roles()).extracting(CatalogService.RoleView::tenantId)
+        assertThat(roleCatalogFacade.roles()).extracting(RoleView::tenantId)
                 .contains("platform", TENANT);
     }
 
@@ -167,12 +168,12 @@ class RoleManagementServiceTest {
                 "租户A角色",
                 "平台管理员创建",
                 DataScopeType.CUSTOM,
-                java.util.List.of(2L),
+                java.util.List.of(tenantRootDeptId()),
                 TENANT
         ));
 
         assertThat(result.tenantId()).isEqualTo(TENANT);
-        assertThat(result.customDeptIds()).containsExactly(2L);
+        assertThat(result.customDeptIds()).containsExactly(tenantRootDeptId());
 
         Long count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM sys_role WHERE tenant_id = ? AND role_code = ?",
@@ -188,6 +189,14 @@ class RoleManagementServiceTest {
                 1L, tenantId, "test_admin", "{noop}ignored",
                 true, Set.of("ADMIN"), permissions, Set.of(),
                 DataScopeType.ALL, 1
+        );
+    }
+
+    private Long tenantRootDeptId() {
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_dept WHERE tenant_id = ? AND parent_id IS NULL AND deleted = 0 ORDER BY id LIMIT 1",
+                Long.class,
+                TENANT
         );
     }
 }

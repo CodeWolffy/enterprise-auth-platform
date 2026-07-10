@@ -1,122 +1,127 @@
 <script lang="ts" setup>
 import { PERMS } from '#/constants/permissions';
 
-import { defineAsyncComponent, reactive, ref } from 'vue';
+import type { VxeTableGridOptions } from '#/adapter/vxe-table';
+import type { DeptTreeItem } from '#/api/upms/dept';
 
-import { Delete, Edit, Plus, Refresh } from '@element-plus/icons-vue';
-import {
-  ElButton,
-  ElMessage,
-  ElMessageBox,
-  ElTable,
-  ElTableColumn,
-  ElTag,
-} from 'element-plus';
+import { defineAsyncComponent, ref } from 'vue';
 
+import { Page } from '@vben/common-ui';
+import { Plus } from '@vben/icons';
+
+import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus';
+
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { delObj, getTreeList } from '#/api/upms/dept';
 import { invokeWhenComponentReady } from '#/utils/component-ready';
 
+import { useColumns } from './data';
+
 const Form = defineAsyncComponent(() => import('./form.vue'));
 
-const state = reactive({ tableData: [] as any[] });
-const loading = ref(false);
 const formRef = ref();
 const formMounted = ref(false);
 
-const initPage = async () => {
-  loading.value = true;
-  try {
-    state.tableData = (await getTreeList()) as any[];
-  } finally {
-    loading.value = false;
-  }
+const gridConfig = {
+  gridOptions: {
+    columns: useColumns(),
+    height: 'auto',
+    keepSource: true,
+    pagerConfig: {
+      enabled: false,
+    },
+    proxyConfig: {
+      ajax: {
+        query: async () => {
+          return await getTreeList();
+        },
+      },
+    },
+    rowConfig: {
+      keyField: 'id',
+    },
+    toolbarConfig: {
+      refresh: true,
+      refreshOptions: { code: 'query' },
+      zoom: false,
+    },
+    treeConfig: {
+      parentField: 'parentId',
+      reserve: true,
+      rowField: 'id',
+      transform: false,
+    },
+  } as VxeTableGridOptions<DeptTreeItem>,
 };
+
+const [Grid, gridApi] = useVbenVxeGrid(gridConfig as any);
+
+const onRefresh = () => {
+  gridApi.query();
+};
+
 const openForm = (row?: any) => {
   formMounted.value = true;
   void invokeWhenComponentReady(formRef, (form: any) => form.initForm(row));
 };
-const add = () => openForm();
-const edit = (row: any) => openForm(row);
-const del = (id: number | string) => {
+const onCreate = () => openForm();
+const onEdit = (row: DeptTreeItem) => openForm(row);
+const onDelete = (row: DeptTreeItem) => {
   ElMessageBox.confirm('此操作将删除该部门，是否继续?', '提示', {
     cancelButtonText: '取消',
     confirmButtonText: '确认',
     type: 'warning',
   }).then(() => {
-    delObj(id)
+    delObj(row.id)
       .then(() => {
         ElMessage.success('删除成功');
-        initPage();
+        onRefresh();
       })
       .catch(() => {});
   });
 };
-
-initPage();
 </script>
 
 <template>
-  <div class="hx-layout-container">
-    <div class="hx-layout-container-auto hx-layout-container-view">
-      <div
-        class="hx-table-toolbar"
-        style="display: flex; gap: 8px; margin-bottom: 12px"
-      >
+  <Page auto-content-height>
+    <Form v-if="formMounted" ref="formRef" @init-page="onRefresh" />
+
+    <Grid>
+      <template #toolbar-tools>
         <ElButton
           v-access:code="PERMS.upms.dept.add"
-          :icon="Plus"
           type="primary"
-          @click="add"
+          @click="onCreate"
         >
+          <Plus class="size-5" />
           新增
         </ElButton>
-        <ElButton :icon="Refresh" @click="initPage"> 刷新 </ElButton>
-      </div>
+      </template>
 
-      <Form v-if="formMounted" ref="formRef" @init-page="initPage" />
+      <template #status="{ row }">
+        <ElTag :type="row.enabled === 1 ? 'success' : 'info'">
+          {{ row.enabled === 1 ? '启用' : '停用' }}
+        </ElTag>
+      </template>
 
-      <ElTable
-        v-loading="loading"
-        :data="state.tableData"
-        border
-        default-expand-all
-        row-key="id"
-      >
-        <ElTableColumn label="部门名称" prop="name" />
-        <ElTableColumn label="部门编码" prop="code" />
-        <ElTableColumn label="负责人" prop="leaderName" />
-        <ElTableColumn label="负责人手机号" prop="leaderPhone" />
-        <ElTableColumn label="排序" prop="orderNo" width="90" />
-        <ElTableColumn label="状态" width="90">
-          <template #default="scope">
-            <ElTag :type="scope.row.enabled === 1 ? 'success' : 'info'">
-              {{ scope.row.enabled === 1 ? '启用' : '停用' }}
-            </ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn align="center" fixed="right" label="操作" width="200">
-          <template #default="scope">
-            <ElButton
-              v-access:code="PERMS.upms.dept.edit"
-              :icon="Edit"
-              link
-              type="primary"
-              @click="edit(scope.row)"
-            >
-              修改
-            </ElButton>
-            <ElButton
-              v-access:code="PERMS.upms.dept.del"
-              :icon="Delete"
-              link
-              type="danger"
-              @click="del(scope.row.id)"
-            >
-              删除
-            </ElButton>
-          </template>
-        </ElTableColumn>
-      </ElTable>
-    </div>
-  </div>
+      <template #operation="{ row }">
+        <ElButton
+          v-access:code="PERMS.upms.dept.edit"
+          link
+          type="primary"
+          @click="onEdit(row)"
+        >
+          修改
+        </ElButton>
+        <ElButton
+          v-access:code="PERMS.upms.dept.del"
+          link
+          type="danger"
+          @click="onDelete(row)"
+        >
+          删除
+        </ElButton>
+      </template>
+    </Grid>
+  </Page>
 </template>

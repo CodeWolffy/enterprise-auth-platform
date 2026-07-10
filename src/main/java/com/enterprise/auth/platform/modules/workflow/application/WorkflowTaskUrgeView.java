@@ -1,6 +1,6 @@
 package com.enterprise.auth.platform.modules.workflow.application;
 
-import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfTaskUrgeEntity;
+import com.enterprise.auth.platform.modules.workflow.domain.WorkflowTaskUrge;
 import java.time.Instant;
 import java.util.Set;
 
@@ -14,7 +14,7 @@ public record WorkflowTaskUrgeView(
         Instant urgedAt,
         Set<String> targetUsernames
 ) {
-    public static WorkflowTaskUrgeView from(WfTaskUrgeEntity entity, Set<String> targetUsernames) {
+    public static WorkflowTaskUrgeView from(WorkflowTaskUrge entity, Set<String> targetUsernames) {
         return new WorkflowTaskUrgeView(
                 entity.getId(),
                 entity.getTaskId(),

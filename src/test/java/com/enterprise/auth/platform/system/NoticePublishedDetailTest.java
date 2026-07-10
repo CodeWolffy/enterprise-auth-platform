@@ -115,6 +115,12 @@ class NoticePublishedDetailTest {
     }
 
     private UserAccount principal(String tenantId, Long userId) {
+        Integer sessionVersion = jdbcTemplate.queryForObject(
+                "SELECT session_version FROM sys_user WHERE id = ? AND tenant_id = ? AND deleted = 0",
+                Integer.class,
+                userId,
+                tenantId
+        );
         return new UserAccount(
                 userId,
                 tenantId,
@@ -125,7 +131,7 @@ class NoticePublishedDetailTest {
                 Set.of(),
                 Set.of(),
                 DataScopeType.ALL,
-                1
+                sessionVersion == null ? 1 : sessionVersion
         );
     }
 }

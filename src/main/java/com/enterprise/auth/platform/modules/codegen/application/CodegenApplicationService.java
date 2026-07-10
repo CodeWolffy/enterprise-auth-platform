@@ -62,7 +62,12 @@ public class CodegenApplicationService {
 
     @Transactional(readOnly = true)
     public PageResult<CodegenTableView> tables(String keyword, int page, int size) {
-        PageResult<TableDefinition> result = metadataExtractor.pageImportedSourceTables(currentTenantId(), keyword, page, size);
+        PageResult<TableDefinition> result = metadataExtractor.pageImportedSourceTables(
+                TenantContextSupport.currentTenantIdTrimmedOr(TenantContextSupport.PLATFORM_TENANT_ID),
+                keyword,
+                page,
+                size
+        );
         return PageResult.of(result.total(), result.page(), result.size(), result.records().stream().map(this::toTableView).toList());
     }
 
@@ -245,13 +250,12 @@ public class CodegenApplicationService {
     }
 
     private void ensureImportedTable(String tableName) {
-        if (!metadataExtractor.isTableImported(currentTenantId(), tableName)) {
+        if (!metadataExtractor.isTableImported(
+                TenantContextSupport.currentTenantIdTrimmedOr(TenantContextSupport.PLATFORM_TENANT_ID),
+                tableName
+        )) {
             throw new BusinessException("ACCESS_DENIED", "数据表未导入代码生成配置");
         }
-    }
-
-    private String currentTenantId() {
-        return TenantContextSupport.currentTenantIdTrimmedOr(TenantContextSupport.PLATFORM_TENANT_ID);
     }
 
     private CodegenTableView toTableView(TableDefinition table) {

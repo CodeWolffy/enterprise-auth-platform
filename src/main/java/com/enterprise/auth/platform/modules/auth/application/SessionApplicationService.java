@@ -12,6 +12,7 @@ import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.auth.interfaces.UserSessionResponse;
 import com.enterprise.auth.platform.modules.auth.application.SessionIndexService;
 import com.enterprise.auth.platform.modules.auth.application.SessionIndexService.Page;
+import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.modules.notification.application.NotificationScenarioPublisher;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -30,17 +31,20 @@ public class SessionApplicationService {
     private static final int SESSION_RESULT_LIMIT = 200;
 
     private final DataScopeService dataScopeService;
+    private final LogPublisher logPublisher;
     private final PlatformAdminSupport platformAdminSupport;
     private final SessionIndexService sessionIndexService;
     private final NotificationScenarioPublisher notificationScenarioPublisher;
 
     public SessionApplicationService(
             DataScopeService dataScopeService,
+            LogPublisher logPublisher,
             PlatformAdminSupport platformAdminSupport,
             SessionIndexService sessionIndexService,
             NotificationScenarioPublisher notificationScenarioPublisher
     ) {
         this.dataScopeService = dataScopeService;
+        this.logPublisher = logPublisher;
         this.platformAdminSupport = platformAdminSupport;
         this.sessionIndexService = sessionIndexService;
         this.notificationScenarioPublisher = notificationScenarioPublisher;
@@ -50,6 +54,7 @@ public class SessionApplicationService {
         Map<String, Object> payload = sessionAuditPayload(sessionId);
         StpUtil.logoutByTokenValue(sessionId);
         sessionIndexService.remove(sessionId);
+        logPublisher.publish("LOGOUT", username, tenantId, payload);
     }
 
     public List<UserSessionResponse> sessions(UserAccount currentUser, String scope, String currentToken) {
@@ -91,6 +96,7 @@ public class SessionApplicationService {
         StpUtil.kickoutByTokenValue(sessionId);
         sessionIndexService.remove(sessionId);
         payload.put("targetUserId", targetUserId);
+        logPublisher.publish("SESSION_FORCED_OFFLINE", currentUser.username(), currentUser.tenantId(), payload);
         notificationScenarioPublisher.sessionForcedOffline(targetTenantId, targetUserId, currentUser.username(), payload);
     }
 

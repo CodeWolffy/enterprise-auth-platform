@@ -82,7 +82,7 @@ public class MailChannelApplicationService {
 
     @Transactional
     public MailChannelResponse saveOrUpdate(MailChannelRequest request) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdTrimmedOr(platformTenantId());
         SysMailChannelEntity existing = findByTenant(tenantId).orElse(null);
         boolean creating = existing == null;
         boolean passwordProvided = StringUtils.hasText(request.mailPassword());
@@ -122,7 +122,7 @@ public class MailChannelApplicationService {
 
     @Transactional
     public void deleteChannel() {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdTrimmedOr(platformTenantId());
         SysMailChannelEntity entity = findByTenant(tenantId)
                 .orElseThrow(() -> new BusinessException("MAIL_CHANNEL_NOT_FOUND", "未找到当前租户的邮件渠道配置"));
         withTenant(tenantId, () -> mapper.update(null, new LambdaUpdateWrapper<SysMailChannelEntity>()
@@ -251,10 +251,6 @@ public class MailChannelApplicationService {
                 && StringUtils.hasText(entity.getMailUsername())
                 && StringUtils.hasText(entity.getMailPassword())
                 && StringUtils.hasText(entity.getMailFrom());
-    }
-
-    private String currentTenantId() {
-        return TenantContextSupport.currentTenantIdTrimmedOr(platformTenantId());
     }
 
     private String normalizeTenantId(String tenantId) {

@@ -2,6 +2,7 @@ package com.enterprise.auth.platform.common.web;
 
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.context.RequestContext;
+import com.enterprise.auth.platform.common.context.RequestLogContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -34,15 +35,18 @@ public class TenantFilter extends OncePerRequestFilter {
             requestId = UUID.randomUUID().toString();
         }
 
+        String clientIp = clientIpResolver.resolve(request);
         RequestContext.setRequestId(requestId);
-        RequestContext.setClientIp(clientIpResolver.resolve(request));
+        RequestContext.setClientIp(clientIp);
         RequestContext.setStartTime(System.currentTimeMillis());
+        RequestLogContext.bindRequest(requestId, clientIp, request.getMethod(), request.getRequestURI());
         response.setHeader(REQUEST_ID_HEADER, requestId);
         try {
             filterChain.doFilter(request, response);
         } finally {
             TenantContext.clear();
             RequestContext.clear();
+            RequestLogContext.clearRequest();
         }
     }
 }

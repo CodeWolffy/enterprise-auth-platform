@@ -1,27 +1,21 @@
 <script setup lang="ts">
 import { PERMS } from '#/constants/permissions';
 
-import { defineAsyncComponent, reactive, ref } from 'vue';
+import type { VxeTableGridOptions } from '#/adapter/vxe-table';
 
-import { Delete, Edit, Plus, Refresh, Search } from '@element-plus/icons-vue';
-import {
-  ElButton,
-  ElForm,
-  ElFormItem,
-  ElInput,
-  ElMessage,
-  ElMessageBox,
-  ElTable,
-  ElTableColumn,
-  ElTag,
-} from 'element-plus';
+import { defineAsyncComponent, ref } from 'vue';
 
+import { Page } from '@vben/common-ui';
+import { Plus } from '@vben/icons';
+
+import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus';
+
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { delObj, getPage, queryRoleImpact } from '#/api/upms/sys-role';
 import { invokeWhenComponentReady } from '#/utils/component-ready';
 
-const Pagination = defineAsyncComponent(
-  () => import('#/components/pagination/index.vue'),
-);
+import { useColumns, useGridFormSchema } from './data';
+
 const Form = defineAsyncComponent(() => import('./form.vue'));
 const RoleMenu = defineAsyncComponent(() => import('./rolemenu.vue'));
 
@@ -33,195 +27,156 @@ const DATA_SCOPE_LABELS: Record<string, string> = {
   SELF: '仅本人',
 };
 
-const state = reactive({
-  queryParams: {
-    keyword: '',
-  },
-  page: {
-    total: 0,
-    currentPage: 1,
-    pageSize: 10,
-  },
-  tableData: [] as any[],
-});
-const loading = ref(false);
 const formRef = ref();
 const roleMenuRef = ref();
 const formMounted = ref(false);
 const menuMounted = ref(false);
 
-const initPage = async () => {
-  loading.value = true;
-  try {
-    const response: any = await getPage({
-      page: state.page.currentPage,
-      size: state.page.pageSize,
-      keyword: state.queryParams.keyword,
-    });
-    state.tableData = response?.records ?? [];
-    state.page.total = response?.total ?? 0;
-  } finally {
-    loading.value = false;
-  }
-};
+const [Grid, gridApi] = useVbenVxeGrid({
+  formOptions: {
+    schema: useGridFormSchema(),
+    submitOnChange: false,
+  },
+  gridOptions: {
+    columns: useColumns(),
+    height: 'auto',
+    keepSource: true,
+    pagerConfig: {
+      enabled: true,
+      pageSize: 10,
+    },
+    proxyConfig: {
+      ajax: {
+        query: async ({ page }, formValues) => {
+          const response: any = await getPage({
+            ...formValues,
+            page: page.currentPage,
+            size: page.pageSize,
+          });
+          return {
+            list: response?.records ?? [],
+            total: response?.total ?? 0,
+          };
+        },
+      },
+    },
+    rowConfig: {
+      keyField: 'id',
+    },
+    toolbarConfig: {
+      refresh: true,
+      refreshOptions: { code: 'query' },
+      search: true,
+      zoom: false,
+    },
+  } as VxeTableGridOptions,
+});
 
-const resetQuery = () => {
-  state.queryParams.keyword = '';
-  state.page.currentPage = 1;
-  initPage();
-};
-const openForm = (row?: any) => {
+function onRefresh() {
+  gridApi.query();
+}
+
+function openForm(row?: any) {
   formMounted.value = true;
   void invokeWhenComponentReady(formRef, (form: any) => form.initForm(row));
-};
-const add = () => openForm();
-const edit = (row: any) => openForm(row);
-const del = (id: number | string) => {
-  ElMessageBox.confirm('此操作将删除该角色，是否继续?', '提示', {
-    cancelButtonText: '取消',
-    confirmButtonText: '确认',
-    type: 'warning',
-  }).then(() => {
-    // 先检查影响分析
-    queryRoleImpact(id)
-      .then((impact: any) => {
-        const userCount = impact?.assignedUserCount ?? 0;
-        const menuCount = impact?.assignedMenuCount ?? 0;
-        if (userCount > 0 || menuCount > 0) {
-          const details = [];
-          if (userCount > 0) details.push(`${userCount} 个用户引用`);
-          if (menuCount > 0) details.push(`${menuCount} 个菜单授权`);
-          ElMessageBox.confirm(
-            `该角色存在关联引用（${details.join('、')}），删除后相关用户将失去此角色权限。是否继续？`,
-            '删除影响提示',
-            {
-              cancelButtonText: '取消',
-              confirmButtonText: '强制删除',
-              type: 'warning',
-            },
-          ).then(() => doDelete(id));
-        } else {
-          doDelete(id);
-        }
-      })
-      .catch(() => {
-        // 影响分析查询失败，直接删除
-        doDelete(id);
-      });
-  });
-};
+}
 
-const doDelete = (id: number | string) => {
-  delObj(id)
-    .then(() => {
-      ElMessage.success('删除成功');
-      initPage();
-    })
-    .catch(() => {});
-};
-const onAuth = (row: any) => {
+function onAuth(row: any) {
   menuMounted.value = true;
   void invokeWhenComponentReady(roleMenuRef, (menu: any) => {
     void menu.initRoleMenu(row);
   });
-};
+}
 
-initPage();
+async function doDelete(id: number | string) {
+  await delObj(id);
+  ElMessage.success('删除成功');
+  onRefresh();
+}
+
+async function onDelete(row: any) {
+  try {
+    await ElMessageBox.confirm('此操作将删除该角色，是否继续?', '提示', {
+      cancelButtonText: '取消',
+      confirmButtonText: '确认',
+      type: 'warning',
+    });
+
+    const impact: any = await queryRoleImpact(row.id).catch(() => null);
+    const userCount = impact?.assignedUserCount ?? 0;
+    const menuCount = impact?.assignedMenuCount ?? 0;
+    if (userCount > 0 || menuCount > 0) {
+      const details = [];
+      if (userCount > 0) details.push(`${userCount} 个用户引用`);
+      if (menuCount > 0) details.push(`${menuCount} 个菜单授权`);
+      await ElMessageBox.confirm(
+        `该角色存在关联引用（${details.join('、')}），删除后相关用户将失去此角色权限。是否继续？`,
+        '删除影响提示',
+        {
+          cancelButtonText: '取消',
+          confirmButtonText: '强制删除',
+          type: 'warning',
+        },
+      );
+    }
+    await doDelete(row.id);
+  } catch {
+    // Cancelled confirmations require no further action.
+  }
+}
 </script>
 
 <template>
-  <div class="hx-layout-container">
-    <div class="hx-layout-container-auto hx-layout-container-view">
-      <ElForm :inline="true" :model="state.queryParams">
-        <ElFormItem label="关键字" prop="keyword">
-          <ElInput
-            v-model="state.queryParams.keyword"
-            clearable
-            placeholder="角色名称 / 编码"
-            @keyup.enter="initPage"
-          />
-        </ElFormItem>
-        <ElFormItem>
-          <ElButton :icon="Search" type="primary" @click="initPage">
-            搜索
-          </ElButton>
-          <ElButton :icon="Refresh" @click="resetQuery"> 重置 </ElButton>
-        </ElFormItem>
-      </ElForm>
+  <Page auto-content-height>
+    <Form v-if="formMounted" ref="formRef" @init-page="onRefresh" />
+    <RoleMenu v-if="menuMounted" ref="roleMenuRef" @init-page="onRefresh" />
 
-      <div class="hx-table-toolbar" style="margin-bottom: 12px">
+    <Grid>
+      <template #toolbar-tools>
         <ElButton
           v-access:code="PERMS.upms.role.add"
-          :icon="Plus"
           type="primary"
-          @click="add"
+          @click="openForm()"
         >
+          <Plus class="size-5" />
           新增
         </ElButton>
-      </div>
+      </template>
 
-      <Form v-if="formMounted" ref="formRef" @init-page="initPage" />
-      <RoleMenu v-if="menuMounted" ref="roleMenuRef" @init-page="initPage" />
+      <template #dataScope="{ row }">
+        <ElTag>
+          {{ DATA_SCOPE_LABELS[row.dataScopeType] ?? row.dataScopeType }}
+        </ElTag>
+      </template>
 
-      <ElTable v-loading="loading" :data="state.tableData" border>
-        <ElTableColumn label="角色名称" prop="name" />
-        <ElTableColumn label="角色编码" prop="code" />
-        <ElTableColumn
-          label="角色描述"
-          prop="description"
-          show-overflow-tooltip
-        />
-        <ElTableColumn label="数据权限" width="140">
-          <template #default="scope">
-            <ElTag>
-              {{
-                DATA_SCOPE_LABELS[scope.row.dataScopeType] ??
-                scope.row.dataScopeType
-              }}
-            </ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn align="center" fixed="right" label="操作" width="300">
-          <template #default="scope">
-            <ElButton
-              v-if="scope.row.code !== 'ADMIN'"
-              v-access:code="PERMS.upms.role.edit"
-              :icon="Edit"
-              link
-              type="primary"
-              @click="edit(scope.row)"
-            >
-              修改
-            </ElButton>
-            <ElButton
-              v-if="scope.row.code !== 'ADMIN'"
-              v-access:code="PERMS.upms.role.del"
-              :icon="Delete"
-              link
-              type="danger"
-              @click="del(scope.row.id)"
-            >
-              删除
-            </ElButton>
-            <ElButton
-              v-access:code="PERMS.upms.role.edit"
-              :icon="Plus"
-              link
-              type="primary"
-              @click="onAuth(scope.row)"
-            >
-              分配菜单
-            </ElButton>
-          </template>
-        </ElTableColumn>
-      </ElTable>
-
-      <Pagination
-        v-model:current="state.page.currentPage"
-        v-model:size="state.page.pageSize"
-        :total="state.page.total"
-        @change="initPage"
-      />
-    </div>
-  </div>
+      <template #operation="{ row }">
+        <ElButton
+          v-if="row.code !== 'ADMIN'"
+          v-access:code="PERMS.upms.role.edit"
+          link
+          type="primary"
+          @click="openForm(row)"
+        >
+          修改
+        </ElButton>
+        <ElButton
+          v-if="row.code !== 'ADMIN'"
+          v-access:code="PERMS.upms.role.del"
+          link
+          type="danger"
+          @click="onDelete(row)"
+        >
+          删除
+        </ElButton>
+        <ElButton
+          v-access:code="PERMS.upms.role.edit"
+          link
+          type="primary"
+          @click="onAuth(row)"
+        >
+          分配菜单
+        </ElButton>
+      </template>
+    </Grid>
+  </Page>
 </template>

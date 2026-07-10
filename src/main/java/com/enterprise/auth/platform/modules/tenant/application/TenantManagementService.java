@@ -8,7 +8,6 @@ import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
 import com.enterprise.auth.platform.modules.dept.application.DeptTenantDataFacade;
-import com.enterprise.auth.platform.modules.catalog.application.CatalogService;
 import com.enterprise.auth.platform.modules.role.application.RoleTenantDataFacade;
 import com.enterprise.auth.platform.modules.security.application.SecurityPolicyApplicationService;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantEntity;
@@ -36,7 +35,7 @@ public class TenantManagementService {
     private final DeptTenantDataFacade deptTenantDataFacade;
     private final SysTenantPackageMapper sysTenantPackageMapper;
     private final TenantMenuService tenantMenuService;
-    private final CatalogService catalogService;
+    private final TenantProfileFacade tenantProfileFacade;
     private final LogPublisher logPublisher;
     private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
     private final TenantAccessPolicy tenantAccessPolicy;
@@ -51,7 +50,7 @@ public class TenantManagementService {
             DeptTenantDataFacade deptTenantDataFacade,
             SysTenantPackageMapper sysTenantPackageMapper,
             TenantMenuService tenantMenuService,
-            CatalogService catalogService,
+            TenantProfileFacade tenantProfileFacade,
             LogPublisher logPublisher,
             AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
             TenantAccessPolicy tenantAccessPolicy,
@@ -65,7 +64,7 @@ public class TenantManagementService {
         this.deptTenantDataFacade = deptTenantDataFacade;
         this.sysTenantPackageMapper = sysTenantPackageMapper;
         this.tenantMenuService = tenantMenuService;
-        this.catalogService = catalogService;
+        this.tenantProfileFacade = tenantProfileFacade;
         this.logPublisher = logPublisher;
         this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
         this.tenantAccessPolicy = tenantAccessPolicy;
@@ -75,7 +74,7 @@ public class TenantManagementService {
     }
 
     @Transactional
-    public CatalogService.TenantView create(CreateTenantRequest request) {
+    public TenantView create(CreateTenantRequest request) {
         requirePlatformSuperAdmin();
         String operator = SecuritySupport.currentOperator();
         if (existsTenant(request.tenantId())) {
@@ -116,11 +115,11 @@ public class TenantManagementService {
         recordTenantChange(request.tenantId(), "PROFILE", "lifecycleNote", null, request.lifecycleNote(), "初始化运营备注", operator);
 
         evictPrincipalSnapshots();
-        return catalogService.tenant(request.tenantId());
+        return tenantProfileFacade.tenant(request.tenantId());
     }
 
     @Transactional
-    public CatalogService.TenantView update(String tenantId, CreateTenantRequest request) {
+    public TenantView update(String tenantId, CreateTenantRequest request) {
         requirePlatformSuperAdmin();
         SysTenantEntity entity = getTenant(tenantId);
         String oldTenantName = entity.getTenantName();
@@ -172,7 +171,7 @@ public class TenantManagementService {
         recordIfChanged(tenantId, "PROFILE", "lifecycleNote", oldProfile.lifecycleNote(), request.lifecycleNote(), "更新运营备注", operator);
 
         evictPrincipalSnapshots();
-        return catalogService.tenant(tenantId);
+        return tenantProfileFacade.tenant(tenantId);
     }
 
     @Transactional
@@ -192,9 +191,9 @@ public class TenantManagementService {
         evictPrincipalSnapshots();
     }
 
-    public PageResult<CatalogService.TenantView> page(String keyword, Boolean platformLevel, Integer tenantStatus, int page, int size) {
+    public PageResult<TenantView> page(String keyword, Boolean platformLevel, Integer tenantStatus, int page, int size) {
         boolean platformSuperAdmin = isPlatformSuperAdmin();
-        String operatorTenantId = currentTenantId();
+        String operatorTenantId = tenantAccessPolicy.currentTenantId();
         int safePage = PaginationSupport.normalizePage(page);
         int safeSize = PaginationSupport.normalizeSize(size);
         LambdaQueryWrapper<SysTenantEntity> query = new LambdaQueryWrapper<SysTenantEntity>()
@@ -224,15 +223,15 @@ public class TenantManagementService {
                 .orderByDesc(SysTenantEntity::getId)
                 .last("limit " + offset + "," + safeSize));
         Map<String, TenantProfile> profiles = loadTenantProfiles(entities);
-        List<CatalogService.TenantView> records = entities.stream()
+        List<TenantView> records = entities.stream()
                 .map(entity -> toTenantView(entity, profiles.getOrDefault(entity.getTenantId(), TenantProfile.empty())))
                 .toList();
         return PageResult.of(total, safePage, safeSize, records);
     }
 
-    public CatalogService.TenantView detail(String tenantId) {
+    public TenantView detail(String tenantId) {
         ensureTenantReadable(tenantId);
-        return withPlatformTenant(() -> catalogService.tenant(tenantId));
+        return withPlatformTenant(() -> tenantProfileFacade.tenant(tenantId));
     }
 
     private boolean existsTenant(String tenantId) {
@@ -297,8 +296,8 @@ public class TenantManagementService {
         return result;
     }
 
-    private CatalogService.TenantView toTenantView(SysTenantEntity tenant, TenantProfile profile) {
-        return new CatalogService.TenantView(
+    private TenantView toTenantView(SysTenantEntity tenant, TenantProfile profile) {
+        return new TenantView(
                 tenant.getTenantId(),
                 tenant.getTenantName(),
                 tenant.getPlatformLevel() != null && tenant.getPlatformLevel() == 1,
@@ -337,10 +336,6 @@ public class TenantManagementService {
 
     private boolean isPlatformSuperAdmin() {
         return tenantAccessPolicy.isPlatformSuperAdmin();
-    }
-
-    private String currentTenantId() {
-        return tenantAccessPolicy.currentTenantId();
     }
 
     private void ensureTenantReadable(String tenantId) {

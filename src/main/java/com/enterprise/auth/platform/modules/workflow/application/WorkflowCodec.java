@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.modules.workflow.application;
 
 import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.modules.workflow.domain.WorkflowStepDefinition;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;

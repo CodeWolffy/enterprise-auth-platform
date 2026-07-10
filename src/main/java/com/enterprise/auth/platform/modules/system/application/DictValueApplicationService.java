@@ -42,7 +42,7 @@ public class DictValueApplicationService {
 
     @Cacheable(value = CacheNames.SYSTEM_DICTS, key = "'value:' + #dictType")
     public List<SystemViewModels.DictValueView> listByType(String dictType) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         String normalizedDictType = normalizeRequired(dictType, "字典类型不能为空", 64, "字典类型长度不能超过64个字符");
         return sysDictValueMapper.selectList(new LambdaQueryWrapper<SysDictValueEntity>()
                 .eq(SysDictValueEntity::getTenantId, tenantId)
@@ -73,7 +73,7 @@ public class DictValueApplicationService {
         ensureDictValueUnique(dict.getTenantId(), dict.getId(), dictValue, null);
 
         SysDictValueEntity entity = new SysDictValueEntity();
-        entity.setTenantId(currentTenantId());
+        entity.setTenantId(TenantContextSupport.currentTenantIdOrPlatform());
         entity.setDictId(dict.getId());
         entity.setDictType(dict.getDictType());
         entity.setDictLabel(normalizeRequired(request.dictLabel(), "字典标签不能为空", DICT_LABEL_MAX_LENGTH, "字典标签长度不能超过128个字符"));
@@ -121,7 +121,7 @@ public class DictValueApplicationService {
 
     private SysDictEntity getDict(Long dictId) {
         SysDictEntity entity = sysDictMapper.selectOne(new LambdaQueryWrapper<SysDictEntity>()
-                .eq(SysDictEntity::getTenantId, currentTenantId())
+                .eq(SysDictEntity::getTenantId, TenantContextSupport.currentTenantIdOrPlatform())
                 .eq(SysDictEntity::getId, dictId)
                 .eq(SysDictEntity::getDeleted, 0)
                 .last("limit 1"));
@@ -136,7 +136,7 @@ public class DictValueApplicationService {
 
     private SysDictValueEntity getValue(Long valueId) {
         SysDictValueEntity entity = sysDictValueMapper.selectOne(new LambdaQueryWrapper<SysDictValueEntity>()
-                .eq(SysDictValueEntity::getTenantId, currentTenantId())
+                .eq(SysDictValueEntity::getTenantId, TenantContextSupport.currentTenantIdOrPlatform())
                 .eq(SysDictValueEntity::getId, valueId)
                 .eq(SysDictValueEntity::getDeleted, 0)
                 .last("limit 1"));
@@ -149,7 +149,7 @@ public class DictValueApplicationService {
 
     private List<SysDictValueEntity> listEntitiesByDictId(Long dictId) {
         return sysDictValueMapper.selectList(new LambdaQueryWrapper<SysDictValueEntity>()
-                .eq(SysDictValueEntity::getTenantId, currentTenantId())
+                .eq(SysDictValueEntity::getTenantId, TenantContextSupport.currentTenantIdOrPlatform())
                 .eq(SysDictValueEntity::getDictId, dictId)
                 .eq(SysDictValueEntity::getDeleted, 0)
                 .orderByAsc(SysDictValueEntity::getSort)
@@ -229,7 +229,4 @@ public class DictValueApplicationService {
         return StringUtils.hasText(value) ? value.trim() : null;
     }
 
-    private String currentTenantId() {
-        return TenantContextSupport.currentTenantIdOrPlatform();
-    }
 }

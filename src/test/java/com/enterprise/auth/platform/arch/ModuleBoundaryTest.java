@@ -55,6 +55,36 @@ class ModuleBoundaryTest {
         assertTrue(violations.isEmpty(), () -> String.join(System.lineSeparator(), violations));
     }
 
+    @Test
+    void workflowApplicationLayerDoesNotDependOnWorkflowInfrastructure() throws IOException {
+        Path workflowApplication = MODULES_ROOT.resolve("workflow").resolve("application");
+        if (!Files.exists(workflowApplication)) {
+            return;
+        }
+        Pattern workflowInfrastructure = Pattern.compile(
+                "com\\.enterprise\\.auth\\.platform\\.modules\\.workflow\\.infrastructure|com\\.baomidou");
+        List<String> violations;
+        try (Stream<Path> files = Files.walk(workflowApplication)) {
+            violations = files
+                    .filter(path -> path.toString().endsWith(".java"))
+                    .flatMap(path -> findViolations(path, "workflow", workflowInfrastructure).stream())
+                    .toList();
+        }
+        assertTrue(violations.isEmpty(), () -> String.join(System.lineSeparator(), violations));
+    }
+
+    @Test
+    void catalogAggregationModuleIsRemoved() throws IOException {
+        Path catalog = MODULES_ROOT.resolve("catalog");
+        if (Files.notExists(catalog)) {
+            return;
+        }
+        try (Stream<Path> files = Files.walk(catalog)) {
+            assertTrue(files.noneMatch(path -> path.toString().endsWith(".java")),
+                    "Catalog aggregation should live in the owning role/dept/tenant modules");
+        }
+    }
+
     private static List<String> scanFiles(String layer, Pattern violationPattern) throws IOException {
         try (Stream<Path> files = Files.walk(MODULES_ROOT)) {
             return files
@@ -77,6 +107,17 @@ class ModuleBoundaryTest {
             return Files.readAllLines(path).stream()
                     .map(line -> violation(path, currentModule, line, violationPattern))
                     .filter(message -> !message.isBlank())
+                    .toList();
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to inspect " + path, ex);
+        }
+    }
+
+    private static List<String> findViolations(Path path, String currentModule, Pattern violationPattern) {
+        try {
+            return Files.readAllLines(path).stream()
+                    .filter(line -> violationPattern.matcher(line).find())
+                    .map(line -> path + " imports restricted workflow infrastructure: " + line.trim())
                     .toList();
         } catch (IOException ex) {
             throw new IllegalStateException("Failed to inspect " + path, ex);

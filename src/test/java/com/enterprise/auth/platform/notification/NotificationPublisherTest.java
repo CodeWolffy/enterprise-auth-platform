@@ -13,6 +13,7 @@ import com.enterprise.auth.platform.modules.notification.application.Notificatio
 import com.enterprise.auth.platform.modules.notification.application.NotificationPublisher;
 import com.enterprise.auth.platform.modules.notification.application.NotificationSseRegistry;
 import com.enterprise.auth.platform.modules.notification.application.NotificationView;
+import com.enterprise.auth.platform.common.observability.PlatformMetrics;
 import com.enterprise.auth.platform.modules.notification.infrastructure.entity.SysUserNotificationEntity;
 import com.enterprise.auth.platform.modules.notification.infrastructure.mapper.SysUserNotificationMapper;
 import com.enterprise.auth.platform.modules.role.application.RoleQueryFacade;
@@ -45,7 +46,8 @@ class NotificationPublisherTest {
                 roleQueryFacade,
                 userQueryFacade,
                 new ObjectMapper(),
-                sseRegistry);
+                sseRegistry,
+                mock(PlatformMetrics.class));
     }
 
     @Test

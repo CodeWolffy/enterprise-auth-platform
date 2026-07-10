@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.plugins.IgnoreStrategy;
 import com.baomidou.mybatisplus.core.plugins.InterceptorIgnoreHelper;
 import com.enterprise.auth.platform.modules.log.application.LogPublisher;
-import com.enterprise.auth.platform.modules.catalog.application.CatalogService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.modules.dept.application.DeptQueryFacade;
@@ -35,7 +34,7 @@ public class RoleManagementService {
     private final SysRoleMenuMapper sysRoleMenuMapper;
     private final UserQueryFacade userQueryFacade;
     private final DeptQueryFacade deptQueryFacade;
-    private final CatalogService catalogService;
+    private final RoleCatalogFacade roleCatalogFacade;
     private final LogPublisher logPublisher;
     private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
     private final RolePayloadCodec rolePayloadCodec;
@@ -48,7 +47,7 @@ public class RoleManagementService {
             SysRoleMenuMapper sysRoleMenuMapper,
             UserQueryFacade userQueryFacade,
             DeptQueryFacade deptQueryFacade,
-            CatalogService catalogService,
+            RoleCatalogFacade roleCatalogFacade,
             LogPublisher logPublisher,
             AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
             RolePayloadCodec rolePayloadCodec,
@@ -60,7 +59,7 @@ public class RoleManagementService {
         this.sysRoleMenuMapper = sysRoleMenuMapper;
         this.userQueryFacade = userQueryFacade;
         this.deptQueryFacade = deptQueryFacade;
-        this.catalogService = catalogService;
+        this.roleCatalogFacade = roleCatalogFacade;
         this.logPublisher = logPublisher;
         this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
         this.rolePayloadCodec = rolePayloadCodec;
@@ -70,7 +69,7 @@ public class RoleManagementService {
     }
 
     @Transactional
-    public CatalogService.RoleView create(CreateRoleRequest request) {
+    public RoleView create(CreateRoleRequest request) {
         String tenantId = resolveTargetTenantId(request.tenantId());
         String operator = SecuritySupport.currentOperator();
         if (existsRoleCode(tenantId, request.roleCode())) {
@@ -85,11 +84,11 @@ public class RoleManagementService {
         applyDataScope(entity, tenantId, request.dataScopeType(), request.customDeptIds());
         sysRoleMapper.insert(entity);
 
-        return catalogService.tenantRole(tenantId, entity.getId());
+        return roleCatalogFacade.tenantRole(tenantId, entity.getId());
     }
 
     @Transactional
-    public CatalogService.RoleView update(Long roleId, CreateRoleRequest request) {
+    public RoleView update(Long roleId, CreateRoleRequest request) {
         SysRoleEntity entity = getRole(roleId);
         String tenantId = entity.getTenantId();
         entity.setRoleName(request.roleName());
@@ -98,7 +97,7 @@ public class RoleManagementService {
         sysRoleMapper.updateById(entity);
         evictPrincipalsByRole(tenantId, roleId);
 
-        return catalogService.tenantRole(tenantId, entity.getId());
+        return roleCatalogFacade.tenantRole(tenantId, entity.getId());
     }
 
     @Transactional
@@ -258,7 +257,7 @@ public class RoleManagementService {
         } else {
             entity = sysRoleMapper.selectOne(new LambdaQueryWrapper<SysRoleEntity>()
                     .eq(SysRoleEntity::getId, roleId)
-                    .eq(SysRoleEntity::getTenantId, currentTenantId())
+                .eq(SysRoleEntity::getTenantId, TenantContextSupport.currentTenantIdOrPlatform())
                     .eq(SysRoleEntity::getDeleted, 0)
                     .last("limit 1"));
         }
@@ -280,12 +279,8 @@ public class RoleManagementService {
     ) {
     }
 
-    private String currentTenantId() {
-        return TenantContextSupport.currentTenantIdOrPlatform();
-    }
-
     private String resolveTargetTenantId(String requestedTenantId) {
-        String currentTenantId = currentTenantId();
+        String currentTenantId = TenantContextSupport.currentTenantIdOrPlatform();
         if (!dataScopeService.isPlatformSuperAdmin()) {
             return currentTenantId;
         }

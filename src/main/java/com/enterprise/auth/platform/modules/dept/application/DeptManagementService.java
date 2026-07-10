@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.plugins.IgnoreStrategy;
 import com.baomidou.mybatisplus.core.plugins.InterceptorIgnoreHelper;
 import com.enterprise.auth.platform.modules.log.application.LogPublisher;
-import com.enterprise.auth.platform.modules.catalog.application.CatalogService;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.dept.interfaces.DeptCrudRequest;
 import com.enterprise.auth.platform.modules.dept.infrastructure.entity.SysDeptEntity;
@@ -27,11 +26,12 @@ public class DeptManagementService {
     private final LogPublisher logPublisher;
     private final DataScopeService dataScopeService;
     private final TenantProfileFacade tenantProfileFacade;
+    private final DeptCatalogFacade deptCatalogFacade;
 
     public DeptManagementService(
             SysDeptMapper sysDeptMapper,
             UserQueryFacade userQueryFacade,
-            CatalogService catalogService,
+            DeptCatalogFacade deptCatalogFacade,
             LogPublisher logPublisher,
             DataScopeService dataScopeService,
             TenantProfileFacade tenantProfileFacade
@@ -41,10 +41,11 @@ public class DeptManagementService {
         this.logPublisher = logPublisher;
         this.dataScopeService = dataScopeService;
         this.tenantProfileFacade = tenantProfileFacade;
+        this.deptCatalogFacade = deptCatalogFacade;
     }
 
     @Transactional
-    public CatalogService.DepartmentView create(DeptCrudRequest request) {
+    public DepartmentView create(DeptCrudRequest request) {
         String tenantId = resolveTargetTenantId(request.tenantId());
         String operator = SecuritySupport.currentOperator();
         validateParentAccess(tenantId, request.parentId());
@@ -65,7 +66,7 @@ public class DeptManagementService {
     }
 
     @Transactional
-    public CatalogService.DepartmentView update(Long deptId, DeptCrudRequest request) {
+    public DepartmentView update(Long deptId, DeptCrudRequest request) {
         SysDeptEntity entity = getDept(deptId);
         String tenantId = entity.getTenantId();
         validateParentAccess(tenantId, request.parentId());
@@ -112,7 +113,7 @@ public class DeptManagementService {
         } else {
             entity = sysDeptMapper.selectOne(new LambdaQueryWrapper<SysDeptEntity>()
                     .eq(SysDeptEntity::getId, deptId)
-                    .eq(SysDeptEntity::getTenantId, currentTenantId())
+                .eq(SysDeptEntity::getTenantId, TenantContextSupport.currentTenantIdOrPlatform())
                     .eq(SysDeptEntity::getDeleted, 0)
                     .last("limit 1"));
         }
@@ -151,12 +152,8 @@ public class DeptManagementService {
                 .eq(SysDeptEntity::getDeleted, 0)) == 1;
     }
 
-    private String currentTenantId() {
-        return TenantContextSupport.currentTenantIdOrPlatform();
-    }
-
     private String resolveTargetTenantId(String requestedTenantId) {
-        String currentTenantId = currentTenantId();
+        String currentTenantId = TenantContextSupport.currentTenantIdOrPlatform();
         if (!dataScopeService.isPlatformSuperAdmin()) {
             return currentTenantId;
         }
@@ -166,19 +163,8 @@ public class DeptManagementService {
         return targetTenantId;
     }
 
-    private CatalogService.DepartmentView toDepartmentView(SysDeptEntity entity) {
-        return new CatalogService.DepartmentView(
-                entity.getId(),
-                entity.getTenantId(),
-                entity.getDeptCode(),
-                entity.getDeptName(),
-                entity.getParentId(),
-                entity.getLeaderUserId(),
-                entity.getLeaderName(),
-                entity.getLeaderPhone(),
-                entity.getOrderNo(),
-                entity.getEnabled()
-        );
+    private DepartmentView toDepartmentView(SysDeptEntity entity) {
+        return deptCatalogFacade.toView(entity);
     }
 
     private String normalizeText(String value) {

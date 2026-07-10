@@ -1,16 +1,13 @@
 <script lang="ts" setup>
 import { PERMS } from '#/constants/permissions';
 
+import type { VxeTableGridOptions } from '#/adapter/vxe-table';
+
 import { computed, defineAsyncComponent, reactive, ref } from 'vue';
 
-import {
-  Delete,
-  Edit,
-  Plus,
-  Refresh,
-  Search,
-  View,
-} from '@element-plus/icons-vue';
+import { Page } from '@vben/common-ui';
+import { Plus } from '@vben/icons';
+
 import {
   ElButton,
   ElCard,
@@ -32,6 +29,7 @@ import {
   ElTag,
 } from 'element-plus';
 
+import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { getList as getMenuList } from '#/api/upms/menu';
 import {
   delObj,
@@ -45,9 +43,8 @@ import { invokeWhenComponentReady } from '#/utils/component-ready';
 import { formatDateTime } from '#/utils/datetime';
 import { useDict } from '#/utils/dict';
 
-const RightToolbar = defineAsyncComponent(
-  () => import('#/components/right-toolbar/index.vue'),
-);
+import { useColumns, useGridFormSchema } from './data';
+
 const Pagination = defineAsyncComponent(
   () => import('#/components/pagination/index.vue'),
 );
@@ -60,40 +57,13 @@ const TenantMenu = defineAsyncComponent(() => import('./tenantmenu.vue'));
 
 // 字典
 const { status } = useDict('status');
-const queryRef = ref();
-const state = reactive({
-  queryParams: {
-    keyword: '',
-    platformLevel: '',
-    tenantStatus: '',
-  },
-  page: {
-    total: 0,
-    currentPage: 1,
-    pageSize: 10,
-    asc: '',
-    desc: 'create_time',
-  },
-  tableData: [] as any[],
-});
-const showSearch = ref(true);
-const loading = ref(false);
 const refForm = ref();
 const tenantMenuRef = ref();
 const formMounted = ref(false);
 const menuMounted = ref(false);
 
 // ---- 统计卡片 ----
-const statData = computed(() => {
-  const all = state.tableData;
-  const enabled = all.filter((t: any) => String(t.tenantStatus) === '1');
-  const platformLevel = all.filter((t: any) => isPlatformTenant(t));
-  return {
-    total: state.page.total,
-    enabled: enabled.length,
-    platform: platformLevel.length,
-  };
-});
+const statData = reactive({ total: 0, enabled: 0, platform: 0 });
 
 // ---- 详情抽屉 ----
 const detailVisible = ref(false);
@@ -224,24 +194,52 @@ const resetHistoryQuery = () => {
 
 const formatHistoryTime = (value?: null | string) => formatDateTime(value);
 
-const initPage = async () => {
-  loading.value = true;
-  const params = {
-    page: state.page.currentPage,
-    size: state.page.pageSize,
-    asc: state.page.asc,
-    desc: state.page.desc,
-  };
-  await getPage(Object.assign(params, state.queryParams))
-    .then((response) => {
-      state.tableData = response.records;
-      state.page.total = response.total;
-      loading.value = false;
-    })
-    .catch(() => {
-      loading.value = false;
-    });
-};
+const [Grid, gridApi] = useVbenVxeGrid({
+  formOptions: {
+    schema: useGridFormSchema(),
+    submitOnChange: false,
+  },
+  gridOptions: {
+    columns: useColumns(),
+    height: 'auto',
+    keepSource: true,
+    pagerConfig: {
+      enabled: true,
+      pageSize: 10,
+    },
+    proxyConfig: {
+      ajax: {
+        query: async ({ page }, formValues) => {
+          const response: any = await getPage({
+            ...formValues,
+            page: page.currentPage,
+            size: page.pageSize,
+          });
+          const records = response?.records ?? [];
+          statData.total = response?.total ?? 0;
+          statData.enabled = records.filter(
+            (tenant: any) => String(tenant.tenantStatus) === '1',
+          ).length;
+          statData.platform = records.filter((tenant: any) =>
+            isPlatformTenant(tenant),
+          ).length;
+          return { list: records, total: statData.total };
+        },
+      },
+    },
+    rowConfig: {
+      keyField: 'tenantId',
+    },
+    toolbarConfig: {
+      refresh: true,
+      refreshOptions: { code: 'query' },
+      search: true,
+      zoom: false,
+    },
+  } as VxeTableGridOptions,
+});
+
+const initPage = () => gridApi.query();
 
 /** 新增按钮 */
 const openForm = (row?: any) => {
@@ -274,13 +272,6 @@ const del = (row: any) => {
   });
 };
 
-initPage();
-
-/** 重置搜索表单 */
-const resetQuery = () => {
-  queryRef.value.resetFields();
-};
-
 const upMenu = (id: string) => {
   menuMounted.value = true;
   void invokeWhenComponentReady(tenantMenuRef, (menu: any) =>
@@ -290,8 +281,8 @@ const upMenu = (id: string) => {
 </script>
 
 <template>
-  <div class="hx-layout-container">
-    <div class="hx-layout-container-auto hx-layout-container-view">
+  <Page auto-content-height>
+    <div>
       <!-- 统计卡片 -->
       <ElRow :gutter="16" style="margin-bottom: 16px">
         <ElCol :span="8">
@@ -311,70 +302,6 @@ const upMenu = (id: string) => {
         </ElCol>
       </ElRow>
 
-      <!-- 搜索 -->
-      <ElForm
-        :model="state.queryParams"
-        ref="queryRef"
-        :inline="true"
-        v-show="showSearch"
-      >
-        <ElFormItem label="租户名称" prop="keyword">
-          <ElInput
-            v-model="state.queryParams.keyword"
-            clearable
-            placeholder="请输入租户编码或名称"
-          />
-        </ElFormItem>
-        <ElFormItem label="租户级别" prop="platformLevel">
-          <ElSelect
-            v-model="state.queryParams.platformLevel"
-            clearable
-            placeholder="全部"
-            style="width: 140px"
-          >
-            <ElOption label="平台级" value="PLATFORM" />
-            <ElOption label="业务级" value="BUSINESS" />
-          </ElSelect>
-        </ElFormItem>
-        <ElFormItem label="状态" prop="tenantStatus">
-          <ElSelect
-            v-model="state.queryParams.tenantStatus"
-            clearable
-            placeholder="全部"
-            style="width: 120px"
-          >
-            <ElOption label="启用" value="1" />
-            <ElOption label="停用" value="0" />
-          </ElSelect>
-        </ElFormItem>
-        <ElFormItem>
-          <ElButton type="primary" @click="initPage" :icon="Search">
-            搜索
-          </ElButton>
-          <ElButton @click="resetQuery" :icon="Refresh"> 重置 </ElButton>
-        </ElFormItem>
-      </ElForm>
-
-      <!-- 工具栏 -->
-      <div class="hx-table-toolbar">
-        <div>
-          <ElButton
-            type="primary"
-            v-access:code="PERMS.upms.tenant.add"
-            @click="add"
-            :icon="Plus"
-          >
-            新增
-          </ElButton>
-        </div>
-        <RightToolbar
-          :search-btn="true"
-          :refresh-btn="true"
-          @search="showSearch = !showSearch"
-          @refresh="initPage"
-        />
-      </div>
-
       <Form v-if="formMounted" ref="refForm" @init-page="initPage" />
       <TenantMenu
         v-if="menuMounted"
@@ -382,97 +309,84 @@ const upMenu = (id: string) => {
         @init-page="initPage"
       />
 
-      <!-- 列表 -->
-      <ElTable v-loading="loading" :data="state.tableData" border>
-        <ElTableColumn prop="tenantId" label="租户编码" width="160" />
-        <ElTableColumn prop="name" label="租户名称" min-width="120" />
-        <ElTableColumn label="租户级别" width="100">
-          <template #default="scope">
-            <ElTag
-              :type="isPlatformTenant(scope.row) ? 'danger' : 'info'"
-              size="small"
-              effect="plain"
-            >
-              {{ isPlatformTenant(scope.row) ? '平台级' : '业务级' }}
-            </ElTag>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="联系人" min-width="150">
-          <template #default="scope">
-            <div style="display: grid; gap: 2px">
-              <span>{{ scope.row.contactName || '-' }}</span>
-              <span style="font-size: 12px; color: #909399">{{
-                scope.row.contactPhone || '-'
-              }}</span>
-            </div>
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="授权到期" width="170">
-          <template #default="scope">
-            {{ formatDateTime(scope.row.expireAt) }}
-          </template>
-        </ElTableColumn>
-        <ElTableColumn prop="tenantStatus" label="状态" width="90">
-          <template #default="scope">
-            <DictTag
-              :options="status"
-              :value="String(scope.row.tenantStatus)"
-            />
-          </template>
-        </ElTableColumn>
-        <ElTableColumn label="操作" width="320" align="center" fixed="right">
-          <template #default="scope">
-            <ElButton
-              link
-              type="primary"
-              v-access:code="PERMS.upms.tenant.edit"
-              :icon="View"
-              @click="openDetail(scope.row)"
-            >
-              详情
-            </ElButton>
-            <ElButton
-              link
-              type="primary"
-              v-access:code="PERMS.upms.tenant.edit"
-              :icon="Edit"
-              @click="edit(scope.row)"
-            >
-              修改
-            </ElButton>
-            <ElButton
-              link
-              type="primary"
-              v-if="scope.row.tenantId !== '1881232176465358849'"
-              v-access:code="PERMS.upms.tenant.add"
-              :icon="Edit"
-              @click="upMenu(scope.row.tenantId)"
-            >
-              配置菜单
-            </ElButton>
-            <ElButton link type="warning" @click="openHistory(scope.row)">
-              历史
-            </ElButton>
-            <ElButton
-              link
-              type="danger"
-              v-access:code="PERMS.upms.tenant.del"
-              :icon="Delete"
-              @click="del(scope.row)"
-            >
-              删除
-            </ElButton>
-          </template>
-        </ElTableColumn>
-      </ElTable>
+      <Grid>
+        <template #toolbar-tools>
+          <ElButton
+            v-access:code="PERMS.upms.tenant.add"
+            type="primary"
+            @click="add"
+          >
+            <Plus class="size-5" />
+            新增
+          </ElButton>
+        </template>
 
-      <!-- 分页 -->
-      <Pagination
-        :total="state.page.total"
-        v-model:current="state.page.currentPage"
-        v-model:size="state.page.pageSize"
-        @change="initPage"
-      />
+        <template #platformLevel="{ row }">
+          <ElTag
+            :type="isPlatformTenant(row) ? 'danger' : 'info'"
+            effect="plain"
+            size="small"
+          >
+            {{ isPlatformTenant(row) ? '平台级' : '业务级' }}
+          </ElTag>
+        </template>
+
+        <template #contact="{ row }">
+          <div class="grid gap-0.5">
+            <span>{{ row.contactName || '-' }}</span>
+            <span class="text-xs text-gray-400">
+              {{ row.contactPhone || '-' }}
+            </span>
+          </div>
+        </template>
+
+        <template #expireAt="{ row }">
+          {{ formatDateTime(row.expireAt) }}
+        </template>
+
+        <template #status="{ row }">
+          <DictTag :options="status" :value="String(row.tenantStatus)" />
+        </template>
+
+        <template #operation="{ row }">
+          <ElButton
+            v-access:code="PERMS.upms.tenant.edit"
+            link
+            type="primary"
+            @click="openDetail(row)"
+          >
+            详情
+          </ElButton>
+          <ElButton
+            v-access:code="PERMS.upms.tenant.edit"
+            link
+            type="primary"
+            @click="edit(row)"
+          >
+            修改
+          </ElButton>
+          <ElButton
+            v-if="row.tenantId !== '1881232176465358849'"
+            v-access:code="PERMS.upms.tenant.add"
+            link
+            type="primary"
+            @click="upMenu(row.tenantId)"
+          >
+            配置菜单
+          </ElButton>
+          <ElButton link type="warning" @click="openHistory(row)">
+            历史
+          </ElButton>
+          <ElButton
+            v-access:code="PERMS.upms.tenant.del"
+            link
+            type="danger"
+            @click="del(row)"
+          >
+            删除
+          </ElButton>
+        </template>
+      </Grid>
     </div>
 
     <!-- 详情抽屉 -->
@@ -673,5 +587,5 @@ const upMenu = (id: string) => {
         @change="loadHistory"
       />
     </ElDrawer>
-  </div>
+  </Page>
 </template>

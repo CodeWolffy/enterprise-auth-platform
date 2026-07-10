@@ -52,14 +52,14 @@ public class CodegenMetadataService {
     @Transactional
     public List<DataSourceView> dataSources() {
         ensureLocalDataSource();
-        return repository.findDataSources(currentTenantId());
+        return repository.findDataSources(TenantContextSupport.currentTenantIdTrimmedOr(TenantContextSupport.PLATFORM_TENANT_ID));
     }
 
     @Transactional
     public DataSourceView createDataSource(DataSourceRequest request) {
         validateDataSourceRequest(request);
         Long id = repository.insertDataSource(
-                currentTenantId(),
+                TenantContextSupport.currentTenantIdTrimmedOr(TenantContextSupport.PLATFORM_TENANT_ID),
                 request.name().trim(),
                 request.jdbcUrl().trim(),
                 trimToNull(request.username()),
@@ -79,7 +79,7 @@ public class CodegenMetadataService {
         DataSourceView existing = requireDataSource(id);
         boolean resetAuthorization = existing.external() && !existing.jdbcUrl().equals(request.jdbcUrl().trim());
         repository.updateDataSource(
-                currentTenantId(),
+                TenantContextSupport.currentTenantIdTrimmedOr(TenantContextSupport.PLATFORM_TENANT_ID),
                 id,
                 request.name().trim(),
                 request.jdbcUrl().trim(),
@@ -101,10 +101,12 @@ public class CodegenMetadataService {
         if (LOCAL_JDBC_URL.equalsIgnoreCase(dataSource.jdbcUrl())) {
             throw new BusinessException("VALIDATION_ERROR", "当前应用库数据源不允许删除");
         }
-        if (repository.countImportedTablesByDataSource(currentTenantId(), id) > 0) {
+        if (repository.countImportedTablesByDataSource(
+                TenantContextSupport.currentTenantIdTrimmedOr(TenantContextSupport.PLATFORM_TENANT_ID), id) > 0) {
             throw new BusinessException("VALIDATION_ERROR", "数据源下已有导入表配置，不能删除");
         }
-        repository.softDeleteDataSource(currentTenantId(), id);
+        repository.softDeleteDataSource(
+                TenantContextSupport.currentTenantIdTrimmedOr(TenantContextSupport.PLATFORM_TENANT_ID), id);
     }
 
     @Transactional
@@ -115,7 +117,7 @@ public class CodegenMetadataService {
         }
         String note = trimToNull(request == null ? null : request.note());
         repository.markDataSourceAuthorized(
-                currentTenantId(),
+                TenantContextSupport.currentTenantIdTrimmedOr(TenantContextSupport.PLATFORM_TENANT_ID),
                 id,
                 note == null ? "已确认该外部数据源属于当前授权范围" : note);
         return dataSource(id);
@@ -162,14 +164,21 @@ public class CodegenMetadataService {
 
     @Transactional(readOnly = true)
     public PageResult<ImportedTableView> importedTables(String keyword, int page, int size) {
-        return repository.pageImportedTables(currentTenantId(), keyword, page, size);
+        return repository.pageImportedTables(
+                TenantContextSupport.currentTenantIdTrimmedOr(TenantContextSupport.PLATFORM_TENANT_ID),
+                keyword,
+                page,
+                size
+        );
     }
 
     @Transactional(readOnly = true)
     public TableConfigDetailView tableConfig(Long tableId) {
-        ImportedTableView table = repository.findImportedTable(currentTenantId(), tableId)
+        ImportedTableView table = repository.findImportedTable(
+                        TenantContextSupport.currentTenantIdTrimmedOr(TenantContextSupport.PLATFORM_TENANT_ID), tableId)
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "表配置不存在"));
-        List<ColumnConfigView> columns = repository.findColumnConfigs(currentTenantId(), tableId);
+        List<ColumnConfigView> columns = repository.findColumnConfigs(
+                TenantContextSupport.currentTenantIdTrimmedOr(TenantContextSupport.PLATFORM_TENANT_ID), tableId);
         return new TableConfigDetailView(table, columns);
     }
 
@@ -183,7 +192,11 @@ public class CodegenMetadataService {
             if (!StringUtils.hasText(column.columnName())) {
                 continue;
             }
-            repository.updateColumnConfig(currentTenantId(), tableId, column);
+            repository.updateColumnConfig(
+                    TenantContextSupport.currentTenantIdTrimmedOr(TenantContextSupport.PLATFORM_TENANT_ID),
+                    tableId,
+                    column
+            );
         }
         return tableConfig(tableId);
     }
@@ -193,7 +206,8 @@ public class CodegenMetadataService {
         if (tableId == null) {
             throw new BusinessException("VALIDATION_ERROR", "表配置 ID 不能为空");
         }
-        int updated = repository.softDeleteImportedTable(currentTenantId(), tableId);
+        int updated = repository.softDeleteImportedTable(
+                TenantContextSupport.currentTenantIdTrimmedOr(TenantContextSupport.PLATFORM_TENANT_ID), tableId);
         if (updated == 0) {
             throw new BusinessException("NOT_FOUND", "表配置不存在");
         }
@@ -203,7 +217,7 @@ public class CodegenMetadataService {
      * 已导入表的字段级配置覆盖，按 sort 顺序返回，供生成链路合并使用。
      */
     public Map<String, ColumnDefinition> importedColumnOverrides(String tableName) {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdTrimmedOr(TenantContextSupport.PLATFORM_TENANT_ID);
         Long tableId = repository.findLatestImportedTableId(tenantId, tableName).orElse(null);
         if (tableId == null) {
             return Map.of();
@@ -239,7 +253,7 @@ public class CodegenMetadataService {
         String className = CodegenNaming.toCamel(CodegenNaming.stripPrefix(table.tableName()), true);
         String moduleName = CodegenNaming.toCamel(CodegenNaming.stripPrefix(table.tableName()), false);
         return repository.upsertTableConfig(
-                currentTenantId(),
+                TenantContextSupport.currentTenantIdTrimmedOr(TenantContextSupport.PLATFORM_TENANT_ID),
                 dataSourceId,
                 table.tableName(),
                 table.tableComment(),
@@ -258,7 +272,7 @@ public class CodegenMetadataService {
             boolean systemColumn = SYSTEM_COLUMNS.contains(column.columnName().toLowerCase(Locale.ROOT));
             boolean businessColumn = !systemColumn && !column.primaryKey();
             repository.upsertColumnConfig(
-                    currentTenantId(),
+                TenantContextSupport.currentTenantIdTrimmedOr(TenantContextSupport.PLATFORM_TENANT_ID),
                     tableId,
                     column.columnName(),
                     column.columnComment(),
@@ -321,7 +335,8 @@ public class CodegenMetadataService {
     }
 
     private DataSourceView dataSource(Long id) {
-        return repository.findDataSource(currentTenantId(), id)
+        return repository.findDataSource(
+                        TenantContextSupport.currentTenantIdTrimmedOr(TenantContextSupport.PLATFORM_TENANT_ID), id)
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "数据源不存在"));
     }
 
@@ -340,7 +355,7 @@ public class CodegenMetadataService {
     }
 
     private void ensureLocalDataSource() {
-        String tenantId = currentTenantId();
+        String tenantId = TenantContextSupport.currentTenantIdTrimmedOr(TenantContextSupport.PLATFORM_TENANT_ID);
         if (repository.countLocalDataSources(tenantId) > 0) {
             return;
         }
@@ -362,10 +377,6 @@ public class CodegenMetadataService {
             throw new BusinessException("VALIDATION_ERROR", "表名格式不合法");
         }
         return normalized;
-    }
-
-    private String currentTenantId() {
-        return TenantContextSupport.currentTenantIdTrimmedOr(TenantContextSupport.PLATFORM_TENANT_ID);
     }
 
     private String maskPassword(String password) {

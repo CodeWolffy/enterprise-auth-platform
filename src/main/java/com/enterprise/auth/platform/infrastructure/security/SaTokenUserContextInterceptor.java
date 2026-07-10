@@ -4,6 +4,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.enterprise.auth.platform.modules.auth.application.SessionIndexService;
 import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import com.enterprise.auth.platform.common.context.AuthContextHolder;
+import com.enterprise.auth.platform.common.context.RequestLogContext;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.ClientIpResolver;
@@ -60,6 +61,8 @@ public class SaTokenUserContextInterceptor implements HandlerInterceptor {
             } else {
                 TenantContext.setTenantId(principal.tenantId());
             }
+            AuthContextHolder.currentUser().ifPresent(user -> RequestLogContext.bindPrincipal(
+                    user.id(), user.username(), principal.tenantId()));
             enforcePasswordChangeRestriction(request);
         }
         return true;
@@ -69,6 +72,7 @@ public class SaTokenUserContextInterceptor implements HandlerInterceptor {
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
         AuthContextHolder.clear();
         TenantContext.clear();
+        RequestLogContext.clearPrincipal();
     }
 
     private void enforceClientIpBinding(HttpServletRequest request) {

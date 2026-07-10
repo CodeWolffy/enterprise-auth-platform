@@ -5,7 +5,8 @@ import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
 import com.enterprise.auth.platform.modules.role.application.RoleGrantQueryFacade;
-import com.enterprise.auth.platform.modules.catalog.application.CatalogService;
+import com.enterprise.auth.platform.modules.role.application.RoleCatalogFacade;
+import com.enterprise.auth.platform.modules.role.application.RoleView;
 import com.enterprise.auth.platform.modules.role.application.RoleManagementService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -29,16 +30,16 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/roles")
 public class RoleController {
 
-    private final CatalogService catalogService;
+    private final RoleCatalogFacade roleCatalogFacade;
     private final RoleManagementService roleManagementService;
     private final RoleGrantQueryFacade roleGrantQueryFacade;
 
     public RoleController(
-            CatalogService catalogService,
+            RoleCatalogFacade roleCatalogFacade,
             RoleManagementService roleManagementService,
             RoleGrantQueryFacade roleGrantQueryFacade
     ) {
-        this.catalogService = catalogService;
+        this.roleCatalogFacade = roleCatalogFacade;
         this.roleManagementService = roleManagementService;
         this.roleGrantQueryFacade = roleGrantQueryFacade;
     }
@@ -46,28 +47,28 @@ public class RoleController {
     @Operation(summary = "查询角色列表")
     @GetMapping
     @SaCheckPermission(PermissionCodes.SYSROLE_PAGE)
-    public ApiResponse<PageResult<CatalogService.RoleView>> list(
+    public ApiResponse<PageResult<RoleView>> list(
             @Parameter(description = "角色关键字") @RequestParam(required = false) String keyword,
             @Parameter(description = "数据权限范围") @RequestParam(required = false) String dataScopeType,
             @Parameter(description = "租户编码") @RequestParam(required = false) String tenantId,
             @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "每页大小") @RequestParam(defaultValue = "10") int size
     ) {
-        return ApiResponse.ok(catalogService.rolesPage(keyword, dataScopeType, tenantId, page, size));
+        return ApiResponse.ok(roleCatalogFacade.rolesPage(keyword, dataScopeType, tenantId, page, size));
     }
 
     @Operation(summary = "查询角色选项")
     @GetMapping("/options")
     @SaCheckPermission(PermissionCodes.SYSROLE_PAGE)
-    public ApiResponse<List<CatalogService.RoleView>> options() {
-        return ApiResponse.ok(catalogService.roles());
+    public ApiResponse<List<RoleView>> options() {
+        return ApiResponse.ok(roleCatalogFacade.roles());
     }
 
     @SysLog("新增角色")
     @Operation(summary = "新增角色")
     @PostMapping
     @SaCheckPermission(PermissionCodes.SYSROLE_ADD)
-    public ApiResponse<CatalogService.RoleView> create(@Valid @RequestBody CreateRoleRequest request) {
+    public ApiResponse<RoleView> create(@Valid @RequestBody CreateRoleRequest request) {
         return ApiResponse.ok(roleManagementService.create(request));
     }
 
@@ -75,7 +76,7 @@ public class RoleController {
     @Operation(summary = "修改角色")
     @PutMapping("/{roleId}")
     @SaCheckPermission(PermissionCodes.SYSROLE_EDIT)
-    public ApiResponse<CatalogService.RoleView> update(
+    public ApiResponse<RoleView> update(
             @Parameter(description = "角色 ID") @PathVariable Long roleId,
             @Valid @RequestBody CreateRoleRequest request
     ) {

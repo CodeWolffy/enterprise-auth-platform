@@ -1,7 +1,6 @@
 package com.enterprise.auth.platform.modules.tenant.application;
 
 import com.enterprise.auth.platform.modules.tenant.interfaces.CreateTenantRequest;
-import com.enterprise.auth.platform.modules.catalog.application.CatalogService;
 import com.enterprise.auth.platform.modules.tenant.application.TenantManagementService;
 import org.springframework.stereotype.Service;
 
@@ -14,11 +13,11 @@ public class TenantLifecycleApplicationService {
         this.tenantManagementService = tenantManagementService;
     }
 
-    public CatalogService.TenantView create(CreateTenantRequest request) {
+    public TenantView create(CreateTenantRequest request) {
         return tenantManagementService.create(request);
     }
 
-    public CatalogService.TenantView update(String tenantId, CreateTenantRequest request) {
+    public TenantView update(String tenantId, CreateTenantRequest request) {
         return tenantManagementService.update(tenantId, request);
     }
 

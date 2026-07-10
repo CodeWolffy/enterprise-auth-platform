@@ -90,6 +90,29 @@ public class TenantMenuService {
         permissionSnapshotInvalidationService.invalidateTenant(tenantId);
     }
 
+    /** Adds menu assignments without replacing the tenant's existing catalog. */
+    @Transactional
+    public void addTenantMenus(String tenantId, Set<Long> menuIds) {
+        if (!StringUtils.hasText(tenantId) || menuIds == null || menuIds.isEmpty()) {
+            return;
+        }
+        Set<Long> normalizedMenuIds = validateTenantMenuIds(tenantId, menuIds);
+        runWithTenant(tenantId, () -> {
+            Set<Long> existing = findTenantMenuIds(tenantId);
+            for (Long menuId : normalizedMenuIds) {
+                if (existing.contains(menuId)) {
+                    continue;
+                }
+                SysTenantMenuEntity relation = new SysTenantMenuEntity();
+                relation.setTenantId(tenantId);
+                relation.setMenuId(menuId);
+                sysTenantMenuMapper.insert(relation);
+            }
+            return null;
+        });
+        permissionSnapshotInvalidationService.invalidateTenant(tenantId);
+    }
+
     @Transactional
     public Set<Long> saveTenantMenuByPackage(String tenantId, String packageCode) {
         Set<Long> menuIds = menuIdsForPackageCode(packageCode);

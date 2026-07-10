@@ -6,7 +6,8 @@ import static com.enterprise.auth.platform.test.SaTokenMockMvcSupport.clear;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.enterprise.auth.platform.modules.catalog.application.CatalogService;
+import com.enterprise.auth.platform.modules.dept.application.DepartmentView;
+import com.enterprise.auth.platform.modules.dept.application.DeptCatalogFacade;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.modules.dept.interfaces.DeptCrudRequest;
@@ -37,7 +38,7 @@ class DeptManagementServiceTest {
     private DeptManagementService deptManagementService;
 
     @Autowired
-    private CatalogService catalogService;
+    private DeptCatalogFacade deptCatalogFacade;
 
     @Autowired
     private SysDeptMapper sysDeptMapper;
@@ -64,7 +65,7 @@ class DeptManagementServiceTest {
     void shouldCreateAndDeleteDeptInDatabaseMode() {
         TenantContext.setTenantId("platform");
         String deptCode = "TEST_DEPT_" + System.nanoTime();
-        CatalogService.DepartmentView created = deptManagementService.create(
+        DepartmentView created = deptManagementService.create(
                 new DeptCrudRequest(null, deptCode, "测试部门", null, "测试负责人", "13800138000", 12, 0)
         );
 
@@ -72,7 +73,7 @@ class DeptManagementServiceTest {
         assertThat(created.leaderPhone()).isEqualTo("13800138000");
         assertThat(created.orderNo()).isEqualTo(12);
         assertThat(created.enabled()).isZero();
-        assertThat(catalogService.departments())
+        assertThat(deptCatalogFacade.departments())
                 .filteredOn(item -> item.id().equals(created.id()))
                 .first()
                 .satisfies(item -> {
@@ -84,12 +85,13 @@ class DeptManagementServiceTest {
 
         deptManagementService.delete(created.id());
 
-        assertThat(catalogService.departments()).extracting(CatalogService.DepartmentView::id).doesNotContain(created.id());
+        assertThat(deptCatalogFacade.departments()).extracting(DepartmentView::id).doesNotContain(created.id());
     }
 
     @Test
     void shouldFilterDepartmentsByDataScope() {
         TenantContext.setTenantId("tenant-a");
+        Long rootDeptId = tenantRootDeptId();
         Long childDeptId = ensureChildDept();
         Long userId = ensureScopedUser();
 
@@ -107,9 +109,8 @@ class DeptManagementServiceTest {
         );
         bind(principal);
 
-        assertThat(catalogService.departments()).extracting(CatalogService.DepartmentView::id)
-                .contains(2L, childDeptId)
-                .doesNotContain(3L);
+        assertThat(deptCatalogFacade.departments()).extracting(DepartmentView::id)
+                .contains(rootDeptId, childDeptId);
     }
 
     @Test
@@ -131,7 +132,8 @@ class DeptManagementServiceTest {
         );
         bind(principal);
 
-        assertThatThrownBy(() -> deptManagementService.create(new DeptCrudRequest(3L, CHILD_DEPT_CODE, "隐藏子部门", null)))
+        assertThatThrownBy(() -> deptManagementService.create(
+                new DeptCrudRequest(tenantRootDeptId() + 999_999L, CHILD_DEPT_CODE, "隐藏子部门", null)))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("父级部门");
 
@@ -141,7 +143,8 @@ class DeptManagementServiceTest {
                 "tenant-a",
                 HIDDEN_LEADER
         );
-        assertThatThrownBy(() -> deptManagementService.create(new DeptCrudRequest(2L, CHILD_DEPT_CODE, "负责人越权部门", hiddenLeaderId)))
+        assertThatThrownBy(() -> deptManagementService.create(
+                new DeptCrudRequest(tenantRootDeptId(), CHILD_DEPT_CODE, "负责人越权部门", hiddenLeaderId)))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("负责人");
     }
@@ -167,7 +170,7 @@ class DeptManagementServiceTest {
         );
         bind(admin);
 
-        assertThat(catalogService.departments()).extracting(CatalogService.DepartmentView::tenantId)
+        assertThat(deptCatalogFacade.departments()).extracting(DepartmentView::tenantId)
                 .contains("platform", "tenant-a");
     }
 
@@ -188,12 +191,12 @@ class DeptManagementServiceTest {
         );
         bind(admin);
 
-        CatalogService.DepartmentView created = deptManagementService.create(
-                new DeptCrudRequest(2L, CHILD_DEPT_CODE, "租户A部门", null, null, null, 0, 1, "tenant-a")
+        DepartmentView created = deptManagementService.create(
+                new DeptCrudRequest(tenantRootDeptId(), CHILD_DEPT_CODE, "租户A部门", null, null, null, 0, 1, "tenant-a")
         );
 
         assertThat(created.tenantId()).isEqualTo("tenant-a");
-        assertThat(created.parentId()).isEqualTo(2L);
+        assertThat(created.parentId()).isEqualTo(tenantRootDeptId());
     }
 
     private Long ensureChildDept() {
@@ -202,7 +205,7 @@ class DeptManagementServiceTest {
         entity.setTenantId("tenant-a");
         entity.setDeptCode(CHILD_DEPT_CODE);
         entity.setDeptName("租户A-数据权限子部门");
-        entity.setParentId(2L);
+        entity.setParentId(tenantRootDeptId());
         sysDeptMapper.insert(entity);
         return entity.getId();
     }
@@ -211,7 +214,7 @@ class DeptManagementServiceTest {
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username = ?", "tenant-a", SCOPE_USER);
         SysUserEntity entity = new SysUserEntity();
         entity.setTenantId("tenant-a");
-        entity.setDeptId(2L);
+        entity.setDeptId(tenantRootDeptId());
         entity.setUsername(SCOPE_USER);
         entity.setDisplayName("部门权限测试用户");
         entity.setPasswordHash(passwordHasher.hash("DeptTest@123"));
@@ -225,12 +228,32 @@ class DeptManagementServiceTest {
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username = ?", "tenant-a", HIDDEN_LEADER);
         SysUserEntity entity = new SysUserEntity();
         entity.setTenantId("tenant-a");
-        entity.setDeptId(3L);
+        entity.setDeptId(ensureHiddenDept());
         entity.setUsername(HIDDEN_LEADER);
         entity.setDisplayName("隐藏负责人");
         entity.setPasswordHash(passwordHasher.hash("DeptTest@123"));
         entity.setEnabled(1);
         entity.setSessionVersion(1);
         sysUserMapper.insert(entity);
+    }
+
+    private Long tenantRootDeptId() {
+        return jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_dept WHERE tenant_id = ? AND parent_id IS NULL AND deleted = 0 ORDER BY id LIMIT 1",
+                Long.class,
+                "tenant-a"
+        );
+    }
+
+    private Long ensureHiddenDept() {
+        String code = "DEPT_HIDDEN_UT";
+        jdbcTemplate.update("DELETE FROM sys_dept WHERE tenant_id = ? AND dept_code = ?", "tenant-a", code);
+        SysDeptEntity entity = new SysDeptEntity();
+        entity.setTenantId("tenant-a");
+        entity.setDeptCode(code);
+        entity.setDeptName("租户A-隐藏部门");
+        entity.setParentId(tenantRootDeptId());
+        sysDeptMapper.insert(entity);
+        return entity.getId();
     }
 }

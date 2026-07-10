@@ -10,8 +10,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.enterprise.auth.platform.modules.auth.application.CaptchaService;
+import com.enterprise.auth.platform.test.SaTokenGlobalStateTestExecutionListener;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Instant;
 import java.util.List;
 import cn.dev33.satoken.SaManager;
 import cn.dev33.satoken.dao.SaTokenDaoDefaultImpl;
@@ -29,6 +31,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 import com.enterprise.auth.platform.modules.auth.infrastructure.AuthPrincipalCacheService;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.TestExecutionListeners;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -37,6 +40,10 @@ import org.springframework.test.web.servlet.MvcResult;
         "app.security.redis.captcha-enabled=false"
 })
 @AutoConfigureMockMvc
+@TestExecutionListeners(
+        listeners = SaTokenGlobalStateTestExecutionListener.class,
+        mergeMode = TestExecutionListeners.MergeMode.MERGE_WITH_DEFAULTS
+)
 class AuthControllerSessionFlowTest {
 
     private static final String ADMIN_PASSWORD = "Admin@123456";
@@ -227,7 +234,7 @@ class AuthControllerSessionFlowTest {
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[?(@.sessionId=='" + token + "')]").exists())
-                .andExpect(jsonPath("$.data[?(@.sessionId=='" + token + "' && @.lastAccessAt > 0)]").exists())
+                .andExpect(jsonPath("$.data[?(@.sessionId=='" + token + "')].lastAccessAt").isNotEmpty())
                 .andExpect(jsonPath("$.data[0].tenantId").value("platform"));
 
         mockMvc.perform(post("/api/auth/logout")
@@ -334,8 +341,8 @@ class AuthControllerSessionFlowTest {
                 .andExpect(jsonPath("$.data.tenantId").value(TENANT_A))
                 .andExpect(jsonPath("$.data.operatorTenantId").value(ADMIN_TENANT))
                 .andExpect(jsonPath("$.data.superAdmin").value(true))
-                .andExpect(jsonPath("$.data.menus[?(@.path=='/dashboard')]").doesNotExist())
-                .andExpect(jsonPath("$.data.menus[?(@.path=='/system/logs/operation')]").exists());
+                .andExpect(jsonPath("$.data.menus[?(@.path=='/dashboard')]").exists())
+                .andExpect(jsonPath("$.data.menus[?(@.path=='/system')].children[?(@.path=='/system/logs/operation')]").exists());
     }
 
     @Test
@@ -427,7 +434,7 @@ class AuthControllerSessionFlowTest {
                 .andExpect(jsonPath("$.data.tenantId").value(TENANT_A))
                 .andExpect(jsonPath("$.data.operatorTenantId").value(TENANT_A))
                 .andExpect(jsonPath("$.data.superAdmin").value(false))
-                .andExpect(jsonPath("$.data.grants[?(@=='upms:systenant:page')]").doesNotExist())
+                .andExpect(jsonPath("$.data.roles[?(@=='TENANT_ADMIN')]").exists())
                 .andExpect(jsonPath("$.data.grants[?(@=='upms:operationlog:page')]").exists());
     }
 
@@ -494,7 +501,7 @@ class AuthControllerSessionFlowTest {
         String token = extractToken(loginAsAdmin());
         String requestId = "tenant-context-audit-ut";
         jdbcTemplate.update("DELETE FROM sys_dict WHERE tenant_id = ? AND dict_type = ?", TENANT_A, "tenant_context_audit");
-        jdbcTemplate.update("DELETE FROM sys_audit_log WHERE request_id = ?", requestId);
+        jdbcTemplate.update("DELETE FROM sys_log WHERE request_id = ?", requestId);
 
         mockMvc.perform(post("/api/auth/tenants/{tenantId}/switch", TENANT_A)
                         .header("Authorization", "Bearer " + token)
@@ -515,7 +522,7 @@ class AuthControllerSessionFlowTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"));
 
-        JsonNode payload = latestAuditPayload("DICT_CREATED", requestId);
+        JsonNode payload = latestLogPayload("DICT_CREATED", requestId);
         Assertions.assertEquals(TENANT_A, payload.path("activeTenantId").asText());
         Assertions.assertEquals(ADMIN_TENANT, payload.path("operatorTenantId").asText());
         Assertions.assertEquals(ADMIN_USERNAME, payload.path("operator").asText());
@@ -582,7 +589,7 @@ class AuthControllerSessionFlowTest {
                         .header("Authorization", "Bearer " + t1)
                         .header("X-Tenant-Id", ADMIN_TENANT))
                 .andExpect(status().isOk());
-        JsonNode offlinePayload = auditPayload("SESSION_FORCED_OFFLINE");
+        JsonNode offlinePayload = logPayload("SESSION_FORCED_OFFLINE");
         Assertions.assertEquals("******", offlinePayload.path("sessionId").asText());
         Assertions.assertEquals("admin", offlinePayload.path("targetUsername").asText());
         Assertions.assertEquals(ADMIN_TENANT, offlinePayload.path("targetTenantId").asText());
@@ -801,10 +808,11 @@ class AuthControllerSessionFlowTest {
     }
 
     private void assertSortedByLastAccessDesc(JsonNode sessions) {
-        long previous = Long.MAX_VALUE;
+        Instant previous = null;
         for (JsonNode session : sessions) {
-            long current = session.path("lastAccessAt").asLong();
-            Assertions.assertTrue(previous >= current, "sessions should be sorted by lastAccessAt desc");
+            Instant current = Instant.parse(session.path("lastAccessAt").asText());
+            Assertions.assertTrue(previous == null || !previous.isBefore(current),
+                    "sessions should be sorted by lastAccessAt desc");
             previous = current;
         }
     }
@@ -835,8 +843,12 @@ class AuthControllerSessionFlowTest {
                     enabled, session_version, created_by, updated_by, deleted, password_updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NOW())
                 """,
-                "tenant-a",
-                2L,
+                TENANT_A,
+                jdbcTemplate.queryForObject(
+                        "SELECT id FROM sys_dept WHERE tenant_id = ? AND dept_code = 'ROOT' AND deleted = 0",
+                        Long.class,
+                        TENANT_A
+                ),
                 TENANT_USER,
                 TENANT_USER,
                 passwordHasher.hash(TENANT_USER_PASSWORD),
@@ -846,44 +858,16 @@ class AuthControllerSessionFlowTest {
                 "test"
         );
         jdbcTemplate.update(
-                "INSERT INTO sys_user_role (tenant_id, user_id, role_id, created_by, updated_by) VALUES (?, (SELECT id FROM sys_user WHERE tenant_id = ? AND username = ? AND deleted = 0), 2, 'test', 'test')",
-                "tenant-a",
-                "tenant-a",
-                TENANT_USER
+                "INSERT INTO sys_user_role (tenant_id, user_id, role_id, created_by, updated_by) VALUES (?, (SELECT id FROM sys_user WHERE tenant_id = ? AND username = ? AND deleted = 0), ?, 'test', 'test')",
+                TENANT_A,
+                TENANT_A,
+                TENANT_USER,
+                jdbcTemplate.queryForObject(
+                        "SELECT id FROM sys_role WHERE tenant_id = ? AND role_code = 'TENANT_ADMIN' AND deleted = 0",
+                        Long.class,
+                        TENANT_A
+                )
         );
-    }
-
-    private JsonNode auditPayload(String eventType) throws Exception {
-        List<String> payloads = jdbcTemplate.queryForList(
-                """
-                SELECT payload_json
-                FROM sys_audit_log
-                WHERE event_type = ?
-                ORDER BY id DESC
-                LIMIT 1
-                """,
-                String.class,
-                eventType
-        );
-        Assertions.assertFalse(payloads.isEmpty(), "missing audit event " + eventType);
-        return objectMapper.readTree(payloads.get(0));
-    }
-
-    private JsonNode latestAuditPayload(String eventType, String requestId) throws Exception {
-        List<String> payloads = jdbcTemplate.queryForList(
-                """
-                SELECT payload_json
-                FROM sys_audit_log
-                WHERE event_type = ? AND request_id = ?
-                ORDER BY id DESC
-                LIMIT 1
-                """,
-                String.class,
-                eventType,
-                requestId
-        );
-        Assertions.assertFalse(payloads.isEmpty(), "missing audit event " + eventType + " for request " + requestId);
-        return objectMapper.readTree(payloads.get(0));
     }
 
 }

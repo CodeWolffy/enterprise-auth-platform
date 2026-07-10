@@ -95,11 +95,7 @@ export const PERMS = {
       del: 'upms:file:del',
     },
     onlineUser: {
-      /**
-       * 注意：该码未登记在后端 PermissionCodes.java（后端登记的是
-       * upms:session:kick），此处沿用页面/菜单现有授权码以保持行为不变。
-       */
-      forced: 'upms:onlineuser:forced',
+      kick: 'upms:session:kick',
     },
   },
   gen: {

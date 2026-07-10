@@ -590,17 +590,13 @@ public class MenuService {
     }
 
     private void requirePlatformTenant() {
-        if (!platformTenantId().equals(currentTenantId())) {
+        if (!platformTenantId().equals(TenantContextSupport.currentTenantIdOr(platformTenantId()))) {
             throw new BusinessException("仅平台租户允许维护菜单模板");
         }
     }
 
     private void evictPrincipalSnapshots() {
         permissionSnapshotInvalidationService.invalidateAll();
-    }
-
-    private String currentTenantId() {
-        return TenantContextSupport.currentTenantIdOr(platformTenantId());
     }
 
     private String platformTenantId() {

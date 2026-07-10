@@ -39,7 +39,7 @@ public class NotificationInboxService {
 
     public PageResult<NotificationView> myNotifications(int page, int size, Boolean read) {
         UserAccount user = currentUserService.requireCurrentUser();
-        String tenantId = currentTenantId(user);
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform(user.tenantId());
         int safePage = PaginationSupport.normalizePage(page);
         int safeSize = PaginationSupport.normalizeSize(size, 100);
         Instant now = TimeSupport.now();
@@ -72,7 +72,7 @@ public class NotificationInboxService {
 
     public long unreadCount() {
         UserAccount user = currentUserService.requireCurrentUser();
-        String tenantId = currentTenantId(user);
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform(user.tenantId());
         Instant now = TimeSupport.now();
         return notificationMapper.selectCount(visibleMineWrapper(tenantId, user.id(), false))
                 + noticeReadStatusMapper.countVisibleBroadcasts(tenantId, user.id(), false, now);
@@ -81,7 +81,7 @@ public class NotificationInboxService {
     @Transactional
     public NotificationView markRead(Long notificationId) {
         UserAccount user = currentUserService.requireCurrentUser();
-        String tenantId = currentTenantId(user);
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform(user.tenantId());
         if (notificationId != null && notificationId < 0) {
             return markBroadcastRead(tenantId, user.id(), -notificationId);
         }
@@ -101,7 +101,7 @@ public class NotificationInboxService {
     @Transactional
     public long markAllRead() {
         UserAccount user = currentUserService.requireCurrentUser();
-        String tenantId = currentTenantId(user);
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform(user.tenantId());
         Instant now = TimeSupport.now();
         long directChanged = notificationMapper.update(null, visibleMineUpdateWrapper(tenantId, user.id(), now)
                 .isNull(SysUserNotificationEntity::getReadAt)
@@ -117,7 +117,7 @@ public class NotificationInboxService {
     @Transactional
     public long clearReadNotifications() {
         UserAccount user = currentUserService.requireCurrentUser();
-        String tenantId = currentTenantId(user);
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform(user.tenantId());
         // 物理硬删除当前用户所有已读通知，释放存储空间。
         long directDeleted = notificationMapper.hardDeleteReadNotifications(tenantId, user.id());
         long broadcastsCleared = noticeReadStatusMapper.clearReadBroadcasts(
@@ -177,10 +177,6 @@ public class NotificationInboxService {
                 .eq(SysUserNotificationEntity::getTenantId, tenantId)
                 .eq(SysUserNotificationEntity::getRecipientUserId, userId)
                 .eq(SysUserNotificationEntity::getDeleted, 0);
-    }
-
-    private String currentTenantId(UserAccount user) {
-        return TenantContextSupport.currentTenantIdOr(user.tenantId());
     }
 
     private Comparator<NotificationView> notificationOrder() {

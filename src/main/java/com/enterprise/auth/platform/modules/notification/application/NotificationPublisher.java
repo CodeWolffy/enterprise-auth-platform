@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.modules.notification.application;
 
 import com.enterprise.auth.platform.common.TimeSupport;
+import com.enterprise.auth.platform.common.observability.PlatformMetrics;
 import com.enterprise.auth.platform.modules.notification.infrastructure.entity.SysUserNotificationEntity;
 import com.enterprise.auth.platform.modules.notification.infrastructure.mapper.SysUserNotificationMapper;
 import com.enterprise.auth.platform.modules.role.application.RoleQueryFacade;
@@ -32,29 +33,43 @@ public class NotificationPublisher {
     private final UserQueryFacade userQueryFacade;
     private final ObjectMapper objectMapper;
     private final NotificationSseRegistry sseRegistry;
+    private final PlatformMetrics metrics;
 
     public NotificationPublisher(
             SysUserNotificationMapper notificationMapper,
             RoleQueryFacade roleQueryFacade,
             UserQueryFacade userQueryFacade,
             ObjectMapper objectMapper,
-            NotificationSseRegistry sseRegistry
+            NotificationSseRegistry sseRegistry,
+            PlatformMetrics metrics
     ) {
         this.notificationMapper = notificationMapper;
         this.roleQueryFacade = roleQueryFacade;
         this.userQueryFacade = userQueryFacade;
         this.objectMapper = objectMapper;
         this.sseRegistry = sseRegistry;
+        this.metrics = metrics;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public long publish(NotificationPublishCommand command) {
+        try {
+            return doPublish(command);
+        } catch (RuntimeException exception) {
+            metrics.recordNotificationPublish(command == null ? null : command.scenarioCode(), "failure", 0);
+            throw exception;
+        }
+    }
+
+    private long doPublish(NotificationPublishCommand command) {
         if (command == null || !StringUtils.hasText(command.tenantId())) {
+            metrics.recordNotificationPublish(null, "ignored", 0);
             return 0;
         }
         String tenantId = command.tenantId().trim();
         String title = limit(command.title(), 128);
         if (!StringUtils.hasText(title)) {
+            metrics.recordNotificationPublish(command.scenarioCode(), "ignored", 0);
             return 0;
         }
         String scenarioCode = limit(command.scenarioCode(), 64);
@@ -71,6 +86,7 @@ public class NotificationPublisher {
         String createdBy = limit(command.createdBy(), 64);
         Set<Long> recipientUserIds = resolveRecipients(command);
         if (recipientUserIds.isEmpty()) {
+            metrics.recordNotificationPublish(command.scenarioCode(), "no_recipients", 0);
             return 0;
         }
         long published = 0;
@@ -109,6 +125,7 @@ public class NotificationPublisher {
             }
         }
         published += batchInsertIgnore(pendingBatch);
+        metrics.recordNotificationPublish(command.scenarioCode(), "success", published);
         return published;
     }
 
