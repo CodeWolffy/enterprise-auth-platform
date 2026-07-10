@@ -237,9 +237,9 @@ function handleSubmit() {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: fill;
-  user-select: none;
   pointer-events: none;
+  user-select: none;
+  object-fit: fill;
 }
 
 .point-captcha__marker {
@@ -252,12 +252,12 @@ function handleSubmit() {
   font-size: 13px;
   font-weight: 600;
   color: var(--el-color-white);
+  pointer-events: none;
   background: var(--el-color-primary);
   border: 2px solid var(--el-color-white);
   border-radius: 50%;
   box-shadow: 0 2px 6px rgb(0 0 0 / 30%);
   transform: translate(-50%, -50%);
-  pointer-events: none;
 }
 
 .point-captcha__refresh {

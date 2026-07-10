@@ -672,10 +672,8 @@ function getPreviewContent() {
             :style="{
               background:
                 previewActiveFile === file.path ? '#ecf5ff' : 'transparent',
-              color:
-                previewActiveFile === file.path ? '#409eff' : '#606266',
-              fontWeight:
-                previewActiveFile === file.path ? '600' : 'normal',
+              color: previewActiveFile === file.path ? '#409eff' : '#606266',
+              fontWeight: previewActiveFile === file.path ? '600' : 'normal',
             }"
             @click="previewActiveFile = file.path"
           >
@@ -713,10 +711,7 @@ function getPreviewContent() {
         >
           代码已成功生成
         </ElTag>
-        <div
-          v-if="generateResult.files?.length"
-          style="margin-bottom: 16px"
-        >
+        <div v-if="generateResult.files?.length" style="margin-bottom: 16px">
           <h4 style="margin-bottom: 8px">
             生成文件 ({{ generateResult.files.length }})
           </h4>

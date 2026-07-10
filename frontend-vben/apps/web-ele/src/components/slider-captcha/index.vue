@@ -342,10 +342,13 @@ function normalizeTrack(points: Array<{ t: number; x: number; y: number }>) {
   //    不改变轨迹形状与时序，避免后端因轨迹点太少而拒绝）。
   let result = interpolated;
   while (result.length < MIN_TRACK_POINTS && result.length >= 2) {
-    const densified: Array<{ t: number; x: number; y: number }> = [result[0]!];
+    const first = result[0];
+    if (!first) break;
+    const densified: Array<{ t: number; x: number; y: number }> = [first];
     for (let index = 1; index < result.length; index += 1) {
-      const from = result[index - 1]!;
-      const to = result[index]!;
+      const from = result[index - 1];
+      const to = result[index];
+      if (!from || !to) continue;
       densified.push(
         {
           x: (from.x + to.x) / 2,
@@ -365,7 +368,8 @@ function normalizeTrack(points: Array<{ t: number; x: number; y: number }>) {
       const sourceIndex = Math.round(
         (index * (result.length - 1)) / (MAX_TRACK_POINTS - 1),
       );
-      sampled.push(result[sourceIndex]!);
+      const point = result[sourceIndex];
+      if (point) sampled.push(point);
     }
     result = sampled;
   }

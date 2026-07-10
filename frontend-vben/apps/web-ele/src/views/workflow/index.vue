@@ -4,6 +4,8 @@ import { useRoute, useRouter } from 'vue-router';
 
 import { ElButton, ElTabPane, ElTabs } from 'element-plus';
 
+import { PERMS } from '#/constants/permissions';
+
 const router = useRouter();
 const route = useRoute();
 const activeTab = ref((route.name as string) || 'workflow-definitions');
@@ -79,8 +81,18 @@ function handleTabChange(name: number | string) {
           </article>
         </div>
         <div class="workflow-hero__actions">
-          <ElButton @click="goRoute('workflow-definitions')">流程定义</ElButton>
-          <ElButton type="primary" plain @click="goRoute('workflow-designer')">
+          <ElButton
+            v-access:code="PERMS.upms.workflow.definition.page"
+            @click="goRoute('workflow-definitions')"
+          >
+            流程定义
+          </ElButton>
+          <ElButton
+            v-access:code="PERMS.upms.workflow.designer.page"
+            type="primary"
+            plain
+            @click="goRoute('workflow-designer')"
+          >
             流程设计器
           </ElButton>
         </div>
@@ -211,8 +223,8 @@ function handleTabChange(name: number | string) {
 
 .muted-line {
   margin: 8px 0 0;
-  color: var(--text-soft);
   line-height: 1.7;
+  color: var(--text-soft);
 }
 
 .workflow-nav {

@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { PERMS } from '#/constants/permissions';
-
 import type { VxeTableGridOptions } from '#/adapter/vxe-table';
 
 import { Page } from '@vben/common-ui';
@@ -9,6 +7,7 @@ import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { delObj, getList } from '#/api/upms/online-user';
+import { PERMS } from '#/constants/permissions';
 import { formatDateTime } from '#/utils/datetime';
 
 import { useColumns } from './data';

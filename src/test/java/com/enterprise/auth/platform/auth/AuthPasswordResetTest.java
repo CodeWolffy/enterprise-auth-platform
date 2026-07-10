@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.enterprise.auth.platform.modules.auth.application.CaptchaService;
+import com.enterprise.auth.platform.modules.auth.application.PasswordResetNotificationService;
 import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -46,6 +47,9 @@ class AuthPasswordResetTest {
 
     @org.springframework.test.context.bean.override.mockito.MockitoBean
     private CaptchaService captchaService;
+
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private PasswordResetNotificationService passwordResetNotificationService;
 
     @BeforeEach
     void setUp() {
@@ -90,6 +94,16 @@ class AuthPasswordResetTest {
         assertThat(existingTokenCount).isEqualTo(1);
         assertThat(missingTokenCount).isZero();
         assertThat(storedTokenHash).hasSize(64).matches("[0-9a-f]{64}");
+
+        var resetLink = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(passwordResetNotificationService).sendPasswordResetLink(
+                org.mockito.ArgumentMatchers.eq(TENANT_ID),
+                org.mockito.ArgumentMatchers.eq(EMAIL),
+                org.mockito.ArgumentMatchers.eq(USERNAME),
+                resetLink.capture()
+        );
+        assertThat(resetLink.getValue())
+                .startsWith("http://localhost:5777/#/reset-password?token=");
     }
 
     @Test
@@ -154,7 +168,12 @@ class AuthPasswordResetTest {
                         .content(tokenPayload(rawToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.valid").value(true))
-                .andExpect(jsonPath("$.data.username").value(USERNAME));
+                .andExpect(jsonPath("$.data.username").value(USERNAME))
+                .andExpect(jsonPath("$.data.passwordPolicy.passwordMinLength").isNumber())
+                .andExpect(jsonPath("$.data.passwordPolicy.passwordMaxLength").isNumber())
+                .andExpect(jsonPath("$.data.passwordPolicy.passwordRequireLetter").isBoolean())
+                .andExpect(jsonPath("$.data.passwordPolicy.passwordRequireNumber").isBoolean())
+                .andExpect(jsonPath("$.data.passwordPolicy.passwordRequireSpecial").isBoolean());
 
         mockMvc.perform(post("/api/auth/password/reset/confirm")
                         .contentType(MediaType.APPLICATION_JSON)

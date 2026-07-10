@@ -4,20 +4,40 @@ import type { FeatureFlags } from '#/types/api';
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { ElButton, ElCard, ElCol, ElRow, ElTag } from 'element-plus';
+import { useAccess } from '@vben/access';
+
+import {
+  ElAlert,
+  ElButton,
+  ElCard,
+  ElCol,
+  ElEmpty,
+  ElRow,
+  ElTag,
+} from 'element-plus';
 
 import { queryFeatures } from '#/api/system';
 import { getPage as getConfigPage } from '#/api/upms/config';
 import { getPage as getDictPage } from '#/api/upms/dict';
 import { getPage as getNoticePage } from '#/api/upms/notice';
+import { PERMS } from '#/constants/permissions';
 
 const router = useRouter();
+const { hasAccessByCodes } = useAccess();
 
-const dictCount = ref(0);
-const configCount = ref(0);
-const noticeCount = ref(0);
-const publishedNoticeCount = ref(0);
+const loading = ref(false);
+const loadErrors = ref<string[]>([]);
+const dictCount = ref<null | number>(null);
+const configCount = ref<null | number>(null);
+const noticeCount = ref<null | number>(null);
+const publishedNoticeCount = ref<null | number>(null);
 const features = ref<FeatureFlags | null>(null);
+
+function canAccess(code: string) {
+  return hasAccessByCodes([code]);
+}
+
+const canLoadFeatures = computed(() => canAccess(PERMS.upms.system.get));
 
 const featureItems = computed(() => {
   if (!features.value) return [];
@@ -43,66 +63,145 @@ const featureItems = computed(() => {
   ];
 });
 
-onMounted(async () => {
-  const [dicts, configs, notices, publishedNotices, featureData] =
-    await Promise.all([
-      getDictPage({ page: 1, size: 1 }),
-      getConfigPage({ page: 1, size: 1 }),
-      getNoticePage({ page: 1, size: 1 }),
-      getNoticePage({ page: 1, size: 1, published: true }),
-      queryFeatures(),
-    ]);
-  dictCount.value = dicts.total;
-  configCount.value = configs.total;
-  noticeCount.value = notices.total;
-  publishedNoticeCount.value = publishedNotices.total;
-  features.value = featureData;
-});
-
 const entryCards = [
   {
     title: '字典管理',
     eyebrow: '字典',
     desc: '维护业务枚举、状态映射和基础字典条目。',
     path: '/platform/dicts',
+    permission: PERMS.upms.dict.page,
   },
   {
     title: '邮件配置',
     eyebrow: '邮件',
     desc: '配置 SMTP 服务器、授权管理和测试邮件发送。',
     path: '/platform/mail-channel',
+    permission: PERMS.upms.mail.page,
   },
   {
     title: '参数管理',
     eyebrow: '参数',
     desc: '维护平台运行参数、业务配置项和策略型参数。',
     path: '/platform/configs',
+    permission: PERMS.upms.config.page,
   },
   {
     title: '公告管理',
     eyebrow: '公告',
     desc: '维护面向租户和运营人员的公告内容与发布时间。',
     path: '/platform/notices',
+    permission: PERMS.upms.notice.page,
   },
   {
     title: '分类配置',
     eyebrow: '分类',
     desc: '维护字典分类和参数分类的匹配规则，并查看引用分析与趋势。',
     path: '/platform/categories',
+    permission: PERMS.upms.category.page,
   },
   {
     title: '租户套餐',
     eyebrow: '租户套餐',
     desc: '维护平台级租户套餐、能力目录，以及套餐与能力的绑定关系。',
     path: '/platform/tenant-catalog',
+    permission: PERMS.upms.tenantPackage.page,
   },
   {
     title: '菜单管理',
     eyebrow: '菜单权限',
     desc: '维护目录、菜单、按钮和 API 权限节点，支持授权键、路由键、可见性与排序配置。',
     path: '/system/menus',
+    permission: PERMS.upms.menu.page,
   },
 ];
+
+const visibleEntryCards = computed(() =>
+  entryCards.filter((card) => canAccess(card.permission)),
+);
+
+const statCards = computed(() =>
+  [
+    {
+      count: dictCount.value,
+      eyebrow: '字典',
+      hint: '当前可见字典条目数量',
+      permission: PERMS.upms.dict.page,
+    },
+    {
+      count: configCount.value,
+      eyebrow: '参数',
+      hint: '当前可见参数条目数量',
+      permission: PERMS.upms.config.page,
+    },
+    {
+      count: noticeCount.value,
+      eyebrow: '公告',
+      hint: '当前公告数量',
+      permission: PERMS.upms.notice.page,
+    },
+    {
+      count: publishedNoticeCount.value,
+      eyebrow: '已发布',
+      hint: '已发布公告数量',
+      permission: PERMS.upms.notice.page,
+    },
+  ].filter((card) => canAccess(card.permission)),
+);
+
+onMounted(async () => {
+  loading.value = true;
+  loadErrors.value = [];
+
+  const tasks: Array<{ label: string; request: Promise<void> }> = [];
+  if (canAccess(PERMS.upms.dict.page)) {
+    tasks.push({
+      label: '字典统计',
+      request: getDictPage({ page: 1, size: 1 }).then((data) => {
+        dictCount.value = data.total ?? 0;
+      }),
+    });
+  }
+  if (canAccess(PERMS.upms.config.page)) {
+    tasks.push({
+      label: '参数统计',
+      request: getConfigPage({ page: 1, size: 1 }).then((data) => {
+        configCount.value = data.total ?? 0;
+      }),
+    });
+  }
+  if (canAccess(PERMS.upms.notice.page)) {
+    tasks.push(
+      {
+        label: '公告统计',
+        request: getNoticePage({ page: 1, size: 1 }).then((data) => {
+          noticeCount.value = data.total ?? 0;
+        }),
+      },
+      {
+        label: '已发布公告统计',
+        request: getNoticePage({ page: 1, published: true, size: 1 }).then(
+          (data) => {
+            publishedNoticeCount.value = data.total ?? 0;
+          },
+        ),
+      },
+    );
+  }
+  if (canLoadFeatures.value) {
+    tasks.push({
+      label: '系统特性',
+      request: queryFeatures().then((data) => {
+        features.value = data;
+      }),
+    });
+  }
+
+  const results = await Promise.allSettled(tasks.map((task) => task.request));
+  loadErrors.value = results.flatMap((result, index) =>
+    result.status === 'rejected' ? [tasks[index]?.label ?? '未知模块'] : [],
+  );
+  loading.value = false;
+});
 
 function goTo(path: string) {
   router.push(path);
@@ -113,40 +212,35 @@ function goTo(path: string) {
   <div class="hx-layout-container">
     <div class="hx-layout-container-auto hx-layout-container-view">
       <!-- 统计卡片 -->
-      <ElRow :gutter="16" class="mb-4">
-        <ElCol :span="6">
+      <ElAlert
+        v-if="loadErrors.length > 0"
+        :closable="false"
+        class="mb-4"
+        show-icon
+        title="部分模块加载失败"
+        :description="`${loadErrors.join('、')}暂时不可用，其他模块不受影响。`"
+        type="warning"
+      />
+
+      <ElRow
+        v-if="statCards.length > 0"
+        v-loading="loading"
+        :gutter="16"
+        class="mb-4"
+      >
+        <ElCol
+          v-for="card in statCards"
+          :key="card.eyebrow"
+          :lg="6"
+          :md="12"
+          :sm="12"
+          :xs="24"
+        >
           <ElCard shadow="never">
             <div class="stat-cell">
-              <span class="stat-eyebrow">字典</span>
-              <strong class="stat-value">{{ dictCount }}</strong>
-              <span class="stat-hint">当前可见字典条目数量</span>
-            </div>
-          </ElCard>
-        </ElCol>
-        <ElCol :span="6">
-          <ElCard shadow="never">
-            <div class="stat-cell">
-              <span class="stat-eyebrow">参数</span>
-              <strong class="stat-value">{{ configCount }}</strong>
-              <span class="stat-hint">当前可见参数条目数量</span>
-            </div>
-          </ElCard>
-        </ElCol>
-        <ElCol :span="6">
-          <ElCard shadow="never">
-            <div class="stat-cell">
-              <span class="stat-eyebrow">公告</span>
-              <strong class="stat-value">{{ noticeCount }}</strong>
-              <span class="stat-hint">当前公告数量</span>
-            </div>
-          </ElCard>
-        </ElCol>
-        <ElCol :span="6">
-          <ElCard shadow="never">
-            <div class="stat-cell">
-              <span class="stat-eyebrow">已发布</span>
-              <strong class="stat-value">{{ publishedNoticeCount }}</strong>
-              <span class="stat-hint">已发布公告数量</span>
+              <span class="stat-eyebrow">{{ card.eyebrow }}</span>
+              <strong class="stat-value">{{ card.count ?? '-' }}</strong>
+              <span class="stat-hint">{{ card.hint }}</span>
             </div>
           </ElCard>
         </ElCol>
@@ -162,7 +256,7 @@ function goTo(path: string) {
         </div>
         <ElRow :gutter="16">
           <ElCol
-            v-for="card in entryCards"
+            v-for="card in visibleEntryCards"
             :key="card.path"
             :span="8"
             class="mb-3"
@@ -177,10 +271,14 @@ function goTo(path: string) {
             </div>
           </ElCol>
         </ElRow>
+        <ElEmpty
+          v-if="visibleEntryCards.length === 0"
+          description="暂无可访问的系统管理模块"
+        />
       </ElCard>
 
       <!-- 功能开关 -->
-      <ElCard shadow="never">
+      <ElCard v-if="canLoadFeatures" v-loading="loading" shadow="never">
         <div class="custom-card-header">
           <div>
             <span class="eyebrow">功能开关</span>

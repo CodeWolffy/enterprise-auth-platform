@@ -1,6 +1,4 @@
 <script lang="ts" setup>
-import { PERMS } from '#/constants/permissions';
-
 import type { VxeTableGridOptions } from '#/adapter/vxe-table';
 
 import { ref } from 'vue';
@@ -13,6 +11,7 @@ import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus';
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { requestClient } from '#/api/request';
 import { delObj, getPage, upload } from '#/api/upms/file';
+import { PERMS } from '#/constants/permissions';
 import { formatDateTime } from '#/utils/datetime';
 
 import { useColumns, useGridFormSchema } from './data';

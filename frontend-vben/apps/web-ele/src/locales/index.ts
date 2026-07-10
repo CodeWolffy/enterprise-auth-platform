@@ -9,8 +9,9 @@ import { ref } from 'vue';
 import { $t, setupI18n as coreSetup } from '@vben/locales';
 
 import dayjs from 'dayjs';
-import 'dayjs/locale/zh-cn';
 import defaultLocale from 'element-plus/es/locale/lang/zh-cn';
+
+import 'dayjs/locale/zh-cn';
 
 const elementLocale = ref<Language>(defaultLocale);
 

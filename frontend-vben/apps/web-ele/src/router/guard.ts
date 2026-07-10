@@ -5,7 +5,11 @@ import { preferences } from '@vben/preferences';
 import { useAccessStore, useUserStore } from '@vben/stores';
 import { startProgress, stopProgress } from '@vben/utils';
 
-import { accessRoutes, coreRouteNames } from '#/router/routes';
+import {
+  accessRoutes,
+  coreRouteNames,
+  isPublicRouteName,
+} from '#/router/routes';
 import { useAuthStore } from '#/store';
 
 import { generateAccess } from './access';
@@ -66,26 +70,20 @@ function setupAccessGuard(router: Router) {
       };
     }
 
-    // 基本路由，这些路由不需要进入权限拦截；但登录后首次刷新到隐藏核心路由时，
-    // 仍需继续生成动态菜单，否则侧边栏会因为 accessMenus 为空而消失。
+    // 静态核心路由仍可能需要登录。只有认证相关页面属于公开路由。
     const isCoreRoute = coreRouteNames.includes(to.name as string);
-    if (isCoreRoute) {
-      if (to.path === LOGIN_PATH && accessStore.accessToken) {
-        return decodeURIComponent(
-          (to.query?.redirect as string) ||
-            userStore.userInfo?.homePath ||
-            preferences.app.defaultHomePath,
-        );
-      }
-      if (!accessStore.accessToken || accessStore.isAccessChecked) {
-        return true;
-      }
+    const isPublicRoute = isPublicRouteName(to.name);
+    if (to.path === LOGIN_PATH && accessStore.accessToken) {
+      return decodeURIComponent(
+        (to.query?.redirect as string) ||
+          userStore.userInfo?.homePath ||
+          preferences.app.defaultHomePath,
+      );
     }
 
     // accessToken 检查
     if (!accessStore.accessToken) {
-      // 明确声明忽略权限访问权限，则可以访问
-      if (to.meta.ignoreAccess) {
+      if (isPublicRoute) {
         return true;
       }
 
@@ -103,6 +101,11 @@ function setupAccessGuard(router: Router) {
         };
       }
       return to;
+    }
+
+    // 登录后首次刷新到隐藏核心路由时仍需生成动态菜单，否则侧边栏为空。
+    if (isCoreRoute && accessStore.isAccessChecked) {
+      return true;
     }
 
     // 是否已经生成过动态路由

@@ -1,6 +1,4 @@
 <script lang="ts" setup>
-import { PERMS } from '#/constants/permissions';
-
 import type { VxeTableGridOptions } from '#/adapter/vxe-table';
 import type { TenantPackageView } from '#/types/tenant';
 
@@ -11,6 +9,7 @@ import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { delObj, getList } from '#/api/upms/tenant-package';
+import { PERMS } from '#/constants/permissions';
 
 import { useColumns } from './data';
 import Detail from './modules/detail.vue';

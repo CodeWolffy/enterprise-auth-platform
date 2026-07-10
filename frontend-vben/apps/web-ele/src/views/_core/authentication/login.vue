@@ -15,8 +15,8 @@ import { $t } from '@vben/locales';
 import { ElDialog, ElMessage } from 'element-plus';
 
 import { getCaptchaApi, verifyCaptchaApi } from '#/api/core/auth';
-import PointCaptcha from '#/components/slider-captcha/point-captcha.vue';
 import SliderCaptcha from '#/components/slider-captcha/index.vue';
+import PointCaptcha from '#/components/slider-captcha/point-captcha.vue';
 import { useAuthStore } from '#/store';
 
 defineOptions({ name: 'Login' });
@@ -86,7 +86,8 @@ async function reloadCaptcha() {
     // 传入用户名：后端据其近期失败情况决定下发滑块或文字点选(风险升级)
     const c = await getCaptchaApi(loginUser.username || undefined);
     loginUser.captchaId = c?.captchaId ?? '';
-    captchaType.value = c?.type === 'WORD_IMAGE_CLICK' ? 'WORD_IMAGE_CLICK' : 'SLIDER';
+    captchaType.value =
+      c?.type === 'WORD_IMAGE_CLICK' ? 'WORD_IMAGE_CLICK' : 'SLIDER';
     captcha.background = toDataUrl(c?.backgroundImage, 'image/jpeg');
     captcha.slider = toDataUrl(c?.sliderImage, 'image/png');
     captcha.bgWidth = c?.backgroundImageWidth ?? 0;
@@ -145,19 +146,24 @@ async function doLogin() {
   } catch (error: any) {
     // 检查是否是验证码相关错误（验证码过期或无效）
     const errorMsg = error?.response?.data?.message || error?.message || '';
+    const shouldShowLocalError = error?.config?.suppressErrorMessage === true;
     const isCaptchaError =
       errorMsg.includes('验证码') || errorMsg.includes('CAPTCHA');
     if (isCaptchaError) {
       // 验证码过期或无效，需要重新获取验证码
       loginUser.captchaCode = '';
-      ElMessage.error('验证码已过期，请重新验证');
+      if (shouldShowLocalError) {
+        ElMessage.error('验证码已过期，请重新验证');
+      }
       await reloadCaptcha();
       captchaDialogVisible.value = true;
     } else {
       // 密码等其他错误：清空验证码令牌，强制下次提交重新取码，
       // 使后端能按最新失败次数重新决定验证码类型(风险升级)。
       loginUser.captchaCode = '';
-      ElMessage.error(errorMsg || '用户名或密码错误');
+      if (shouldShowLocalError) {
+        ElMessage.error(errorMsg || '用户名或密码错误');
+      }
     }
   }
 }
@@ -166,9 +172,13 @@ async function doLogin() {
 <template>
   <div>
     <AuthenticationLogin
+      forget-password-path="/reset-password"
       :form-schema="formSchema"
       :loading="authStore.loginLoading"
+      :show-code-login="false"
+      :show-qrcode-login="false"
       :show-register="true"
+      :show-third-party-login="false"
       register-path="/register"
       @submit="handleSubmit"
     />

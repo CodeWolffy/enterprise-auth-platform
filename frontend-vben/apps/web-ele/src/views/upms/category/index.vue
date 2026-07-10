@@ -1,6 +1,4 @@
 <script lang="ts" setup>
-import { PERMS } from '#/constants/permissions';
-
 import type { VxeTableGridOptions } from '#/adapter/vxe-table';
 import type { CategoryAnalysis, CategoryOption } from '#/types/system';
 
@@ -30,8 +28,9 @@ import {
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { delObj, getAnalysis, getOptions } from '#/api/upms/category';
-import { formatDateTime } from '#/utils/datetime';
+import { PERMS } from '#/constants/permissions';
 import { invokeWhenComponentReady } from '#/utils/component-ready';
+import { formatDateTime } from '#/utils/datetime';
 
 import { useColumns, useGridFormSchema } from './data';
 

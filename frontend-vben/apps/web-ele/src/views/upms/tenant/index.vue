@@ -1,6 +1,4 @@
 <script lang="ts" setup>
-import { PERMS } from '#/constants/permissions';
-
 import type { VxeTableGridOptions } from '#/adapter/vxe-table';
 
 import { computed, defineAsyncComponent, reactive, ref } from 'vue';
@@ -39,6 +37,7 @@ import {
   getTenantMenuList,
 } from '#/api/upms/tenant';
 import { getList as getPkgList } from '#/api/upms/tenant-package';
+import { PERMS } from '#/constants/permissions';
 import { invokeWhenComponentReady } from '#/utils/component-ready';
 import { formatDateTime } from '#/utils/datetime';
 import { useDict } from '#/utils/dict';

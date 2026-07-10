@@ -10,6 +10,7 @@ import com.enterprise.auth.platform.common.web.ClientIpResolver;
 import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 import com.enterprise.auth.platform.modules.auth.infrastructure.SecurityProperties;
+import com.enterprise.auth.platform.modules.security.domain.EffectiveSecurityPolicy;
 import com.enterprise.auth.platform.modules.auth.infrastructure.entity.SysPasswordResetTokenEntity;
 import com.enterprise.auth.platform.modules.auth.infrastructure.mapper.SysPasswordResetTokenMapper;
 import com.enterprise.auth.platform.modules.notification.application.NotificationScenarioPublisher;
@@ -162,9 +163,23 @@ public class PasswordResetApplicationService {
         SysPasswordResetTokenEntity token = activeToken(request.token());
         if (token == null) {
             logPublisher.publish("PASSWORD_RESET_FAILED", "anonymous", "unknown", Map.of("reason", "invalid_or_expired"));
-            return new PasswordResetVerifyResponse(false, null);
+            return new PasswordResetVerifyResponse(false, null, null);
         }
-        return new PasswordResetVerifyResponse(true, token.getUsername());
+        EffectiveSecurityPolicy policy = withTenant(
+                token.getTenantId(),
+                () -> securityPolicyApplicationService.effectivePolicy(token.getTenantId())
+        );
+        return new PasswordResetVerifyResponse(
+                true,
+                token.getUsername(),
+                new PasswordResetPolicyResponse(
+                        policy.passwordMinLength(),
+                        policy.passwordMaxLength(),
+                        policy.passwordRequireLetter(),
+                        policy.passwordRequireNumber(),
+                        policy.passwordRequireSpecial()
+                )
+        );
     }
 
     @Transactional
@@ -372,7 +387,20 @@ public class PasswordResetApplicationService {
     public record PasswordResetVerifyRequest(@NotBlank String token) {
     }
 
-    public record PasswordResetVerifyResponse(boolean valid, String username) {
+    public record PasswordResetVerifyResponse(
+            boolean valid,
+            String username,
+            PasswordResetPolicyResponse passwordPolicy
+    ) {
+    }
+
+    public record PasswordResetPolicyResponse(
+            int passwordMinLength,
+            int passwordMaxLength,
+            boolean passwordRequireLetter,
+            boolean passwordRequireNumber,
+            boolean passwordRequireSpecial
+    ) {
     }
 
     public record PasswordResetConfirmRequest(

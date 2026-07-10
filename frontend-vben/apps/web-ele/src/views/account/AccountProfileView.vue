@@ -1168,9 +1168,9 @@ h1 {
   padding: 0;
   margin: -1px;
   overflow: hidden;
-  clip: rect(0 0 0 0);
   white-space: nowrap;
   border: 0;
+  clip-path: inset(50%);
 }
 
 .password-strength {

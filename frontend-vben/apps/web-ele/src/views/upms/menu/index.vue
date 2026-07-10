@@ -1,6 +1,4 @@
 <script lang="ts" setup>
-import { PERMS } from '#/constants/permissions';
-
 import type { VxeTableGridOptions } from '#/adapter/vxe-table';
 
 import { Page, useVbenDrawer } from '@vben/common-ui';
@@ -11,6 +9,7 @@ import { ElButton, ElMessage, ElMessageBox } from 'element-plus';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { delObj as deleteMenu, getList as getMenuList } from '#/api/upms/menu';
+import { PERMS } from '#/constants/permissions';
 
 import { useColumns } from './data';
 import Form from './modules/form.vue';

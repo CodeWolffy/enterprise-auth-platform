@@ -5,6 +5,16 @@ import { preferences } from '@vben/preferences';
 
 const BasicLayout = () => import('#/layouts/basic.vue');
 const AuthPageLayout = () => import('#/layouts/auth.vue');
+
+/** 无需登录即可访问的路由。静态核心路由并不等同于公开路由。 */
+const publicRouteNames = [
+  'Authentication',
+  'Login',
+  'RegisterPage',
+  'Register',
+  'ResetPasswordPage',
+  'ResetPassword',
+] as const;
 /** 全局404页面 */
 const fallbackNotFoundRoute: RouteRecordRaw = {
   component: () => import('#/views/_core/fallback/not-found.vue'),
@@ -168,4 +178,4 @@ const coreRoutes: RouteRecordRaw[] = [
   },
 ];
 
-export { coreRoutes, fallbackNotFoundRoute };
+export { coreRoutes, fallbackNotFoundRoute, publicRouteNames };

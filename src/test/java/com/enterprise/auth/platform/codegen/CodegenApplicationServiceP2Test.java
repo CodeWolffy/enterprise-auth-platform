@@ -181,16 +181,28 @@ class CodegenApplicationServiceP2Test {
                 .contains("remove(row)")
                 .contains("v-access:code=\"'orderGen:add'\"")
                 .contains("from '#/api/order-gen'")
-                .contains("ref<InstanceType<typeof Form>>")
+                .contains("<Page auto-content-height>")
+                .contains("useVbenVxeGrid")
+                .contains("useVbenModal")
+                .contains("connectedComponent: Form")
                 .doesNotContain("AdvancedSearch")
+                .doesNotContain("<el-table")
+                .doesNotContain("<el-form")
+                .doesNotContain("<el-pagination")
+                .doesNotContain("<el-dialog")
+                .doesNotContain("<el-drawer")
                 .doesNotContain("@/");
         assertThat(fileContent(preview, "frontend-vben/apps/web-ele/src/views/order-gen/form.vue"))
-                .contains("submitForm")
+                .contains("onSubmit")
                 .contains("createOrderGen")
                 .contains("updateOrderGen")
-                .contains("import { reactive, ref, toRefs } from 'vue'")
-                .contains("defineExpose({ initForm })")
+                .contains("useVbenForm")
+                .contains("useVbenModal")
+                .contains("const createSchema: VbenFormSchema[]")
+                .contains("const updateSchema: VbenFormSchema[]")
                 .contains("from '#/api/order-gen'")
+                .doesNotContain("<el-form")
+                .doesNotContain("<el-dialog")
                 .doesNotContain("@/");
     }
 
@@ -476,25 +488,31 @@ class CodegenApplicationServiceP2Test {
 
         var view = fileContent(preview, "frontend-vben/apps/web-ele/src/views/order-gen/index.vue");
         assertThat(view)
-                .contains("<el-table-column prop=\"bizOrderNo\"")
-                .contains("<el-table-column prop=\"enabled\"")
-                .doesNotContain("<el-table-column prop=\"amount\"")
-                .contains("<el-input v-model=\"query.bizOrderNo\"")
-                .contains("<el-date-picker v-model=\"query.createdAtStart\"")
-                .doesNotContain("v-model=\"query.amount\"");
+                .contains("{ field: 'bizOrderNo', minWidth: 140")
+                .contains("{ field: 'enabled', minWidth: 140")
+                .doesNotContain("{ field: 'amount', minWidth: 140")
+                .contains("fieldName: 'bizOrderNo'")
+                .contains("fieldName: 'createdAtStart'")
+                .contains("fieldName: 'createdAtEnd'")
+                .doesNotContain("fieldName: 'amount'");
 
         var form = fileContent(preview, "frontend-vben/apps/web-ele/src/views/order-gen/form.vue");
         assertThat(form)
-                .contains("v-if=\"editingId === null\" label=\"业务订单号\"")
-                .contains("v-if=\"editingId !== null\" label=\"下单金额\"")
-                .contains("rules: {")
-                .contains("bizOrderNo: [{ required: true")
-                .contains("const { form, rules } = toRefs(state)")
-                .contains("defineExpose({ initForm })")
-                .contains("function buildPayload()")
+                .contains("const createSchema: VbenFormSchema[]")
+                .contains("const updateSchema: VbenFormSchema[]")
+                .contains("fieldName: 'bizOrderNo'")
+                .contains("fieldName: 'amount'")
+                .contains("rules: 'required'")
+                .contains("formApi.setState")
                 .doesNotContain("dictApi");
-        assertThat(form.substring(form.indexOf("function buildPayload"), form.indexOf("const submitForm")))
-                .contains("...state.form");
+        assertThat(form.substring(form.indexOf("const createSchema"), form.indexOf("const updateSchema")))
+                .contains("fieldName: 'bizOrderNo'")
+                .contains("fieldName: 'enabled'")
+                .doesNotContain("fieldName: 'amount'");
+        assertThat(form.substring(form.indexOf("const updateSchema"), form.indexOf("const formData")))
+                .contains("fieldName: 'amount'")
+                .contains("fieldName: 'enabled'")
+                .doesNotContain("fieldName: 'bizOrderNo'");
         assertThat(form.substring(form.indexOf("function toForm")))
                 .contains("bizOrderNo: row?.bizOrderNo")
                 .contains("enabled: row?.enabled")

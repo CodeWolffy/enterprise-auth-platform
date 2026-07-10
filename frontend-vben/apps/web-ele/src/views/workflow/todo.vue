@@ -39,6 +39,7 @@ import {
   transferWorkflowTask,
   urgeWorkflowTask,
 } from '#/api/workflow';
+import { PERMS } from '#/constants/permissions';
 import { formatDateTime as formatInstantDateTime } from '#/utils/datetime';
 
 const route = useRoute();
@@ -240,7 +241,8 @@ async function submitTransfer() {
     ElMessage.success(
       result.nextTask
         ? `任务已转签给 ${
-            result.nextTask.assigneeUsername || `用户 ${transferForm.targetUserId}`
+            result.nextTask.assigneeUsername ||
+            `用户 ${transferForm.targetUserId}`
           }`
         : '任务已转签',
     );
@@ -398,6 +400,7 @@ function formatDateTime(value?: null | string) {
               class="urge-badge"
             >
               <ElButton
+                v-access:code="PERMS.upms.workflow.todo.get"
                 link
                 type="warning"
                 @click="openUrgeHistory(asWorkflowTask(row))"
@@ -407,6 +410,7 @@ function formatDateTime(value?: null | string) {
             </ElBadge>
             <ElButton
               v-else
+              v-access:code="PERMS.upms.workflow.todo.get"
               link
               type="info"
               @click="openUrgeHistory(asWorkflowTask(row))"
@@ -418,6 +422,7 @@ function formatDateTime(value?: null | string) {
         <ElTableColumn fixed="right" label="操作" width="320">
           <template #default="{ row }">
             <ElButton
+              v-access:code="PERMS.upms.workflow.todo.get"
               link
               type="primary"
               @click="openDetail(asWorkflowTask(row))"
@@ -425,6 +430,7 @@ function formatDateTime(value?: null | string) {
               详情
             </ElButton>
             <ElButton
+              v-access:code="PERMS.upms.workflow.todo.edit"
               :disabled="!row.actionable || submitting"
               link
               type="success"
@@ -433,6 +439,7 @@ function formatDateTime(value?: null | string) {
               通过
             </ElButton>
             <ElButton
+              v-access:code="PERMS.upms.workflow.todo.edit"
               :disabled="!row.actionable || submitting"
               link
               type="warning"
@@ -441,6 +448,7 @@ function formatDateTime(value?: null | string) {
               转签
             </ElButton>
             <ElButton
+              v-access:code="PERMS.upms.workflow.todo.edit"
               :disabled="!row.actionable || submitting"
               link
               type="danger"
@@ -449,6 +457,7 @@ function formatDateTime(value?: null | string) {
               驳回
             </ElButton>
             <ElButton
+              v-access:code="PERMS.upms.workflow.todo.edit"
               :disabled="urging"
               link
               type="info"
@@ -497,6 +506,7 @@ function formatDateTime(value?: null | string) {
       <template #footer>
         <ElButton @click="actionVisible = false">取消</ElButton>
         <ElButton
+          v-access:code="PERMS.upms.workflow.todo.edit"
           :type="actionType === 'approve' ? 'success' : 'danger'"
           :loading="submitting"
           @click="submitAction"
@@ -535,7 +545,12 @@ function formatDateTime(value?: null | string) {
       </ElForm>
       <template #footer>
         <ElButton @click="transferVisible = false">取消</ElButton>
-        <ElButton type="warning" :loading="submitting" @click="submitTransfer">
+        <ElButton
+          v-access:code="PERMS.upms.workflow.todo.edit"
+          type="warning"
+          :loading="submitting"
+          @click="submitTransfer"
+        >
           确认转签
         </ElButton>
       </template>
@@ -584,7 +599,12 @@ function formatDateTime(value?: null | string) {
       </ElForm>
       <template #footer>
         <ElButton @click="urgeVisible = false">关闭</ElButton>
-        <ElButton type="primary" :loading="urging" @click="submitUrge">
+        <ElButton
+          v-access:code="PERMS.upms.workflow.todo.edit"
+          type="primary"
+          :loading="urging"
+          @click="submitUrge"
+        >
           确认催办
         </ElButton>
       </template>

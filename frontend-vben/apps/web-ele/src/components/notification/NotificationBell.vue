@@ -5,12 +5,7 @@ import { computed } from 'vue';
 
 import { Bell, CircleCheckBig, MailCheck } from '@vben/icons';
 
-import {
-  ElButton,
-  ElEmpty,
-  ElPopover,
-  ElTooltip,
-} from 'element-plus';
+import { ElButton, ElEmpty, ElPopover, ElTooltip } from 'element-plus';
 
 import { useNotifications } from '#/composables/useNotifications';
 import { formatRelativeTime } from '#/utils/datetime';
@@ -210,14 +205,14 @@ async function handleViewAllMessages() {
   justify-content: center;
   width: 32px;
   height: 32px;
-  margin-right: 4px;
   padding: 0;
+  margin-right: 4px;
   color: hsl(var(--foreground) / 86%);
   cursor: pointer;
+  outline: none;
   background: transparent;
   border: 0;
   border-radius: 8px;
-  outline: none;
   transition:
     background-color 0.2s ease,
     color 0.2s ease;
@@ -286,10 +281,10 @@ async function handleViewAllMessages() {
   padding: 0;
   color: hsl(var(--foreground));
   cursor: pointer;
+  outline: none;
   background: transparent;
   border: 0;
   border-radius: 8px;
-  outline: none;
   transition:
     background-color 0.2s ease,
     color 0.2s ease,
@@ -373,11 +368,11 @@ async function handleViewAllMessages() {
   display: block;
   max-width: 300px;
   overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 24px;
   font-weight: 700;
   line-height: 1.24;
   color: hsl(var(--foreground));
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -422,10 +417,10 @@ async function handleViewAllMessages() {
   padding: 0;
   color: hsl(var(--foreground));
   cursor: pointer;
+  outline: none;
   background: transparent;
   border: 0;
   border-radius: 999px;
-  outline: none;
   transform: translateY(-50%);
   transition:
     background-color 0.2s ease,

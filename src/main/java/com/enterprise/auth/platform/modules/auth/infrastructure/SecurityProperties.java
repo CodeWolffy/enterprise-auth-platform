@@ -50,7 +50,14 @@ public record SecurityProperties(
             int ipMaxRequests
     ) {
         private static PasswordReset defaults() {
-            return new PasswordReset(Duration.ofMinutes(10), "", 15, 3, 15, 10);
+            return new PasswordReset(
+                    Duration.ofMinutes(10),
+                    "http://localhost:5777/#/reset-password",
+                    15,
+                    3,
+                    15,
+                    10
+            );
         }
 
         private PasswordReset withDefaults() {

@@ -2,143 +2,143 @@ package com.enterprise.auth.platform.modules.codegen.domain.render;
 
 import com.enterprise.auth.platform.modules.codegen.domain.model.ColumnDefinition;
 import com.enterprise.auth.platform.modules.codegen.domain.model.RenderContext;
+import java.util.List;
 import java.util.Locale;
 
 /**
- * Vue 模板片段渲染纯逻辑：表格列、详情描述、表单项、搜索项与输入控件。
+ * Vben 页面片段渲染纯逻辑：Grid 列、详情项、查询表单与编辑表单 schema。
  */
 class VueSnippetRenderer {
 
-    String renderVueColumns(RenderContext model) {
+    String renderVbenGridColumns(RenderContext model) {
         StringBuilder builder = new StringBuilder();
         for (ColumnDefinition column : model.listColumns()) {
-            builder.append("        <el-table-column prop=\"")
+            builder.append("  { field: '")
                     .append(column.javaField())
-                    .append("\" label=\"")
-                    .append(RenderSupport.escapeVue(RenderSupport.columnLabel(column)))
-                    .append("\" min-width=\"140\" show-overflow-tooltip />\n");
+                    .append("', minWidth: 140, title: '")
+                    .append(RenderSupport.escapeTs(RenderSupport.columnLabel(column)))
+                    .append("' },\n");
         }
         return builder.toString();
     }
 
-    String renderVueDescriptions(RenderContext model) {
+    String renderVbenDetailItems(RenderContext model) {
         StringBuilder builder = new StringBuilder();
         for (ColumnDefinition column : model.columns()) {
-            builder.append("        <el-descriptions-item label=\"")
+            builder.append("        <div class=\"grid grid-cols-[140px_1fr] border-b border-border last:border-b-0\">\n")
+                    .append("          <dt class=\"bg-muted px-4 py-3 font-medium\">")
                     .append(RenderSupport.escapeVue(RenderSupport.columnLabel(column)))
-                    .append("\">{{ detailItem.")
+                    .append("</dt>\n")
+                    .append("          <dd class=\"min-w-0 break-words px-4 py-3\">{{ detailItem.")
                     .append(column.javaField())
-                    .append(" }}</el-descriptions-item>\n");
+                    .append(" ?? '-' }}</dd>\n")
+                    .append("        </div>\n");
         }
         return builder.toString();
     }
 
-    String renderVueFormItems(RenderContext model) {
-        StringBuilder builder = new StringBuilder();
-        for (ColumnDefinition column : model.editableColumns()) {
-            builder.append("        <el-form-item")
-                    .append(vueFormItemVisibility(column))
-                    .append(" label=\"")
-                    .append(RenderSupport.escapeVue(RenderSupport.columnLabel(column)))
-                    .append("\" prop=\"")
-                    .append(column.javaField())
-                    .append("\">\n")
-                    .append(vueInput("form", column))
-                    .append("        </el-form-item>\n");
-        }
-        return builder.toString();
-    }
-
-    private String vueFormItemVisibility(ColumnDefinition column) {
-        if (column.insert() && column.edit()) {
-            return "";
-        }
-        if (column.insert()) {
-            return " v-if=\"editingId === null\"";
-        }
-        return " v-if=\"editingId !== null\"";
-    }
-
-    String renderVueSearchItems(RenderContext model) {
-        if (model.queryColumns().isEmpty()) {
-            return "";
-        }
-        StringBuilder builder = new StringBuilder();
+    String renderVbenSearchSchema(RenderContext model) {
+        StringBuilder builder = new StringBuilder("[\n");
         for (ColumnDefinition column : model.queryColumns()) {
             if (RenderSupport.isBetweenQuery(column)) {
-                builder.append("        <el-form-item label=\"").append(RenderSupport.escapeVue(RenderSupport.columnLabel(column))).append("\">\n");
-                builder.append("          <div style=\"display: flex; gap: 8px\">\n");
-                builder.append(queryInput(RenderSupport.queryRangeField(column, "Start"), column, "开始"));
-                builder.append(queryInput(RenderSupport.queryRangeField(column, "End"), column, "结束"));
-                builder.append("          </div>\n");
-                builder.append("        </el-form-item>\n");
+                appendVbenSchemaItem(builder, RenderSupport.queryRangeField(column, "Start"), column,
+                        RenderSupport.columnLabel(column) + "开始", false);
+                appendVbenSchemaItem(builder, RenderSupport.queryRangeField(column, "End"), column,
+                        RenderSupport.columnLabel(column) + "结束", false);
             } else {
-                builder.append("        <el-form-item label=\"").append(RenderSupport.escapeVue(RenderSupport.columnLabel(column))).append("\">\n");
-                builder.append(queryInput(column.javaField(), column, "请输入" + RenderSupport.columnLabel(column)));
-                builder.append("        </el-form-item>\n");
+                appendVbenSchemaItem(builder, column.javaField(), column,
+                        RenderSupport.columnLabel(column), false);
             }
         }
-        return builder.toString();
+        return builder.append("]").toString();
     }
 
-    private String queryInput(String fieldName, ColumnDefinition column, String placeholder) {
-        return vueInput("query", fieldName, column, placeholder);
+    String renderVbenFormSchema(List<ColumnDefinition> columns) {
+        StringBuilder builder = new StringBuilder("[\n");
+        for (ColumnDefinition column : columns) {
+            appendVbenSchemaItem(builder, column.javaField(), column,
+                    RenderSupport.columnLabel(column), RenderSupport.requestRequired(column));
+        }
+        return builder.append("]").toString();
     }
 
-    private String vueInput(String modelName, ColumnDefinition column) {
-        return vueInput(modelName, column.javaField(), column, "请输入" + RenderSupport.columnLabel(column));
+    private void appendVbenSchemaItem(
+            StringBuilder builder,
+            String fieldName,
+            ColumnDefinition column,
+            String label,
+            boolean required
+    ) {
+        builder.append("  {\n")
+                .append("    component: '").append(vbenComponent(column)).append("',\n")
+                .append("    componentProps: ").append(vbenComponentProps(column, label)).append(",\n")
+                .append("    fieldName: '").append(fieldName).append("',\n")
+                .append("    label: '").append(RenderSupport.escapeTs(label)).append("',\n");
+        if (required) {
+            builder.append("    rules: 'required',\n");
+        }
+        if (!fieldName.endsWith("Start") && !fieldName.endsWith("End")) {
+            builder.append("    defaultValue: ").append(RenderSupport.tsDefaultValue(column)).append(",\n");
+        }
+        builder.append("  },\n");
     }
 
-    private String vueInput(String modelName, String fieldName, ColumnDefinition column, String placeholder) {
-        String modelPath = modelName + "." + fieldName;
+    private String vbenComponent(ColumnDefinition column) {
         String htmlType = column.htmlType();
         if ("select".equals(htmlType)) {
-            return "          <el-select v-model=\"" + modelPath + "\" placeholder=\"" + RenderSupport.escapeVue(placeholder) + "\" clearable style=\"width: 100%\">\n"
-                    + selectOptions(column)
-                    + "          </el-select>\n";
+            return "Select";
         }
-        if ("textarea".equals(htmlType)) {
-            return "          <el-input v-model=\"" + modelPath + "\" type=\"textarea\" :rows=\"4\" placeholder=\"" + RenderSupport.escapeVue(placeholder) + "\" clearable />\n";
+        if ("number".equals(htmlType) || "number".equals(column.tsType())) {
+            return "InputNumber";
         }
-        if ("number".equals(htmlType)) {
-            return "          <el-input-number v-model=\"" + modelPath + "\" :min=\"0\" controls-position=\"right\" style=\"width: 100%\" />\n";
-        }
-        if ("datetime".equals(htmlType)) {
-            return renderTemporalControl(modelPath, placeholder, column);
+        if ("datetime".equals(htmlType) || RenderSupport.isTemporal(column)) {
+            return "time".equalsIgnoreCase(column.dataType()) ? "TimePicker" : "DatePicker";
         }
         if ("boolean".equals(column.tsType())) {
-            return "          <el-switch v-model=\"" + modelPath + "\" />\n";
+            return "Switch";
         }
-        if ("number".equals(column.tsType())) {
-            return "          <el-input-number v-model=\"" + modelPath + "\" :min=\"0\" controls-position=\"right\" style=\"width: 100%\" />\n";
-        }
-        if (RenderSupport.isTemporal(column)) {
-            return renderTemporalControl(modelPath, placeholder, column);
-        }
-        if (column.columnType() != null && column.columnType().toLowerCase(Locale.ROOT).contains("text")) {
-            return "          <el-input v-model=\"" + modelPath + "\" type=\"textarea\" :rows=\"4\" placeholder=\"" + RenderSupport.escapeVue(placeholder) + "\" clearable />\n";
-        }
-        return "          <el-input v-model=\"" + modelPath + "\" placeholder=\"" + RenderSupport.escapeVue(placeholder) + "\" clearable />\n";
+        return "Input";
     }
 
-    private String selectOptions(ColumnDefinition column) {
+    private String vbenComponentProps(ColumnDefinition column, String label) {
+        String placeholder = RenderSupport.escapeTs("请输入" + label);
+        if ("select".equals(column.htmlType())) {
+            return "{ clearable: true, options: " + vbenSelectOptions(column) + ", placeholder: '请选择"
+                    + RenderSupport.escapeTs(label) + "' }";
+        }
+        if ("textarea".equals(column.htmlType())
+                || (column.columnType() != null && column.columnType().toLowerCase(Locale.ROOT).contains("text"))) {
+            return "{ clearable: true, placeholder: '" + placeholder + "', rows: 4, type: 'textarea' }";
+        }
+        if ("number".equals(column.htmlType()) || "number".equals(column.tsType())) {
+            return "{ min: 0 }";
+        }
+        if ("datetime".equals(column.htmlType()) || RenderSupport.isTemporal(column)) {
+            return vbenTemporalProps(column, label);
+        }
         if ("boolean".equals(column.tsType())) {
-            return "            <el-option label=\"是\" :value=\"true\" />\n"
-                    + "            <el-option label=\"否\" :value=\"false\" />\n";
+            return "{}";
         }
-        if ("number".equals(column.tsType())) {
-            return "            <el-option label=\"选项一\" :value=\"1\" />\n"
-                    + "            <el-option label=\"选项二\" :value=\"2\" />\n";
-        }
-        return "            <el-option label=\"选项一\" value=\"option1\" />\n"
-                + "            <el-option label=\"选项二\" value=\"option2\" />\n";
+        return "{ clearable: true, placeholder: '" + placeholder + "' }";
     }
 
-    private String renderTemporalControl(String modelPath, String placeholder, ColumnDefinition column) {
+    private String vbenSelectOptions(ColumnDefinition column) {
+        if ("boolean".equals(column.tsType())) {
+            return "[{ label: '是', value: true }, { label: '否', value: false }]";
+        }
+        if ("number".equals(column.tsType())) {
+            return "[{ label: '选项一', value: 1 }, { label: '选项二', value: 2 }]";
+        }
+        return "[{ label: '选项一', value: 'option1' }, { label: '选项二', value: 'option2' }]";
+    }
+
+    private String vbenTemporalProps(ColumnDefinition column, String label) {
+        String placeholder = RenderSupport.escapeTs("请选择" + label);
         return switch (column.dataType().toLowerCase(Locale.ROOT)) {
-            case "date" -> "          <el-date-picker v-model=\"" + modelPath + "\" type=\"date\" value-format=\"YYYY-MM-DD\" placeholder=\"" + RenderSupport.escapeVue(placeholder) + "\" style=\"width: 100%\" />\n";
-            case "time" -> "          <el-time-picker v-model=\"" + modelPath + "\" value-format=\"HH:mm:ss\" placeholder=\"" + RenderSupport.escapeVue(placeholder) + "\" style=\"width: 100%\" />\n";
-            default -> "          <el-date-picker v-model=\"" + modelPath + "\" type=\"datetime\" value-format=\"YYYY-MM-DDTHH:mm:ssZ\" placeholder=\"" + RenderSupport.escapeVue(placeholder) + "\" style=\"width: 100%\" />\n";
+            case "date" -> "{ placeholder: '" + placeholder + "', type: 'date', valueFormat: 'YYYY-MM-DD' }";
+            case "time" -> "{ placeholder: '" + placeholder + "', valueFormat: 'HH:mm:ss' }";
+            default -> "{ placeholder: '" + placeholder
+                    + "', type: 'datetime', valueFormat: 'YYYY-MM-DDTHH:mm:ssZ' }";
         };
     }
 }

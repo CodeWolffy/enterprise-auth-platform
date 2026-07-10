@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 import { Refresh } from '@element-plus/icons-vue';
 import { LineChart } from 'echarts/charts';
@@ -219,13 +219,19 @@ const renderTrendChart = () => {
   });
 };
 
-onMounted(() => {
-  loadStats();
+const handleResize = () => {
+  chartInstance?.resize();
+};
 
-  // 响应窗口大小变化
-  window.addEventListener('resize', () => {
-    chartInstance?.resize();
-  });
+onMounted(() => {
+  void loadStats();
+  window.addEventListener('resize', handleResize);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize);
+  chartInstance?.dispose();
+  chartInstance = null;
 });
 </script>
 

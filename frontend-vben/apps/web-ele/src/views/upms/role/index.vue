@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { PERMS } from '#/constants/permissions';
-
 import type { VxeTableGridOptions } from '#/adapter/vxe-table';
 
 import { defineAsyncComponent, ref } from 'vue';
@@ -12,6 +10,7 @@ import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { delObj, getPage, queryRoleImpact } from '#/api/upms/sys-role';
+import { PERMS } from '#/constants/permissions';
 import { invokeWhenComponentReady } from '#/utils/component-ready';
 
 import { useColumns, useGridFormSchema } from './data';

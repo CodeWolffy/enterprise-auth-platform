@@ -1,6 +1,4 @@
 <script lang="ts" setup>
-import { PERMS } from '#/constants/permissions';
-
 import type { VxeTableGridOptions } from '#/adapter/vxe-table';
 
 import { defineAsyncComponent, ref } from 'vue';
@@ -18,9 +16,10 @@ import {
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { delObj, getPage, refresh } from '#/api/upms/dict';
+import { PERMS } from '#/constants/permissions';
 import { useDictStore } from '#/store/dict';
-import { formatDateTime } from '#/utils/datetime';
 import { invokeWhenComponentReady } from '#/utils/component-ready';
+import { formatDateTime } from '#/utils/datetime';
 
 import { useColumns, useGridFormSchema } from './data';
 

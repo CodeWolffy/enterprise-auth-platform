@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { PERMS } from '#/constants/permissions';
-
 import type { FormInstance, FormRules } from 'element-plus';
 
 import type { MailChannel, MailChannelPreset } from '#/types/system';
@@ -31,6 +29,7 @@ import {
   getPresets,
   testSend,
 } from '#/api/upms/mail-channel';
+import { PERMS } from '#/constants/permissions';
 
 const loading = ref(false);
 const saving = ref(false);

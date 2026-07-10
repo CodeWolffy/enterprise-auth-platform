@@ -1,6 +1,4 @@
 <script lang="ts" setup>
-import { PERMS } from '#/constants/permissions';
-
 import type { VxeTableGridOptions } from '#/adapter/vxe-table';
 import type { DeptTreeItem } from '#/api/upms/dept';
 
@@ -13,6 +11,7 @@ import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { delObj, getTreeList } from '#/api/upms/dept';
+import { PERMS } from '#/constants/permissions';
 import { invokeWhenComponentReady } from '#/utils/component-ready';
 
 import { useColumns } from './data';

@@ -1,3 +1,4 @@
+import type { ScopedRequestConfig } from '#/api/request';
 import type { PermissionSnapshot } from '#/types/auth-models';
 import type { SwitchableTenantView } from '#/types/tenant';
 
@@ -35,12 +36,14 @@ export namespace AuthApi {
  * 注意：后端为明文密码 + 服务端 BCrypt 校验，前端不做 AES 加密。
  */
 export async function loginApi(data: AuthApi.LoginParams) {
-  const res = await requestClient.post<any>('/auth/login', data, {
+  const config: ScopedRequestConfig = {
     headers: {
       isToken: false,
       isSwitchTenant: false,
     },
-  });
+    suppressErrorMessage: true,
+  };
+  const res = await requestClient.post<any>('/auth/login', data, config);
   return {
     tokenValue: res?.token,
     tenantId: res?.tenantId,

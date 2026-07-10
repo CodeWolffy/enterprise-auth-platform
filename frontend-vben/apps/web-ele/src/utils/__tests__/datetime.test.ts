@@ -1,6 +1,6 @@
-import { afterEach, describe, expect, it } from 'vitest';
-
 import { setCurrentTimezone } from '@vben/utils';
+
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { formatDateTime, getClientTimeZone, toInstantIso } from '../datetime';
 
@@ -11,14 +11,10 @@ describe('datetime timezone alignment', () => {
 
   it('uses the Vben configured timezone for display', () => {
     setCurrentTimezone('Asia/Shanghai');
-    expect(formatDateTime('2026-01-01T00:00:00Z')).toBe(
-      '2026-01-01 08:00:00',
-    );
+    expect(formatDateTime('2026-01-01T00:00:00Z')).toBe('2026-01-01 08:00:00');
 
     setCurrentTimezone('America/New_York');
-    expect(formatDateTime('2026-01-01T00:00:00Z')).toBe(
-      '2025-12-31 19:00:00',
-    );
+    expect(formatDateTime('2026-01-01T00:00:00Z')).toBe('2025-12-31 19:00:00');
   });
 
   it('exposes the Vben configured timezone for API headers', () => {

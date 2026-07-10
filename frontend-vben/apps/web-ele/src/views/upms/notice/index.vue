@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { PERMS } from '#/constants/permissions';
-
 import type { VxeTableGridOptions } from '#/adapter/vxe-table';
 
 import { defineAsyncComponent, ref } from 'vue';
@@ -19,6 +17,7 @@ import {
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { delObj, getById, getPage } from '#/api/upms/notice';
 import RichTextViewer from '#/components/rich-text-viewer/index.vue';
+import { PERMS } from '#/constants/permissions';
 import { invokeWhenComponentReady } from '#/utils/component-ready';
 import { formatDateTime } from '#/utils/datetime';
 

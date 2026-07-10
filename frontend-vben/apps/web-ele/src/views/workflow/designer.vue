@@ -7,6 +7,8 @@ import type {
 import { computed, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
+import { useAccess } from '@vben/access';
+
 import {
   ElAlert,
   ElButton,
@@ -23,6 +25,7 @@ import {
   createWorkflowDefinition,
   deployWorkflowDefinition,
 } from '#/api/workflow';
+import { PERMS } from '#/constants/permissions';
 
 type DesignerRejectStrategy =
   | 'END'
@@ -71,6 +74,10 @@ const REJECT_STRATEGY_OPTIONS: Array<{
 let stepSerial = 0;
 
 const router = useRouter();
+const { hasAccessByCodes } = useAccess();
+const canDeploy = computed(() =>
+  hasAccessByCodes([PERMS.upms.workflow.definition.deploy]),
+);
 const submitting = ref(false);
 
 const definitionForm = reactive({
@@ -384,6 +391,7 @@ function rejectStrategyLabel(value: DesignerStep['rejectStrategy']) {
       <div class="designer-hero__actions">
         <ElButton @click="resetDesigner">重置</ElButton>
         <ElButton
+          v-access:code="PERMS.upms.workflow.definition.add"
           type="primary"
           plain
           :disabled="Boolean(validationIssue)"
@@ -393,6 +401,8 @@ function rejectStrategyLabel(value: DesignerStep['rejectStrategy']) {
           保存草稿
         </ElButton>
         <ElButton
+          v-if="canDeploy"
+          v-access:code="PERMS.upms.workflow.definition.add"
           type="primary"
           :disabled="Boolean(validationIssue)"
           :loading="submitting"

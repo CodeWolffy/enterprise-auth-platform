@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { PERMS } from '#/constants/permissions';
-
 import type { VxeTableGridOptions } from '#/adapter/vxe-table';
 import type { DataSourceView } from '#/api/codegen';
 
@@ -24,6 +22,7 @@ import {
   getDataSources,
   testDataSource,
 } from '#/api/codegen';
+import { PERMS } from '#/constants/permissions';
 
 import { useColumns, useGridFormSchema } from './data';
 import DataSourceForm from './form.vue';

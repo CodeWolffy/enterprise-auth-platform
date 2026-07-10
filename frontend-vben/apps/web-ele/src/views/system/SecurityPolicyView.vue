@@ -32,6 +32,7 @@ import {
   updatePlatformSecurityPolicy,
   updateSecurityPolicy,
 } from '#/api/system';
+import { PERMS } from '#/constants/permissions';
 import { useAuthStore } from '#/store/auth';
 
 type PolicyScope = 'platform' | 'tenant';
@@ -470,7 +471,12 @@ function formatPolicyValue(target: SecurityPolicy, item: PolicyItem) {
             <ElButton :icon="Refresh" @click="loadPolicies(activeScope)">
               刷新
             </ElButton>
-            <ElButton :icon="Edit" type="primary" @click="openDrawer()">
+            <ElButton
+              v-access:code="PERMS.upms.security.edit"
+              :icon="Edit"
+              type="primary"
+              @click="openDrawer()"
+            >
               编辑
             </ElButton>
           </div>
@@ -716,6 +722,7 @@ function formatPolicyValue(target: SecurityPolicy, item: PolicyItem) {
               取消
             </ElButton>
             <ElButton
+              v-access:code="PERMS.upms.security.edit"
               :icon="Check"
               :loading="saving"
               type="primary"

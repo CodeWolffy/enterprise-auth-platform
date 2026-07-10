@@ -38,6 +38,7 @@ import {
   disableWorkflowDefinition,
   queryWorkflowDefinitions,
 } from '#/api/workflow';
+import { PERMS } from '#/constants/permissions';
 import { formatDateTime as formatInstantDateTime } from '#/utils/datetime';
 
 const router = useRouter();
@@ -400,8 +401,19 @@ function definitionStatusTag(status: string): TagProps['type'] {
           </p>
         </div>
         <div class="panel-actions">
-          <ElButton @click="openCreateDialog">JSON 新增</ElButton>
-          <ElButton type="primary" @click="openDesigner">打开设计器</ElButton>
+          <ElButton
+            v-access:code="PERMS.upms.workflow.definition.add"
+            @click="openCreateDialog"
+          >
+            JSON 新增
+          </ElButton>
+          <ElButton
+            v-access:code="PERMS.upms.workflow.designer.page"
+            type="primary"
+            @click="openDesigner"
+          >
+            打开设计器
+          </ElButton>
         </div>
       </div>
 
@@ -465,6 +477,7 @@ function definitionStatusTag(status: string): TagProps['type'] {
         <ElTableColumn fixed="right" label="操作" width="230">
           <template #default="{ row }">
             <ElButton
+              v-access:code="PERMS.upms.workflow.definition.get"
               link
               type="primary"
               @click="openDetail(asWorkflowDefinition(row))"
@@ -473,6 +486,7 @@ function definitionStatusTag(status: string): TagProps['type'] {
             </ElButton>
             <ElButton
               v-if="row.status === 'DRAFT'"
+              v-access:code="PERMS.upms.workflow.definition.deploy"
               link
               type="primary"
               @click="deployDefinition(asWorkflowDefinition(row))"
@@ -481,6 +495,7 @@ function definitionStatusTag(status: string): TagProps['type'] {
             </ElButton>
             <ElButton
               v-if="row.status === 'DEPLOYED'"
+              v-access:code="PERMS.upms.workflow.definition.deploy"
               link
               type="danger"
               @click="disableDefinition(asWorkflowDefinition(row))"
@@ -536,6 +551,7 @@ function definitionStatusTag(status: string): TagProps['type'] {
       <template #footer>
         <ElButton @click="createVisible = false">取消</ElButton>
         <ElButton
+          v-access:code="PERMS.upms.workflow.definition.add"
           type="primary"
           :loading="submitting"
           @click="submitDefinition"

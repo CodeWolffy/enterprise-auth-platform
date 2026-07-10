@@ -4,7 +4,7 @@ import com.enterprise.auth.platform.modules.codegen.domain.CodegenTypeMappings;
 import com.enterprise.auth.platform.modules.codegen.domain.model.RenderContext;
 
 /**
- * Vue 页面级模板渲染纯逻辑：列表页 index.vue 与弹窗表单 form.vue。
+ * Vue 页面级模板渲染纯逻辑：Vben Grid 列表页与 Vben Form 弹窗。
  */
 class VueViewRenderer {
 
@@ -14,353 +14,286 @@ class VueViewRenderer {
         this.snippets = snippets;
     }
 
-    /**
-     * 旧版单文件视图模板。迁移自原 CodegenApplicationService#renderView，
-     * 原实现中即已无调用方（疑似遗留代码），为保持行为一致原样保留。
-     */
-    String renderView(RenderContext model) {
-        return "<template>\n"
-                + "  <div class=\"panel-stack\">\n"
-                + "    <section class=\"dashboard-panel\">\n"
-                + "      <div class=\"panel-head\">\n"
-                + "        <div>\n"
-                + "          <span class=\"eyebrow\">Generated CRUD</span>\n"
-                + "          <h3>" + RenderSupport.escapeVue(model.title()) + "</h3>\n"
-                + "        </div>\n"
-                + "        <div class=\"panel-actions\">\n"
-                + "          <el-button v-permission=\"'" + model.moduleName() + ":page'\" :loading=\"loading\" @click=\"load\">刷新</el-button>\n"
-                + "          <el-button v-permission=\"'" + model.moduleName() + ":add'\" type=\"primary\" @click=\"openForm()\">新增</el-button>\n"
-                + "        </div>\n"
-                + "      </div>\n\n"
-                + "      <el-form :inline=\"true\" :model=\"query\" class=\"codegen-search\">\n"
-                + snippets.renderVueSearchItems(model)
-                + "        <el-form-item>\n"
-                + "          <el-button type=\"primary\" @click=\"handleSearch\">查询</el-button>\n"
-                + "          <el-button @click=\"resetSearch\">重置</el-button>\n"
-                + "        </el-form-item>\n"
-                + "      </el-form>\n\n"
-                + "      <el-table v-loading=\"loading\" :data=\"records\" stripe>\n"
-                + snippets.renderVueColumns(model)
-                + "        <el-table-column fixed=\"right\" label=\"操作\" width=\"180\">\n"
-                + "          <template #default=\"{ row }\">\n"
-                + "            <el-button v-permission=\"'" + model.moduleName() + ":get'\" link type=\"primary\" @click=\"openDetail(row)\">详情</el-button>\n"
-                + "            <el-button v-permission=\"'" + model.moduleName() + ":edit'\" link type=\"primary\" @click=\"openForm(row)\">编辑</el-button>\n"
-                + "            <el-button v-permission=\"'" + model.moduleName() + ":del'\" link type=\"danger\" @click=\"remove(row)\">删除</el-button>\n"
-                + "          </template>\n"
-                + "        </el-table-column>\n"
-                + "        <template #empty><el-empty description=\"暂无数据\" /></template>\n"
-                + "      </el-table>\n\n"
-                + "      <div class=\"pagination-wrap\">\n"
-                + "        <el-pagination\n"
-                + "          v-model:current-page=\"page\"\n"
-                + "          v-model:page-size=\"size\"\n"
-                + "          :page-sizes=\"[10, 20, 50, 100]\"\n"
-                + "          layout=\"total, sizes, prev, pager, next\"\n"
-                + "          :total=\"total\"\n"
-                + "          @size-change=\"handleSizeChange\"\n"
-                + "          @current-change=\"handleCurrentChange\"\n"
-                + "        />\n"
-                + "      </div>\n"
-                + "    </section>\n\n"
-                + "    <el-drawer v-model=\"detailVisible\" title=\"详情\" size=\"560px\">\n"
-                + "      <el-descriptions v-if=\"detailItem\" :column=\"1\" border>\n"
-                + snippets.renderVueDescriptions(model)
-                + "      </el-descriptions>\n"
-                + "    </el-drawer>\n\n"
-                + "    <el-dialog v-model=\"formVisible\" :title=\"editingId === null ? '新增' : '编辑'\" width=\"560px\">\n"
-                + "      <el-form ref=\"formRef\" label-position=\"top\" :model=\"form\" :rules=\"editingId === null ? createRules : updateRules\">\n"
-                + snippets.renderVueFormItems(model)
-                + "      </el-form>\n"
-                + "      <template #footer>\n"
-                + "        <el-button @click=\"formVisible = false\">取消</el-button>\n"
-                + "        <el-button v-if=\"editingId === null\" v-permission=\"'" + model.moduleName() + ":add'\" type=\"primary\" @click=\"submit\">保存</el-button>\n"
-                + "        <el-button v-else v-permission=\"'" + model.moduleName() + ":edit'\" type=\"primary\" @click=\"submit\">保存</el-button>\n"
-                + "      </template>\n"
-                + "    </el-dialog>\n"
-                + "  </div>\n"
-                + "</template>\n\n"
-                + "<script setup lang=\"ts\">\n"
-                + "import { reactive, ref, toRefs } from 'vue'\n"
-                + "import { ElMessage, ElMessageBox } from 'element-plus'\n"
-                + "import type { FormInstance, FormRules } from 'element-plus'\n"
-                + "import { create" + model.className() + ", delete" + model.className() + ", query" + model.className() + "Page, update" + model.className() + " } from '#/api/" + model.kebabName() + "'\n"
-                + "import type { " + model.className() + "CreateRequest, " + model.className() + "QueryParams, " + model.className() + "UpdateRequest, " + model.className() + "View } from '#/types/" + model.moduleName() + "'\n\n"
-                + "const loading = ref(false)\n"
-                + "const formVisible = ref(false)\n"
-                + "const detailVisible = ref(false)\n"
-                + "const records = ref<" + model.className() + "View[]>([])\n"
-                + "const detailItem = ref<" + model.className() + "View | null>(null)\n"
-                + "const editingId = ref<" + CodegenTypeMappings.tsScalarType(model.primaryKeyJavaType()) + " | null>(null)\n"
-                + "const query = reactive<" + model.className() + "QueryParams>(" + RenderSupport.renderTsInitialQuery(model) + ")\n"
-                + "const page = ref(1)\n"
-                + "const size = ref(20)\n"
-                + "const total = ref(0)\n"
-                + "const formRef = ref<FormInstance>()\n\n"
-                + "const form = reactive<" + model.className() + "CreateRequest & " + model.className() + "UpdateRequest>(" + RenderSupport.renderTsInitialForm(model) + ")\n\n"
-                + "const createRules = reactive<FormRules>(" + RenderSupport.renderTsRules(model.insertColumns()) + ")\n"
-                + "const updateRules = reactive<FormRules>(" + RenderSupport.renderTsRules(model.editColumns()) + ")\n\n"
-                + "void load()\n\n"
-                + "async function load() {\n"
-                + "  loading.value = true\n"
-                + "  try {\n"
-                + "    const result = await query" + model.className() + "Page({\n"
-                + "      ...query,\n"
-                + "      page: page.value,\n"
-                + "      size: size.value,\n"
-                + "    })\n"
-                + "    records.value = result.records\n"
-                + "    total.value = result.total\n"
-                + "  } finally {\n"
-                + "    loading.value = false\n"
-                + "  }\n"
-                + "}\n\n"
-                + "function handleSearch() {\n"
-                + "  page.value = 1\n"
-                + "  void load()\n"
-                + "}\n\n"
-                + "function resetSearch() {\n"
-                + "  Object.assign(query, " + RenderSupport.renderTsInitialQuery(model) + ")\n"
-                + "  page.value = 1\n"
-                + "  void load()\n"
-                + "}\n\n"
-                + "function handleSizeChange(value: number) {\n"
-                + "  size.value = value\n"
-                + "  page.value = 1\n"
-                + "  void load()\n"
-                + "}\n\n"
-                + "function handleCurrentChange(value: number) {\n"
-                + "  page.value = value\n"
-                + "  void load()\n"
-                + "}\n\n"
-                + "function openDetail(row: " + model.className() + "View) {\n"
-                + "  detailItem.value = row\n"
-                + "  detailVisible.value = true\n"
-                + "}\n\n"
-                + "function openForm(row?: " + model.className() + "View) {\n"
-                + "  editingId.value = row?." + model.primaryKeyField() + " ?? null\n"
-                + "  Object.assign(form, toForm(row))\n"
-                + "  formVisible.value = true\n"
-                + "}\n\n"
-                + "async function submit() {\n"
-                + "  if (!formRef.value) {\n"
-                + "    return\n"
-                + "  }\n"
-                + "  await formRef.value.validate()\n"
-                + "  if (editingId.value === null) {\n"
-                + "    await create" + model.className() + "(toCreatePayload())\n"
-                + "    ElMessage.success('已创建')\n"
-                + "  } else {\n"
-                + "    await update" + model.className() + "(editingId.value, toUpdatePayload())\n"
-                + "    ElMessage.success('已更新')\n"
-                + "  }\n"
-                + "  formVisible.value = false\n"
-                + "  await load()\n"
-                + "}\n\n"
-                + "async function remove(row: " + model.className() + "View) {\n"
-                + "  await ElMessageBox.confirm('删除后不可恢复，是否继续？', '删除确认', { type: 'warning' })\n"
-                + "  await delete" + model.className() + "(row." + model.primaryKeyField() + ")\n"
-                + "  ElMessage.success('已删除')\n"
-                + "  await load()\n"
-                + "}\n\n"
-                + "function toForm(row?: " + model.className() + "View): " + model.className() + "CreateRequest & " + model.className() + "UpdateRequest {\n"
-                + RenderSupport.renderTsToForm(model)
-                + "}\n\n"
-                + "function toCreatePayload(): " + model.className() + "CreateRequest {\n"
-                + RenderSupport.renderTsPayload(model.insertColumns())
-                + "}\n\n"
-                + "function toUpdatePayload(): " + model.className() + "UpdateRequest {\n"
-                + RenderSupport.renderTsPayload(model.editColumns())
-                + "}\n"
-                + "</script>\n";
-    }
-
     String renderIndexView(RenderContext model) {
-        String permissionModule = model.moduleName();
-        return "<template>\n"
-                + "  <div class=\"hx-layout-container\">\n"
-                + "    <div class=\"hx-layout-container-auto hx-layout-container-view\">\n"
-                + "      <div class=\"hx-table-toolbar\" style=\"display: flex; gap: 8px; margin-bottom: 12px\">\n"
-                + "        <el-button v-access:code=\"'" + permissionModule + ":add'\" :icon=\"Plus\" type=\"primary\" @click=\"openForm()\">新增</el-button>\n"
-                + "        <el-button :icon=\"Refresh\" @click=\"load\">刷新</el-button>\n"
-                + "      </div>\n"
-                + "      <el-form :inline=\"true\" :model=\"query\" class=\"codegen-search\">\n"
-                + snippets.renderVueSearchItems(model)
-                + "        <el-form-item>\n"
-                + "          <el-button type=\"primary\" @click=\"handleSearch\">查询</el-button>\n"
-                + "          <el-button @click=\"resetSearch\">重置</el-button>\n"
-                + "        </el-form-item>\n"
-                + "      </el-form>\n"
-                + "      <el-table v-loading=\"loading\" :data=\"records\" stripe>\n"
-                + snippets.renderVueColumns(model)
-                + "        <el-table-column align=\"center\" fixed=\"right\" label=\"操作\" width=\"180\">\n"
-                + "          <template #default=\"{ row }\">\n"
-                + "            <el-button v-access:code=\"'" + permissionModule + ":get'\" link type=\"primary\" @click=\"openDetail(row)\">详情</el-button>\n"
-                + "            <el-button v-access:code=\"'" + permissionModule + ":edit'\" link type=\"primary\" @click=\"openForm(row)\">修改</el-button>\n"
-                + "            <el-button v-access:code=\"'" + permissionModule + ":del'\" link type=\"danger\" @click=\"remove(row)\">删除</el-button>\n"
-                + "          </template>\n"
-                + "        </el-table-column>\n"
-                + "        <template #empty><el-empty description=\"暂无数据\" /></template>\n"
-                + "      </el-table>\n"
-                + "      <div class=\"pagination-wrap\">\n"
-                + "        <el-pagination\n"
-                + "          v-model:current-page=\"page\"\n"
-                + "          v-model:page-size=\"size\"\n"
-                + "          :page-sizes=\"[10, 20, 50, 100]\"\n"
-                + "          layout=\"total, sizes, prev, pager, next\"\n"
-                + "          :total=\"total\"\n"
-                + "          @size-change=\"handleSizeChange\"\n"
-                + "          @current-change=\"handleCurrentChange\"\n"
-                + "        />\n"
-                + "      </div>\n"
-                + "    </div>\n"
-                + "  </div>\n"
-                + "  <el-drawer v-model=\"detailVisible\" title=\"详情\" size=\"560px\">\n"
-                + "    <el-descriptions v-if=\"detailItem\" :column=\"1\" border>\n"
-                + snippets.renderVueDescriptions(model)
-                + "    </el-descriptions>\n"
-                + "  </el-drawer>\n"
-                + "  <Form ref=\"formRef\" @init-page=\"load\" />\n"
-                + "</template>\n\n"
-                + "<script setup lang=\"ts\">\n"
-                + "import { reactive, ref } from 'vue'\n"
-                + "import { ElMessage, ElMessageBox } from 'element-plus'\n"
-                + "import { Refresh, Plus } from '@element-plus/icons-vue'\n"
-                + "import { query" + model.className() + "Page, delete" + model.className() + " } from '#/api/" + model.kebabName() + "'\n"
-                + "import type { " + model.className() + "QueryParams, " + model.className() + "View } from '#/types/" + model.moduleName() + "'\n"
-                + "import Form from './form.vue'\n\n"
-                + "const loading = ref(false)\n"
-                + "const detailVisible = ref(false)\n"
-                + "const records = ref<" + model.className() + "View[]>([])\n"
-                + "const detailItem = ref<" + model.className() + "View | null>(null)\n"
-                + "const query = reactive<" + model.className() + "QueryParams>(" + RenderSupport.renderTsInitialQuery(model) + ")\n"
-                + "const page = ref(1)\n"
-                + "const size = ref(20)\n"
-                + "const total = ref(0)\n"
-                + "const formRef = ref<InstanceType<typeof Form>>()\n\n"
-                + "void load()\n\n"
-                + "async function load() {\n"
-                + "  loading.value = true\n"
-                + "  try {\n"
-                + "    const result = await query" + model.className() + "Page({\n"
-                + "      ...query,\n"
-                + "      page: page.value,\n"
-                + "      size: size.value,\n"
-                + "    })\n"
-                + "    records.value = result.records\n"
-                + "    total.value = result.total\n"
-                + "  } finally {\n"
-                + "    loading.value = false\n"
-                + "  }\n"
-                + "}\n\n"
-                + "function handleSearch() {\n"
-                + "  page.value = 1\n"
-                + "  void load()\n"
-                + "}\n\n"
-                + "function resetSearch() {\n"
-                + "  Object.assign(query, " + RenderSupport.renderTsInitialQuery(model) + ")\n"
-                + "  page.value = 1\n"
-                + "  void load()\n"
-                + "}\n\n"
-                + "function handleSizeChange(value: number) {\n"
-                + "  size.value = value\n"
-                + "  page.value = 1\n"
-                + "  void load()\n"
-                + "}\n\n"
-                + "function handleCurrentChange(value: number) {\n"
-                + "  page.value = value\n"
-                + "  void load()\n"
-                + "}\n\n"
-                + "function openDetail(row: " + model.className() + "View) {\n"
-                + "  detailItem.value = row\n"
-                + "  detailVisible.value = true\n"
-                + "}\n\n"
-                + "function openForm(row?: " + model.className() + "View) {\n"
-                + "  formRef.value?.initForm(row)\n"
-                + "}\n\n"
-                + "async function remove(row: " + model.className() + "View) {\n"
-                + "  await ElMessageBox.confirm('删除后不可恢复，是否继续？', '删除确认', { type: 'warning' })\n"
-                + "  await delete" + model.className() + "(row." + model.primaryKeyField() + ")\n"
-                + "  ElMessage.success('已删除')\n"
-                + "  await load()\n"
-                + "}\n"
-                + "</script>\n";
+        return """
+                <script lang="ts" setup>
+                import type { VbenFormSchema } from '#/adapter/form';
+                import type { VxeTableGridOptions } from '#/adapter/vxe-table';
+                import type { __CLASS__QueryParams, __CLASS__View } from '#/types/__MODULE__';
+
+                import { ref } from 'vue';
+
+                import { Page, useVbenModal } from '@vben/common-ui';
+                import { Plus } from '@vben/icons';
+
+                import { ElButton, ElMessage, ElMessageBox } from 'element-plus';
+
+                import { useVbenVxeGrid } from '#/adapter/vxe-table';
+                import { delete__CLASS__, query__CLASS__Page } from '#/api/__KEBAB__';
+
+                import Form from './form.vue';
+
+                const searchSchema: VbenFormSchema[] = __SEARCH_SCHEMA__;
+                const columns: VxeTableGridOptions<__CLASS__View>['columns'] = [
+                __GRID_COLUMNS__  {
+                    align: 'center',
+                    field: 'operation',
+                    fixed: 'right',
+                    headerAlign: 'center',
+                    showOverflow: false,
+                    slots: { default: 'operation' },
+                    title: '操作',
+                    width: 200,
+                  },
+                ];
+
+                const detailItem = ref<null | __CLASS__View>(null);
+
+                const [FormModal, formModalApi] = useVbenModal({
+                  connectedComponent: Form,
+                  destroyOnClose: true,
+                });
+                const [DetailModal, detailModalApi] = useVbenModal({
+                  footer: false,
+                  fullscreenButton: false,
+                });
+
+                const [Grid, gridApi] = useVbenVxeGrid({
+                  formOptions: {
+                    schema: searchSchema,
+                    submitOnChange: false,
+                  },
+                  gridOptions: {
+                    columns,
+                    height: 'auto',
+                    keepSource: true,
+                    pagerConfig: { enabled: true, pageSize: 20 },
+                    proxyConfig: {
+                      ajax: {
+                        query: async ({ page }, formValues) => {
+                          const result = await query__CLASS__Page({
+                            ...formValues,
+                            page: page.currentPage,
+                            size: page.pageSize,
+                          } as __CLASS__QueryParams);
+                          return {
+                            list: result.records ?? [],
+                            total: result.total ?? 0,
+                          };
+                        },
+                      },
+                    },
+                    rowConfig: { keyField: '__PRIMARY_KEY__' },
+                    toolbarConfig: {
+                      refresh: true,
+                      refreshOptions: { code: 'query' },
+                      search: true,
+                      zoom: false,
+                    },
+                  } as VxeTableGridOptions<__CLASS__View>,
+                });
+
+                function onRefresh() {
+                  gridApi.query();
+                }
+
+                function openForm(row?: __CLASS__View) {
+                  formModalApi.setData(row ?? {}).open();
+                }
+
+                function openDetail(row: __CLASS__View) {
+                  detailItem.value = row;
+                  detailModalApi.open();
+                }
+
+                async function remove(row: __CLASS__View) {
+                  try {
+                    await ElMessageBox.confirm(
+                      '删除后不可恢复，是否继续？',
+                      '删除确认',
+                      { type: 'warning' },
+                    );
+                  } catch {
+                    return;
+                  }
+                  await delete__CLASS__(row.__PRIMARY_KEY__);
+                  ElMessage.success('已删除');
+                  onRefresh();
+                }
+                </script>
+
+                <template>
+                  <Page auto-content-height>
+                    <FormModal @success="onRefresh" />
+                    <DetailModal title="详情">
+                      <dl v-if="detailItem" class="overflow-hidden rounded border border-border">
+                __DETAIL_ITEMS__      </dl>
+                    </DetailModal>
+
+                    <Grid>
+                      <template #toolbar-tools>
+                        <ElButton
+                          v-access:code="'__MODULE__:add'"
+                          type="primary"
+                          @click="openForm()"
+                        >
+                          <Plus class="size-5" />
+                          新增
+                        </ElButton>
+                      </template>
+
+                      <template #operation="{ row }">
+                        <ElButton
+                          v-access:code="'__MODULE__:get'"
+                          link
+                          type="primary"
+                          @click="openDetail(row)"
+                        >
+                          详情
+                        </ElButton>
+                        <ElButton
+                          v-access:code="'__MODULE__:edit'"
+                          link
+                          type="primary"
+                          @click="openForm(row)"
+                        >
+                          修改
+                        </ElButton>
+                        <ElButton
+                          v-access:code="'__MODULE__:del'"
+                          link
+                          type="danger"
+                          @click="remove(row)"
+                        >
+                          删除
+                        </ElButton>
+                      </template>
+                    </Grid>
+                  </Page>
+                </template>
+                """
+                .replace("__CLASS__", model.className())
+                .replace("__MODULE__", model.moduleName())
+                .replace("__KEBAB__", model.kebabName())
+                .replace("__PRIMARY_KEY__", model.primaryKeyField())
+                .replace("__SEARCH_SCHEMA__", snippets.renderVbenSearchSchema(model))
+                .replace("__GRID_COLUMNS__", snippets.renderVbenGridColumns(model))
+                .replace("__DETAIL_ITEMS__", snippets.renderVbenDetailItems(model));
     }
 
     String renderFormView(RenderContext model) {
-        return "<template>\n"
-                + "  <el-dialog v-model=\"dialog\" :before-close=\"handleClose\" :title=\"editingId ? '编辑' : '新增'\" width=\"640px\">\n"
-                + "    <el-form ref=\"formRef\" label-width=\"120px\" :model=\"form\" :rules=\"rules\">\n"
-                + snippets.renderVueFormItems(model)
-                + "    </el-form>\n"
-                + "    <template #footer>\n"
-                + "      <span class=\"dialog-footer\">\n"
-                + "        <el-button @click=\"handleClose\">关 闭</el-button>\n"
-                + "        <el-button :loading=\"loading\" type=\"primary\" @click=\"submitForm(formRef)\">确 认</el-button>\n"
-                + "      </span>\n"
-                + "    </template>\n"
-                + "  </el-dialog>\n"
-                + "</template>\n\n"
-                + "<script setup lang=\"ts\">\n"
-                + "import type { FormInstance, FormRules } from 'element-plus'\n"
-                + "import { reactive, ref, toRefs } from 'vue'\n"
-                + "import { ElMessage } from 'element-plus'\n"
-                + "import { create" + model.className() + ", update" + model.className() + " } from '#/api/" + model.kebabName() + "'\n"
-                + "import type { " + model.className() + "CreateRequest, " + model.className() + "UpdateRequest, " + model.className() + "View } from '#/types/" + model.moduleName() + "'\n\n"
-                + "const emit = defineEmits(['initPage'])\n\n"
-                + "function defaultForm(): " + model.className() + "CreateRequest & " + model.className() + "UpdateRequest {\n"
-                + "  return " + RenderSupport.renderTsInitialForm(model) + "\n"
-                + "}\n\n"
-                + "const state = reactive({\n"
-                + "  form: defaultForm(),\n"
-                + "  rules: " + RenderSupport.renderTsRules(model.insertColumns()) + " as FormRules,\n"
-                + "})\n"
-                + "const { form, rules } = toRefs(state)\n"
-                + "const dialog = ref(false)\n"
-                + "const loading = ref(false)\n"
-                + "const formRef = ref()\n"
-                + "const editingId = ref<" + CodegenTypeMappings.tsScalarType(model.primaryKeyJavaType()) + " | null>(null)\n\n"
-                + "const initForm = (row?: " + model.className() + "View) => {\n"
-                + "  state.form = defaultForm()\n"
-                + "  if (row && row." + model.primaryKeyField() + ") {\n"
-                + "    editingId.value = row." + model.primaryKeyField() + "\n"
-                + "    Object.assign(state.form, toForm(row))\n"
-                + "  } else {\n"
-                + "    editingId.value = null\n"
-                + "  }\n"
-                + "  dialog.value = true\n"
-                + "}\n\n"
-                + "defineExpose({ initForm })\n\n"
-                + "const handleClose = () => {\n"
-                + "  dialog.value = false\n"
-                + "  formRef.value?.resetFields()\n"
-                + "}\n\n"
-                + "function buildPayload() {\n"
-                + "  return {\n"
-                + "    ...state.form,\n"
-                + "  }\n"
-                + "}\n\n"
-                + "const submitForm = async (formEl: FormInstance | undefined) => {\n"
-                + "  if (!formEl) return\n"
-                + "  await formEl.validate(async (valid) => {\n"
-                + "    if (!valid) return\n"
-                + "    loading.value = true\n"
-                + "    const payload = buildPayload()\n"
-                + "    if (editingId.value === null) {\n"
-                + "      await create" + model.className() + "(payload)\n"
-                + "      ElMessage.success('新增成功')\n"
-                + "    } else {\n"
-                + "      await update" + model.className() + "(editingId.value, payload)\n"
-                + "      ElMessage.success('修改成功')\n"
-                + "    }\n"
-                + "    dialog.value = false\n"
-                + "    emit('initPage')\n"
-                + "  }).finally(() => {\n"
-                + "    loading.value = false\n"
-                + "  })\n"
-                + "}\n\n"
-                + "function toForm(row?: " + model.className() + "View): " + model.className() + "CreateRequest & " + model.className() + "UpdateRequest {\n"
-                + RenderSupport.renderTsToForm(model)
-                + "}\n"
-                + "</script>\n";
+        return """
+                <script lang="ts" setup>
+                import type { VbenFormSchema } from '#/adapter/form';
+                import type {
+                  __CLASS__CreateRequest,
+                  __CLASS__UpdateRequest,
+                  __CLASS__View,
+                } from '#/types/__MODULE__';
+
+                import { computed, ref } from 'vue';
+
+                import { useVbenModal } from '@vben/common-ui';
+
+                import { ElMessage } from 'element-plus';
+
+                import { useVbenForm } from '#/adapter/form';
+                import { create__CLASS__, update__CLASS__ } from '#/api/__KEBAB__';
+
+                const emit = defineEmits<{ success: [] }>();
+
+                const createSchema: VbenFormSchema[] = __CREATE_SCHEMA__;
+                const updateSchema: VbenFormSchema[] = __UPDATE_SCHEMA__;
+                const formData = ref<null | __CLASS__View>(null);
+                const editingId = computed<__PRIMARY_KEY_TYPE__ | null>(
+                  () => formData.value?.__PRIMARY_KEY__ ?? null,
+                );
+
+                const [Form, formApi] = useVbenForm({
+                  commonConfig: {
+                    colon: true,
+                    formItemClass: 'col-span-2 md:col-span-1',
+                  },
+                  schema: createSchema,
+                  showDefaultActions: false,
+                  wrapperClass: 'grid-cols-2 gap-x-4',
+                });
+
+                const [Modal, modalApi] = useVbenModal({
+                  onConfirm: onSubmit,
+                  async onOpenChange(isOpen) {
+                    if (!isOpen) return;
+                    const data = modalApi.getData<__CLASS__View>();
+                    formData.value =
+                      data?.__PRIMARY_KEY__ === undefined || data.__PRIMARY_KEY__ === null
+                        ? null
+                        : data;
+                    formApi.setState({
+                      schema: formData.value ? updateSchema : createSchema,
+                    });
+                    await formApi.resetForm();
+                    if (formData.value) {
+                      await formApi.setValues(toForm(formData.value));
+                    }
+                  },
+                });
+
+                const title = computed(() => (editingId.value === null ? '新增' : '编辑'));
+
+                async function onSubmit() {
+                  const { valid } = await formApi.validate();
+                  if (!valid) return;
+
+                  modalApi.lock();
+                  try {
+                    const form = await formApi.getValues<
+                      __CLASS__CreateRequest & __CLASS__UpdateRequest
+                    >();
+                    if (editingId.value === null) {
+                      await create__CLASS__(toCreatePayload(form));
+                      ElMessage.success('新增成功');
+                    } else {
+                      await update__CLASS__(editingId.value, toUpdatePayload(form));
+                      ElMessage.success('修改成功');
+                    }
+                    modalApi.close();
+                    emit('success');
+                  } finally {
+                    modalApi.unlock();
+                  }
+                }
+
+                function toCreatePayload(
+                  form: __CLASS__CreateRequest & __CLASS__UpdateRequest,
+                ): __CLASS__CreateRequest {
+                __CREATE_PAYLOAD__}
+
+                function toUpdatePayload(
+                  form: __CLASS__CreateRequest & __CLASS__UpdateRequest,
+                ): __CLASS__UpdateRequest {
+                __UPDATE_PAYLOAD__}
+
+                function toForm(
+                  row?: __CLASS__View,
+                ): __CLASS__CreateRequest & __CLASS__UpdateRequest {
+                __TO_FORM__}
+                </script>
+
+                <template>
+                  <Modal class="w-full max-w-[640px]" :title="title">
+                    <Form class="mx-4" />
+                  </Modal>
+                </template>
+                """
+                .replace("__CLASS__", model.className())
+                .replace("__MODULE__", model.moduleName())
+                .replace("__KEBAB__", model.kebabName())
+                .replace("__PRIMARY_KEY__", model.primaryKeyField())
+                .replace("__PRIMARY_KEY_TYPE__", CodegenTypeMappings.tsScalarType(model.primaryKeyJavaType()))
+                .replace("__CREATE_SCHEMA__", snippets.renderVbenFormSchema(model.insertColumns()))
+                .replace("__UPDATE_SCHEMA__", snippets.renderVbenFormSchema(model.editColumns()))
+                .replace("__CREATE_PAYLOAD__", RenderSupport.renderTsPayload(model.insertColumns()))
+                .replace("__UPDATE_PAYLOAD__", RenderSupport.renderTsPayload(model.editColumns()))
+                .replace("__TO_FORM__", RenderSupport.renderTsToForm(model));
     }
 }

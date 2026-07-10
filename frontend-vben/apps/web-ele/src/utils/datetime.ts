@@ -3,11 +3,11 @@
  * 后端公开 API 使用 ISO-8601 Instant 字符串，业务时区通过 X-Time-Zone 传递。
  */
 
+import { getCurrentTimezone } from '@vben/utils';
+
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone.js';
 import utc from 'dayjs/plugin/utc.js';
-
-import { getCurrentTimezone } from '@vben/utils';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -33,7 +33,7 @@ export function getClientTimeZone(): string {
 function isValidTimeZone(timeZone?: string): timeZone is string {
   if (!timeZone) return false;
   try {
-    new Intl.DateTimeFormat('zh-CN', { timeZone });
+    new Intl.DateTimeFormat('zh-CN', { timeZone }).format(0);
     return true;
   } catch {
     return false;
@@ -104,11 +104,12 @@ function parseLocalCalendarDateTime(
 ): Date | null {
   const match = localDateTimePattern.exec(value.trim());
   if (!match) return null;
-  const year = match[1]!;
-  const month = match[2]!;
-  const day = match[3]!;
-  const hour = match[4]!;
-  const minute = match[5]!;
+  const year = match[1];
+  const month = match[2];
+  const day = match[3];
+  const hour = match[4];
+  const minute = match[5];
+  if (!year || !month || !day || !hour || !minute) return null;
   const second = match[6] ?? '0';
   const millis = match[7] ?? '0';
   return calendarDateTimeToInstant(

@@ -1,6 +1,4 @@
 <script lang="ts" setup name="genTable">
-import { PERMS } from '#/constants/permissions';
-
 import type { VxeTableGridOptions } from '#/adapter/vxe-table';
 import type { DataSourceView } from '#/api/codegen';
 
@@ -34,6 +32,7 @@ import {
   importTables,
   saveTableColumns,
 } from '#/api/gen/table';
+import { PERMS } from '#/constants/permissions';
 
 import {
   useImportedColumns,

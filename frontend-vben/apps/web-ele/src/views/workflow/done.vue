@@ -19,6 +19,7 @@ import {
 } from 'element-plus';
 
 import { queryWorkflowDoneTasks } from '#/api/workflow';
+import { PERMS } from '#/constants/permissions';
 import { formatDateTime as formatInstantDateTime } from '#/utils/datetime';
 
 const loading = ref(false);
@@ -177,6 +178,7 @@ function formatDateTime(value?: null | string) {
         <ElTableColumn fixed="right" label="操作" width="100">
           <template #default="{ row }">
             <ElButton
+              v-access:code="PERMS.upms.workflow.done.get"
               link
               type="primary"
               @click="openDetail(asWorkflowTask(row))"

@@ -7,6 +7,10 @@
  */
 export const PERMS = {
   upms: {
+    system: {
+      page: 'upms:system:page',
+      get: 'upms:system:get',
+    },
     dashboard: {
       page: 'upms:dashboard:page',
       get: 'upms:dashboard:get',
@@ -80,6 +84,38 @@ export const PERMS = {
       add: 'upms:sysnotice:add',
       edit: 'upms:sysnotice:edit',
       del: 'upms:sysnotice:del',
+    },
+    security: {
+      get: 'upms:security:get',
+      edit: 'upms:security:edit',
+    },
+    workflow: {
+      designer: {
+        page: 'upms:workflowdesigner:page',
+      },
+      definition: {
+        page: 'upms:workflowdefinition:page',
+        get: 'upms:workflowdefinition:get',
+        add: 'upms:workflowdefinition:add',
+        edit: 'upms:workflowdefinition:edit',
+        deploy: 'upms:workflowdefinition:deploy',
+      },
+      instance: {
+        page: 'upms:workflowinstance:page',
+        get: 'upms:workflowinstance:get',
+        add: 'upms:workflowinstance:add',
+        edit: 'upms:workflowinstance:edit',
+        del: 'upms:workflowinstance:del',
+      },
+      todo: {
+        page: 'upms:workflowtodo:page',
+        get: 'upms:workflowtodo:get',
+        edit: 'upms:workflowtodo:edit',
+      },
+      done: {
+        page: 'upms:workflowdone:page',
+        get: 'upms:workflowdone:get',
+      },
     },
     menu: {
       page: 'upms:sysmenu:page',

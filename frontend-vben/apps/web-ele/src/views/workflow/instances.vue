@@ -40,6 +40,7 @@ import {
   terminateWorkflowInstance,
   withdrawWorkflowInstance,
 } from '#/api/workflow';
+import { PERMS } from '#/constants/permissions';
 import { formatDateTime as formatInstantDateTime } from '#/utils/datetime';
 
 const router = useRouter();
@@ -352,7 +353,13 @@ function formatDateTime(value?: null | string) {
             发起时保存变量快照，审批过程只读取快照，不反向改写业务变量。
           </p>
         </div>
-        <ElButton type="primary" @click="openStartDialog">发起流程</ElButton>
+        <ElButton
+          v-access:code="PERMS.upms.workflow.instance.add"
+          type="primary"
+          @click="openStartDialog"
+        >
+          发起流程
+        </ElButton>
       </div>
 
       <ElForm :inline="true" :model="query" class="workflow-search">
@@ -418,6 +425,7 @@ function formatDateTime(value?: null | string) {
         <ElTableColumn fixed="right" label="操作" width="240">
           <template #default="{ row }">
             <ElButton
+              v-access:code="PERMS.upms.workflow.instance.get"
               link
               type="primary"
               @click="openDetail(asWorkflowInstance(row))"
@@ -426,6 +434,7 @@ function formatDateTime(value?: null | string) {
             </ElButton>
             <ElButton
               v-if="row.status === 'RUNNING'"
+              v-access:code="PERMS.upms.workflow.instance.edit"
               :loading="withdrawingId === row.id"
               link
               type="danger"
@@ -435,6 +444,7 @@ function formatDateTime(value?: null | string) {
             </ElButton>
             <ElButton
               v-if="row.status === 'RUNNING'"
+              v-access:code="PERMS.upms.workflow.instance.del"
               :loading="terminatingId === row.id"
               link
               type="danger"
@@ -502,7 +512,12 @@ function formatDateTime(value?: null | string) {
       </ElForm>
       <template #footer>
         <ElButton @click="startVisible = false">取消</ElButton>
-        <ElButton type="primary" :loading="submitting" @click="submitStart">
+        <ElButton
+          v-access:code="PERMS.upms.workflow.instance.add"
+          type="primary"
+          :loading="submitting"
+          @click="submitStart"
+        >
           发起
         </ElButton>
       </template>
@@ -549,6 +564,7 @@ function formatDateTime(value?: null | string) {
           <div class="urge-card-head">
             <span class="eyebrow">Urge Records</span>
             <ElButton
+              v-access:code="PERMS.upms.workflow.instance.get"
               size="small"
               text
               :loading="urgeLoading"

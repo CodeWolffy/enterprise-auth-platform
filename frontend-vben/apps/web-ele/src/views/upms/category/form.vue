@@ -28,11 +28,17 @@ const state = reactive({
     name: [{ required: true, message: '请输入分类名称', trigger: 'change' }],
     matchersText: [
       {
-        validator: (_rule: unknown, value: string, callback: (error?: Error) => void) => {
+        validator: (
+          _rule: unknown,
+          value: string,
+          callback: (error?: Error) => void,
+        ) => {
           const hasMatcher = String(value ?? '')
             .split('\n')
             .some((item) => item.trim());
-          callback(hasMatcher ? undefined : new Error('请至少填写一个匹配规则'));
+          callback(
+            hasMatcher ? undefined : new Error('请至少填写一个匹配规则'),
+          );
         },
         trigger: 'blur',
       },
@@ -199,7 +205,7 @@ defineExpose({
           v-model="state.form.matchersText"
           type="textarea"
           :rows="5"
-          :placeholder="'sys_*\\nmenu_*\\ntenant_package_*'"
+          placeholder="sys_*\nmenu_*\ntenant_package_*"
         />
       </ElFormItem>
     </ElForm>

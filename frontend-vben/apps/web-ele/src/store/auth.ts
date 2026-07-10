@@ -19,6 +19,7 @@ import {
   switchTenantApi,
 } from '#/api';
 import { $t } from '#/locales';
+import { resetRoutes } from '#/router/reset-routes';
 
 export const useAuthStore = defineStore('auth', () => {
   const accessStore = useAccessStore();
@@ -141,6 +142,7 @@ export const useAuthStore = defineStore('auth', () => {
     } catch {
       // 不做任何处理
     }
+    resetRoutes(router);
     resetAllStores();
     accessStore.setLoginExpired(false);
 
