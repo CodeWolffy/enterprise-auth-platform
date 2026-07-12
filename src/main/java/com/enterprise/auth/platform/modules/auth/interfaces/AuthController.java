@@ -15,7 +15,7 @@ import com.enterprise.auth.platform.modules.auth.application.CaptchaService;
 import com.enterprise.auth.platform.modules.auth.application.RegistrationPolicyService;
 import com.enterprise.auth.platform.common.web.RateLimit;
 import com.enterprise.auth.platform.common.web.ApiResponse;
-import com.enterprise.auth.platform.common.context.AuthContextHolder;
+import com.enterprise.auth.platform.modules.auth.domain.AuthContextHolder;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import com.enterprise.auth.platform.modules.auth.interfaces.RegisterRequest;

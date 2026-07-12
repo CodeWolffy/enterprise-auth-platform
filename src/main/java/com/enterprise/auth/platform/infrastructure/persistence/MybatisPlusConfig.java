@@ -51,7 +51,10 @@ public class MybatisPlusConfig {
                 }
             }));
         }
-        interceptor.addInnerInterceptor(new PaginationInnerInterceptor(com.baomidou.mybatisplus.annotation.DbType.MYSQL));
+        PaginationInnerInterceptor pagination = new PaginationInnerInterceptor(com.baomidou.mybatisplus.annotation.DbType.MYSQL);
+        // 数据库访问最后一道保护：单页最多 100 条
+        pagination.setMaxLimit(100L);
+        interceptor.addInnerInterceptor(pagination);
         return interceptor;
     }
 }

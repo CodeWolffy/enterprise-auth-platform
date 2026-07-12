@@ -53,13 +53,8 @@ public class UserAuthenticationFacade {
         if (raw instanceof AuthenticationUser user) {
             return Optional.of(user);
         }
-        if (raw instanceof java.util.Map<?, ?> map) {
-            try {
-                return Optional.of(objectMapper.convertValue(map, AuthenticationUser.class));
-            } catch (Exception ex) {
-                log.debug("缓存用户数据转换为 AuthenticationUser 失败", ex);
-            }
-        }
+        // 旧 Map 缓存兼容已移除：namespace v7 淘汰旧格式后仅接受 AuthenticationUser
+        log.debug("缓存用户类型非 AuthenticationUser，已丢弃。type={}", raw.getClass().getName());
         return Optional.empty();
     }
 

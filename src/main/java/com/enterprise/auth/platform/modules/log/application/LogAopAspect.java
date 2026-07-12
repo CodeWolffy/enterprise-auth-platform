@@ -1,6 +1,6 @@
 package com.enterprise.auth.platform.modules.log.application;
 
-import com.enterprise.auth.platform.common.authz.SecuritySupport;
+import com.enterprise.auth.platform.modules.auth.application.SecuritySupport;
 import com.enterprise.auth.platform.common.context.RequestContext;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.web.IpLocationResolver;

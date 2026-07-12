@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.modules.workflow.application;
 
 import com.enterprise.auth.platform.modules.log.application.LogPublisher;
-import com.enterprise.auth.platform.modules.notification.application.NotificationScenarioPublisher;
+import com.enterprise.auth.platform.common.notification.NotificationScenarioPort;
 import com.enterprise.auth.platform.modules.user.application.UserQueryFacade.EnabledUser;
 import com.enterprise.auth.platform.modules.workflow.domain.WorkflowInstance;
 import com.enterprise.auth.platform.modules.workflow.domain.WorkflowInstanceStatus;
@@ -16,12 +16,12 @@ import org.springframework.stereotype.Component;
 @Component
 class WorkflowNotifier {
 
-    private final NotificationScenarioPublisher notificationScenarioPublisher;
+    private final NotificationScenarioPort notificationScenarioPublisher;
     private final LogPublisher logPublisher;
     private final WorkflowStore store;
 
     WorkflowNotifier(
-            NotificationScenarioPublisher notificationScenarioPublisher,
+            NotificationScenarioPort notificationScenarioPublisher,
             LogPublisher logPublisher,
             WorkflowStore store
     ) {
@@ -32,15 +32,15 @@ class WorkflowNotifier {
 
     void publishWorkflowTodoCreated(String tenantId, WorkflowInstance instance, WorkflowTask task, String operator) {
         WorkflowRecipients recipients = store.notificationRecipients(task);
-        notificationScenarioPublisher.workflowTodoCreated(new NotificationScenarioPublisher.WorkflowTodoCreatedEvent(
+        notificationScenarioPublisher.workflowTodoCreated(new NotificationScenarioPort.WorkflowTodoCreatedEvent(
                 tenantId, instance.getId(), instance.getTitle(), instance.getBusinessKey(),
                 task.getId(), task.getStepName(), recipients.userIds(), recipients.roleCodes(), operator));
     }
 
     void publishWorkflowTaskDecision(
             String tenantId, WorkflowInstance instance, WorkflowTask task, String operator, boolean approved) {
-        NotificationScenarioPublisher.WorkflowTaskDecisionEvent event =
-                new NotificationScenarioPublisher.WorkflowTaskDecisionEvent(
+        NotificationScenarioPort.WorkflowTaskDecisionEvent event =
+                new NotificationScenarioPort.WorkflowTaskDecisionEvent(
                         tenantId, instance.getId(), instance.getTitle(), instance.getBusinessKey(),
                         instance.getStarterUserId(), task.getId(), task.getStepName(), operator,
                         instance.getStatus() != WorkflowInstanceStatus.RUNNING);
@@ -62,7 +62,7 @@ class WorkflowNotifier {
             String operator
     ) {
         notificationScenarioPublisher.workflowTaskTransferred(
-                new NotificationScenarioPublisher.WorkflowTaskTransferEvent(
+                new NotificationScenarioPort.WorkflowTaskTransferEvent(
                         tenantId, instance.getId(), instance.getTitle(), instance.getBusinessKey(),
                         instance.getStarterUserId(), originalTask.getId(), newTask.getId(), newTask.getStepName(),
                         targetUser.id(), targetUser.username(), operator));
@@ -85,8 +85,8 @@ class WorkflowNotifier {
         if (instance.getStarterUserId() != null && !Objects.equals(instance.getStarterUserId(), operatorUserId)) {
             userIds.add(instance.getStarterUserId());
         }
-        NotificationScenarioPublisher.WorkflowInstanceClosedEvent event =
-                new NotificationScenarioPublisher.WorkflowInstanceClosedEvent(
+        NotificationScenarioPort.WorkflowInstanceClosedEvent event =
+                new NotificationScenarioPort.WorkflowInstanceClosedEvent(
                         tenantId, instance.getId(), instance.getTitle(), instance.getBusinessKey(),
                         userIds, recipients.roleCodes(), operator);
         if (withdrawn) {

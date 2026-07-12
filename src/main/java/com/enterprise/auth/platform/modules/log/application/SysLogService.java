@@ -7,10 +7,9 @@ import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.common.web.PaginationSupport;
 import com.enterprise.auth.platform.modules.log.infrastructure.entity.SysLogEntity;
 import com.enterprise.auth.platform.modules.log.infrastructure.mapper.SysLogMapper;
+import java.time.Instant;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-
-import java.time.Instant;
 
 @Service
 public class SysLogService {
@@ -21,8 +20,17 @@ public class SysLogService {
         this.sysLogMapper = sysLogMapper;
     }
 
-    public PageResult<SysLogEntity> page(String tenantId, String eventType, String operator, String requestId,
-                                         String clientIp, Instant from, Instant to, int page, int size) {
+    public PageResult<OperationLogView> page(
+            String tenantId,
+            String eventType,
+            String operator,
+            String requestId,
+            String clientIp,
+            Instant from,
+            Instant to,
+            int page,
+            int size
+    ) {
         int safePage = PaginationSupport.normalizePage(page);
         int safeSize = PaginationSupport.normalizeSize(size, 200);
         String effectiveTenantId = effectiveTenantId(tenantId);
@@ -36,7 +44,12 @@ public class SysLogService {
                 .le(to != null, SysLogEntity::getCreatedAt, to)
                 .orderByDesc(SysLogEntity::getCreatedAt);
         Page<SysLogEntity> result = sysLogMapper.selectPage(new Page<>(safePage, safeSize), wrapper);
-        return PageResult.of(result.getTotal(), safePage, safeSize, result.getRecords());
+        return PageResult.of(
+                result.getTotal(),
+                safePage,
+                safeSize,
+                result.getRecords().stream().map(this::toView).toList()
+        );
     }
 
     public long count(String tenantId, String eventType, String operator, Instant from, Instant to) {
@@ -48,6 +61,23 @@ public class SysLogService {
                 .ge(from != null, SysLogEntity::getCreatedAt, from)
                 .le(to != null, SysLogEntity::getCreatedAt, to);
         return sysLogMapper.selectCount(wrapper);
+    }
+
+    private OperationLogView toView(SysLogEntity entity) {
+        return new OperationLogView(
+                entity.getId(),
+                entity.getTenantId(),
+                entity.getEventType(),
+                entity.getOperator(),
+                entity.getRequestId(),
+                entity.getClientIp(),
+                entity.getLocation(),
+                entity.getMethod(),
+                entity.getRequestUri(),
+                entity.getStatus(),
+                entity.getRequestTime(),
+                entity.getCreatedAt()
+        );
     }
 
     private String effectiveTenantId(String requestedTenantId) {

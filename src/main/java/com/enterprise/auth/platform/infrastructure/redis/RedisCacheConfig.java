@@ -31,7 +31,11 @@ public class RedisCacheConfig implements CachingConfigurer {
         cacheObjectMapper.disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         cacheObjectMapper.activateDefaultTyping(
                 BasicPolymorphicTypeValidator.builder()
-                        .allowIfBaseType(Object.class)
+                        // 仅允许本项目与常见集合类型，收窄 default typing 攻击面
+                        .allowIfSubType("com.enterprise.auth.platform.")
+                        .allowIfSubType("java.util.")
+                        .allowIfSubType("java.time.")
+                        .allowIfSubType("java.lang.")
                         .build(),
                 ObjectMapper.DefaultTyping.EVERYTHING
         );

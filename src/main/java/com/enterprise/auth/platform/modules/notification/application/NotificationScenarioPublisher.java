@@ -2,10 +2,12 @@ package com.enterprise.auth.platform.modules.notification.application;
 
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.context.TimeZoneContext;
+import com.enterprise.auth.platform.common.notification.NotificationScenarioPort;
+import com.enterprise.auth.platform.modules.system.application.OutboxDispatchWorker;
+import com.enterprise.auth.platform.modules.system.application.OutboxWriter;
 import com.enterprise.auth.platform.modules.user.application.UserAuthenticationFacade;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Service;
@@ -14,26 +16,30 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.util.StringUtils;
 
 @Service
-public class NotificationScenarioPublisher {
+public class NotificationScenarioPublisher implements NotificationScenarioPort {
 
     private static final String WORKFLOW_TODO_LINK = "/workflow/todo";
     private static final String WORKFLOW_INSTANCE_LINK = "/workflow/instances";
     private static final String ACCOUNT_PROFILE_LINK = "/account/profile";
 
-    private final NotificationPublisher notificationPublisher;
     private final NotificationSseRegistry sseRegistry;
     private final UserAuthenticationFacade userAuthenticationFacade;
+    private final OutboxWriter outboxWriter;
+    private final OutboxDispatchWorker outboxDispatchWorker;
 
     public NotificationScenarioPublisher(
-            NotificationPublisher notificationPublisher,
             NotificationSseRegistry sseRegistry,
-            UserAuthenticationFacade userAuthenticationFacade
+            UserAuthenticationFacade userAuthenticationFacade,
+            OutboxWriter outboxWriter,
+            OutboxDispatchWorker outboxDispatchWorker
     ) {
-        this.notificationPublisher = notificationPublisher;
         this.sseRegistry = sseRegistry;
         this.userAuthenticationFacade = userAuthenticationFacade;
+        this.outboxWriter = outboxWriter;
+        this.outboxDispatchWorker = outboxDispatchWorker;
     }
 
+    @Override
     public void workflowTodoCreated(WorkflowTodoCreatedEvent event) {
         if (event == null || event.emptyRecipients()) {
             return;
@@ -70,14 +76,17 @@ public class NotificationScenarioPublisher {
         ));
     }
 
+    @Override
     public void workflowTaskApproved(WorkflowTaskDecisionEvent event) {
         workflowTaskDecision(event, "WORKFLOW_TASK_APPROVED", "流程审批通过：", "审批人", "SUCCESS");
     }
 
+    @Override
     public void workflowTaskRejected(WorkflowTaskDecisionEvent event) {
         workflowTaskDecision(event, "WORKFLOW_TASK_REJECTED", "流程审批驳回：", "驳回人", "ERROR");
     }
 
+    @Override
     public void workflowTaskTransferred(WorkflowTaskTransferEvent event) {
         if (event == null || event.starterUserId() == null) {
             return;
@@ -115,14 +124,17 @@ public class NotificationScenarioPublisher {
         ));
     }
 
+    @Override
     public void workflowInstanceWithdrawn(WorkflowInstanceClosedEvent event) {
         workflowInstanceClosed(event, "WORKFLOW_INSTANCE_WITHDRAWN", "流程已撤回：", "发起人", "WARNING");
     }
 
+    @Override
     public void workflowInstanceTerminated(WorkflowInstanceClosedEvent event) {
         workflowInstanceClosed(event, "WORKFLOW_INSTANCE_TERMINATED", "流程已终止：", "操作人", "ERROR");
     }
 
+    @Override
     public void accountLocked(String tenantId, String username, String clientIp) {
         SysUserEntity user = loadUserByUsername(tenantId, username);
         if (user == null) {
@@ -141,6 +153,7 @@ public class NotificationScenarioPublisher {
         );
     }
 
+    @Override
     public void passwordResetRequested(String tenantId, Long userId, String username, String clientIp) {
         publishAccountSecurity(
                 tenantId,
@@ -155,6 +168,7 @@ public class NotificationScenarioPublisher {
         );
     }
 
+    @Override
     public void passwordResetCompleted(String tenantId, Long userId, String username) {
         publishAccountSecurity(
                 tenantId,
@@ -169,6 +183,7 @@ public class NotificationScenarioPublisher {
         );
     }
 
+    @Override
     public void passwordChanged(String tenantId, Long userId, String username) {
         publishAccountSecurity(
                 tenantId,
@@ -183,6 +198,7 @@ public class NotificationScenarioPublisher {
         );
     }
 
+    @Override
     public void adminPasswordReset(String tenantId, Long userId, String username, String operator) {
         publishAccountSecurity(
                 tenantId,
@@ -197,6 +213,7 @@ public class NotificationScenarioPublisher {
         );
     }
 
+    @Override
     public void accountDisabled(String tenantId, Long userId, String username, String operator) {
         publishAccountSecurity(
                 tenantId,
@@ -211,6 +228,7 @@ public class NotificationScenarioPublisher {
         );
     }
 
+    @Override
     public void sessionForcedOffline(String tenantId, Long userId, String operator, Map<String, Object> payload) {
         publishAccountSecurity(
                 tenantId,
@@ -225,6 +243,7 @@ public class NotificationScenarioPublisher {
         );
     }
 
+    @Override
     public void systemNoticePublished(String tenantId, Long noticeId, String title, String content, String operator) {
         if (!StringUtils.hasText(tenantId) || noticeId == null) {
             return;
@@ -359,7 +378,15 @@ public class NotificationScenarioPublisher {
         if (command == null) {
             return;
         }
-        runAfterCommit(() -> notificationPublisher.publish(command));
+        // 业务事务内写入 Outbox，提交后异步投递，避免请求线程扇出与长事务
+        outboxWriter.enqueue(
+                OutboxWriter.TYPE_NOTIFICATION_PUBLISH,
+                command.tenantId(),
+                command.sourceType(),
+                command.sourceId(),
+                command
+        );
+        runAfterCommit(outboxDispatchWorker::triggerAsync);
     }
 
     private void runAfterCommit(Runnable publishTask) {
@@ -414,97 +441,4 @@ public class NotificationScenarioPublisher {
                 .trim();
     }
 
-    public record WorkflowTodoCreatedEvent(
-            String tenantId,
-            Long instanceId,
-            String instanceTitle,
-            String businessKey,
-            Long taskId,
-            String stepName,
-            Set<Long> recipientUserIds,
-            Set<String> recipientRoleCodes,
-            String operator
-    ) {
-        public WorkflowTodoCreatedEvent {
-            recipientUserIds = copyUserIds(recipientUserIds);
-            recipientRoleCodes = copyRoleCodes(recipientRoleCodes);
-        }
-
-        boolean emptyRecipients() {
-            return recipientUserIds.isEmpty() && recipientRoleCodes.isEmpty();
-        }
-    }
-
-    public record WorkflowTaskDecisionEvent(
-            String tenantId,
-            Long instanceId,
-            String instanceTitle,
-            String businessKey,
-            Long starterUserId,
-            Long taskId,
-            String stepName,
-            String operator,
-            boolean ended
-    ) {
-    }
-
-    public record WorkflowTaskTransferEvent(
-            String tenantId,
-            Long instanceId,
-            String instanceTitle,
-            String businessKey,
-            Long starterUserId,
-            Long originalTaskId,
-            Long newTaskId,
-            String stepName,
-            Long targetUserId,
-            String targetUsername,
-            String operator
-    ) {
-    }
-
-    public record WorkflowInstanceClosedEvent(
-            String tenantId,
-            Long instanceId,
-            String instanceTitle,
-            String businessKey,
-            Set<Long> recipientUserIds,
-            Set<String> recipientRoleCodes,
-            String operator
-    ) {
-        public WorkflowInstanceClosedEvent {
-            recipientUserIds = copyUserIds(recipientUserIds);
-            recipientRoleCodes = copyRoleCodes(recipientRoleCodes);
-        }
-
-        boolean emptyRecipients() {
-            return recipientUserIds.isEmpty() && recipientRoleCodes.isEmpty();
-        }
-    }
-
-    private static Set<Long> copyUserIds(Set<Long> userIds) {
-        if (userIds == null || userIds.isEmpty()) {
-            return Set.of();
-        }
-        Set<Long> values = new LinkedHashSet<>();
-        for (Long userId : userIds) {
-            if (userId != null) {
-                values.add(userId);
-            }
-        }
-        return values;
-    }
-
-    private static Set<String> copyRoleCodes(Set<String> roleCodes) {
-        if (roleCodes == null || roleCodes.isEmpty()) {
-            return Set.of();
-        }
-        Set<String> values = new LinkedHashSet<>();
-        for (String roleCode : roleCodes) {
-            if (StringUtils.hasText(roleCode)) {
-                values.add(roleCode.trim());
-            }
-        }
-        return values;
-    }
 }

@@ -50,12 +50,15 @@ public class RedisHealthIndicator implements HealthIndicator {
     @Override
     public Health health() {
         try {
-            return CompletableFuture.supplyAsync(this::probe, probeExecutor)
-                    .get(PROBE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-        } catch (TimeoutException e) {
-            return Health.down()
-                    .withDetail("error", "redis probe timed out after " + PROBE_TIMEOUT.toSeconds() + "s")
-                    .build();
+            CompletableFuture<Health> future = CompletableFuture.supplyAsync(this::probe, probeExecutor);
+            try {
+                return future.get(PROBE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+            } catch (TimeoutException e) {
+                future.cancel(true);
+                return Health.down()
+                        .withDetail("error", "redis probe timed out after " + PROBE_TIMEOUT.toSeconds() + "s")
+                        .build();
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             return Health.down().withDetail("error", "redis probe interrupted").build();

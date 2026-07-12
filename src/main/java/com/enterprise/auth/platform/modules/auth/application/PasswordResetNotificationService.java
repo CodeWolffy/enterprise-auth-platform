@@ -6,7 +6,11 @@ import com.enterprise.auth.platform.modules.system.application.MailChannelApplic
 import com.enterprise.auth.platform.modules.system.application.MailChannelSenderManager;
 import com.enterprise.auth.platform.modules.system.application.TransactionalMailSupport;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysMailChannelEntity;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
+import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -54,16 +58,22 @@ public class PasswordResetNotificationService {
 
         SecurityProperties.Notification notification = securityProperties.resolvedNotification();
         String channel = notification.channel().toLowerCase(Locale.ROOT);
+        // staging/prod：禁止 log 通道，缺邮件渠道 fail-closed（无论 channel 是否为 smtp）
+        if (requiresSmtp()) {
+            throw new BusinessException(
+                    "MAIL_CHANNEL_NOT_CONFIGURED",
+                    "当前环境禁止通过日志下发密码重置链接，租户 " + normalizedTenantId + " 尚未配置可用邮件渠道"
+            );
+        }
         if (!"smtp".equals(channel)) {
-            logResetLink(username, email, resetLink);
+            // 仅 local/dev 可降级：只记诊断字段，永不记录 raw token / 完整 resetLink
+            logResetDiagnostics(username, email, resetLink);
             return;
         }
-        if (requiresSmtp()) {
-            throw new BusinessException("MAIL_CHANNEL_NOT_CONFIGURED",
-                    "当前环境要求启用 SMTP，但租户 " + normalizedTenantId + " 尚未配置可用邮件渠道，请在系统设置中配置");
-        }
-        log.warn("SMTP notification requested but no enabled mail channel found for tenant={}, falling back to log", normalizedTenantId);
-        logResetLink(username, email, resetLink);
+        throw new BusinessException(
+                "MAIL_CHANNEL_NOT_CONFIGURED",
+                "已配置 SMTP 通知通道，但租户 " + normalizedTenantId + " 尚未配置可用邮件渠道"
+        );
     }
 
     private void sendViaDbChannel(SysMailChannelEntity config, String email, String username, String resetLink) {
@@ -77,11 +87,21 @@ public class PasswordResetNotificationService {
                     "密码重置确认",
                     transactionalMailSupport.passwordResetContent(username, resetLink, ttlMinutes)
             );
-            log.info("Password reset email sent to {} for user={}, channelTenant={}", maskEmail(email), username, config.getTenantId());
+            log.info(
+                    "Password reset email sent to {} for user={}, channelTenant={}",
+                    maskEmail(email),
+                    username,
+                    config.getTenantId()
+            );
         } catch (BusinessException ex) {
             throw ex;
         } catch (Exception ex) {
-            log.error("Password reset email send failed for user={}, channelTenant={}", username, config.getTenantId(), ex);
+            log.error(
+                    "Password reset email send failed for user={}, channelTenant={}",
+                    username,
+                    config.getTenantId(),
+                    ex
+            );
             throw new BusinessException("NOTIFICATION_SEND_FAILED", "密码重置邮件发送失败");
         }
     }
@@ -96,8 +116,37 @@ public class PasswordResetNotificationService {
         return StringUtils.hasText(tenantId) ? tenantId.trim() : "platform";
     }
 
-    private void logResetLink(String username, String email, String resetLink) {
-        log.info("Password reset link generated for user={}, email={}, link={}", username, maskEmail(email), resetLink);
+    /** 诊断日志：request 级可关联字段 + token 哈希前缀，不含完整链接。 */
+    private void logResetDiagnostics(String username, String email, String resetLink) {
+        String tokenFingerprint = tokenFingerprint(resetLink);
+        log.info(
+                "Password reset link generated for user={}, email={}, tokenFingerprint={}, channel=log(dev-only)",
+                username,
+                maskEmail(email),
+                tokenFingerprint
+        );
+    }
+
+    private String tokenFingerprint(String resetLink) {
+        if (!StringUtils.hasText(resetLink)) {
+            return "none";
+        }
+        String token = resetLink;
+        int tokenIdx = resetLink.indexOf("token=");
+        if (tokenIdx >= 0) {
+            token = resetLink.substring(tokenIdx + 6);
+            int amp = token.indexOf('&');
+            if (amp >= 0) {
+                token = token.substring(0, amp);
+            }
+        }
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash).substring(0, 12);
+        } catch (NoSuchAlgorithmException ex) {
+            return "unavailable";
+        }
     }
 
     private String maskEmail(String email) {

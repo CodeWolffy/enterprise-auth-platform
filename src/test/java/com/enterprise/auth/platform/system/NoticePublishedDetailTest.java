@@ -17,6 +17,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
+@org.junit.jupiter.api.Tag("integration")
 @SpringBootTest
 @AutoConfigureMockMvc
 class NoticePublishedDetailTest {

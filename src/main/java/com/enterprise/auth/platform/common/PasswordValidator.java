@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.common;
 
 import com.enterprise.auth.platform.common.exception.BusinessException;
-import com.enterprise.auth.platform.modules.security.domain.EffectiveSecurityPolicy;
+import com.enterprise.auth.platform.common.security.EffectiveSecurityPolicy;
 
 public class PasswordValidator {
 
@@ -12,7 +12,10 @@ public class PasswordValidator {
     public static void validate(String password, EffectiveSecurityPolicy policy) {
         EffectiveSecurityPolicy resolved = policy == null ? EffectiveSecurityPolicy.defaults() : policy;
         if (password == null || password.length() < resolved.passwordMinLength() || password.length() > resolved.passwordMaxLength()) {
-            throw new BusinessException("PASSWORD_INVALID", "密码长度需在" + resolved.passwordMinLength() + "到" + resolved.passwordMaxLength() + "位之间");
+            throw new BusinessException(
+                    "PASSWORD_INVALID",
+                    "密码长度需在" + resolved.passwordMinLength() + "到" + resolved.passwordMaxLength() + "位之间"
+            );
         }
         if (password.chars().anyMatch(Character::isWhitespace)) {
             throw new BusinessException("PASSWORD_INVALID", "密码不能包含空白字符");

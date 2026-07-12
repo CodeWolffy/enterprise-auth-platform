@@ -5,7 +5,7 @@ import com.enterprise.auth.platform.infrastructure.config.RateLimitProperties;
 import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.modules.log.domain.event.LoginLogEvent;
 import com.enterprise.auth.platform.modules.security.application.SecurityPolicyApplicationService;
-import com.enterprise.auth.platform.modules.security.domain.EffectiveSecurityPolicy;
+import com.enterprise.auth.platform.common.security.EffectiveSecurityPolicy;
 import java.time.Duration;
 import java.util.Map;
 import org.springframework.data.redis.core.StringRedisTemplate;

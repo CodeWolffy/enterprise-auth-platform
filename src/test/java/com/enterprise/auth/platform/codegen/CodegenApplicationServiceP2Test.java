@@ -27,6 +27,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+@org.junit.jupiter.api.Tag("integration")
 @SpringBootTest(properties = "platform.codegen.output-root=target/codegen-ut")
 class CodegenApplicationServiceP2Test {
 

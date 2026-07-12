@@ -26,6 +26,8 @@ public class SysStorageFileEntity {
     private String etag;
     private String visibility;
     private Long ownerUserId;
+    /** READY / PENDING / FAILED / DELETE_PENDING */
+    private String lifecycleStatus;
     @TableLogic
     private Integer deleted;
     @TableField(fill = FieldFill.INSERT)

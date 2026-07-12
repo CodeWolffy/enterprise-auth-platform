@@ -1,6 +1,6 @@
 package com.enterprise.auth.platform.modules.tenant.application;
 
-import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
+import com.enterprise.auth.platform.modules.auth.application.PlatformAdminSupport;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;

@@ -20,11 +20,11 @@ import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMa
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserRoleMapper;
 import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
 import com.enterprise.auth.platform.modules.security.application.SecurityPolicyApplicationService;
-import com.enterprise.auth.platform.common.authz.DataScopeService;
+import com.enterprise.auth.platform.modules.auth.application.DataScopeService;
 import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
-import com.enterprise.auth.platform.modules.notification.application.NotificationScenarioPublisher;
-import com.enterprise.auth.platform.common.authz.SecuritySupport;
-import com.enterprise.auth.platform.common.context.AuthContextHolder;
+import com.enterprise.auth.platform.common.notification.NotificationScenarioPort;
+import com.enterprise.auth.platform.modules.auth.application.SecuritySupport;
+import com.enterprise.auth.platform.modules.auth.domain.AuthContextHolder;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.modules.user.interfaces.CreateUserRequest;
@@ -55,7 +55,7 @@ public class UserManagementService {
     private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
     private final SessionIndexService sessionIndexService;
     private final SecurityPolicyApplicationService securityPolicyApplicationService;
-    private final NotificationScenarioPublisher notificationScenarioPublisher;
+    private final NotificationScenarioPort notificationScenarioPublisher;
     private final TenantProfileFacade tenantProfileFacade;
 
     public UserManagementService(
@@ -71,7 +71,7 @@ public class UserManagementService {
             AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
             SessionIndexService sessionIndexService,
             SecurityPolicyApplicationService securityPolicyApplicationService,
-            NotificationScenarioPublisher notificationScenarioPublisher,
+            NotificationScenarioPort notificationScenarioPublisher,
             TenantProfileFacade tenantProfileFacade
     ) {
         this.sysUserMapper = sysUserMapper;
@@ -372,9 +372,7 @@ public class UserManagementService {
             } else {
                 TenantContext.setTenantId(tenantId);
             }
-            return userDirectoryService.listUsers().stream()
-                    .filter(user -> user.id().equals(userId))
-                    .findFirst()
+            return userDirectoryService.findUserSummary(userId, tenantId)
                     .orElseThrow(() -> new BusinessException("用户不存在"));
         } finally {
             if (StringUtils.hasText(previousTenantId)) {

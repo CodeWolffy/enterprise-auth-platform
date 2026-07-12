@@ -5,11 +5,10 @@ import cn.dev33.satoken.exception.NotPermissionException;
 import cn.dev33.satoken.exception.SaTokenException;
 import com.enterprise.auth.platform.common.context.RequestContext;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
+import com.enterprise.auth.platform.common.event.SecurityAccessDeniedEvent;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.ApiResponse.ErrorDetail;
 import com.enterprise.auth.platform.common.web.RateLimitInterceptor.RateLimitExceededException;
-import com.enterprise.auth.platform.modules.log.application.LogPublisher;
-import com.enterprise.auth.platform.modules.log.domain.event.LogEvent;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.security.Principal;
@@ -19,6 +18,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
@@ -36,11 +36,11 @@ public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     private static final String RATE_LIMITED_CODE = "RATE_LIMITED";
     private static final String REQUEST_ID_HEADER = "X-Request-Id";
-    private final LogPublisher logPublisher;
+    private final ApplicationEventPublisher eventPublisher;
     private final IpLocationResolver ipLocationResolver;
 
-    public GlobalExceptionHandler(LogPublisher logPublisher, IpLocationResolver ipLocationResolver) {
-        this.logPublisher = logPublisher;
+    public GlobalExceptionHandler(ApplicationEventPublisher eventPublisher, IpLocationResolver ipLocationResolver) {
+        this.eventPublisher = eventPublisher;
         this.ipLocationResolver = ipLocationResolver;
     }
 
@@ -233,7 +233,15 @@ public class GlobalExceptionHandler {
             String location = ipLocationResolver.resolve(clientIp);
             String method = request.getMethod();
             String requestUri = request.getRequestURI();
-            logPublisher.publish(new LogEvent("拒绝访问", operator, tenantId, payload, null, clientIp, location, method, requestUri, null, null, null, null));
+            eventPublisher.publishEvent(new SecurityAccessDeniedEvent(
+                    operator,
+                    tenantId,
+                    method,
+                    requestUri,
+                    clientIp,
+                    location,
+                    payload
+            ));
         } catch (Exception ex) {
             log.debug("Failed to record security deny log event. method={}, path={}, error={}",
                     request.getMethod(), request.getRequestURI(), ex.getMessage());

@@ -11,7 +11,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import cn.dev33.satoken.session.SaSession;
-import cn.dev33.satoken.stp.SaLoginModel;
 import cn.dev33.satoken.stp.StpUtil;
 import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
@@ -28,13 +27,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.context.TestExecutionListeners;
 
+@org.junit.jupiter.api.Tag("integration")
 @SpringBootTest(properties = {
         "app.security.redis.session-enabled=false"
 })
@@ -55,7 +55,7 @@ class ResourceAuthorizationControllerTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    @SpyBean
+    @MockitoSpyBean
     private AuthPrincipalCacheService authPrincipalCacheService;
 
     @BeforeEach
@@ -282,26 +282,7 @@ class ResourceAuthorizationControllerTest {
     }
 
     private RequestPostProcessor bearerWithSnapshotCapture(UserAccount user, AtomicReference<String> tokenRef) {
-        return request -> {
-            String token = StpUtil.createLoginSession(user.id(), new SaLoginModel().setDevice("mockmvc"));
-            SaSession tokenSession = StpUtil.getTokenSessionByToken(token);
-            tokenSession.set("username", user.username());
-            tokenSession.set("userId", user.id());
-            tokenSession.set("tenantId", user.tenantId());
-            tokenSession.set("activeTenantId", user.tenantId());
-            tokenSession.set("sessionVersion", user.sessionVersion());
-            tokenSession.set("roles", List.copyOf(user.roles()));
-            tokenSession.set("permissions", List.copyOf(user.permissions()));
-            tokenSession.set("permissionsTenantId", user.tenantId());
-            tokenSession.set("clientIp", "127.0.0.1");
-            tokenSession.set("device", "mockmvc");
-            long now = System.currentTimeMillis();
-            tokenSession.set("issuedAt", now);
-            tokenSession.set("expiresAt", now + 7 * 24 * 60 * 60 * 1000L);
-            tokenRef.set(token);
-            request.addHeader("Authorization", "Bearer " + token);
-            return request;
-        };
+        return bearer(user, tokenRef::set);
     }
 
     @Test

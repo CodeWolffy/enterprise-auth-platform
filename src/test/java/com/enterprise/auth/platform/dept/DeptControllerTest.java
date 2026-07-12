@@ -25,6 +25,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 import org.springframework.test.web.servlet.MockMvc;
 
+@org.junit.jupiter.api.Tag("integration")
 @SpringBootTest
 @AutoConfigureMockMvc
 class DeptControllerTest {

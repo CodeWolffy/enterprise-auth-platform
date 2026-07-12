@@ -42,6 +42,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: false
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -58,6 +66,7 @@ jobs:
           TEST_REDIS_HOST: 127.0.0.1
           TEST_REDIS_PORT: '6379'
           TEST_REDIS_DATABASE: '8'
+          TEST_REDIS_PASSWORD: ''
         run: mvn -B -ntp verify
 
       - name: Upload JaCoCo report
@@ -67,6 +76,15 @@ jobs:
           name: backend-jacoco-report
           path: target/site/jacoco
           retention-days: 7
+
+      - name: Upload SpotBugs report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-spotbugs-report
+          path: target/spotbugsXml.xml
+          retention-days: 7
+          if-no-files-found: ignore
 
   frontend:
     name: frontend-typecheck-build

@@ -12,18 +12,23 @@ import com.enterprise.auth.platform.modules.workflow.domain.WorkflowTask;
 import com.enterprise.auth.platform.modules.workflow.domain.WorkflowTaskStatus;
 import com.enterprise.auth.platform.modules.workflow.domain.WorkflowTaskUrge;
 import com.enterprise.auth.platform.modules.workflow.domain.WorkflowStepDefinition;
+import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfTaskCandidateRoleEntity;
+import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfTaskCandidateUserEntity;
 import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfProcessDefinitionEntity;
 import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfProcessInstanceEntity;
 import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfTaskEntity;
 import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfTaskUrgeEntity;
 import com.enterprise.auth.platform.modules.workflow.infrastructure.mapper.WfProcessDefinitionMapper;
 import com.enterprise.auth.platform.modules.workflow.infrastructure.mapper.WfProcessInstanceMapper;
+import com.enterprise.auth.platform.modules.workflow.infrastructure.mapper.WfTaskCandidateRoleMapper;
+import com.enterprise.auth.platform.modules.workflow.infrastructure.mapper.WfTaskCandidateUserMapper;
 import com.enterprise.auth.platform.modules.workflow.infrastructure.mapper.WfTaskMapper;
 import com.enterprise.auth.platform.modules.workflow.infrastructure.mapper.WfTaskUrgeMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Map;
@@ -38,6 +43,8 @@ public class MybatisWorkflowRepository implements WorkflowRepository {
     private final WfProcessInstanceMapper instanceMapper;
     private final WfTaskMapper taskMapper;
     private final WfTaskUrgeMapper urgeMapper;
+    private final WfTaskCandidateUserMapper candidateUserMapper;
+    private final WfTaskCandidateRoleMapper candidateRoleMapper;
     private static final TypeReference<List<WorkflowStepDefinition>> STEP_LIST_TYPE = new TypeReference<>() { };
     private static final TypeReference<Set<Long>> LONG_SET_TYPE = new TypeReference<>() { };
     private static final TypeReference<Set<String>> STRING_SET_TYPE = new TypeReference<>() { };
@@ -50,12 +57,16 @@ public class MybatisWorkflowRepository implements WorkflowRepository {
             WfProcessInstanceMapper instanceMapper,
             WfTaskMapper taskMapper,
             WfTaskUrgeMapper urgeMapper,
+            WfTaskCandidateUserMapper candidateUserMapper,
+            WfTaskCandidateRoleMapper candidateRoleMapper,
             ObjectMapper objectMapper
     ) {
         this.definitionMapper = definitionMapper;
         this.instanceMapper = instanceMapper;
         this.taskMapper = taskMapper;
         this.urgeMapper = urgeMapper;
+        this.candidateUserMapper = candidateUserMapper;
+        this.candidateRoleMapper = candidateRoleMapper;
         this.objectMapper = objectMapper;
     }
 
@@ -175,6 +186,45 @@ public class MybatisWorkflowRepository implements WorkflowRepository {
         task.setId(entity.getId());
         task.setCreatedAt(entity.getCreatedAt());
         task.setUpdatedAt(entity.getUpdatedAt());
+        // expand-contract 双写：规范化候选关系，供 SQL 下推
+        writeCandidateLinks(task);
+    }
+
+    private void writeCandidateLinks(WorkflowTask task) {
+        if (task == null || task.getId() == null || !StringUtils.hasText(task.getTenantId())) {
+            return;
+        }
+        if (task.getCandidateUserIds() != null) {
+            for (Long userId : task.getCandidateUserIds()) {
+                if (userId == null) {
+                    continue;
+                }
+                WfTaskCandidateUserEntity link = new WfTaskCandidateUserEntity();
+                link.setTenantId(task.getTenantId());
+                link.setTaskId(task.getId());
+                link.setUserId(userId);
+                try {
+                    candidateUserMapper.insert(link);
+                } catch (RuntimeException ignored) {
+                    // 唯一键冲突忽略（回填/重试）
+                }
+            }
+        }
+        if (task.getCandidateGroupCodes() != null) {
+            for (String roleCode : task.getCandidateGroupCodes()) {
+                if (!StringUtils.hasText(roleCode)) {
+                    continue;
+                }
+                WfTaskCandidateRoleEntity link = new WfTaskCandidateRoleEntity();
+                link.setTenantId(task.getTenantId());
+                link.setTaskId(task.getId());
+                link.setRoleCode(roleCode.trim());
+                try {
+                    candidateRoleMapper.insert(link);
+                } catch (RuntimeException ignored) {
+                }
+            }
+        }
     }
 
     @Override
@@ -246,28 +296,59 @@ public class MybatisWorkflowRepository implements WorkflowRepository {
 
     @Override
     public List<WorkflowTask> findTodoCandidates(String tenantId, Long userId, Long taskId, int limit) {
+        // 候选关系表 SQL 下推，避免全量 PENDING 再内存过滤
+        int safeLimit = Math.min(Math.max(limit, 1), 500);
         LambdaQueryWrapper<WfTaskEntity> query = new LambdaQueryWrapper<WfTaskEntity>()
                 .eq(WfTaskEntity::getTenantId, tenantId)
                 .eq(WfTaskEntity::getStatus, WorkflowTaskStatus.PENDING.name())
                 .eq(WfTaskEntity::getDeleted, 0)
                 .eq(taskId != null && taskId > 0, WfTaskEntity::getId, taskId)
-                .and(wrapper -> wrapper.eq(WfTaskEntity::getAssigneeUserId, userId)
-                        .or().isNull(WfTaskEntity::getAssigneeUserId))
+                .and(wrapper -> wrapper
+                        .eq(WfTaskEntity::getAssigneeUserId, userId)
+                        .or(w -> w.isNull(WfTaskEntity::getAssigneeUserId)
+                                .apply("EXISTS (SELECT 1 FROM wf_task_candidate_user cu WHERE cu.tenant_id = wf_task.tenant_id AND cu.task_id = wf_task.id AND cu.user_id = {0})", userId))
+                        .or(w -> w.isNull(WfTaskEntity::getAssigneeUserId)
+                                .apply("""
+                                        EXISTS (
+                                          SELECT 1 FROM wf_task_candidate_role cr
+                                          INNER JOIN sys_role r ON r.tenant_id = cr.tenant_id AND r.role_code = cr.role_code AND r.deleted = 0
+                                          INNER JOIN sys_user_role ur ON ur.tenant_id = r.tenant_id AND ur.role_id = r.id AND ur.user_id = {0}
+                                          WHERE cr.tenant_id = wf_task.tenant_id AND cr.task_id = wf_task.id
+                                        )
+                                        """, userId))
+                )
                 .orderByAsc(WfTaskEntity::getCreatedAt)
                 .orderByAsc(WfTaskEntity::getId)
-                .last("limit " + limit);
+                .last("limit " + safeLimit);
         return taskMapper.selectList(query).stream().map(this::toDomain).toList();
     }
 
     @Override
     public List<WorkflowTask> findDoneTasks(String tenantId, Long userId) {
+        return findDoneTasks(tenantId, userId, 0, 100);
+    }
+
+    @Override
+    public long countDoneTasks(String tenantId, Long userId) {
+        return taskMapper.selectCount(new LambdaQueryWrapper<WfTaskEntity>()
+                .eq(WfTaskEntity::getTenantId, tenantId)
+                .ne(WfTaskEntity::getStatus, WorkflowTaskStatus.PENDING.name())
+                .eq(WfTaskEntity::getAssigneeUserId, userId)
+                .eq(WfTaskEntity::getDeleted, 0));
+    }
+
+    @Override
+    public List<WorkflowTask> findDoneTasks(String tenantId, Long userId, int offset, int limit) {
+        int safeOffset = Math.max(offset, 0);
+        int safeLimit = Math.min(Math.max(limit, 1), 100);
         return taskMapper.selectList(new LambdaQueryWrapper<WfTaskEntity>()
                         .eq(WfTaskEntity::getTenantId, tenantId)
                         .ne(WfTaskEntity::getStatus, WorkflowTaskStatus.PENDING.name())
                         .eq(WfTaskEntity::getAssigneeUserId, userId)
                         .eq(WfTaskEntity::getDeleted, 0)
                         .orderByDesc(WfTaskEntity::getCompletedAt)
-                        .orderByDesc(WfTaskEntity::getId))
+                        .orderByDesc(WfTaskEntity::getId)
+                        .last("limit " + safeOffset + "," + safeLimit))
                 .stream().map(this::toDomain).toList();
     }
 
@@ -286,6 +367,26 @@ public class MybatisWorkflowRepository implements WorkflowRepository {
                 .eq(WfTaskUrgeEntity::getTenantId, tenantId)
                 .eq(WfTaskUrgeEntity::getTaskId, taskId)
                 .eq(WfTaskUrgeEntity::getDeleted, 0));
+    }
+
+    @Override
+    public Map<Long, Long> countUrgesByTaskIds(String tenantId, Collection<Long> taskIds) {
+        if (taskIds == null || taskIds.isEmpty()) {
+            return Map.of();
+        }
+        List<WfTaskUrgeEntity> rows = urgeMapper.selectList(new LambdaQueryWrapper<WfTaskUrgeEntity>()
+                .select(WfTaskUrgeEntity::getTaskId)
+                .eq(WfTaskUrgeEntity::getTenantId, tenantId)
+                .in(WfTaskUrgeEntity::getTaskId, taskIds)
+                .eq(WfTaskUrgeEntity::getDeleted, 0));
+        Map<Long, Long> counts = new java.util.HashMap<>();
+        for (WfTaskUrgeEntity row : rows) {
+            if (row.getTaskId() == null) {
+                continue;
+            }
+            counts.merge(row.getTaskId(), 1L, Long::sum);
+        }
+        return counts;
     }
 
     @Override

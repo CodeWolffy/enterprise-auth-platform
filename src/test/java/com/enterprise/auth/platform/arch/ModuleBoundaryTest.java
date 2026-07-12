@@ -85,17 +85,101 @@ class ModuleBoundaryTest {
         }
     }
 
+    @Test
+    void commonPackageDoesNotImportModules() throws IOException {
+        Path commonRoot = SOURCE_ROOT.resolve("common");
+        if (!Files.exists(commonRoot)) {
+            return;
+        }
+        Pattern modulesImport = Pattern.compile("import\\s+com\\.enterprise\\.auth\\.platform\\.modules\\.");
+        List<String> violations;
+        try (Stream<Path> files = Files.walk(commonRoot)) {
+            violations = files
+                    .filter(path -> path.toString().endsWith(".java"))
+                    .flatMap(path -> {
+                        try {
+                            return Files.readAllLines(path).stream()
+                                    .filter(line -> modulesImport.matcher(line).find())
+                                    .map(line -> path + " : " + line.trim());
+                        } catch (IOException ex) {
+                            throw new IllegalStateException(ex);
+                        }
+                    })
+                    .toList();
+        }
+        assertTrue(violations.isEmpty(), () ->
+                "common 不得 import modules：\n" + String.join(System.lineSeparator(), violations));
+    }
+
+    @Test
+    void logModuleDoesNotImportDashboard() throws IOException {
+        Path logRoot = MODULES_ROOT.resolve("log");
+        if (!Files.exists(logRoot)) {
+            return;
+        }
+        Pattern dashboardImport = Pattern.compile("import\\s+com\\.enterprise\\.auth\\.platform\\.modules\\.dashboard\\.");
+        List<String> violations;
+        try (Stream<Path> files = Files.walk(logRoot)) {
+            violations = files
+                    .filter(path -> path.toString().endsWith(".java"))
+                    .flatMap(path -> {
+                        try {
+                            return Files.readAllLines(path).stream()
+                                    .filter(line -> dashboardImport.matcher(line).find())
+                                    .map(line -> path + " : " + line.trim());
+                        } catch (IOException ex) {
+                            throw new IllegalStateException(ex);
+                        }
+                    })
+                    .toList();
+        }
+        assertTrue(violations.isEmpty(), () ->
+                "log 不得反向依赖 dashboard：\n" + String.join(System.lineSeparator(), violations));
+    }
+
+    @Test
+    void interfacesControllersDoNotReturnInfrastructureEntity() throws IOException {
+        Pattern entityImport = Pattern.compile(
+                "import\\s+com\\.enterprise\\.auth\\.platform\\.modules\\.[a-z]+\\.infrastructure\\.entity\\.");
+        List<String> violations;
+        try (Stream<Path> files = Files.walk(MODULES_ROOT)) {
+            violations = files
+                    .filter(path -> path.toString().endsWith(".java"))
+                    .filter(path -> isUnderLayer(path, "interfaces"))
+                    .flatMap(path -> {
+                        try {
+                            return Files.readAllLines(path).stream()
+                                    .filter(line -> entityImport.matcher(line).find())
+                                    .map(line -> path + " : " + line.trim());
+                        } catch (IOException ex) {
+                            throw new IllegalStateException(ex);
+                        }
+                    })
+                    .toList();
+        }
+        assertTrue(violations.isEmpty(), () ->
+                "interfaces 不得 import infrastructure.entity：\n" + String.join(System.lineSeparator(), violations));
+    }
+
     private static List<String> scanFiles(String layer, Pattern violationPattern) throws IOException {
         try (Stream<Path> files = Files.walk(MODULES_ROOT)) {
             return files
                     .filter(path -> path.toString().endsWith(".java"))
-                    .filter(path -> {
-                        Path parent = path.getParent();
-                        return parent != null && layer.equals(parent.getFileName().toString());
-                    })
+                    // 扫描 layer 及其子包（如 interfaces/controller），避免漏检
+                    .filter(path -> isUnderLayer(path, layer))
                     .flatMap(path -> findViolations(path, violationPattern).stream())
                     .toList();
         }
+    }
+
+    /** path 是否位于 modules/{module}/{layer}/... 下 */
+    private static boolean isUnderLayer(Path path, String layer) {
+        Path relative = MODULES_ROOT.relativize(path);
+        // modules/{module}/{layer}/...
+        if (relative.getNameCount() < 3) {
+            return false;
+        }
+        return layer.equals(relative.getName(1).toString());
     }
 
     private static List<String> findViolations(Path path, Pattern violationPattern) {
@@ -104,10 +188,20 @@ class ModuleBoundaryTest {
             return List.of();
         }
         try {
-            return Files.readAllLines(path).stream()
+            return java.nio.file.Files.readAllLines(path, java.nio.charset.StandardCharsets.UTF_8).stream()
                     .map(line -> violation(path, currentModule, line, violationPattern))
                     .filter(message -> !message.isBlank())
                     .toList();
+        } catch (java.nio.charset.MalformedInputException encodingEx) {
+            // 回退系统默认编码，避免 Windows 历史文件阻塞门禁
+            try {
+                return Files.readAllLines(path).stream()
+                        .map(line -> violation(path, currentModule, line, violationPattern))
+                        .filter(message -> !message.isBlank())
+                        .toList();
+            } catch (IOException ex) {
+                throw new IllegalStateException("Failed to inspect " + path, ex);
+            }
         } catch (IOException ex) {
             throw new IllegalStateException("Failed to inspect " + path, ex);
         }

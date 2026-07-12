@@ -54,23 +54,48 @@ public class NotificationPublisher {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public long publish(NotificationPublishCommand command) {
         try {
-            return doPublish(command);
+            PublishOutcome outcome = doPublish(command);
+            scheduleSseAfterCommit(outcome.ssePushes());
+            return outcome.published();
         } catch (RuntimeException exception) {
             metrics.recordNotificationPublish(command == null ? null : command.scenarioCode(), "failure", 0);
             throw exception;
         }
     }
 
-    private long doPublish(NotificationPublishCommand command) {
+    private void scheduleSseAfterCommit(List<SsePush> pushes) {
+        if (pushes == null || pushes.isEmpty()) {
+            return;
+        }
+        Runnable task = () -> {
+            for (SsePush push : pushes) {
+                sseRegistry.send(push.tenantId(), push.userId(), push.view());
+            }
+        };
+        if (!org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            task.run();
+            return;
+        }
+        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                new org.springframework.transaction.support.TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        task.run();
+                    }
+                }
+        );
+    }
+
+    private PublishOutcome doPublish(NotificationPublishCommand command) {
         if (command == null || !StringUtils.hasText(command.tenantId())) {
             metrics.recordNotificationPublish(null, "ignored", 0);
-            return 0;
+            return PublishOutcome.empty();
         }
         String tenantId = command.tenantId().trim();
         String title = limit(command.title(), 128);
         if (!StringUtils.hasText(title)) {
             metrics.recordNotificationPublish(command.scenarioCode(), "ignored", 0);
-            return 0;
+            return PublishOutcome.empty();
         }
         String scenarioCode = limit(command.scenarioCode(), 64);
         String sourceType = limit(command.sourceType(), 64);
@@ -87,9 +112,10 @@ public class NotificationPublisher {
         Set<Long> recipientUserIds = resolveRecipients(command);
         if (recipientUserIds.isEmpty()) {
             metrics.recordNotificationPublish(command.scenarioCode(), "no_recipients", 0);
-            return 0;
+            return PublishOutcome.empty();
         }
         long published = 0;
+        List<SsePush> ssePushes = new ArrayList<>();
         List<SysUserNotificationEntity> pendingBatch = new ArrayList<>(Math.min(recipientUserIds.size(), BATCH_INSERT_SIZE));
         Instant createdAt = TimeSupport.now();
         for (Long recipientUserId : recipientUserIds) {
@@ -115,7 +141,10 @@ public class NotificationPublisher {
                     createdBy,
                     createdAt);
             if (sseRegistry.hasActiveConnection(tenantId, recipientUserId)) {
-                published += insertAndPush(tenantId, recipientUserId, entity);
+                if (insertOnly(entity) > 0) {
+                    published += 1;
+                    ssePushes.add(new SsePush(tenantId, recipientUserId, NotificationView.from(entity)));
+                }
                 continue;
             }
             pendingBatch.add(entity);
@@ -126,7 +155,25 @@ public class NotificationPublisher {
         }
         published += batchInsertIgnore(pendingBatch);
         metrics.recordNotificationPublish(command.scenarioCode(), "success", published);
-        return published;
+        return new PublishOutcome(published, ssePushes);
+    }
+
+    private long insertOnly(SysUserNotificationEntity entity) {
+        try {
+            notificationMapper.insert(entity);
+            return 1;
+        } catch (DuplicateKeyException ex) {
+            return 0;
+        }
+    }
+
+    private record SsePush(String tenantId, Long userId, NotificationView view) {
+    }
+
+    private record PublishOutcome(long published, List<SsePush> ssePushes) {
+        static PublishOutcome empty() {
+            return new PublishOutcome(0, List.of());
+        }
     }
 
     private Set<Long> resolveRecipients(NotificationPublishCommand command) {
@@ -192,17 +239,6 @@ public class NotificationPublisher {
         entity.setCreatedAt(createdAt);
         entity.setUpdatedAt(createdAt);
         return entity;
-    }
-
-    private long insertAndPush(String tenantId, Long recipientUserId, SysUserNotificationEntity entity) {
-        try {
-            notificationMapper.insert(entity);
-            sseRegistry.send(tenantId, recipientUserId, NotificationView.from(entity));
-            return 1;
-        } catch (DuplicateKeyException ex) {
-            // 已由唯一约束兜底保证同一用户同一去重键只写入一次。
-            return 0;
-        }
     }
 
     private long batchInsertIgnore(List<SysUserNotificationEntity> notifications) {

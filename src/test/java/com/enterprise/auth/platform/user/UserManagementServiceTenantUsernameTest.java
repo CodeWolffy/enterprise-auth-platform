@@ -15,6 +15,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 
+@org.junit.jupiter.api.Tag("integration")
 @SpringBootTest
 class UserManagementServiceTenantUsernameTest {
 

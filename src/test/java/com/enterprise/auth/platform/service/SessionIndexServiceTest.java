@@ -1,22 +1,26 @@
 package com.enterprise.auth.platform.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.enterprise.auth.platform.modules.auth.infrastructure.SecurityProperties;
 import com.enterprise.auth.platform.modules.auth.application.SessionIndexService;
+import com.enterprise.auth.platform.modules.auth.infrastructure.SecurityProperties;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.HashOperations;
+import org.springframework.data.redis.core.SessionCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
+import org.springframework.data.redis.core.script.RedisScript;
 
 class SessionIndexServiceTest {
 
@@ -41,16 +45,14 @@ class SessionIndexServiceTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void updateActiveTenantShouldPersistActiveTenantOnly() {
+    void updateActiveTenantShouldUseLuaScript() {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
-        HashOperations<String, Object, Object> hashOps = mock(HashOperations.class);
-        when(redisTemplate.opsForHash()).thenReturn(hashOps);
+        when(redisTemplate.execute(any(RedisScript.class), any(List.class), any(), any())).thenReturn(1L);
         SessionIndexService service = new SessionIndexService(redisTemplate, securityProperties());
 
         service.updateActiveTenant("token-1", "tenant-a");
 
-        verify(hashOps).put("eap:test:v1:session:meta:token-1", "activeTenantId", "tenant-a");
-        verify(redisTemplate).expire("eap:test:v1:session:meta:token-1", Duration.ofDays(7).plusHours(1));
+        verify(redisTemplate).execute(any(RedisScript.class), any(List.class), eq("tenant-a"), any());
     }
 
     @Test
@@ -61,26 +63,28 @@ class SessionIndexServiceTest {
         ZSetOperations<String, String> zSetOps = mock(ZSetOperations.class);
         when(redisTemplate.opsForZSet()).thenReturn(zSetOps);
         when(redisTemplate.opsForHash()).thenReturn(hashOps);
-        when(zSetOps.zCard("eap:test:v1:session:index:all")).thenReturn(3L);
-        when(zSetOps.reverseRange("eap:test:v1:session:index:all", 0, 199L))
+        when(zSetOps.zCard("eap:test:v1:session:index:tenant:tenant-a")).thenReturn(3L);
+        when(zSetOps.reverseRange("eap:test:v1:session:index:tenant:tenant-a", 0, 199L))
                 .thenReturn(Set.of("token-1", "token-2", "token-3"));
-        when(hashOps.entries("eap:test:v1:session:meta:token-1")).thenReturn(Map.of(
-                "userId", "100",
-                "username", "admin",
-                "tenantId", "tenant-a",
-                "activeTenantId", "tenant-a"
-        ));
-        when(hashOps.entries("eap:test:v1:session:meta:token-2")).thenReturn(Map.of(
-                "userId", "200",
-                "username", "visible",
-                "tenantId", "tenant-a",
-                "activeTenantId", "tenant-a"
-        ));
-        when(hashOps.entries("eap:test:v1:session:meta:token-3")).thenReturn(Map.of(
-                "userId", "300",
-                "username", "other",
-                "tenantId", "tenant-b",
-                "activeTenantId", "tenant-b"
+        when(redisTemplate.executePipelined(any(SessionCallback.class))).thenReturn(List.of(
+                Map.of(
+                        "userId", "100",
+                        "username", "admin",
+                        "tenantId", "tenant-a",
+                        "activeTenantId", "tenant-a"
+                ),
+                Map.of(
+                        "userId", "200",
+                        "username", "visible",
+                        "tenantId", "tenant-a",
+                        "activeTenantId", "tenant-a"
+                ),
+                Map.of(
+                        "userId", "300",
+                        "username", "other",
+                        "tenantId", "tenant-b",
+                        "activeTenantId", "tenant-b"
+                )
         ));
         SessionIndexService service = new SessionIndexService(redisTemplate, securityProperties());
 
@@ -95,7 +99,7 @@ class SessionIndexServiceTest {
                 Duration.ofMinutes(1),
                 false,
                 "Lax",
-                new SecurityProperties.Redis(true, false, false, "eap:test:", "v1")
+                new SecurityProperties.Redis(true, false, false, "eap:test:", "v1", Duration.ofSeconds(30))
         );
     }
 }

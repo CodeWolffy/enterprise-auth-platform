@@ -3,7 +3,7 @@ package com.enterprise.auth.platform.modules.auth.application;
 import cn.dev33.satoken.exception.SaTokenContextException;
 import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
-import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
+import com.enterprise.auth.platform.modules.auth.application.PlatformAdminSupport;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.auth.interfaces.MenuNode;
@@ -21,15 +21,18 @@ public class PermissionSnapshotApplicationService {
     private final PlatformAdminSupport platformAdminSupport;
     private final RoleGrantQueryFacade roleGrantQueryFacade;
     private final FileApplicationService fileApplicationService;
+    private final AuthzVersionService authzVersionService;
 
     public PermissionSnapshotApplicationService(
             PlatformAdminSupport platformAdminSupport,
             RoleGrantQueryFacade roleGrantQueryFacade,
-            FileApplicationService fileApplicationService
+            FileApplicationService fileApplicationService,
+            AuthzVersionService authzVersionService
     ) {
         this.platformAdminSupport = platformAdminSupport;
         this.roleGrantQueryFacade = roleGrantQueryFacade;
         this.fileApplicationService = fileApplicationService;
+        this.authzVersionService = authzVersionService;
     }
 
     public PermissionSnapshotResponse build(UserAccount user) {
@@ -64,6 +67,9 @@ public class PermissionSnapshotApplicationService {
             tokenSession.set("permissions", List.copyOf(grants));
             tokenSession.set("permissionsTenantId", activeTenantId);
             tokenSession.set("roles", List.copyOf(roles));
+            AuthzVersionService.Versions versions = authzVersionService.currentVersions(activeTenantId);
+            tokenSession.set("authzGlobalVersion", versions.global());
+            tokenSession.set("authzTenantVersion", versions.tenant());
         } catch (SaTokenContextException ignored) {
         } catch (RuntimeException ignored) {
         }

@@ -14,11 +14,11 @@ import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMa
 import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMenuMapper;
 import com.enterprise.auth.platform.modules.role.interfaces.CreateRoleRequest;
 import com.enterprise.auth.platform.modules.role.application.RolePayloadCodec;
-import com.enterprise.auth.platform.modules.menu.application.MenuService;
+import com.enterprise.auth.platform.modules.menu.application.MenuGrantQueryPort;
 import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
 import com.enterprise.auth.platform.modules.tenant.application.TenantProfileFacade;
-import com.enterprise.auth.platform.common.authz.DataScopeService;
-import com.enterprise.auth.platform.common.authz.SecuritySupport;
+import com.enterprise.auth.platform.modules.auth.application.DataScopeService;
+import com.enterprise.auth.platform.modules.auth.application.SecuritySupport;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import java.util.List;
 import java.util.Map;
@@ -38,7 +38,7 @@ public class RoleManagementService {
     private final LogPublisher logPublisher;
     private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
     private final RolePayloadCodec rolePayloadCodec;
-    private final MenuService menuService;
+    private final MenuGrantQueryPort menuGrantQueryPort;
     private final DataScopeService dataScopeService;
     private final TenantProfileFacade tenantProfileFacade;
 
@@ -51,7 +51,7 @@ public class RoleManagementService {
             LogPublisher logPublisher,
             AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
             RolePayloadCodec rolePayloadCodec,
-            MenuService menuService,
+            MenuGrantQueryPort menuGrantQueryPort,
             DataScopeService dataScopeService,
             TenantProfileFacade tenantProfileFacade
     ) {
@@ -63,7 +63,7 @@ public class RoleManagementService {
         this.logPublisher = logPublisher;
         this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
         this.rolePayloadCodec = rolePayloadCodec;
-        this.menuService = menuService;
+        this.menuGrantQueryPort = menuGrantQueryPort;
         this.dataScopeService = dataScopeService;
         this.tenantProfileFacade = tenantProfileFacade;
     }
@@ -105,7 +105,7 @@ public class RoleManagementService {
         String operator = SecuritySupport.currentOperator();
         SysRoleEntity entity = getRole(roleId);
         String tenantId = entity.getTenantId();
-        Set<Long> assigned = menuService.expandMenuIdsWithAncestors(tenantId, menuIds);
+        Set<Long> assigned = menuGrantQueryPort.expandMenuIdsWithAncestors(tenantId, menuIds);
         sysRoleMenuMapper.delete(new LambdaQueryWrapper<SysRoleMenuEntity>()
                 .eq(SysRoleMenuEntity::getTenantId, tenantId)
                 .eq(SysRoleMenuEntity::getRoleId, roleId));
@@ -123,7 +123,7 @@ public class RoleManagementService {
     public Set<Long> listAssignedMenus(Long roleId) {
         SysRoleEntity entity = getRole(roleId);
         String tenantId = entity.getTenantId();
-        return menuService.filterGrantableMenuIds(tenantId, listRoleMenuIds(tenantId, roleId));
+        return menuGrantQueryPort.filterGrantableMenuIds(tenantId, listRoleMenuIds(tenantId, roleId));
     }
 
     public RoleImpactView impact(Long roleId) {

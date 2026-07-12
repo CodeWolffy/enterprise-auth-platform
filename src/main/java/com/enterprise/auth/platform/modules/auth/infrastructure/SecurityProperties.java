@@ -95,11 +95,22 @@ public record SecurityProperties(
             boolean captchaEnabled,
             boolean redissonEnabled,
             String keyPrefix,
-            String namespaceVersion
+            String namespaceVersion,
+            Duration sessionTouchThrottle
     ) {
 
         private static Redis defaults() {
-            return new Redis(true, true, true, "eap:auth:", "v1");
+            return new Redis(true, true, true, "eap:auth:", "v1", Duration.ofSeconds(30));
+        }
+
+        public Redis(
+                boolean sessionEnabled,
+                boolean captchaEnabled,
+                boolean redissonEnabled,
+                String keyPrefix,
+                String namespaceVersion
+        ) {
+            this(sessionEnabled, captchaEnabled, redissonEnabled, keyPrefix, namespaceVersion, Duration.ofSeconds(30));
         }
 
         public String resolvedKeyPrefix() {
@@ -118,6 +129,14 @@ public record SecurityProperties(
 
         public String resolvedNamespacePrefix() {
             return resolvedKeyPrefix() + resolvedNamespaceVersion() + ":";
+        }
+
+        /** 影子索引 lastAccessAt 刷新节流窗口；Sa-Token 活跃超时不受此影响。 */
+        public Duration resolvedSessionTouchThrottle() {
+            if (sessionTouchThrottle == null || sessionTouchThrottle.isNegative() || sessionTouchThrottle.isZero()) {
+                return Duration.ofSeconds(30);
+            }
+            return sessionTouchThrottle;
         }
     }
 }

@@ -3,9 +3,9 @@ package com.enterprise.auth.platform.modules.auth.application;
 import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
 import com.enterprise.auth.platform.common.TimeSupport;
-import com.enterprise.auth.platform.common.authz.DataScopeService;
+import com.enterprise.auth.platform.modules.auth.application.DataScopeService;
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
-import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
+import com.enterprise.auth.platform.modules.auth.application.PlatformAdminSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
@@ -13,12 +13,13 @@ import com.enterprise.auth.platform.modules.auth.interfaces.UserSessionResponse;
 import com.enterprise.auth.platform.modules.auth.application.SessionIndexService;
 import com.enterprise.auth.platform.modules.auth.application.SessionIndexService.Page;
 import com.enterprise.auth.platform.modules.log.application.LogPublisher;
-import com.enterprise.auth.platform.modules.notification.application.NotificationScenarioPublisher;
+import com.enterprise.auth.platform.common.notification.NotificationScenarioPort;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -28,20 +29,18 @@ import org.springframework.util.StringUtils;
 public class SessionApplicationService {
 
     private static final Logger log = LoggerFactory.getLogger(SessionApplicationService.class);
-    private static final int SESSION_RESULT_LIMIT = 200;
-
     private final DataScopeService dataScopeService;
     private final LogPublisher logPublisher;
     private final PlatformAdminSupport platformAdminSupport;
     private final SessionIndexService sessionIndexService;
-    private final NotificationScenarioPublisher notificationScenarioPublisher;
+    private final NotificationScenarioPort notificationScenarioPublisher;
 
     public SessionApplicationService(
             DataScopeService dataScopeService,
             LogPublisher logPublisher,
             PlatformAdminSupport platformAdminSupport,
             SessionIndexService sessionIndexService,
-            NotificationScenarioPublisher notificationScenarioPublisher
+            NotificationScenarioPort notificationScenarioPublisher
     ) {
         this.dataScopeService = dataScopeService;
         this.logPublisher = logPublisher;
@@ -112,28 +111,30 @@ public class SessionApplicationService {
     private PageResult<UserSessionResponse> allSessions(UserAccount currentUser, String currentToken, Integer page, Integer size) {
         boolean platformAdmin = platformAdminSupport.isPlatformSuperAdmin(currentUser);
         int effectivePage = page != null && page > 0 ? page : 1;
-        int effectiveSize = size != null && size > 0 ? size : 10;
-        int scanMultiplier = Math.min(effectiveSize * 3, SESSION_RESULT_LIMIT);
-        Page indexPage = sessionIndexService.page(effectivePage - 1, scanMultiplier)
-                .orElseGet(() -> new Page(0, List.of()));
-        if (indexPage.records().isEmpty()) {
-            List<UserSessionResponse> own = ownSessions(currentUser, currentToken);
-            return PageResult.of(own.size(), 1, own.size(), own);
+        int effectiveSize = size != null && size > 0 ? Math.min(size, 100) : 10;
+        // 请求内只算一次可见用户集合，避免循环 N 次 DataScope 查库
+        final Optional<Set<Long>> visibleUserIds = platformAdmin
+                ? Optional.empty()
+                : dataScopeService.visibleUserIds(currentUser.tenantId());
+        Page indexPage = platformAdmin
+                ? sessionIndexService.page(effectivePage - 1, effectiveSize).orElseGet(() -> new Page(0, List.of()))
+                : sessionIndexService.pageVisible(currentUser.tenantId(), visibleUserIds, effectivePage - 1, effectiveSize)
+                        .orElseGet(() -> new Page(0, List.of()));
+        if (indexPage.records().isEmpty() && effectivePage == 1) {
+            List<UserSessionResponse> own = ownSessions(currentUser, currentToken).stream()
+                    .limit(effectiveSize)
+                    .toList();
+            return PageResult.of(Math.max(indexPage.total(), own.size()), 1, effectiveSize, own);
         }
         List<UserSessionResponse> sessions = indexPage.records().stream()
                 .filter(entry -> entry != null)
                 .filter(entry -> tenantVisible(currentUser, entry.response()))
-                .filter(entry -> platformAdmin || canAccessSessionUser(currentUser, entry))
+                .filter(entry -> platformAdmin || canAccessSessionUser(currentUser, entry, visibleUserIds))
                 .map(entry -> withCurrentSession(entry.response(), currentToken))
-                .map(this::withActiveState)
-                .peek(session -> {
-                    if (!session.active()) {
-                        sessionIndexService.remove(session.sessionId());
-                    }
-                })
-                .filter(UserSessionResponse::active)
+                // 索引 TTL 承担陈旧数据清理；列表页不再逐条回查 Sa-Token 活跃状态
+                .filter(session -> session.expiresAt() == null
+                        || session.expiresAt().toEpochMilli() >= Instant.now().toEpochMilli())
                 .sorted((a, b) -> Long.compare(instantEpoch(b.lastAccessAt()), instantEpoch(a.lastAccessAt())))
-                .limit(effectiveSize)
                 .toList();
         boolean hasCurrentSession = sessions.stream().anyMatch(UserSessionResponse::currentSession);
         if (!hasCurrentSession) {
@@ -171,6 +172,18 @@ public class SessionApplicationService {
             sessionIndexService.remove(token);
             return Optional.empty();
         }
+    }
+
+    private boolean canAccessSessionUser(
+            UserAccount currentUser,
+            SessionIndexService.IndexedSession entry,
+            Optional<Set<Long>> visibleUserIds
+    ) {
+        if (currentUser.id().equals(entry.userId())) {
+            return true;
+        }
+        // empty Optional = ALL scope；empty Set = NONE
+        return visibleUserIds.map(userIds -> userIds.contains(entry.userId())).orElse(true);
     }
 
     private boolean canAccessSessionUser(UserAccount currentUser, SessionIndexService.IndexedSession entry) {

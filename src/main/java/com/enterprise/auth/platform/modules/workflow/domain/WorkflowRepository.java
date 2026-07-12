@@ -1,7 +1,9 @@
 package com.enterprise.auth.platform.modules.workflow.domain;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public interface WorkflowRepository {
@@ -52,9 +54,16 @@ public interface WorkflowRepository {
 
     List<WorkflowTask> findDoneTasks(String tenantId, Long userId);
 
+    long countDoneTasks(String tenantId, Long userId);
+
+    List<WorkflowTask> findDoneTasks(String tenantId, Long userId, int offset, int limit);
+
     void insertUrge(WorkflowTaskUrge urge);
 
     long countUrges(String tenantId, Long taskId);
+
+    /** 按 taskIds 批量统计催办数，避免 N 次 COUNT。 */
+    Map<Long, Long> countUrgesByTaskIds(String tenantId, Collection<Long> taskIds);
 
     List<WorkflowTaskUrge> findUrgesByTask(String tenantId, Long taskId);
 

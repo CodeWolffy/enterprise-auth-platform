@@ -10,8 +10,8 @@ import com.enterprise.auth.platform.modules.dept.infrastructure.entity.SysDeptEn
 import com.enterprise.auth.platform.modules.dept.infrastructure.mapper.SysDeptMapper;
 import com.enterprise.auth.platform.modules.tenant.application.TenantProfileFacade;
 import com.enterprise.auth.platform.modules.user.application.UserQueryFacade;
-import com.enterprise.auth.platform.common.authz.DataScopeService;
-import com.enterprise.auth.platform.common.authz.SecuritySupport;
+import com.enterprise.auth.platform.modules.auth.application.DataScopeService;
+import com.enterprise.auth.platform.modules.auth.application.SecuritySupport;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import java.util.Map;
 import org.springframework.stereotype.Service;

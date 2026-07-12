@@ -1,11 +1,15 @@
-package com.enterprise.auth.platform.common.authz;
+package com.enterprise.auth.platform.modules.auth.application;
 
-import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
+import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+/**
+ * 平台超管判定。不依赖 tenant 模块 infrastructure，仅读取配置中的平台租户 ID。
+ */
 @Component
 public class PlatformAdminSupport {
 
@@ -18,17 +22,19 @@ public class PlatformAdminSupport {
             PermissionCodes.SYSTENANT_DEL
     );
 
-    private final TenantProperties tenantProperties;
+    private final String platformTenantId;
 
-    public PlatformAdminSupport(TenantProperties tenantProperties) {
-        this.tenantProperties = tenantProperties;
+    public PlatformAdminSupport(
+            @Value("${app.tenant.platform-tenant-id:platform}") String platformTenantId
+    ) {
+        this.platformTenantId = StringUtils.hasText(platformTenantId) ? platformTenantId.trim() : "platform";
     }
 
     public boolean isPlatformSuperAdmin(UserAccount user) {
         if (user == null || !StringUtils.hasText(user.tenantId())) {
             return false;
         }
-        if (!tenantProperties.platformTenantId().equals(user.tenantId())) {
+        if (!platformTenantId.equals(user.tenantId())) {
             return false;
         }
         if (user.roles() != null && user.roles().stream().anyMatch(PLATFORM_ADMIN_ROLE_CODES::contains)) {
@@ -42,11 +48,11 @@ public class PlatformAdminSupport {
         if (!isPlatformSuperAdmin(user)) {
             return false;
         }
-        return !StringUtils.hasText(activeTenantId) || tenantProperties.platformTenantId().equals(activeTenantId);
+        return !StringUtils.hasText(activeTenantId) || platformTenantId.equals(activeTenantId);
     }
 
     public String platformTenantId() {
-        return tenantProperties.platformTenantId();
+        return platformTenantId;
     }
 
     public boolean canSwitchTenant(UserAccount user, String requestedTenantId) {

@@ -23,6 +23,7 @@ import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+@org.junit.jupiter.api.Tag("integration")
 @SpringBootTest(properties = {
         "app.registration.max-attempts-per-user-ip=2",
         "app.registration.max-attempts-per-ip=100"

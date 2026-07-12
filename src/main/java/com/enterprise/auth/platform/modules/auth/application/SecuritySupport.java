@@ -1,8 +1,8 @@
-package com.enterprise.auth.platform.common.authz;
+package com.enterprise.auth.platform.modules.auth.application;
 
 import cn.dev33.satoken.exception.SaTokenContextException;
 import cn.dev33.satoken.stp.StpUtil;
-import com.enterprise.auth.platform.common.context.AuthContextHolder;
+import com.enterprise.auth.platform.modules.auth.domain.AuthContextHolder;
 
 public final class SecuritySupport {
 

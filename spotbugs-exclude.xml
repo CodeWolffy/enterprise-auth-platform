@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SpotBugs 排除：Spring 注入字段/构造器返回可变对象的常见误报 -->
+<FindBugsFilter>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Or>
+            <Class name="~.*Config"/>
+            <Class name="~.*Configuration"/>
+            <Class name="~.*Properties"/>
+            <Class name="~.*Application"/>
+            <Class name="~.*Service"/>
+            <Class name="~.*Facade"/>
+            <Class name="~.*Controller"/>
+            <Class name="~.*Repository"/>
+            <Class name="~.*Mapper"/>
+            <Class name="~.*Entity"/>
+            <Class name="~.*Provider"/>
+            <Class name="~.*Interceptor"/>
+            <Class name="~.*Listener"/>
+            <Class name="~.*Support"/>
+            <Class name="~.*Handler"/>
+            <Class name="~.*Filter"/>
+            <Class name="~.*Publisher"/>
+            <Class name="~.*Manager"/>
+            <Class name="~.*Store"/>
+            <Class name="~.*Client"/>
+            <Class name="~.*Indicator"/>
+        </Or>
+    </Match>
+</FindBugsFilter>

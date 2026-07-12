@@ -1,23 +1,34 @@
 package com.enterprise.auth.platform.common;
 
-import com.enterprise.auth.platform.modules.auth.infrastructure.SecurityProperties;
 import java.time.Duration;
 import java.util.Locale;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+/**
+ * 限流 Redis key 工具。key 前缀来自配置，不再依赖 auth SecurityProperties。
+ */
 @Component
 public class RateLimitSupport {
 
-    private final SecurityProperties securityProperties;
+    private final String namespacePrefix;
 
-    public RateLimitSupport(SecurityProperties securityProperties) {
-        this.securityProperties = securityProperties;
+    public RateLimitSupport(
+            @Value("${app.security.redis.key-prefix:eap:auth:}") String keyPrefix,
+            @Value("${app.security.redis.namespace-version:v1}") String namespaceVersion
+    ) {
+        String prefix = StringUtils.hasText(keyPrefix) ? keyPrefix.trim() : "eap:auth:";
+        if (!prefix.endsWith(":")) {
+            prefix = prefix + ":";
+        }
+        String version = StringUtils.hasText(namespaceVersion) ? namespaceVersion.trim() : "v1";
+        this.namespacePrefix = prefix + version + ":";
     }
 
     public String buildKey(String namespace, String... parts) {
-        StringBuilder sb = new StringBuilder(securityProperties.resolvedRedis().resolvedNamespacePrefix());
+        StringBuilder sb = new StringBuilder(namespacePrefix);
         sb.append(namespace);
         for (String part : parts) {
             sb.append(':').append(normalizeKeyPart(part));

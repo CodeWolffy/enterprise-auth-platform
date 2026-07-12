@@ -1,5 +1,8 @@
-package com.enterprise.auth.platform.modules.security.domain;
+package com.enterprise.auth.platform.common.security;
 
+/**
+ * 密码/登录策略纯数据契约，可被 common 与 security 模块共用，无业务模块依赖。
+ */
 public record EffectiveSecurityPolicy(
         int passwordMinLength,
         int passwordMaxLength,

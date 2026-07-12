@@ -12,7 +12,6 @@ import com.enterprise.auth.platform.modules.menu.domain.MenuType;
 import com.enterprise.auth.platform.modules.menu.infrastructure.entity.SysMenuEntity;
 import com.enterprise.auth.platform.modules.menu.infrastructure.mapper.SysMenuMapper;
 import com.enterprise.auth.platform.modules.menu.interfaces.CreateMenuRequest;
-import com.enterprise.auth.platform.modules.role.application.RoleMenuReferenceFacade;
 import com.enterprise.auth.platform.modules.tenant.application.TenantMenuService;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
 import java.util.ArrayList;
@@ -27,14 +26,13 @@ import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 @Service
-public class MenuService {
+public class MenuService implements MenuGrantQueryPort {
 
     private static final String PLATFORM_TENANT = "platform";
     private static final Map<String, String> ACTION_LABELS = Map.of(
@@ -46,26 +44,29 @@ public class MenuService {
     );
 
     private final SysMenuMapper sysMenuMapper;
-    private final RoleMenuReferenceFacade roleMenuReferenceFacade;
+    private final RoleMenuReferencePort roleMenuReferencePort;
     private final ApplicationEventPublisher eventPublisher;
     private final TenantMenuService tenantMenuService;
     private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
     private final TenantProperties tenantProperties;
+    private final MenuTemplateQueryService menuTemplateQueryService;
 
     public MenuService(
             SysMenuMapper sysMenuMapper,
-            RoleMenuReferenceFacade roleMenuReferenceFacade,
+            RoleMenuReferencePort roleMenuReferencePort,
             ApplicationEventPublisher eventPublisher,
             TenantMenuService tenantMenuService,
             AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
-            TenantProperties tenantProperties
+            TenantProperties tenantProperties,
+            MenuTemplateQueryService menuTemplateQueryService
     ) {
         this.sysMenuMapper = sysMenuMapper;
-        this.roleMenuReferenceFacade = roleMenuReferenceFacade;
+        this.roleMenuReferencePort = roleMenuReferencePort;
         this.eventPublisher = eventPublisher;
         this.tenantMenuService = tenantMenuService;
         this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
         this.tenantProperties = tenantProperties;
+        this.menuTemplateQueryService = menuTemplateQueryService;
     }
 
     public List<MenuTreeNode> templateTree() {
@@ -319,12 +320,22 @@ public class MenuService {
         if (normalizedActions.isEmpty()) {
             throw new BusinessException("请选择要生成的按钮权限");
         }
+        List<SysMenuEntity> template = listTemplateMenus();
+        String permissionPrefix = findExistingActionPermissionPrefix(parent.getId(), template);
+        Set<String> existingPermissions = template.stream()
+                .filter(menu -> readMenuType(menu) == MenuType.BUTTON)
+                .map(this::readPermission)
+                .map(MenuService::blankToNull)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
         List<MenuTreeNode> created = new ArrayList<>();
-        int sort = nextChildSort(menuId);
+        int sort = nextChildSort(menuId, template);
         for (String action : normalizedActions) {
-            String permission = resolveActionPermission(parent, action);
+            String permission = resolveActionPermission(parent, action, permissionPrefix);
             validatePermission(MenuType.BUTTON, permission);
-            ensureActionNotExists(permission);
+            if (!existingPermissions.add(permission)) {
+                throw new BusinessException("按钮权限已存在，请勿重复生成");
+            }
             SysMenuEntity entity = new SysMenuEntity();
             entity.setParentId(parent.getId());
             entity.setType(MenuType.BUTTON.value());
@@ -363,7 +374,7 @@ public class MenuService {
         if (children > 0) {
             throw new BusinessException("请先删除子节点");
         }
-        long roleBindings = roleMenuReferenceFacade.countMenuReferencesAcrossTenants(menuId);
+        long roleBindings = roleMenuReferencePort.countMenuReferencesAcrossTenants(menuId);
         if (roleBindings > 0) {
             throw new BusinessException("菜单已被角色授权引用，暂不允许删除");
         }
@@ -391,13 +402,8 @@ public class MenuService {
         return toMenuNode(entity, List.of());
     }
 
-    @Cacheable(value = CacheNames.MENU_TEMPLATE, unless = "#result.isEmpty()")
     public List<SysMenuEntity> listTemplateMenus() {
-        return runWithPlatformTenant(() ->
-                sysMenuMapper.selectList(new LambdaQueryWrapper<SysMenuEntity>()
-                        .eq(SysMenuEntity::getDeleted, 0)
-                        .orderByAsc(SysMenuEntity::getSort)
-                        .orderByAsc(SysMenuEntity::getId)));
+        return menuTemplateQueryService.listTemplateMenus();
     }
 
     private SysMenuEntity getMenu(Long menuId) {
@@ -444,20 +450,17 @@ public class MenuService {
         return result;
     }
 
-    private int nextChildSort(Long menuId) {
-        return runWithPlatformTenant(() -> sysMenuMapper.selectList(new LambdaQueryWrapper<SysMenuEntity>()
-                        .eq(SysMenuEntity::getDeleted, 0)
-                        .eq(SysMenuEntity::getParentId, menuId))
-                .stream()
+    private int nextChildSort(Long menuId, List<SysMenuEntity> template) {
+        return template.stream()
+                .filter(menu -> Objects.equals(menuId, menu.getParentId()))
                 .map(SysMenuEntity::getSort)
                 .filter(Objects::nonNull)
                 .max(Integer::compareTo)
                 .map(value -> value + 1)
-                .orElse(1));
+                .orElse(1);
     }
 
-    private String resolveActionPermission(SysMenuEntity parent, String action) {
-        String existingPrefix = findExistingActionPermissionPrefix(parent.getId());
+    private String resolveActionPermission(SysMenuEntity parent, String action, String existingPrefix) {
         if (existingPrefix != null) {
             return existingPrefix + ":" + action;
         }
@@ -476,8 +479,8 @@ public class MenuService {
         return normalized.contains(":") ? normalized + ":" + action : "upms:" + normalized + ":" + action;
     }
 
-    private String findExistingActionPermissionPrefix(Long parentId) {
-        return listTemplateMenus().stream()
+    private String findExistingActionPermissionPrefix(Long parentId, List<SysMenuEntity> template) {
+        return template.stream()
                 .filter(menu -> Objects.equals(parentId, menu.getParentId()))
                 .filter(menu -> Objects.equals(MenuType.BUTTON.value(), readMenuType(menu).value()))
                 .map(SysMenuEntity::getPermission)
@@ -490,17 +493,6 @@ public class MenuService {
                 .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(null);
-    }
-
-    private void ensureActionNotExists(String permission) {
-        String normalizedPermission = blankToNull(permission);
-        boolean exists = listTemplateMenus().stream().anyMatch(menu ->
-                Objects.equals(MenuType.BUTTON.value(), readMenuType(menu).value())
-                        && Objects.equals(normalizedPermission, blankToNull(readPermission(menu)))
-        );
-        if (exists) {
-            throw new BusinessException("按钮权限已存在，请勿重复生成");
-        }
     }
 
     private void validateMenuShape(MenuType childType, SysMenuEntity parent, String permission) {

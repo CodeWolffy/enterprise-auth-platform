@@ -13,7 +13,12 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest
+@org.junit.jupiter.api.Tag("integration")
+@SpringBootTest(properties = {
+        "app.cors.allowed-origins[0]=http://127.0.0.1:5777",
+        "app.cors.allowed-origins[1]=http://localhost:5777",
+        "app.cors.allowed-origins[2]=http://*:5777"
+})
 @AutoConfigureMockMvc
 class CorsSecurityRegressionTest {
 

@@ -8,7 +8,9 @@ import com.enterprise.auth.platform.modules.workflow.domain.WorkflowStepDefiniti
 import com.enterprise.auth.platform.modules.workflow.domain.WorkflowTask;
 import com.enterprise.auth.platform.modules.workflow.domain.WorkflowTaskStatus;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -70,6 +72,10 @@ class WorkflowViewMapper {
     }
 
     WorkflowTaskView toTaskView(WorkflowTask task, UserAccount user) {
+        return toTaskView(task, user, urgeService.countUrges(task.getTenantId(), task.getId()));
+    }
+
+    WorkflowTaskView toTaskView(WorkflowTask task, UserAccount user, int urgeCount) {
         return new WorkflowTaskView(
                 task.getId(),
                 task.getTenantId(),
@@ -86,7 +92,17 @@ class WorkflowViewMapper {
                 task.getCreatedAt(),
                 task.getCompletedAt(),
                 task.getStatus() == WorkflowTaskStatus.PENDING && store.isActionable(task, user),
-                urgeService.countUrges(task.getTenantId(), task.getId())
+                urgeCount
         );
+    }
+
+    List<WorkflowTaskView> toTaskViews(Collection<WorkflowTask> tasks, UserAccount user, Map<Long, Long> urgeCounts) {
+        return tasks.stream()
+                .map(task -> toTaskView(
+                        task,
+                        user,
+                        Math.toIntExact(urgeCounts.getOrDefault(task.getId(), 0L))
+                ))
+                .toList();
     }
 }

@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.modules.menu.interfaces;
 
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
-import com.enterprise.auth.platform.common.authz.DataScopeService;
+import com.enterprise.auth.platform.modules.auth.application.DataScopeService;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;

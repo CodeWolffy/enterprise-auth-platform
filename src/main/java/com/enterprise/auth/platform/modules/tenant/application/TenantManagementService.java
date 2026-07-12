@@ -15,7 +15,7 @@ import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTena
 import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantMapper;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantPackageMapper;
 import com.enterprise.auth.platform.modules.user.application.UserTenantDataFacade;
-import com.enterprise.auth.platform.common.authz.SecuritySupport;
+import com.enterprise.auth.platform.modules.auth.application.SecuritySupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.modules.tenant.interfaces.CreateTenantRequest;
 import io.swagger.v3.oas.annotations.media.Schema;

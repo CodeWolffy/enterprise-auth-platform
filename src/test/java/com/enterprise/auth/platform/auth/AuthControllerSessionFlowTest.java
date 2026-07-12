@@ -35,6 +35,7 @@ import org.springframework.test.context.TestExecutionListeners;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+@org.junit.jupiter.api.Tag("integration")
 @SpringBootTest(properties = {
         "app.security.redis.session-enabled=false",
         "app.security.redis.captcha-enabled=false"

@@ -22,7 +22,7 @@
         <spring-cloud-alibaba.version>2023.0.1.2</spring-cloud-alibaba.version>
         <mybatis-plus.version>3.5.15</mybatis-plus.version>
         <ip2region.version>3.3.7</ip2region.version>
-        <jsqlparser.version>4.9</jsqlparser.version>
+        <jsqlparser.version>5.0</jsqlparser.version>
         <redisson.version>3.52.0</redisson.version>
         <knife4j.version>4.4.0</knife4j.version>
         <fastjson2.version>2.0.52</fastjson2.version>
@@ -36,12 +36,15 @@
         <jsr305.version>3.0.2</jsr305.version>
         <jacoco.version>0.8.11</jacoco.version>
         <spotbugs.version>4.8.4.0</spotbugs.version>
+        <spotbugs.fail-on-error>true</spotbugs.fail-on-error>
+        <spotbugs.threshold>High</spotbugs.threshold>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <easyexcel.version>4.0.3</easyexcel.version>
         <commons-compress.version>1.25.0</commons-compress.version>
         <tianai-captcha.version>1.5.5</tianai-captcha.version>
         <sa-token.version>1.45.0</sa-token.version>
         <minio.version>9.0.1</minio.version>
+        <archunit.version>1.3.0</archunit.version>
         <okhttp.version>5.3.2</okhttp.version>
 
     </properties>
@@ -239,6 +242,12 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>${archunit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>cloud.tianai.captcha</groupId>
             <artifactId>tianai-captcha-springboot-starter</artifactId>
             <version>${tianai-captcha.version}</version>
@@ -246,6 +255,21 @@
     </dependencies>
 
     <profiles>
+        <profile>
+            <id>unit-tests</id>
+            <properties>
+                <!-- Fast local suite: tests tagged as integration require MySQL/Redis and are skipped. -->
+                <groups>!integration</groups>
+            </properties>
+        </profile>
+        <profile>
+            <id>spotbugs-report</id>
+            <properties>
+                <!-- Audit mode: include the medium-priority baseline without failing the build. -->
+                <spotbugs.fail-on-error>false</spotbugs.fail-on-error>
+                <spotbugs.threshold>Medium</spotbugs.threshold>
+            </properties>
+        </profile>
         <profile>
             <id>future-components</id>
             <activation>
@@ -299,7 +323,13 @@
                 <artifactId>spotbugs-maven-plugin</artifactId>
                 <version>${spotbugs.version}</version>
                 <configuration>
-                    <failOnError>false</failOnError>
+                    <!-- Default gate blocks high-priority defects. Use -Pspotbugs-report to audit
+                         the medium-priority baseline without weakening normal verification. -->
+                    <failOnError>${spotbugs.fail-on-error}</failOnError>
+                    <threshold>${spotbugs.threshold}</threshold>
+                    <excludeFilterFile>spotbugs-exclude.xml</excludeFilterFile>
+                    <xmlOutput>true</xmlOutput>
+                    <xmlOutputDirectory>${project.build.directory}</xmlOutputDirectory>
                 </configuration>
                 <executions>
                     <execution>

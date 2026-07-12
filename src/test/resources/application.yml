@@ -1,15 +1,17 @@
 spring:
   datasource:
+    # 禁止默认连公网；本地/CI 须显式注入 TEST_DB_*，或使用 Testcontainers 覆盖
     url: ${TEST_DB_URL:jdbc:mysql://127.0.0.1:3306/enterprise_auth_platform?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true}
     username: ${TEST_DB_USERNAME:root}
-    password: ${TEST_DB_PASSWORD:123456}
+    password: ${TEST_DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
     type: com.zaxxer.hikari.HikariDataSource
   data:
     redis:
-      host: ${TEST_REDIS_HOST:139.196.7.151}
+      # 默认仅本机，无密码；禁止提交公网地址与明文凭据
+      host: ${TEST_REDIS_HOST:127.0.0.1}
       port: ${TEST_REDIS_PORT:6379}
-      password: ${TEST_REDIS_PASSWORD:zhu123456@}
+      password: ${TEST_REDIS_PASSWORD:}
       database: ${TEST_REDIS_DATABASE:8}
   cache:
     type: simple
@@ -31,18 +33,22 @@ app:
     captcha-ttl: 1m
     cookie-secure: false
     cookie-same-site: Lax
+    notification:
+      channel: log
     redis:
       session-enabled: true
       captcha-enabled: true
       redisson-enabled: true
       key-prefix: "eap:auth:"
       namespace-version: "v2"
+      session-touch-throttle: 30s
   tenant:
     header-name: X-Tenant-Id
     platform-tenant-id: platform
     mybatis-tenant-enabled: true
     mybatis-ignore-tables:
       - sys_tenant
+      - sys_outbox_event
   registration:
     rate-limit-enabled: true
     max-attempts-per-user-ip: 10

@@ -1,4 +1,4 @@
-package com.enterprise.auth.platform.common.context;
+package com.enterprise.auth.platform.modules.auth.domain;
 
 import com.enterprise.auth.platform.modules.auth.domain.SessionPrincipal;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;

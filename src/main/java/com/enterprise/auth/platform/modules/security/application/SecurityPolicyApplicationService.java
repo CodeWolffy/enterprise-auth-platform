@@ -1,11 +1,11 @@
 package com.enterprise.auth.platform.modules.security.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.enterprise.auth.platform.common.authz.SecuritySupport;
+import com.enterprise.auth.platform.modules.auth.application.SecuritySupport;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.log.application.LogPublisher;
-import com.enterprise.auth.platform.modules.security.domain.EffectiveSecurityPolicy;
+import com.enterprise.auth.platform.common.security.EffectiveSecurityPolicy;
 import com.enterprise.auth.platform.modules.security.infrastructure.entity.SysPlatformSecurityPolicyEntity;
 import com.enterprise.auth.platform.modules.security.infrastructure.entity.SysTenantSecurityPolicyEntity;
 import com.enterprise.auth.platform.modules.security.infrastructure.mapper.SysPlatformSecurityPolicyMapper;

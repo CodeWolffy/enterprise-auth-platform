@@ -2,12 +2,13 @@ package com.enterprise.auth.platform.modules.file.application;
 
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
-import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
+import com.enterprise.auth.platform.modules.auth.application.PlatformAdminSupport;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
+import com.enterprise.auth.platform.modules.file.domain.FileLifecycleStatus;
 import com.enterprise.auth.platform.modules.file.domain.FileVisibility;
 import com.enterprise.auth.platform.modules.file.infrastructure.entity.SysStorageFileEntity;
 import com.enterprise.auth.platform.modules.file.infrastructure.mapper.SysStorageFileMapper;
@@ -52,12 +53,10 @@ public class FileApplicationService {
         this.platformAdminSupport = platformAdminSupport;
     }
 
-    @Transactional
     public FileMetadataView upload(MultipartFile file, FileVisibility visibility) {
         return uploadInternal(file, visibility, true, false, "FILE_UPLOADED");
     }
 
-    @Transactional
     public FileMetadataView uploadCurrentUserAvatar(MultipartFile file) {
         return uploadInternal(file, FileVisibility.PUBLIC, false, true, "AVATAR_UPLOADED");
     }
@@ -138,13 +137,20 @@ public class FileApplicationService {
         return toDownload(entity);
     }
 
-    @Transactional
     public void delete(String fileKey) {
         UserAccount user = currentUserService.requireCurrentUser();
         SysStorageFileEntity entity = loadByFileKey(fileKey);
         assertDeletable(entity, user);
-        objectStorageService.delete(entity.getBucketName(), entity.getObjectKey());
-        storageFileMapper.softDeleteByIdIgnoreTenant(entity.getId());
+        storageFileMapper.updateLifecycle(entity.getId(), FileLifecycleStatus.DELETE_PENDING.name(), entity.getEtag());
+        // 事务外删除对象并最终确认；失败留给补偿任务
+        try {
+            if (StringUtils.hasText(entity.getObjectKey())) {
+                objectStorageService.delete(entity.getBucketName(), entity.getObjectKey());
+            }
+            storageFileMapper.softDeleteByIdIgnoreTenant(entity.getId());
+        } catch (Exception ex) {
+            // DELETE_PENDING 保留，由 FileLifecycleCompensationJob 重试
+        }
     }
 
     public String publicUrl(String fileKey) {
@@ -152,7 +158,9 @@ public class FileApplicationService {
             return null;
         }
         SysStorageFileEntity entity = storageFileMapper.selectByFileKeyIgnoreTenant(fileKey.trim());
-        if (entity == null || FileVisibility.from(entity.getVisibility()) != FileVisibility.PUBLIC) {
+        if (entity == null
+                || FileVisibility.from(entity.getVisibility()) != FileVisibility.PUBLIC
+                || FileLifecycleStatus.from(entity.getLifecycleStatus()) != FileLifecycleStatus.READY) {
             return null;
         }
         return publicUrl(entity);
@@ -173,6 +181,24 @@ public class FileApplicationService {
         String tenantId = TenantContextSupport.currentTenantIdOrPlatform(user.tenantId());
         String fileKey = newFileKey();
         String objectKey = buildObjectKey(tenantId, fileKey, file.getOriginalFilename());
+
+        // 1) 短事务：创建 PENDING 记录（无外层事务时单语句即提交）
+        SysStorageFileEntity entity = new SysStorageFileEntity();
+        entity.setTenantId(tenantId);
+        entity.setFileKey(fileKey);
+        entity.setOriginalName(safeOriginalName(file.getOriginalFilename()));
+        entity.setContentType(validatedUpload.contentType());
+        entity.setFileSize(file.getSize());
+        entity.setStorageType(properties.resolvedStorage().toUpperCase(Locale.ROOT));
+        entity.setBucketName("");
+        entity.setObjectKey(objectKey);
+        entity.setEtag(null);
+        entity.setVisibility(resolvedVisibility.name());
+        entity.setOwnerUserId(user.id());
+        entity.setLifecycleStatus(FileLifecycleStatus.PENDING.name());
+        storageFileMapper.insert(entity);
+
+        // 2) 事务外上传对象存储
         ObjectStorageService.StoredObject storedObject;
         try (InputStream inputStream = file.getInputStream()) {
             storedObject = objectStorageService.put(
@@ -183,22 +209,17 @@ public class FileApplicationService {
                     file.getOriginalFilename()
             );
         } catch (Exception exception) {
+            storageFileMapper.updateLifecycle(entity.getId(), FileLifecycleStatus.FAILED.name(), null);
             throw new BusinessException("FILE_STORAGE_ERROR", "文件上传失败");
         }
 
-        SysStorageFileEntity entity = new SysStorageFileEntity();
-        entity.setTenantId(tenantId);
-        entity.setFileKey(fileKey);
-        entity.setOriginalName(safeOriginalName(file.getOriginalFilename()));
-        entity.setContentType(validatedUpload.contentType());
-        entity.setFileSize(file.getSize());
+        // 3) 短事务：确认 READY
         entity.setStorageType(storedObject.storageType());
         entity.setBucketName(storedObject.bucketName());
         entity.setObjectKey(storedObject.objectKey());
         entity.setEtag(storedObject.etag());
-        entity.setVisibility(resolvedVisibility.name());
-        entity.setOwnerUserId(user.id());
-        storageFileMapper.insert(entity);
+        entity.setLifecycleStatus(FileLifecycleStatus.READY.name());
+        storageFileMapper.updateById(entity);
         return toView(entity);
     }
 
@@ -382,6 +403,10 @@ public class FileApplicationService {
         SysStorageFileEntity entity = storageFileMapper.selectByFileKeyIgnoreTenant(fileKey.trim());
         if (entity == null) {
             throw new BusinessException("NOT_FOUND", "文件不存在");
+        }
+        FileLifecycleStatus status = FileLifecycleStatus.from(entity.getLifecycleStatus());
+        if (status != FileLifecycleStatus.READY && status != FileLifecycleStatus.DELETE_PENDING) {
+            throw new BusinessException("NOT_FOUND", "文件不可用");
         }
         return entity;
     }

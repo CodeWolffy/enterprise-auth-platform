@@ -33,10 +33,10 @@ spring:
       timeout: ${REDIS_TIMEOUT:3s}
       lettuce:
         pool:
-          max-active: 8
-          max-wait: -1ms
-          max-idle: 8
-          min-idle: 0
+          max-active: ${REDIS_POOL_MAX_ACTIVE:16}
+          max-wait: ${REDIS_POOL_MAX_WAIT:1s}
+          max-idle: ${REDIS_POOL_MAX_IDLE:8}
+          min-idle: ${REDIS_POOL_MIN_IDLE:1}
 
   flyway:
     enabled: ${FLYWAY_ENABLED:true}
@@ -179,6 +179,7 @@ app:
       redisson-enabled: true
       key-prefix: "eap:auth:"
       namespace-version: "v2"
+      session-touch-throttle: 30s
 
   tenant:
     header-name: X-Tenant-Id
@@ -188,6 +189,7 @@ app:
       - sys_menu
       - sys_tenant
       - sys_platform_security_policy
+      - sys_outbox_event
 
   registration:
     # 注册接口防刷策略。
@@ -239,7 +241,7 @@ app:
 
   cache:
     key-prefix: "eap:cache:"
-    namespace-version: "v6"
+    namespace-version: "v7"
     default-ttl: 10m
     auth-principal-ttl: 15m
     registration-policy-ttl: 5m
@@ -248,6 +250,9 @@ app:
     system-notices-ttl: 10m
     system-categories-all-ttl: 60m
     system-categories-target-ttl: 60m
+
+  outbox:
+    poll-interval-ms: 2000
 
 logging:
   pattern:

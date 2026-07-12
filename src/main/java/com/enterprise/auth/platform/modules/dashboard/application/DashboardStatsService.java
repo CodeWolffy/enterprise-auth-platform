@@ -1,12 +1,11 @@
 package com.enterprise.auth.platform.modules.dashboard.application;
 
 import com.enterprise.auth.platform.common.TimeSupport;
-import com.enterprise.auth.platform.common.authz.DataScopeService;
-import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.context.TimeZoneContext;
-import com.enterprise.auth.platform.modules.log.application.LogStatsFacade;
 import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
+import com.enterprise.auth.platform.modules.auth.application.DataScopeService;
+import com.enterprise.auth.platform.modules.auth.application.PlatformAdminSupport;
 import com.enterprise.auth.platform.modules.auth.application.SessionIndexService;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.dashboard.domain.DashboardMetrics;
@@ -22,6 +21,9 @@ import com.enterprise.auth.platform.modules.dashboard.interfaces.DashboardStatsR
 import com.enterprise.auth.platform.modules.dashboard.interfaces.DashboardStatsResponse.RecentAuditEvent;
 import com.enterprise.auth.platform.modules.dashboard.interfaces.DashboardStatsResponse.ServiceHealthItem;
 import com.enterprise.auth.platform.modules.file.application.FileStatsFacade;
+import com.enterprise.auth.platform.modules.log.application.LogDailyTrendPoint;
+import com.enterprise.auth.platform.modules.log.application.LogRecentAuditEvent;
+import com.enterprise.auth.platform.modules.log.application.LogStatsFacade;
 import com.enterprise.auth.platform.modules.role.application.RoleStatsFacade;
 import com.enterprise.auth.platform.modules.tenant.application.TenantStatsFacade;
 import com.enterprise.auth.platform.modules.user.application.UserStatsFacade;
@@ -143,13 +145,13 @@ public class DashboardStatsService {
         );
     }
 
-    private List<DailyActivity> toDailyActivities(List<DailyTrendPoint> points) {
+    private List<DailyActivity> toDailyActivities(List<LogDailyTrendPoint> points) {
         return points.stream()
                 .map(point -> new DailyActivity(point.date(), point.loginCount(), point.operationCount(), point.loginFailedCount()))
                 .toList();
     }
 
-    private List<AuditEvent> toAuditEvents(List<RecentAuditEvent> events) {
+    private List<AuditEvent> toAuditEvents(List<LogRecentAuditEvent> events) {
         return events.stream()
                 .map(event -> new AuditEvent(event.eventType(), event.operator(), event.tenantId(), event.clientIp(), event.occurredAt()))
                 .toList();

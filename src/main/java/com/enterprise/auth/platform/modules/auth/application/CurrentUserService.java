@@ -5,8 +5,8 @@ import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
 import com.enterprise.auth.platform.modules.auth.domain.SessionPrincipal;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
-import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
-import com.enterprise.auth.platform.common.context.AuthContextHolder;
+import com.enterprise.auth.platform.modules.auth.application.PlatformAdminSupport;
+import com.enterprise.auth.platform.modules.auth.domain.AuthContextHolder;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.user.application.AuthenticationUser;
@@ -26,15 +26,18 @@ public class CurrentUserService {
     private final ObjectProvider<UserAuthenticationFacade> userAuthenticationFacadeProvider;
     private final PlatformAdminSupport platformAdminSupport;
     private final SessionIndexService sessionIndexService;
+    private final AuthzVersionService authzVersionService;
 
     public CurrentUserService(
             ObjectProvider<UserAuthenticationFacade> userAuthenticationFacadeProvider,
             PlatformAdminSupport platformAdminSupport,
-            SessionIndexService sessionIndexService
+            SessionIndexService sessionIndexService,
+            AuthzVersionService authzVersionService
     ) {
         this.userAuthenticationFacadeProvider = userAuthenticationFacadeProvider;
         this.platformAdminSupport = platformAdminSupport;
         this.sessionIndexService = sessionIndexService;
+        this.authzVersionService = authzVersionService;
     }
 
     public Optional<UserAccount> currentUser() {
@@ -146,7 +149,19 @@ public class CurrentUserService {
             return false;
         }
         String activeTenantId = sessionString(tokenSession, "activeTenantId");
-        return permissionsTenantId.equals(activeTenantId);
+        if (!permissionsTenantId.equals(activeTenantId)) {
+            return false;
+        }
+        // 版本字段缺失：兼容升级窗口，仍信任租户匹配的旧快照
+        Object globalVersion = tokenSession.get("authzGlobalVersion");
+        Object tenantVersion = tokenSession.get("authzTenantVersion");
+        if (globalVersion == null && tenantVersion == null) {
+            return true;
+        }
+        long sessionGlobal = sessionLong(tokenSession, "authzGlobalVersion", -1L);
+        long sessionTenant = sessionLong(tokenSession, "authzTenantVersion", -1L);
+        AuthzVersionService.Versions currentVersions = authzVersionService.currentVersions(activeTenantId);
+        return sessionGlobal == currentVersions.global() && sessionTenant == currentVersions.tenant();
     }
 
     private Set<String> mergeStringSet(Set<String> base, Object sessionValue) {
@@ -179,6 +194,21 @@ public class CurrentUserService {
         if (value instanceof String text && StringUtils.hasText(text)) {
             try {
                 return Integer.parseInt(text.trim());
+            } catch (NumberFormatException ignored) {
+                return fallback;
+            }
+        }
+        return fallback;
+    }
+
+    private long sessionLong(SaSession session, String key, long fallback) {
+        Object value = session.get(key);
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value instanceof String text && StringUtils.hasText(text)) {
+            try {
+                return Long.parseLong(text.trim());
             } catch (NumberFormatException ignored) {
                 return fallback;
             }

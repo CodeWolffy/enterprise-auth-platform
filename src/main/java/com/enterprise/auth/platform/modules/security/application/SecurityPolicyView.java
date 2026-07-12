@@ -1,6 +1,6 @@
 package com.enterprise.auth.platform.modules.security.application;
 
-import com.enterprise.auth.platform.modules.security.domain.EffectiveSecurityPolicy;
+import com.enterprise.auth.platform.common.security.EffectiveSecurityPolicy;
 
 public record SecurityPolicyView(
         int passwordMinLength,

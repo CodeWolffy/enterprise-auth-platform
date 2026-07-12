@@ -19,6 +19,7 @@ public interface SysStorageFileMapper extends BaseMapper<SysStorageFileEntity> {
             SELECT COALESCE(SUM(file_size), 0)
             FROM sys_storage_file
             WHERE deleted = 0
+              AND lifecycle_status = 'READY'
             <if test="!platformScope">
               AND tenant_id = #{tenantId}
             </if>
@@ -49,6 +50,7 @@ public interface SysStorageFileMapper extends BaseMapper<SysStorageFileEntity> {
             SELECT COUNT(1)
             FROM sys_storage_file
             WHERE deleted = 0
+              AND lifecycle_status = 'READY'
             <if test="!platformScope">
               AND tenant_id = #{tenantId}
             </if>
@@ -86,6 +88,7 @@ public interface SysStorageFileMapper extends BaseMapper<SysStorageFileEntity> {
             SELECT *
             FROM sys_storage_file
             WHERE deleted = 0
+              AND lifecycle_status = 'READY'
             <if test="!platformScope">
               AND tenant_id = #{tenantId}
             </if>
@@ -134,8 +137,38 @@ public interface SysStorageFileMapper extends BaseMapper<SysStorageFileEntity> {
     @InterceptorIgnore(tenantLine = "true")
     @Update("""
             UPDATE sys_storage_file
+            SET lifecycle_status = #{status},
+                etag = #{etag},
+                updated_at = UTC_TIMESTAMP(3)
+            WHERE id = #{id}
+              AND deleted = 0
+            """)
+    int updateLifecycle(
+            @Param("id") Long id,
+            @Param("status") String status,
+            @Param("etag") String etag
+    );
+
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("""
+            SELECT *
+            FROM sys_storage_file
+            WHERE deleted = 0
+              AND lifecycle_status = #{status}
+            ORDER BY updated_at ASC, id ASC
+            LIMIT #{limit}
+            """)
+    List<SysStorageFileEntity> selectByLifecycle(
+            @Param("status") String status,
+            @Param("limit") int limit
+    );
+
+    @InterceptorIgnore(tenantLine = "true")
+    @Update("""
+            UPDATE sys_storage_file
             SET deleted = 1,
-                updated_at = UTC_TIMESTAMP()
+                lifecycle_status = 'READY',
+                updated_at = UTC_TIMESTAMP(3)
             WHERE id = #{id}
               AND deleted = 0
             """)

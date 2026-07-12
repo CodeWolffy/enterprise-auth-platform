@@ -1,13 +1,13 @@
 package com.enterprise.auth.platform.infrastructure.security;
 
 import cn.dev33.satoken.stp.StpUtil;
-import com.enterprise.auth.platform.modules.auth.application.SessionIndexService;
-import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
-import com.enterprise.auth.platform.common.context.AuthContextHolder;
+import com.enterprise.auth.platform.modules.auth.domain.AuthContextHolder;
 import com.enterprise.auth.platform.common.context.RequestLogContext;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.ClientIpResolver;
+import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
+import com.enterprise.auth.platform.modules.auth.application.SessionIndexService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Instant;
@@ -38,6 +38,7 @@ public class SaTokenUserContextInterceptor implements HandlerInterceptor {
             var principal = currentUserService.bindRequestContext(request);
             enforceClientIpBinding(request);
             long lastAccessAt = Instant.now().toEpochMilli();
+            // Sa-Token 原生 lastAccess 仍每次写，保证 active-timeout 语义
             StpUtil.getTokenSession().set("lastAccessAt", lastAccessAt);
             String token = StpUtil.getTokenValue();
             boolean touched = sessionIndexService.touch(token, lastAccessAt);
@@ -55,6 +56,7 @@ public class SaTokenUserContextInterceptor implements HandlerInterceptor {
                 ));
                 sessionIndexService.touch(token, lastAccessAt);
             }
+            // 仅在租户实际变化时写影子索引（Lua 内再做一次幂等比对）
             sessionIndexService.updateActiveTenant(token, principal.tenantId());
             if (principal.globalScope()) {
                 TenantContext.setGlobalScope(principal.tenantId());

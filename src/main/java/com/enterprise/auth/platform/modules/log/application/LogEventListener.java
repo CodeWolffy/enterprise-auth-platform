@@ -15,13 +15,13 @@ public class LogEventListener {
         this.logPublisher = logPublisher;
     }
 
-    @Async
+    @Async("auditExecutor")
     @EventListener
     public void handleLogEvent(LogEvent event) {
         logPublisher.publish(event);
     }
 
-    @Async
+    @Async("auditExecutor")
     @EventListener
     public void handleLoginLogEvent(LoginLogEvent event) {
         logPublisher.publish(event);

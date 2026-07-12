@@ -15,7 +15,10 @@ public record MinioProperties(
         String publicEndpoint,
         Boolean autoCreateBucket,
         Duration presignedUrlTtl,
-        Boolean allowDefaultCredentials
+        Boolean allowDefaultCredentials,
+        Integer connectTimeoutMillis,
+        Integer readTimeoutMillis,
+        Integer writeTimeoutMillis
 ) {
 
     public String resolvedEndpoint() {
@@ -68,5 +71,17 @@ public record MinioProperties(
         return presignedUrlTtl == null || presignedUrlTtl.isZero() || presignedUrlTtl.isNegative()
                 ? Duration.ofMinutes(10)
                 : presignedUrlTtl;
+    }
+
+    public int resolvedConnectTimeoutMillis() {
+        return connectTimeoutMillis == null || connectTimeoutMillis <= 0 ? 5_000 : connectTimeoutMillis;
+    }
+
+    public int resolvedReadTimeoutMillis() {
+        return readTimeoutMillis == null || readTimeoutMillis <= 0 ? 10_000 : readTimeoutMillis;
+    }
+
+    public int resolvedWriteTimeoutMillis() {
+        return writeTimeoutMillis == null || writeTimeoutMillis <= 0 ? 10_000 : writeTimeoutMillis;
     }
 }

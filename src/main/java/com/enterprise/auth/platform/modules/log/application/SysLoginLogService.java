@@ -7,10 +7,9 @@ import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.common.web.PaginationSupport;
 import com.enterprise.auth.platform.modules.log.infrastructure.entity.SysLoginLogEntity;
 import com.enterprise.auth.platform.modules.log.infrastructure.mapper.SysLoginLogMapper;
+import java.time.Instant;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-
-import java.time.Instant;
 
 @Service
 public class SysLoginLogService {
@@ -21,9 +20,16 @@ public class SysLoginLogService {
         this.sysLoginLogMapper = sysLoginLogMapper;
     }
 
-    public PageResult<SysLoginLogEntity> page(String tenantId, String userName, String status,
-                                              String clientIp, Instant from, Instant to,
-                                              int page, int size) {
+    public PageResult<LoginLogView> page(
+            String tenantId,
+            String userName,
+            String status,
+            String clientIp,
+            Instant from,
+            Instant to,
+            int page,
+            int size
+    ) {
         int safePage = PaginationSupport.normalizePage(page);
         int safeSize = PaginationSupport.normalizeSize(size, 200);
         String effectiveTenantId = effectiveTenantId(tenantId);
@@ -36,7 +42,12 @@ public class SysLoginLogService {
                 .le(to != null, SysLoginLogEntity::getCreatedAt, to)
                 .orderByDesc(SysLoginLogEntity::getCreatedAt);
         Page<SysLoginLogEntity> result = sysLoginLogMapper.selectPage(new Page<>(safePage, safeSize), wrapper);
-        return PageResult.of(result.getTotal(), safePage, safeSize, result.getRecords());
+        return PageResult.of(
+                result.getTotal(),
+                safePage,
+                safeSize,
+                result.getRecords().stream().map(this::toView).toList()
+        );
     }
 
     public long count(String tenantId, String userName, String status, Instant from, Instant to) {
@@ -48,6 +59,21 @@ public class SysLoginLogService {
                 .ge(from != null, SysLoginLogEntity::getCreatedAt, from)
                 .le(to != null, SysLoginLogEntity::getCreatedAt, to);
         return sysLoginLogMapper.selectCount(wrapper);
+    }
+
+    private LoginLogView toView(SysLoginLogEntity entity) {
+        return new LoginLogView(
+                entity.getId(),
+                entity.getTenantId(),
+                entity.getUserName(),
+                entity.getStatus(),
+                entity.getIpAddr(),
+                entity.getLocation(),
+                entity.getBrowser(),
+                entity.getOs(),
+                entity.getMsg(),
+                entity.getCreatedAt()
+        );
     }
 
     private String effectiveTenantId(String requestedTenantId) {

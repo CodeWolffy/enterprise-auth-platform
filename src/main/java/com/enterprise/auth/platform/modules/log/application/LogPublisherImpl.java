@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.modules.log.application;
 
 import com.enterprise.auth.platform.common.TimeSupport;
-import com.enterprise.auth.platform.common.context.AuthContextHolder;
+import com.enterprise.auth.platform.modules.auth.domain.AuthContextHolder;
 import com.enterprise.auth.platform.common.context.RequestContext;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.web.ClientIpResolver;

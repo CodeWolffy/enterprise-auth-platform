@@ -4,18 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
-import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
+import com.enterprise.auth.platform.modules.auth.application.PlatformAdminSupport;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
-import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class PlatformAdminSupportTest {
 
-    private final PlatformAdminSupport support = new PlatformAdminSupport(
-            new TenantProperties("X-Tenant-Id", "platform", true, List.of())
-    );
+    private final PlatformAdminSupport support = new PlatformAdminSupport("platform");
 
     @Test
     void platformTenantAdminRoleShouldBePlatformSuperAdmin() {

@@ -31,6 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+@org.junit.jupiter.api.Tag("integration")
 @SpringBootTest
 class WorkflowApplicationServiceP2Test {
 
@@ -73,8 +74,8 @@ class WorkflowApplicationServiceP2Test {
         approverTwoId = ensureUser(TENANT_A, APPROVER_TWO);
         outsiderId = ensureUser(TENANT_A, OUTSIDER);
         otherTenantUserId = ensureUser(TENANT_B, OTHER_TENANT_USER);
-        ensureRole(TENANT_A, GROUP_APPROVER);
-        ensureRole(TENANT_B, GROUP_APPROVER);
+        ensureRole(TENANT_A, GROUP_APPROVER, approverTwoId);
+        ensureRole(TENANT_B, GROUP_APPROVER, otherTenantUserId);
     }
 
     @AfterEach
@@ -410,7 +411,7 @@ class WorkflowApplicationServiceP2Test {
         return entity.getId();
     }
 
-    private void ensureRole(String tenantId, String roleCode) {
+    private void ensureRole(String tenantId, String roleCode, Long userId) {
         TenantContext.setTenantId(tenantId);
         SysRoleEntity entity = new SysRoleEntity();
         entity.setTenantId(tenantId);
@@ -418,6 +419,12 @@ class WorkflowApplicationServiceP2Test {
         entity.setRoleName(roleCode);
         entity.setDataScopeType("ALL");
         sysRoleMapper.insert(entity);
+        jdbcTemplate.update(
+                "INSERT INTO sys_user_role (tenant_id, user_id, role_id) VALUES (?, ?, ?)",
+                tenantId,
+                userId,
+                entity.getId()
+        );
     }
 
     private void bindPrincipal(String tenantId, Long userId, String username, Set<String> roles, Set<String> permissions) {
@@ -453,6 +460,7 @@ class WorkflowApplicationServiceP2Test {
         jdbcTemplate.update("DELETE FROM wf_process_instance WHERE tenant_id IN (?, ?)", TENANT_A, TENANT_B);
         jdbcTemplate.update("DELETE FROM wf_process_definition WHERE tenant_id IN (?, ?)", TENANT_A, TENANT_B);
         jdbcTemplate.update("DELETE FROM sys_log WHERE tenant_id IN (?, ?)", TENANT_A, TENANT_B);
+        jdbcTemplate.update("DELETE FROM sys_user_role WHERE tenant_id IN (?, ?)", TENANT_A, TENANT_B);
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id IN (?, ?) AND username IN (?, ?, ?, ?, ?)",
                 TENANT_A, TENANT_B, STARTER, APPROVER_ONE, APPROVER_TWO, OUTSIDER, OTHER_TENANT_USER);
         jdbcTemplate.update("DELETE FROM sys_role WHERE tenant_id IN (?, ?) AND role_code = ?", TENANT_A, TENANT_B, GROUP_APPROVER);

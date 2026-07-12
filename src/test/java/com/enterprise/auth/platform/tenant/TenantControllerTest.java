@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.mockito.Mockito.when;
 
 import com.enterprise.auth.platform.common.authz.DataScopeType;
+import com.enterprise.auth.platform.common.cache.CacheNames;
 import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.user.application.AuthenticationUser;
@@ -24,10 +25,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.cache.CacheManager;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+@org.junit.jupiter.api.Tag("integration")
 @SpringBootTest
 @AutoConfigureMockMvc
 class TenantControllerTest {
@@ -47,6 +50,9 @@ class TenantControllerTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private CacheManager cacheManager;
 
     @MockitoBean
     private AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
@@ -335,6 +341,7 @@ class TenantControllerTest {
                 "TestView",
                 appKey
         );
+        clearMenuTemplateCache();
         return jdbcTemplate.queryForObject(
                 "SELECT id FROM sys_menu WHERE application_key = ? ORDER BY id DESC LIMIT 1",
                 Long.class,
@@ -354,6 +361,14 @@ class TenantControllerTest {
         jdbcTemplate.update("DELETE FROM sys_tenant WHERE tenant_id = ?", LINKAGE_TENANT_ID);
         jdbcTemplate.update("DELETE FROM sys_tenant_package WHERE tenant_id = 'platform' AND package_code = ?", LINKAGE_PACKAGE_CODE);
         jdbcTemplate.update("DELETE FROM sys_menu WHERE application_key IN (?, ?)", APP_KEY, OTHER_APP_KEY);
+        clearMenuTemplateCache();
+    }
+
+    private void clearMenuTemplateCache() {
+        org.springframework.cache.Cache cache = cacheManager.getCache(CacheNames.MENU_TEMPLATE);
+        if (cache != null) {
+            cache.clear();
+        }
     }
 
     private UserAccount principal(String authority) {

@@ -32,6 +32,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+@org.junit.jupiter.api.Tag("integration")
 @SpringBootTest
 @AutoConfigureMockMvc
 @TestPropertySource(properties = {
@@ -268,8 +269,8 @@ class FileControllerP1Test {
                 """
                 INSERT INTO sys_storage_file(
                     tenant_id, file_key, original_name, content_type, file_size, storage_type,
-                    bucket_name, object_key, visibility, owner_user_id, deleted, created_at, updated_at
-                ) VALUES(?,?,?,?,?,?,?,?,?,?,0,NOW(),NOW())
+                    bucket_name, object_key, visibility, owner_user_id, lifecycle_status, deleted, created_at, updated_at
+                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,0,NOW(),NOW())
                 """,
                 OTHER_TENANT_ID,
                 OTHER_FILE_KEY,
@@ -280,7 +281,8 @@ class FileControllerP1Test {
                 "local",
                 OTHER_OBJECT_KEY,
                 "OWNER",
-                999_999L
+                999_999L,
+                "READY"
         );
     }
 

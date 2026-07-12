@@ -13,7 +13,7 @@ import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
 import com.enterprise.auth.platform.modules.file.application.FileApplicationService;
 import com.enterprise.auth.platform.modules.file.application.FileMetadataView;
-import com.enterprise.auth.platform.modules.notification.application.NotificationScenarioPublisher;
+import com.enterprise.auth.platform.common.notification.NotificationScenarioPort;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
 import com.enterprise.auth.platform.modules.user.interfaces.AccountPasswordChangeRequest;
@@ -35,7 +35,7 @@ public class AccountApplicationService {
     private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
     private final FileApplicationService fileApplicationService;
     private final LogPublisher logPublisher;
-    private final NotificationScenarioPublisher notificationScenarioPublisher;
+    private final NotificationScenarioPort notificationScenarioPublisher;
 
     public AccountApplicationService(
             CurrentUserService currentUserService,
@@ -44,7 +44,7 @@ public class AccountApplicationService {
             AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
             FileApplicationService fileApplicationService,
             LogPublisher logPublisher,
-            NotificationScenarioPublisher notificationScenarioPublisher
+            NotificationScenarioPort notificationScenarioPublisher
     ) {
         this.currentUserService = currentUserService;
         this.sysUserMapper = sysUserMapper;

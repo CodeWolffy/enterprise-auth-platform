@@ -32,6 +32,10 @@ app:
     session-ttl: ${APP_SECURITY_SESSION_TTL:7d}
     cookie-secure: true
     cookie-same-site: ${APP_SECURITY_COOKIE_SAME_SITE:Lax}
+    notification:
+      # staging/prod 禁止 log 通道；缺邮件渠道时 PasswordResetNotificationService fail-closed
+      channel: ${APP_NOTIFICATION_CHANNEL:smtp}
+      mail-from: ${APP_NOTIFICATION_MAIL_FROM:noreply@enterprise-auth-platform.local}
 
 sa-token:
   active-timeout: ${APP_SECURITY_SESSION_IDLE_SECONDS:7200}

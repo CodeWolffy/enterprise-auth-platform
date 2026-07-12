@@ -2,12 +2,12 @@ package com.enterprise.auth.platform.modules.log.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.TimeSupport;
-import com.enterprise.auth.platform.common.authz.DataScopeService;
-import com.enterprise.auth.platform.common.authz.PlatformAdminSupport;
+import com.enterprise.auth.platform.modules.auth.application.DataScopeService;
+import com.enterprise.auth.platform.modules.auth.application.PlatformAdminSupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.context.TimeZoneContext;
-import com.enterprise.auth.platform.modules.dashboard.interfaces.DashboardStatsResponse.DailyTrendPoint;
-import com.enterprise.auth.platform.modules.dashboard.interfaces.DashboardStatsResponse.RecentAuditEvent;
+import com.enterprise.auth.platform.modules.log.application.LogDailyTrendPoint;
+import com.enterprise.auth.platform.modules.log.application.LogRecentAuditEvent;
 import com.enterprise.auth.platform.modules.log.infrastructure.entity.SysLogEntity;
 import com.enterprise.auth.platform.modules.log.infrastructure.entity.SysLoginLogEntity;
 import com.enterprise.auth.platform.modules.log.infrastructure.mapper.SysLogMapper;
@@ -86,7 +86,7 @@ public class LogStatsFacade {
         return sysLoginLogMapper.selectCount(wrapper);
     }
 
-    public List<DailyTrendPoint> dailyTrend(String tenantId, boolean platformScope, Optional<Set<String>> visibleUsernames) {
+    public List<LogDailyTrendPoint> dailyTrend(String tenantId, boolean platformScope, Optional<Set<String>> visibleUsernames) {
         ZoneId zone = TimeZoneContext.getZone();
         LocalDate startDate = TimeSupport.today(zone).minusDays(6);
         DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE;
@@ -95,7 +95,7 @@ public class LogStatsFacade {
                     LocalDate date = startDate.plusDays(offset);
                     Instant from = TimeSupport.startOfDay(date, zone);
                     Instant to = TimeSupport.startOfDay(date.plusDays(1), zone);
-                    return new DailyTrendPoint(
+                    return new LogDailyTrendPoint(
                             formatter.format(date),
                             countLoginLogs(tenantId, platformScope, visibleUsernames, "SUCCESS", from, to),
                             countOperationLogs(tenantId, platformScope, visibleUsernames, from, to),
@@ -105,12 +105,12 @@ public class LogStatsFacade {
                 .toList();
     }
 
-    public List<RecentAuditEvent> recentAuditEvents(String tenantId, boolean platformScope, Optional<Set<String>> visibleUsernames) {
+    public List<LogRecentAuditEvent> recentAuditEvents(String tenantId, boolean platformScope, Optional<Set<String>> visibleUsernames) {
         LambdaQueryWrapper<SysLogEntity> wrapper = logScope(tenantId, platformScope, visibleUsernames)
                 .orderByDesc(SysLogEntity::getCreatedAt)
                 .last("LIMIT 10");
         return sysLogMapper.selectList(wrapper).stream()
-                .map(entity -> new RecentAuditEvent(
+                .map(entity -> new LogRecentAuditEvent(
                         entity.getEventType(),
                         entity.getOperator(),
                         entity.getTenantId(),
@@ -126,8 +126,13 @@ public class LogStatsFacade {
         if (StringUtils.hasText(tenantId)) {
             wrapper.eq(SysLogEntity::getTenantId, tenantId);
         }
-        if (!platformScope && visibleUsernames.isPresent() && !visibleUsernames.get().isEmpty()) {
-            wrapper.in(SysLogEntity::getOperator, visibleUsernames.get());
+        if (!platformScope && visibleUsernames.isPresent()) {
+            Set<String> usernames = visibleUsernames.get();
+            if (usernames.isEmpty()) {
+                wrapper.apply("1 = 0");
+            } else {
+                wrapper.in(SysLogEntity::getOperator, usernames);
+            }
         }
         return wrapper;
     }
@@ -138,8 +143,13 @@ public class LogStatsFacade {
         if (StringUtils.hasText(tenantId)) {
             wrapper.eq(SysLoginLogEntity::getTenantId, tenantId);
         }
-        if (!platformScope && visibleUsernames.isPresent() && !visibleUsernames.get().isEmpty()) {
-            wrapper.in(SysLoginLogEntity::getUserName, visibleUsernames.get());
+        if (!platformScope && visibleUsernames.isPresent()) {
+            Set<String> usernames = visibleUsernames.get();
+            if (usernames.isEmpty()) {
+                wrapper.apply("1 = 0");
+            } else {
+                wrapper.in(SysLoginLogEntity::getUserName, usernames);
+            }
         }
         return wrapper;
     }

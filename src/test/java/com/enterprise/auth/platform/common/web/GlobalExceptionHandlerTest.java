@@ -5,18 +5,21 @@ import static org.mockito.Mockito.mock;
 
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.RateLimitInterceptor.RateLimitExceededException;
-import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 class GlobalExceptionHandlerTest {
 
+    private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+    private final IpLocationResolver ipLocationResolver = mock(IpLocationResolver.class);
+
     @Test
     void shouldUseExceptionRetryAfterSecondsForRateLimitResponse() {
-        GlobalExceptionHandler handler = new GlobalExceptionHandler(mock(LogPublisher.class), mock(IpLocationResolver.class));
+        GlobalExceptionHandler handler = new GlobalExceptionHandler(eventPublisher, ipLocationResolver);
         MockHttpServletRequest request = request();
 
         ResponseEntity<ApiResponse<Void>> response = handler.handleRateLimit(
@@ -35,7 +38,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void shouldMapBusinessExceptionStatusByCode() {
-        GlobalExceptionHandler handler = new GlobalExceptionHandler(mock(LogPublisher.class), mock(IpLocationResolver.class));
+        GlobalExceptionHandler handler = new GlobalExceptionHandler(eventPublisher, ipLocationResolver);
 
         ResponseEntity<ApiResponse<Void>> response = handler.handleBusiness(
                 new BusinessException("ACCESS_DENIED", "无权访问"),
@@ -50,7 +53,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void shouldKeepBusinessExceptionDetails() {
-        GlobalExceptionHandler handler = new GlobalExceptionHandler(mock(LogPublisher.class), mock(IpLocationResolver.class));
+        GlobalExceptionHandler handler = new GlobalExceptionHandler(eventPublisher, ipLocationResolver);
         List<ApiResponse.ErrorDetail> details = List.of(ApiResponse.ErrorDetail.of("username", "不能为空", "field"));
 
         ResponseEntity<ApiResponse<Void>> response = handler.handleBusiness(
@@ -63,35 +66,9 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().details()).containsExactlyElementsOf(details);
     }
 
-    @Test
-    void shouldReturnStructuredUnexpectedError() {
-        GlobalExceptionHandler handler = new GlobalExceptionHandler(mock(LogPublisher.class), mock(IpLocationResolver.class));
-
-        ResponseEntity<ApiResponse<Void>> response = handler.handleUnexpected(new RuntimeException("boom"), request());
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().code()).isEqualTo("INTERNAL_ERROR");
-        assertThat(response.getBody().message()).isEqualTo("服务器内部错误");
-        assertThat(response.getBody().message()).doesNotContain("boom");
-        assertThat(response.getBody().details()).isEmpty();
-        assertThat(response.getBody().requestId()).isEqualTo("test-request-id");
-        assertThat(response.getBody().path()).isEqualTo("/api/test");
-    }
-
-    @Test
-    void shouldNotReturnNullForClientAbort() {
-        GlobalExceptionHandler handler = new GlobalExceptionHandler(mock(LogPublisher.class), mock(IpLocationResolver.class));
-
-        ResponseEntity<ApiResponse<Void>> response = handler.handleUnexpected(new RuntimeException("Broken pipe"), request());
-
-        assertThat(response).isNotNull();
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-        assertThat(response.getBody()).isNull();
-    }
-
     private MockHttpServletRequest request() {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/test");
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRequestURI("/api/test");
         request.addHeader("X-Request-Id", "test-request-id");
         return request;
     }

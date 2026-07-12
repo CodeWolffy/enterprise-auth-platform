@@ -6,18 +6,20 @@ import com.baomidou.mybatisplus.core.plugins.InterceptorIgnoreHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.common.web.PageResult;
+import com.enterprise.auth.platform.common.web.PaginationSupport;
 import com.enterprise.auth.platform.modules.role.application.RoleQueryFacade;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserRoleEntity;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserRoleMapper;
 import com.enterprise.auth.platform.modules.role.application.RoleGrantQueryFacade;
-import com.enterprise.auth.platform.common.authz.DataScopeService;
+import com.enterprise.auth.platform.modules.auth.application.DataScopeService;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.modules.user.interfaces.UserSummary;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -47,7 +49,63 @@ public class UserDirectoryService {
     }
 
     public List<UserSummary> listUsers() {
-        return listUsers(null, null, null, null, null, 1, 10000).records();
+        // 兼容旧调用：限制为单页上限，禁止 10000 全集路径
+        return listUsers(null, null, null, null, null, 1, PaginationSupport.DEFAULT_MAX_SIZE).records();
+    }
+
+    /** 按 ID 查询单个用户摘要，避免 loadSummary 拉全集。 */
+    public Optional<UserSummary> findUserSummary(Long userId, String tenantId) {
+        if (userId == null) {
+            return Optional.empty();
+        }
+        boolean globalScope = isGlobalScope();
+        if (globalScope) {
+            return InterceptorIgnoreHelper.execute(
+                    IgnoreStrategy.builder().tenantLine(true).build(),
+                    () -> doFindUserSummary(userId, tenantId, true)
+            );
+        }
+        return doFindUserSummary(userId, tenantId, false);
+    }
+
+    private Optional<UserSummary> doFindUserSummary(Long userId, String tenantIdFilter, boolean globalScope) {
+        String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
+        String effectiveTenant = StringUtils.hasText(tenantIdFilter) ? tenantIdFilter.trim() : tenantId;
+        LambdaQueryWrapper<SysUserEntity> query = new LambdaQueryWrapper<SysUserEntity>()
+                .eq(SysUserEntity::getId, userId)
+                .eq(SysUserEntity::getDeleted, 0)
+                .eq(!globalScope, SysUserEntity::getTenantId, tenantId)
+                .eq(globalScope && StringUtils.hasText(tenantIdFilter), SysUserEntity::getTenantId, effectiveTenant)
+                .last("limit 1");
+        SysUserEntity user = sysUserMapper.selectOne(query);
+        if (user == null) {
+            return Optional.empty();
+        }
+        if (!globalScope) {
+            Optional<Set<Long>> visible = dataScopeService.visibleUserIds(tenantId);
+            if (visible.isPresent() && !visible.get().contains(user.getId())) {
+                return Optional.empty();
+            }
+        }
+        Map<Long, Set<String>> roleCodesByUserId = loadRoleCodes(user.getTenantId(), List.of(user), globalScope);
+        Map<Long, Set<String>> permissionsByUserId = loadPermissionCodes(
+                user.getTenantId(), List.of(user), roleCodesByUserId, globalScope);
+        return Optional.of(new UserSummary(
+                user.getId(),
+                user.getTenantId(),
+                user.getUsername(),
+                user.getDisplayName(),
+                user.getMobile(),
+                user.getEmail(),
+                user.getDeptId(),
+                user.getEnabled() != null && user.getEnabled() == 1,
+                roleCodesByUserId.getOrDefault(user.getId(), Set.of()),
+                permissionsByUserId.getOrDefault(user.getId(), Set.of()),
+                DataScopeType.SELF,
+                user.getCreatedAt(),
+                user.getLastLoginAt(),
+                user.getLastLoginIp()
+        ));
     }
 
     public PageResult<UserSummary> listUsers(String username, String mobile, String email, Boolean enabled, int page, int size) {

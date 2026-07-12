@@ -10,11 +10,13 @@ import com.enterprise.auth.platform.common.web.ClientIpResolver;
 import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 import com.enterprise.auth.platform.modules.auth.infrastructure.SecurityProperties;
-import com.enterprise.auth.platform.modules.security.domain.EffectiveSecurityPolicy;
+import com.enterprise.auth.platform.common.security.EffectiveSecurityPolicy;
 import com.enterprise.auth.platform.modules.auth.infrastructure.entity.SysPasswordResetTokenEntity;
 import com.enterprise.auth.platform.modules.auth.infrastructure.mapper.SysPasswordResetTokenMapper;
-import com.enterprise.auth.platform.modules.notification.application.NotificationScenarioPublisher;
+import com.enterprise.auth.platform.common.notification.NotificationScenarioPort;
 import com.enterprise.auth.platform.modules.security.application.SecurityPolicyApplicationService;
+import com.enterprise.auth.platform.modules.system.application.OutboxDispatchWorker;
+import com.enterprise.auth.platform.modules.system.application.OutboxWriter;
 import com.enterprise.auth.platform.modules.user.application.UserAuthenticationFacade;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
 import jakarta.servlet.http.HttpServletRequest;
@@ -46,13 +48,14 @@ public class PasswordResetApplicationService {
     private final SysPasswordResetTokenMapper tokenMapper;
     private final PasswordHasher passwordHasher;
     private final SecurityPolicyApplicationService securityPolicyApplicationService;
-    private final PasswordResetNotificationService notificationService;
     private final LogPublisher logPublisher;
     private final SecurityProperties securityProperties;
     private final ClientIpResolver clientIpResolver;
     private final SessionIndexService sessionIndexService;
-    private final NotificationScenarioPublisher notificationScenarioPublisher;
+    private final NotificationScenarioPort notificationScenarioPublisher;
     private final CaptchaService captchaService;
+    private final OutboxWriter outboxWriter;
+    private final OutboxDispatchWorker outboxDispatchWorker;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public PasswordResetApplicationService(
@@ -60,25 +63,27 @@ public class PasswordResetApplicationService {
             SysPasswordResetTokenMapper tokenMapper,
             PasswordHasher passwordHasher,
             SecurityPolicyApplicationService securityPolicyApplicationService,
-            PasswordResetNotificationService notificationService,
             LogPublisher logPublisher,
             SecurityProperties securityProperties,
             ClientIpResolver clientIpResolver,
             SessionIndexService sessionIndexService,
-            NotificationScenarioPublisher notificationScenarioPublisher,
-            CaptchaService captchaService
+            NotificationScenarioPort notificationScenarioPublisher,
+            CaptchaService captchaService,
+            OutboxWriter outboxWriter,
+            OutboxDispatchWorker outboxDispatchWorker
     ) {
         this.userAuthenticationFacade = userAuthenticationFacade;
         this.tokenMapper = tokenMapper;
         this.passwordHasher = passwordHasher;
         this.securityPolicyApplicationService = securityPolicyApplicationService;
-        this.notificationService = notificationService;
         this.logPublisher = logPublisher;
         this.securityProperties = securityProperties;
         this.clientIpResolver = clientIpResolver;
         this.sessionIndexService = sessionIndexService;
         this.notificationScenarioPublisher = notificationScenarioPublisher;
         this.captchaService = captchaService;
+        this.outboxWriter = outboxWriter;
+        this.outboxDispatchWorker = outboxDispatchWorker;
     }
 
     @Transactional
@@ -152,10 +157,30 @@ public class PasswordResetApplicationService {
         });
 
         String resetLink = buildResetLink(rawToken);
-        notificationService.sendPasswordResetLink(user.getTenantId(), user.getEmail(), user.getUsername(), resetLink);
+        // 同事务写 outbox，提交后异步发信，SMTP 不再占用业务事务
+        outboxWriter.enqueue(
+                OutboxWriter.TYPE_PASSWORD_RESET_MAIL,
+                user.getTenantId(),
+                "PASSWORD_RESET",
+                String.valueOf(entity.getId()),
+                Map.of(
+                        "tenantId", user.getTenantId(),
+                        "email", user.getEmail(),
+                        "username", user.getUsername(),
+                        "resetLink", resetLink
+                )
+        );
         notificationScenarioPublisher.passwordResetRequested(user.getTenantId(), user.getId(), user.getUsername(), clientIp);
         logPublisher.publish("PASSWORD_RESET_REQUESTED", user.getUsername(), user.getTenantId(),
                 Map.of("userId", user.getId(), "clientIp", clientIp));
+        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                new org.springframework.transaction.support.TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        outboxDispatchWorker.triggerAsync();
+                    }
+                }
+        );
         return new PasswordResetRequestResponse(GENERIC_REQUEST_MESSAGE, "EMAIL_SENT");
     }
 

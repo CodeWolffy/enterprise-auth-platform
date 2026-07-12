@@ -58,13 +58,16 @@ public class FileStorageHealthIndicator implements HealthIndicator {
     public Health health() {
         String storage = properties.resolvedStorage();
         try {
-            return CompletableFuture.supplyAsync(() -> probe(storage), probeExecutor)
-                    .get(PROBE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
-        } catch (TimeoutException exception) {
-            return Health.down()
-                    .withDetail("storage", storage)
-                    .withDetail("error", "storage probe timed out after " + PROBE_TIMEOUT.toSeconds() + "s")
-                    .build();
+            CompletableFuture<Health> future = CompletableFuture.supplyAsync(() -> probe(storage), probeExecutor);
+            try {
+                return future.get(PROBE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+            } catch (TimeoutException exception) {
+                future.cancel(true);
+                return Health.down()
+                        .withDetail("storage", storage)
+                        .withDetail("error", "storage probe timed out after " + PROBE_TIMEOUT.toSeconds() + "s")
+                        .build();
+            }
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
             return Health.down()

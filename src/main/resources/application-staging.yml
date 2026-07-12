@@ -31,6 +31,9 @@ app:
     session-ttl: ${STAGING_APP_SECURITY_SESSION_TTL:${APP_SECURITY_SESSION_TTL:7d}}
     cookie-secure: true
     cookie-same-site: ${STAGING_APP_SECURITY_COOKIE_SAME_SITE:${APP_SECURITY_COOKIE_SAME_SITE:Lax}}
+    notification:
+      channel: ${STAGING_APP_NOTIFICATION_CHANNEL:${APP_NOTIFICATION_CHANNEL:smtp}}
+      mail-from: ${STAGING_APP_NOTIFICATION_MAIL_FROM:${APP_NOTIFICATION_MAIL_FROM:noreply@enterprise-auth-platform.local}}
 
 sa-token:
   active-timeout: ${STAGING_APP_SECURITY_SESSION_IDLE_SECONDS:${APP_SECURITY_SESSION_IDLE_SECONDS:7200}}

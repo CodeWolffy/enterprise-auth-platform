@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.modules.tenant.interfaces;
 
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
-import com.enterprise.auth.platform.common.authz.SecuritySupport;
+import com.enterprise.auth.platform.modules.auth.application.SecuritySupport;
 import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
 import com.enterprise.auth.platform.modules.tenant.application.TenantChangeLogApplicationService;
 import com.enterprise.auth.platform.modules.tenant.application.TenantDirectoryApplicationService;

@@ -1,38 +1,43 @@
-package com.enterprise.auth.platform.common.authz;
+package com.enterprise.auth.platform.modules.auth.application;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.enterprise.auth.platform.modules.dept.infrastructure.entity.SysDeptEntity;
-import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
-import com.enterprise.auth.platform.modules.dept.infrastructure.mapper.SysDeptMapper;
-import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
+import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
-import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import java.util.ArrayDeque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
 
+/**
+ * 数据权限。同一请求内对 (principalId, tenantId) 缓存 ScopeContext。
+ * 通过 DataScopeUserQuery / DataScopeDeptQuery 访问用户与部门，不直接依赖跨模块 Mapper。
+ */
 @Service
 public class DataScopeService {
 
-    private final SysUserMapper sysUserMapper;
-    private final SysDeptMapper sysDeptMapper;
+    private static final String REQUEST_SCOPE_CACHE = DataScopeService.class.getName() + ".scopeCache";
+
+    private final DataScopeUserQuery userQuery;
+    private final DataScopeDeptQuery deptQuery;
     private final PlatformAdminSupport platformAdminSupport;
     private final CurrentUserService currentUserService;
 
     public DataScopeService(
-            SysUserMapper sysUserMapper,
-            SysDeptMapper sysDeptMapper,
+            DataScopeUserQuery userQuery,
+            DataScopeDeptQuery deptQuery,
             PlatformAdminSupport platformAdminSupport,
             CurrentUserService currentUserService
     ) {
-        this.sysUserMapper = sysUserMapper;
-        this.sysDeptMapper = sysDeptMapper;
+        this.userQuery = userQuery;
+        this.deptQuery = deptQuery;
         this.platformAdminSupport = platformAdminSupport;
         this.currentUserService = currentUserService;
     }
@@ -43,40 +48,6 @@ public class DataScopeService {
 
     public boolean isPlatformSuperAdmin() {
         return currentUser().map(platformAdminSupport::isPlatformSuperAdmin).orElse(false);
-    }
-
-    public List<SysUserEntity> filterUsers(String tenantId, List<SysUserEntity> users) {
-        Optional<UserAccount> currentUser = currentUser();
-        if (currentUser.isEmpty()) {
-            return users;
-        }
-        ScopeContext context = buildContext(tenantId, currentUser.get());
-        if (context == ScopeContext.ALL) {
-            return users;
-        }
-        if (context == ScopeContext.NONE) {
-            return List.of();
-        }
-        return users.stream()
-                .filter(user -> user.getId() != null && context.userIds().contains(user.getId()))
-                .toList();
-    }
-
-    public List<SysDeptEntity> filterDepartments(String tenantId, List<SysDeptEntity> departments) {
-        Optional<UserAccount> currentUser = currentUser();
-        if (currentUser.isEmpty()) {
-            return departments;
-        }
-        ScopeContext context = buildContext(tenantId, currentUser.get());
-        if (context == ScopeContext.ALL) {
-            return departments;
-        }
-        if (context == ScopeContext.NONE) {
-            return List.of();
-        }
-        return departments.stream()
-                .filter(dept -> dept.getId() != null && context.deptIds().contains(dept.getId()))
-                .toList();
     }
 
     public <T> List<T> filterByCreator(String tenantId, List<T> items, java.util.function.Function<T, String> creatorExtractor) {
@@ -168,6 +139,38 @@ public class DataScopeService {
     }
 
     private ScopeContext buildContext(String tenantId, UserAccount principal) {
+        String cacheKey = principal.id() + ":" + tenantId + ":" + principal.dataScopeType();
+        Map<String, ScopeContext> requestCache = requestScopeCache();
+        if (requestCache != null) {
+            ScopeContext cached = requestCache.get(cacheKey);
+            if (cached != null) {
+                return cached;
+            }
+        }
+
+        ScopeContext context = doBuildContext(tenantId, principal);
+        if (requestCache != null) {
+            requestCache.put(cacheKey, context);
+        }
+        return context;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, ScopeContext> requestScopeCache() {
+        RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
+        if (attributes == null) {
+            return null;
+        }
+        Object existing = attributes.getAttribute(REQUEST_SCOPE_CACHE, RequestAttributes.SCOPE_REQUEST);
+        if (existing instanceof Map<?, ?> map) {
+            return (Map<String, ScopeContext>) map;
+        }
+        Map<String, ScopeContext> created = new HashMap<>();
+        attributes.setAttribute(REQUEST_SCOPE_CACHE, created, RequestAttributes.SCOPE_REQUEST);
+        return created;
+    }
+
+    private ScopeContext doBuildContext(String tenantId, UserAccount principal) {
         if (platformAdminSupport.isPlatformSuperAdmin(principal)) {
             return ScopeContext.ALL;
         }
@@ -178,19 +181,15 @@ public class DataScopeService {
             return ScopeContext.ALL;
         }
 
-        SysUserEntity currentEntity = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>()
-                .eq(SysUserEntity::getId, principal.id())
-                .eq(SysUserEntity::getTenantId, tenantId)
-                .eq(SysUserEntity::getDeleted, 0)
-                .last("limit 1"));
-        if (currentEntity == null) {
+        Optional<DataScopeUserQuery.ScopedUser> currentEntity = userQuery.findActive(principal.id(), tenantId);
+        if (currentEntity.isEmpty()) {
             return ScopeContext.NONE;
         }
 
         Set<Long> deptIds = switch (principal.dataScopeType()) {
             case SELF -> Set.of();
-            case DEPT -> currentEntity.getDeptId() == null ? Set.of() : Set.of(currentEntity.getDeptId());
-            case DEPT_AND_CHILDREN -> collectDeptAndChildren(tenantId, currentEntity.getDeptId());
+            case DEPT -> currentEntity.get().deptId() == null ? Set.of() : Set.of(currentEntity.get().deptId());
+            case DEPT_AND_CHILDREN -> collectDeptAndChildren(tenantId, currentEntity.get().deptId());
             case CUSTOM -> principal.customDeptIds() == null ? Set.of() : principal.customDeptIds();
             case ALL -> Set.of();
         };
@@ -201,35 +200,23 @@ public class DataScopeService {
             userIds = Set.of(principal.id());
             usernames = Set.of(principal.username());
         } else {
-            List<SysUserEntity> visibleUsers = loadUsersByDeptIds(tenantId, deptIds);
-            userIds = visibleUsers.stream().map(SysUserEntity::getId).collect(Collectors.toSet());
-            usernames = visibleUsers.stream().map(SysUserEntity::getUsername).collect(Collectors.toSet());
+            List<DataScopeUserQuery.ScopedUser> visibleUsers = userQuery.listByDeptIds(tenantId, deptIds);
+            userIds = visibleUsers.stream().map(DataScopeUserQuery.ScopedUser::id).collect(Collectors.toSet());
+            usernames = visibleUsers.stream().map(DataScopeUserQuery.ScopedUser::username).collect(Collectors.toSet());
         }
         return new ScopeContext(deptIds, userIds, usernames);
-    }
-
-    private List<SysUserEntity> loadUsersByDeptIds(String tenantId, Set<Long> deptIds) {
-        if (deptIds == null || deptIds.isEmpty()) {
-            return List.of();
-        }
-        return sysUserMapper.selectList(new LambdaQueryWrapper<SysUserEntity>()
-                .eq(SysUserEntity::getTenantId, tenantId)
-                .eq(SysUserEntity::getDeleted, 0)
-                .in(SysUserEntity::getDeptId, deptIds));
     }
 
     private Set<Long> collectDeptAndChildren(String tenantId, Long rootDeptId) {
         if (rootDeptId == null) {
             return Set.of();
         }
-        List<SysDeptEntity> departments = sysDeptMapper.selectList(new LambdaQueryWrapper<SysDeptEntity>()
-                .eq(SysDeptEntity::getTenantId, tenantId)
-                .eq(SysDeptEntity::getDeleted, 0));
+        List<DataScopeDeptQuery.ScopedDept> departments = deptQuery.listActive(tenantId);
         var childrenByParentId = departments.stream()
-                .filter(dept -> dept.getId() != null)
+                .filter(dept -> dept.id() != null)
                 .collect(Collectors.groupingBy(
-                        dept -> dept.getParentId() == null ? 0L : dept.getParentId(),
-                        Collectors.mapping(SysDeptEntity::getId, Collectors.toList())
+                        dept -> dept.parentId() == null ? 0L : dept.parentId(),
+                        Collectors.mapping(DataScopeDeptQuery.ScopedDept::id, Collectors.toList())
                 ));
         Set<Long> deptIds = new HashSet<>();
         Queue<Long> queue = new ArrayDeque<>();

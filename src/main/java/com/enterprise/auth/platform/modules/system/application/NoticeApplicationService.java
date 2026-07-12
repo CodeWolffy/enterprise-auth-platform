@@ -4,8 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.HtmlSanitizer;
-import com.enterprise.auth.platform.common.authz.DataScopeService;
-import com.enterprise.auth.platform.common.authz.SecuritySupport;
+import com.enterprise.auth.platform.modules.auth.application.DataScopeService;
+import com.enterprise.auth.platform.modules.auth.application.SecuritySupport;
 import com.enterprise.auth.platform.common.cache.CacheNames;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
@@ -14,7 +14,7 @@ import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysNoti
 import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysNoticeMapper;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.common.web.PaginationSupport;
-import com.enterprise.auth.platform.modules.notification.application.NotificationScenarioPublisher;
+import com.enterprise.auth.platform.common.notification.NotificationScenarioPort;
 import com.enterprise.auth.platform.modules.system.interfaces.NoticeCrudRequest;
 import java.util.List;
 import java.util.Map;
@@ -35,12 +35,12 @@ public class NoticeApplicationService {
 
     private final SysNoticeMapper sysNoticeMapper;
     private final DataScopeService dataScopeService;
-    private final NotificationScenarioPublisher notificationScenarioPublisher;
+    private final NotificationScenarioPort notificationScenarioPublisher;
 
     public NoticeApplicationService(
             SysNoticeMapper sysNoticeMapper,
             DataScopeService dataScopeService,
-            NotificationScenarioPublisher notificationScenarioPublisher
+            NotificationScenarioPort notificationScenarioPublisher
     ) {
         this.sysNoticeMapper = sysNoticeMapper;
         this.dataScopeService = dataScopeService;

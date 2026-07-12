@@ -7,10 +7,12 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.enterprise.auth.platform.common.notification.NotificationScenarioPort;
 import com.enterprise.auth.platform.modules.notification.application.NotificationPublishCommand;
-import com.enterprise.auth.platform.modules.notification.application.NotificationPublisher;
 import com.enterprise.auth.platform.modules.notification.application.NotificationScenarioPublisher;
 import com.enterprise.auth.platform.modules.notification.application.NotificationSseRegistry;
+import com.enterprise.auth.platform.modules.system.application.OutboxDispatchWorker;
+import com.enterprise.auth.platform.modules.system.application.OutboxWriter;
 import com.enterprise.auth.platform.modules.user.application.UserAuthenticationFacade;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,28 +22,37 @@ import org.junit.jupiter.api.Test;
 
 class NotificationScenarioPublisherTest {
 
-    private NotificationPublisher notificationPublisher;
     private NotificationSseRegistry sseRegistry;
     private UserAuthenticationFacade userAuthenticationFacade;
+    private OutboxWriter outboxWriter;
     private NotificationScenarioPublisher publisher;
     private List<NotificationPublishCommand> publishedCommands;
 
     @BeforeEach
     void setUp() {
-        notificationPublisher = mock(NotificationPublisher.class);
         sseRegistry = mock(NotificationSseRegistry.class);
         userAuthenticationFacade = mock(UserAuthenticationFacade.class);
+        outboxWriter = mock(OutboxWriter.class);
+        OutboxDispatchWorker outboxDispatchWorker = mock(OutboxDispatchWorker.class);
         publishedCommands = new ArrayList<>();
-        when(notificationPublisher.publish(any())).thenAnswer(invocation -> {
-            publishedCommands.add(invocation.getArgument(0, NotificationPublishCommand.class));
+        when(outboxWriter.enqueue(any(), any(), any(), any(), any())).thenAnswer(invocation -> {
+            Object payload = invocation.getArgument(4);
+            if (payload instanceof NotificationPublishCommand command) {
+                publishedCommands.add(command);
+            }
             return 1L;
         });
-        publisher = new NotificationScenarioPublisher(notificationPublisher, sseRegistry, userAuthenticationFacade);
+        publisher = new NotificationScenarioPublisher(
+                sseRegistry,
+                userAuthenticationFacade,
+                outboxWriter,
+                outboxDispatchWorker
+        );
     }
 
     @Test
     void workflowTaskApprovedShouldLinkToMyInstancesRoute() {
-        publisher.workflowTaskApproved(new NotificationScenarioPublisher.WorkflowTaskDecisionEvent(
+        publisher.workflowTaskApproved(new NotificationScenarioPort.WorkflowTaskDecisionEvent(
                 "tenant-a", 1L, "测试流程", "BK-001", 10L, 100L, "审批节点", "admin", false));
 
         assertThat(publishedCommands).hasSize(1);
@@ -52,7 +63,7 @@ class NotificationScenarioPublisherTest {
 
     @Test
     void workflowTaskRejectedShouldLinkToMyInstancesRoute() {
-        publisher.workflowTaskRejected(new NotificationScenarioPublisher.WorkflowTaskDecisionEvent(
+        publisher.workflowTaskRejected(new NotificationScenarioPort.WorkflowTaskDecisionEvent(
                 "tenant-a", 1L, "测试流程", "BK-002", 10L, 101L, "审批节点", "admin", true));
 
         assertThat(publishedCommands).hasSize(1);
@@ -61,7 +72,7 @@ class NotificationScenarioPublisherTest {
 
     @Test
     void workflowTaskTransferredShouldLinkToMyInstancesRoute() {
-        publisher.workflowTaskTransferred(new NotificationScenarioPublisher.WorkflowTaskTransferEvent(
+        publisher.workflowTaskTransferred(new NotificationScenarioPort.WorkflowTaskTransferEvent(
                 "tenant-a", 1L, "测试流程", "BK-003", 10L, 100L, 102L, "审批节点", 20L, "user-b", "admin"));
 
         assertThat(publishedCommands).hasSize(1);
@@ -70,7 +81,7 @@ class NotificationScenarioPublisherTest {
 
     @Test
     void workflowInstanceWithdrawnShouldLinkToMyInstancesRoute() {
-        publisher.workflowInstanceWithdrawn(new NotificationScenarioPublisher.WorkflowInstanceClosedEvent(
+        publisher.workflowInstanceWithdrawn(new NotificationScenarioPort.WorkflowInstanceClosedEvent(
                 "tenant-a", 1L, "测试流程", "BK-004", Set.of(10L), Set.of(), "admin"));
 
         assertThat(publishedCommands).hasSize(1);
@@ -79,7 +90,7 @@ class NotificationScenarioPublisherTest {
 
     @Test
     void workflowInstanceTerminatedShouldLinkToMyInstancesRoute() {
-        publisher.workflowInstanceTerminated(new NotificationScenarioPublisher.WorkflowInstanceClosedEvent(
+        publisher.workflowInstanceTerminated(new NotificationScenarioPort.WorkflowInstanceClosedEvent(
                 "tenant-a", 1L, "测试流程", "BK-005", Set.of(10L), Set.of(), "admin"));
 
         assertThat(publishedCommands).hasSize(1);
