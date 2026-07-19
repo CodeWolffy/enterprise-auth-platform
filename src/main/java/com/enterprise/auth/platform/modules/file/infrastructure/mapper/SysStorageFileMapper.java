@@ -16,6 +16,37 @@ public interface SysStorageFileMapper extends BaseMapper<SysStorageFileEntity> {
     @InterceptorIgnore(tenantLine = "true")
     @Select("""
             <script>
+            SELECT COUNT(1) AS fileCount,
+                   COALESCE(SUM(CASE WHEN lifecycle_status = 'READY' THEN file_size ELSE 0 END), 0) AS totalBytes
+            FROM sys_storage_file
+            WHERE deleted = 0
+            <if test="!platformScope">
+              AND tenant_id = #{tenantId}
+            </if>
+            <if test="ownerUserIds != null">
+              <choose>
+                <when test="ownerUserIds.size() == 0">
+                  AND 1 = 0
+                </when>
+                <otherwise>
+                  AND owner_user_id IN
+                  <foreach collection="ownerUserIds" item="ownerUserId" open="(" separator="," close=")">
+                    #{ownerUserId}
+                  </foreach>
+                </otherwise>
+              </choose>
+            </if>
+            </script>
+            """)
+    FileStorageStatsRow aggregateStorageStats(
+            @Param("tenantId") String tenantId,
+            @Param("platformScope") boolean platformScope,
+            @Param("ownerUserIds") Set<Long> ownerUserIds
+    );
+
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("""
+            <script>
             SELECT COALESCE(SUM(file_size), 0)
             FROM sys_storage_file
             WHERE deleted = 0

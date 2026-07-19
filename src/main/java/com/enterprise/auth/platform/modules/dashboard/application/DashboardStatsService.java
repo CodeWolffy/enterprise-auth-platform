@@ -21,6 +21,7 @@ import com.enterprise.auth.platform.modules.dashboard.interfaces.DashboardStatsR
 import com.enterprise.auth.platform.modules.dashboard.interfaces.DashboardStatsResponse.RecentAuditEvent;
 import com.enterprise.auth.platform.modules.dashboard.interfaces.DashboardStatsResponse.ServiceHealthItem;
 import com.enterprise.auth.platform.modules.file.application.FileStatsFacade;
+import com.enterprise.auth.platform.modules.file.application.FileStatsFacade.StorageStats;
 import com.enterprise.auth.platform.modules.log.application.LogDailyTrendPoint;
 import com.enterprise.auth.platform.modules.log.application.LogRecentAuditEvent;
 import com.enterprise.auth.platform.modules.log.application.LogStatsFacade;
@@ -87,8 +88,7 @@ public class DashboardStatsService {
         long userCount = userStatsFacade.countUsers(activeTenantId, platformScope, visibleUserIds);
         long roleCount = roleStatsFacade.countRoles(activeTenantId, platformScope);
         long tenantCount = platformScope ? tenantStatsFacade.countTenants() : 1;
-        long fileCount = fileStatsFacade.countFiles(activeTenantId, platformScope, visibleUserIds);
-        long storageBytes = fileStatsFacade.sumStorageBytes(activeTenantId, platformScope, visibleUserIds);
+        StorageStats storageStats = fileStatsFacade.storageStats(activeTenantId, platformScope, visibleUserIds);
         long operationLogCount = logStatsFacade.countOperationLogs(activeTenantId, platformScope, visibleUsernames, false);
         long recentOperationLogCount = logStatsFacade.countOperationLogs(activeTenantId, platformScope, visibleUsernames, true);
         ZoneId zone = TimeZoneContext.getZone();
@@ -102,7 +102,7 @@ public class DashboardStatsService {
         return new DashboardMetrics(
                 new StatsScope(scope, platformScope ? null : activeTenantId),
                 new DirectoryCounts(userCount, roleCount, tenantCount),
-                new StorageUsage(fileCount, storageBytes),
+                new StorageUsage(storageStats.fileCount(), storageStats.totalBytes()),
                 new ActivitySummary(
                         operationLogCount,
                         recentOperationLogCount,

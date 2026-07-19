@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
+import com.enterprise.auth.platform.modules.system.application.OutboxDispatchWorker;
 import com.enterprise.auth.platform.modules.user.application.AuthenticationUser;
 import com.enterprise.auth.platform.modules.user.application.UserAuthenticationFacade;
 import java.util.Optional;
@@ -42,6 +43,9 @@ class TenantCatalogControllerTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private OutboxDispatchWorker outboxDispatchWorker;
 
     @MockitoBean
     private AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
@@ -128,13 +132,7 @@ class TenantCatalogControllerTest {
                 .andExpect(jsonPath("$.data.appKey").value(UPDATED_APP_KEY))
                 .andExpect(jsonPath("$.data.referencedTenantCount").value(1));
 
-        Integer syncedCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM sys_tenant_menu WHERE tenant_id = ? AND menu_id = ?",
-                Integer.class,
-                REFERENCED_TENANT_ID,
-                syncedMenuId
-        );
-        org.junit.jupiter.api.Assertions.assertEquals(1, syncedCount);
+        awaitSyncedMenu(syncedMenuId);
 
         mockMvc.perform(delete("/api/tenant-catalog/packages/{id}", packageId)
                         .with(bearer(principal))
@@ -174,7 +172,28 @@ class TenantCatalogControllerTest {
         );
     }
 
+    private void awaitSyncedMenu(Long menuId) throws InterruptedException {
+        for (int attempt = 0; attempt < 50; attempt++) {
+            outboxDispatchWorker.dispatchBatch();
+            Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM sys_tenant_menu WHERE tenant_id = ? AND menu_id = ?",
+                    Integer.class,
+                    REFERENCED_TENANT_ID,
+                    menuId
+            );
+            if (count != null && count == 1) {
+                return;
+            }
+            Thread.sleep(20L);
+        }
+        org.junit.jupiter.api.Assertions.fail("tenant package menu sync did not complete in time");
+    }
+
     private void cleanupTestData() {
+        jdbcTemplate.update(
+                "DELETE FROM sys_outbox_event WHERE event_type = 'TENANT_PACKAGE_MENU_SYNC' AND aggregate_id = ?",
+                PACKAGE_CODE
+        );
         jdbcTemplate.update("DELETE FROM sys_tenant_menu WHERE tenant_id = ?", REFERENCED_TENANT_ID);
         jdbcTemplate.update("DELETE FROM sys_tenant WHERE tenant_id = ?", REFERENCED_TENANT_ID);
         jdbcTemplate.update("DELETE FROM sys_tenant_package WHERE tenant_id = 'platform' AND package_code = ?", PACKAGE_CODE);

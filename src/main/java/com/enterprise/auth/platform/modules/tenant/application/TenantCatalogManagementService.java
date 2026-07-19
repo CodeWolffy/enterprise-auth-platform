@@ -4,7 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.common.outbox.OutboxEventPublisher;
 import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
+import com.enterprise.auth.platform.modules.tenant.api.TenantPackageMenuSyncEvent;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantEntity;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantPackageEntity;
 import com.enterprise.auth.platform.modules.tenant.infrastructure.mapper.SysTenantMapper;
@@ -25,18 +27,18 @@ public class TenantCatalogManagementService {
 
     private final SysTenantPackageMapper sysTenantPackageMapper;
     private final SysTenantMapper sysTenantMapper;
-    private final TenantMenuService tenantMenuService;
+    private final OutboxEventPublisher outboxEventPublisher;
     private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
 
     public TenantCatalogManagementService(
             SysTenantPackageMapper sysTenantPackageMapper,
             SysTenantMapper sysTenantMapper,
-            TenantMenuService tenantMenuService,
+            OutboxEventPublisher outboxEventPublisher,
             AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService
     ) {
         this.sysTenantPackageMapper = sysTenantPackageMapper;
         this.sysTenantMapper = sysTenantMapper;
-        this.tenantMenuService = tenantMenuService;
+        this.outboxEventPublisher = outboxEventPublisher;
         this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
     }
 
@@ -120,7 +122,7 @@ public class TenantCatalogManagementService {
         if (!oldCode.equals(packageCode)) {
             migratePackageReference(oldCode, packageCode);
         }
-        syncPackageTenantMenus(packageCode);
+        enqueuePackageTenantMenuSync(packageCode);
         evictPrincipalSnapshots();
         return toPackageView(entity, loadPackageReferences().get(packageCode));
     }
@@ -137,21 +139,17 @@ public class TenantCatalogManagementService {
         evictPrincipalSnapshots();
     }
 
-    private void syncPackageTenantMenus(String packageCode) {
+    private void enqueuePackageTenantMenuSync(String packageCode) {
         if (!StringUtils.hasText(packageCode)) {
             return;
         }
-        List<String> tenantIds = sysTenantMapper.selectList(new LambdaQueryWrapper<SysTenantEntity>()
-                        .eq(SysTenantEntity::getDeleted, 0)
-                        .eq(SysTenantEntity::getPackageCode, packageCode))
-                .stream()
-                .map(SysTenantEntity::getTenantId)
-                .filter(StringUtils::hasText)
-                .distinct()
-                .toList();
-        for (String tenantId : tenantIds) {
-            tenantMenuService.saveTenantMenuByPackage(tenantId, packageCode);
-        }
+        outboxEventPublisher.enqueue(
+                TenantPackageMenuSyncEvent.TYPE,
+                "platform",
+                TenantPackageMenuSyncEvent.AGGREGATE_TYPE,
+                packageCode,
+                new TenantPackageMenuSyncEvent(packageCode)
+        );
     }
 
     private java.util.Map<String, PackageReferenceHint> loadPackageReferences() {
@@ -174,13 +172,7 @@ public class TenantCatalogManagementService {
     }
 
     private void migratePackageReference(String oldCode, String newCode) {
-        List<SysTenantEntity> tenants = sysTenantMapper.selectList(new LambdaQueryWrapper<SysTenantEntity>()
-                .eq(SysTenantEntity::getDeleted, 0)
-                .eq(SysTenantEntity::getPackageCode, oldCode));
-        for (SysTenantEntity tenant : tenants) {
-            tenant.setPackageCode(newCode);
-            sysTenantMapper.updateById(tenant);
-        }
+        sysTenantMapper.updatePackageCodeReferences(oldCode, newCode);
     }
 
     private boolean packageExists(String packageCode, Long excludeId) {

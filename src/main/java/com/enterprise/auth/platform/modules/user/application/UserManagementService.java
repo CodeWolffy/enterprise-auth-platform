@@ -5,7 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.plugins.IgnoreStrategy;
 import com.baomidou.mybatisplus.core.plugins.InterceptorIgnoreHelper;
 import com.enterprise.auth.platform.modules.log.application.LogPublisher;
-import com.enterprise.auth.platform.modules.auth.application.SessionIndexService;
+import com.enterprise.auth.platform.modules.user.api.UserSessionIndexPort;
 import com.enterprise.auth.platform.modules.dept.application.DeptQueryFacade;
 import com.enterprise.auth.platform.modules.role.application.RoleCatalogFacade;
 import com.enterprise.auth.platform.modules.role.application.RoleView;
@@ -18,13 +18,11 @@ import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEn
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserRoleEntity;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserRoleMapper;
-import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
+import com.enterprise.auth.platform.modules.user.api.UserAuthorizationInvalidationPort;
 import com.enterprise.auth.platform.modules.security.application.SecurityPolicyApplicationService;
-import com.enterprise.auth.platform.modules.auth.application.DataScopeService;
-import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
+import com.enterprise.auth.platform.modules.user.api.UserAccessControlPort;
+import com.enterprise.auth.platform.modules.user.api.UserPasswordHashPort;
 import com.enterprise.auth.platform.common.notification.NotificationScenarioPort;
-import com.enterprise.auth.platform.modules.auth.application.SecuritySupport;
-import com.enterprise.auth.platform.modules.auth.domain.AuthContextHolder;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.modules.user.interfaces.CreateUserRequest;
@@ -47,13 +45,13 @@ public class UserManagementService {
     private final SysUserRoleMapper sysUserRoleMapper;
     private final RoleQueryFacade roleQueryFacade;
     private final DeptQueryFacade deptQueryFacade;
-    private final PasswordHasher passwordHasher;
+    private final UserPasswordHashPort passwordHashPort;
     private final UserDirectoryService userDirectoryService;
     private final RoleCatalogFacade roleCatalogFacade;
     private final LogPublisher logPublisher;
-    private final DataScopeService dataScopeService;
-    private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
-    private final SessionIndexService sessionIndexService;
+    private final UserAccessControlPort accessControlPort;
+    private final UserAuthorizationInvalidationPort authorizationInvalidationPort;
+    private final UserSessionIndexPort sessionIndexPort;
     private final SecurityPolicyApplicationService securityPolicyApplicationService;
     private final NotificationScenarioPort notificationScenarioPublisher;
     private final TenantProfileFacade tenantProfileFacade;
@@ -63,13 +61,13 @@ public class UserManagementService {
             SysUserRoleMapper sysUserRoleMapper,
             RoleQueryFacade roleQueryFacade,
             DeptQueryFacade deptQueryFacade,
-            PasswordHasher passwordHasher,
+            UserPasswordHashPort passwordHashPort,
             UserDirectoryService userDirectoryService,
             RoleCatalogFacade roleCatalogFacade,
             LogPublisher logPublisher,
-            DataScopeService dataScopeService,
-            AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
-            SessionIndexService sessionIndexService,
+            UserAccessControlPort accessControlPort,
+            UserAuthorizationInvalidationPort authorizationInvalidationPort,
+            UserSessionIndexPort sessionIndexPort,
             SecurityPolicyApplicationService securityPolicyApplicationService,
             NotificationScenarioPort notificationScenarioPublisher,
             TenantProfileFacade tenantProfileFacade
@@ -78,13 +76,13 @@ public class UserManagementService {
         this.sysUserRoleMapper = sysUserRoleMapper;
         this.roleQueryFacade = roleQueryFacade;
         this.deptQueryFacade = deptQueryFacade;
-        this.passwordHasher = passwordHasher;
+        this.passwordHashPort = passwordHashPort;
         this.userDirectoryService = userDirectoryService;
         this.roleCatalogFacade = roleCatalogFacade;
         this.logPublisher = logPublisher;
-        this.dataScopeService = dataScopeService;
-        this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
-        this.sessionIndexService = sessionIndexService;
+        this.accessControlPort = accessControlPort;
+        this.authorizationInvalidationPort = authorizationInvalidationPort;
+        this.sessionIndexPort = sessionIndexPort;
         this.securityPolicyApplicationService = securityPolicyApplicationService;
         this.notificationScenarioPublisher = notificationScenarioPublisher;
         this.tenantProfileFacade = tenantProfileFacade;
@@ -106,7 +104,7 @@ public class UserManagementService {
         entity.setDisplayName(StringUtils.hasText(request.displayName()) ? request.displayName() : request.username());
         entity.setMobile(request.mobile());
         entity.setEmail(request.email());
-        entity.setPasswordHash(passwordHasher.hash(request.password()));
+        entity.setPasswordHash(passwordHashPort.hash(request.password()));
         entity.setEnabled(Boolean.FALSE.equals(request.enabled()) ? 0 : 1);
         entity.setSessionVersion(1);
         entity.setMustChangePassword(1);
@@ -118,18 +116,18 @@ public class UserManagementService {
         }
 
         syncUserRoles(tenantId, entity.getId(), request.roleCodes());
-        permissionSnapshotInvalidationService.invalidateUser(entity.getId(), tenantId, entity.getUsername());
+        authorizationInvalidationPort.invalidateUser(entity.getId(), tenantId, entity.getUsername());
         return loadSummary(entity.getId(), tenantId);
     }
 
     @Transactional
     public UserSummary create(CreateUserRequest request) {
-        return createUser(resolveTargetTenantId(request.tenantId()), request, SecuritySupport.currentOperator());
+        return createUser(resolveTargetTenantId(request.tenantId()), request, accessControlPort.currentOperator());
     }
 
     @Transactional
     public UserSummary update(Long userId, CreateUserRequest request) {
-        String operator = SecuritySupport.currentOperator();
+        String operator = accessControlPort.currentOperator();
         SysUserEntity entity = getUser(userId);
         String tenantId = entity.getTenantId();
         validateDeptAccess(tenantId, request.deptId());
@@ -149,7 +147,7 @@ public class UserManagementService {
         }
         if (StringUtils.hasText(request.password())) {
             validatePassword(request.password(), tenantId);
-            entity.setPasswordHash(passwordHasher.hash(request.password()));
+            entity.setPasswordHash(passwordHashPort.hash(request.password()));
             entity.setSessionVersion((entity.getSessionVersion() == null ? 1 : entity.getSessionVersion()) + 1);
             entity.setMustChangePassword(1);
             entity.setPasswordUpdatedAt(TimeSupport.now());
@@ -161,7 +159,7 @@ public class UserManagementService {
         if (request.roleCodes() != null) {
             syncUserRoles(tenantId, entity.getId(), request.roleCodes());
         }
-        permissionSnapshotInvalidationService.invalidateUser(entity.getId(), tenantId, entity.getUsername());
+        authorizationInvalidationPort.invalidateUser(entity.getId(), tenantId, entity.getUsername());
         if (invalidateSessions) {
             kickoutUserSessions(entity.getId());
         }
@@ -170,13 +168,13 @@ public class UserManagementService {
 
     @Transactional
     public UserSummary assignRoles(Long userId, Set<String> roleCodes) {
-        String operator = SecuritySupport.currentOperator();
+        String operator = accessControlPort.currentOperator();
         SysUserEntity entity = getUser(userId);
         String tenantId = entity.getTenantId();
         validateSelfRoleAssignment(entity, roleCodes);
         validateRoleCodesRequired(roleCodes);
         syncUserRoles(tenantId, userId, roleCodes);
-        permissionSnapshotInvalidationService.invalidateUser(entity.getId(), tenantId, entity.getUsername());
+        authorizationInvalidationPort.invalidateUser(entity.getId(), tenantId, entity.getUsername());
         return loadSummary(userId, tenantId);
     }
 
@@ -200,7 +198,7 @@ public class UserManagementService {
 
     @Transactional
     public void delete(Long userId) {
-        String operator = SecuritySupport.currentOperator();
+        String operator = accessControlPort.currentOperator();
         SysUserEntity entity = getUser(userId);
         String tenantId = entity.getTenantId();
         validateSelfDeletion(entity);
@@ -211,7 +209,7 @@ public class UserManagementService {
         entity.setEnabled(0);
         sysUserMapper.updateById(entity);
         sysUserMapper.deleteById(entity.getId());
-        permissionSnapshotInvalidationService.invalidateUser(entity.getId(), tenantId, entity.getUsername());
+        authorizationInvalidationPort.invalidateUser(entity.getId(), tenantId, entity.getUsername());
         kickoutUserSessions(entity.getId());
         notificationScenarioPublisher.accountDisabled(tenantId, entity.getId(), entity.getUsername(), operator);
     }
@@ -222,7 +220,7 @@ public class UserManagementService {
         }
         afterCommit(() -> {
             StpUtil.kickout(userId);
-            sessionIndexService.removeUser(userId);
+        sessionIndexPort.removeUser(userId);
         });
     }
 
@@ -274,7 +272,7 @@ public class UserManagementService {
         if (entity == null || entity.getId() == null) {
             return false;
         }
-        return AuthContextHolder.currentUser()
+        return accessControlPort.currentUser()
                 .map(user -> entity.getId().equals(user.id()) && entity.getTenantId().equals(user.tenantId()))
                 .orElse(false);
     }
@@ -315,7 +313,7 @@ public class UserManagementService {
     }
 
     private SysUserEntity getUser(Long userId) {
-        boolean globalScope = dataScopeService.isPlatformSuperAdmin();
+        boolean globalScope = accessControlPort.isPlatformSuperAdmin();
         SysUserEntity entity;
         if (globalScope) {
             entity = InterceptorIgnoreHelper.execute(
@@ -335,7 +333,7 @@ public class UserManagementService {
         if (entity == null) {
             throw new BusinessException("用户不存在");
         }
-        if (!dataScopeService.canAccessUser(entity.getTenantId(), entity.getId())) {
+        if (!accessControlPort.canAccessUser(entity.getTenantId(), entity.getId())) {
             throw new BusinessException("无权访问该用户");
         }
         return entity;
@@ -345,7 +343,7 @@ public class UserManagementService {
         if (deptId == null) {
             return;
         }
-        if (!dataScopeService.canAccessDept(tenantId, deptId)
+        if (!accessControlPort.canAccessDept(tenantId, deptId)
                 || deptQueryFacade.countByIds(tenantId, List.of(deptId)) != 1) {
             throw new BusinessException("无权使用该部门");
         }
@@ -367,7 +365,7 @@ public class UserManagementService {
         String previousTenantId = TenantContext.getTenantId();
         boolean previousGlobalScope = TenantContext.isGlobalScope();
         try {
-            if (dataScopeService.isPlatformSuperAdmin()) {
+            if (accessControlPort.isPlatformSuperAdmin()) {
                 TenantContext.setGlobalScope(tenantId);
             } else {
                 TenantContext.setTenantId(tenantId);
@@ -389,7 +387,7 @@ public class UserManagementService {
 
     private String resolveTargetTenantId(String requestedTenantId) {
         String currentTenantId = TenantContextSupport.currentTenantIdOrPlatform();
-        if (!dataScopeService.isPlatformSuperAdmin()) {
+        if (!accessControlPort.isPlatformSuperAdmin()) {
             return currentTenantId;
         }
         String targetTenantId = StringUtils.hasText(requestedTenantId) ? requestedTenantId.trim() : currentTenantId;

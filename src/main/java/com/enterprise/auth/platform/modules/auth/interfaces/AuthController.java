@@ -186,7 +186,7 @@ public class AuthController {
     @Operation(summary = "强制指定会话下线")
     @PostMapping("/sessions/{sessionId}/offline")
     public ApiResponse<Void> forceOffline(
-            @Parameter(description = "会话ID") @PathVariable String sessionId
+            @Parameter(description = "会话管理ID（非认证令牌）") @PathVariable String sessionId
     ) {
         sessionApplicationService.forceOffline(currentUser(), sessionId);
         return ApiResponse.ok();

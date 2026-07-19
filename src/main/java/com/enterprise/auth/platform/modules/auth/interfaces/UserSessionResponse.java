@@ -5,7 +5,7 @@ import java.time.Instant;
 
 @Schema(description = "在线会话响应")
 public record UserSessionResponse(
-        @Schema(description = "会话ID") String sessionId,
+        @Schema(description = "会话管理ID，不具备认证能力") String sessionId,
         @Schema(description = "用户名") String username,
         @Schema(description = "登录租户编码") String tenantId,
         @Schema(description = "当前活跃租户编码") String activeTenantId,

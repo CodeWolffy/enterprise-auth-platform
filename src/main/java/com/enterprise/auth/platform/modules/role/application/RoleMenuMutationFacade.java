@@ -8,6 +8,7 @@ import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMa
 import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMenuMapper;
 import java.util.Collection;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
 import org.springframework.stereotype.Service;
@@ -40,22 +41,31 @@ public class RoleMenuMutationFacade {
             Set<Long> normalizedMenuIds = menuIds.stream()
                     .filter(java.util.Objects::nonNull)
                     .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
-            for (Long menuId : normalizedMenuIds) {
-                Long existing = sysRoleMenuMapper.selectCount(new LambdaQueryWrapper<SysRoleMenuEntity>()
-                        .eq(SysRoleMenuEntity::getTenantId, tenantId)
-                        .eq(SysRoleMenuEntity::getRoleId, role.getId())
-                        .eq(SysRoleMenuEntity::getMenuId, menuId));
-                if (existing != null && existing > 0) {
-                    continue;
-                }
-                SysRoleMenuEntity relation = new SysRoleMenuEntity();
-                relation.setTenantId(tenantId);
-                relation.setRoleId(role.getId());
-                relation.setMenuId(menuId);
-                sysRoleMenuMapper.insert(relation);
+            Set<Long> existingMenuIds = sysRoleMenuMapper.selectList(new LambdaQueryWrapper<SysRoleMenuEntity>()
+                            .select(SysRoleMenuEntity::getMenuId)
+                            .eq(SysRoleMenuEntity::getTenantId, tenantId)
+                            .eq(SysRoleMenuEntity::getRoleId, role.getId())
+                            .in(SysRoleMenuEntity::getMenuId, normalizedMenuIds))
+                    .stream()
+                    .map(SysRoleMenuEntity::getMenuId)
+                    .collect(java.util.stream.Collectors.toSet());
+            List<SysRoleMenuEntity> relations = normalizedMenuIds.stream()
+                    .filter(menuId -> !existingMenuIds.contains(menuId))
+                    .map(menuId -> roleMenu(tenantId, role.getId(), menuId))
+                    .toList();
+            if (!relations.isEmpty()) {
+                sysRoleMenuMapper.insert(relations);
             }
             return null;
         });
+    }
+
+    private SysRoleMenuEntity roleMenu(String tenantId, Long roleId, Long menuId) {
+        SysRoleMenuEntity relation = new SysRoleMenuEntity();
+        relation.setTenantId(tenantId);
+        relation.setRoleId(roleId);
+        relation.setMenuId(menuId);
+        return relation;
     }
 
     private <T> T withTenant(String tenantId, Supplier<T> supplier) {

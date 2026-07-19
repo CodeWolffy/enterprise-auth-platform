@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.modules.user.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.enterprise.auth.platform.modules.auth.application.DataScopeUserQuery;
+import com.enterprise.auth.platform.modules.iam.api.DataScopeUserQuery;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
 import java.util.List;

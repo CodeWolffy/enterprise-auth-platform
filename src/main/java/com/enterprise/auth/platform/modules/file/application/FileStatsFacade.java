@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.enterprise.auth.platform.modules.file.infrastructure.entity.SysStorageFileEntity;
 import com.enterprise.auth.platform.modules.file.infrastructure.mapper.SysStorageFileMapper;
+import com.enterprise.auth.platform.modules.file.infrastructure.mapper.FileStorageStatsRow;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,25 @@ public class FileStatsFacade {
                 visibleUserIds.orElse(null)
         );
         return totalSize == null ? 0L : Math.max(totalSize, 0L);
+    }
+
+    public StorageStats storageStats(String tenantId, boolean platformScope, Optional<Set<Long>> visibleUserIds) {
+        FileStorageStatsRow row = sysStorageFileMapper.aggregateStorageStats(
+                tenantId,
+                platformScope,
+                visibleUserIds.orElse(null)
+        );
+        if (row == null) {
+            return new StorageStats(0L, 0L);
+        }
+        return new StorageStats(nonNegative(row.getFileCount()), nonNegative(row.getTotalBytes()));
+    }
+
+    private long nonNegative(Long value) {
+        return value == null ? 0L : Math.max(value, 0L);
+    }
+
+    public record StorageStats(long fileCount, long totalBytes) {
     }
 
     private LambdaQueryWrapper<SysStorageFileEntity> fileScope(

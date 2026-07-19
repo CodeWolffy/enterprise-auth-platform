@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.enterprise.auth.platform.common.context.TimeZoneContext;
+import com.enterprise.auth.platform.common.exception.InvalidRequestException;
 import java.time.ZoneId;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -49,7 +50,7 @@ class TimeZoneInterceptorTest {
         request.addHeader(TimeZoneInterceptor.HEADER_NAME, "Mars/Base");
 
         assertThrows(
-                IllegalArgumentException.class,
+                InvalidRequestException.class,
                 () -> interceptor.preHandle(request, response, new Object())
         );
     }

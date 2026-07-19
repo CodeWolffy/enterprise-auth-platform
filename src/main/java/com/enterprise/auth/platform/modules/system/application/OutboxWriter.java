@@ -1,6 +1,8 @@
 package com.enterprise.auth.platform.modules.system.application;
 
 import com.enterprise.auth.platform.common.TimeSupport;
+import com.enterprise.auth.platform.common.outbox.OutboxEventPublisher;
+import com.enterprise.auth.platform.common.outbox.OutboxEventTypes;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysOutboxEventEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysOutboxEventMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -15,27 +17,35 @@ import org.springframework.util.StringUtils;
  * 事务 Outbox 写入端：业务事务内只落库，提交后由 worker 投递。
  */
 @Service
-public class OutboxWriter {
+public class OutboxWriter implements OutboxEventPublisher {
 
-    public static final String TYPE_NOTIFICATION_PUBLISH = "NOTIFICATION_PUBLISH";
-    public static final String TYPE_PASSWORD_RESET_MAIL = "PASSWORD_RESET_MAIL";
+    public static final String TYPE_NOTIFICATION_PUBLISH = OutboxEventTypes.NOTIFICATION_PUBLISH;
+    public static final String TYPE_PASSWORD_RESET_MAIL = OutboxEventTypes.PASSWORD_RESET_MAIL;
 
     private static final Logger log = LoggerFactory.getLogger(OutboxWriter.class);
 
     private final SysOutboxEventMapper outboxEventMapper;
     private final ObjectMapper objectMapper;
+    private final OutboxPayloadProtectionService payloadProtectionService;
 
-    public OutboxWriter(SysOutboxEventMapper outboxEventMapper, ObjectMapper objectMapper) {
+    public OutboxWriter(
+            SysOutboxEventMapper outboxEventMapper,
+            ObjectMapper objectMapper,
+            OutboxPayloadProtectionService payloadProtectionService
+    ) {
         this.outboxEventMapper = outboxEventMapper;
         this.objectMapper = objectMapper;
+        this.payloadProtectionService = payloadProtectionService;
     }
 
     @Transactional
+    @Override
     public long enqueue(String eventType, String tenantId, Object payload) {
         return enqueue(eventType, tenantId, null, null, payload);
     }
 
     @Transactional
+    @Override
     public long enqueue(
             String eventType,
             String tenantId,
@@ -51,7 +61,7 @@ public class OutboxWriter {
         entity.setEventType(eventType.trim());
         entity.setAggregateType(aggregateType);
         entity.setAggregateId(aggregateId);
-        entity.setPayloadJson(toJson(payload));
+        entity.setPayloadJson(payloadProtectionService.protect(entity.getEventType(), toJson(payload)));
         entity.setStatus("PENDING");
         entity.setAttempts(0);
         entity.setMaxAttempts(8);

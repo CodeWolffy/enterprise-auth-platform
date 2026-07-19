@@ -50,7 +50,8 @@ public class SessionApplicationService {
     }
 
     public void logout(String sessionId, String username, String tenantId) {
-        Map<String, Object> payload = sessionAuditPayload(sessionId);
+        String managementId = sessionIndexService.managementId(sessionId).orElse("");
+        Map<String, Object> payload = sessionAuditPayload(managementId, sessionId);
         StpUtil.logoutByTokenValue(sessionId);
         sessionIndexService.remove(sessionId);
         logPublisher.publish("LOGOUT", username, tenantId, payload);
@@ -77,13 +78,15 @@ public class SessionApplicationService {
     }
 
     public void forceOffline(UserAccount currentUser, String sessionId) {
-        Long targetUserId = resolveLoginId(sessionId);
-        String targetTenantId = sessionAttribute(sessionId, "tenantId");
+        String token = sessionIndexService.resolveToken(sessionId)
+                .orElseThrow(() -> new BusinessException("SESSION_NOT_FOUND", "会话不存在"));
+        Long targetUserId = resolveLoginId(token);
+        String targetTenantId = sessionAttribute(token, "tenantId");
         if (!StringUtils.hasText(targetTenantId)) {
-            sessionIndexService.remove(sessionId);
+            sessionIndexService.remove(token);
             throw new BusinessException("SESSION_INVALID", "会话元数据不完整");
         }
-        Map<String, Object> payload = sessionAuditPayload(sessionId);
+        Map<String, Object> payload = sessionAuditPayload(sessionId, token);
         boolean sameOwner = currentUser.id().equals(targetUserId);
         boolean canManage = currentUser.permissions().contains(PermissionCodes.SESSION_KICK);
         boolean platformAdmin = platformAdminSupport.isPlatformSuperAdmin(currentUser);
@@ -92,18 +95,33 @@ public class SessionApplicationService {
         if (!sameOwner && (!canManage || !sameTenantOrPlatform || !visibleTarget)) {
             throw new BusinessException("ACCESS_DENIED", "无权操作此会话");
         }
-        StpUtil.kickoutByTokenValue(sessionId);
-        sessionIndexService.remove(sessionId);
+        StpUtil.kickoutByTokenValue(token);
+        sessionIndexService.remove(token);
         payload.put("targetUserId", targetUserId);
         logPublisher.publish("SESSION_FORCED_OFFLINE", currentUser.username(), currentUser.tenantId(), payload);
         notificationScenarioPublisher.sessionForcedOffline(targetTenantId, targetUserId, currentUser.username(), payload);
     }
 
     private List<UserSessionResponse> ownSessions(UserAccount currentUser, String currentToken) {
-        return StpUtil.getTokenValueListByLoginId(currentUser.id()).stream()
-                .map(token -> safeSessionResponse(token, currentToken))
+        List<String> tokens = StpUtil.getTokenValueListByLoginId(currentUser.id());
+        Map<String, SessionIndexService.IndexedSession> indexedByToken = sessionIndexService
+                .pageUser(currentUser.id(), 0, Math.max(tokens.size(), 1))
+                .map(Page::records)
+                .orElseGet(List::of)
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        SessionIndexService.IndexedSession::token,
+                        session -> session,
+                        (left, right) -> left
+                ));
+        return tokens.stream()
+                .map(token -> Optional.ofNullable(indexedByToken.get(token))
+                        .map(indexed -> withCurrentSession(indexed, currentToken))
+                        .or(() -> safeSessionResponse(token, currentToken)))
                 .flatMap(Optional::stream)
                 .filter(UserSessionResponse::active)
+                .filter(session -> session.expiresAt() == null
+                        || session.expiresAt().toEpochMilli() >= Instant.now().toEpochMilli())
                 .sorted((a, b) -> Long.compare(instantEpoch(b.lastAccessAt()), instantEpoch(a.lastAccessAt())))
                 .toList();
     }
@@ -130,7 +148,7 @@ public class SessionApplicationService {
                 .filter(entry -> entry != null)
                 .filter(entry -> tenantVisible(currentUser, entry.response()))
                 .filter(entry -> platformAdmin || canAccessSessionUser(currentUser, entry, visibleUserIds))
-                .map(entry -> withCurrentSession(entry.response(), currentToken))
+                .map(entry -> withCurrentSession(entry, currentToken))
                 // 索引 TTL 承担陈旧数据清理；列表页不再逐条回查 Sa-Token 活跃状态
                 .filter(session -> session.expiresAt() == null
                         || session.expiresAt().toEpochMilli() >= Instant.now().toEpochMilli())
@@ -199,7 +217,8 @@ public class SessionApplicationService {
         }
     }
 
-    private UserSessionResponse withCurrentSession(UserSessionResponse session, String currentToken) {
+    private UserSessionResponse withCurrentSession(SessionIndexService.IndexedSession indexedSession, String currentToken) {
+        UserSessionResponse session = indexedSession.response();
         return new UserSessionResponse(
                 session.sessionId(),
                 session.username(),
@@ -212,34 +231,8 @@ public class SessionApplicationService {
                 session.expiresAt(),
                 session.lastAccessAt(),
                 session.active(),
-                session.sessionId().equals(currentToken)
+                indexedSession.token().equals(currentToken)
         );
-    }
-
-    private UserSessionResponse withActiveState(UserSessionResponse session) {
-        return new UserSessionResponse(
-                session.sessionId(),
-                session.username(),
-                session.tenantId(),
-                session.activeTenantId(),
-                session.clientIp(),
-                session.loginLocation(),
-                session.device(),
-                session.issuedAt(),
-                session.expiresAt(),
-                session.lastAccessAt(),
-                isSessionActive(session.sessionId()),
-                session.currentSession()
-        );
-    }
-
-    private boolean isSessionActive(String token) {
-        try {
-            return StpUtil.stpLogic.getLoginIdByToken(token) != null;
-        } catch (Exception ex) {
-            log.debug("检查会话活跃状态失败。token={}，error={}", token, ex.getMessage());
-            return false;
-        }
     }
 
     private long instantEpoch(Instant instant) {
@@ -248,12 +241,14 @@ public class SessionApplicationService {
 
     private UserSessionResponse toSessionResponse(String token, String currentToken) {
         SaSession tokenSession = StpUtil.getTokenSessionByToken(token);
+        String managementId = sessionIndexService.managementId(token)
+                .orElseThrow(() -> new BusinessException("SESSION_INDEX_UNAVAILABLE", "会话管理索引不可用"));
         long issuedAt = sessionLong(tokenSession, "issuedAt", 0L);
         long expiresAt = sessionLong(tokenSession, "expiresAt", 0L);
         long lastAccessAt = sessionLong(tokenSession, "lastAccessAt", issuedAt);
         boolean currentSession = token.equals(currentToken);
         return new UserSessionResponse(
-                token,
+                managementId,
                 requireSessionString(tokenSession, "username"),
                 requireSessionString(tokenSession, "tenantId"),
                 requireSessionString(tokenSession, "activeTenantId"),
@@ -293,11 +288,11 @@ public class SessionApplicationService {
         throw new BusinessException("SESSION_INVALID", "会话元数据不完整");
     }
 
-    private Map<String, Object> sessionAuditPayload(String sessionId) {
+    private Map<String, Object> sessionAuditPayload(String managementId, String token) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("sessionId", sessionId);
+        putIfText(payload, "sessionId", managementId);
         try {
-            SaSession session = StpUtil.getTokenSessionByToken(sessionId);
+            SaSession session = StpUtil.getTokenSessionByToken(token);
             Object userId = session.get("userId");
             if (userId != null) {
                 payload.put("targetUserId", userId);
@@ -315,7 +310,7 @@ public class SessionApplicationService {
                 payload.put("lastAccessAt", lastAccessAt);
             }
         } catch (Exception ex) {
-            log.debug("构建会话审计载荷失败。sessionId={}，error={}", sessionId, ex.getMessage());
+            log.debug("构建会话审计载荷失败。managementId={}，error={}", managementId, ex.getMessage());
             // 即使令牌会话元数据已被清理，也要保证登出/下线操作可靠执行。
         }
         return payload;

@@ -12,7 +12,7 @@ import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMa
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserRoleMapper;
 import com.enterprise.auth.platform.modules.role.application.RolePayloadCodec;
 import com.enterprise.auth.platform.modules.role.application.RoleGrantQueryFacade;
-import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
+import com.enterprise.auth.platform.modules.user.api.UserAuthorizationInvalidationPort;
 import com.enterprise.auth.platform.modules.user.application.AuthenticationUser;
 import java.util.HashSet;
 import java.util.List;
@@ -34,7 +34,7 @@ public class DatabaseUserRepository implements UserRepository {
     private final SysUserMapper sysUserMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
     private final SysRoleMapper sysRoleMapper;
-    private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
+    private final UserAuthorizationInvalidationPort authorizationInvalidationPort;
     private final RolePayloadCodec rolePayloadCodec;
     private final RoleGrantQueryFacade roleGrantQueryFacade;
 
@@ -42,14 +42,14 @@ public class DatabaseUserRepository implements UserRepository {
             SysUserMapper sysUserMapper,
             SysUserRoleMapper sysUserRoleMapper,
             SysRoleMapper sysRoleMapper,
-            AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
+            UserAuthorizationInvalidationPort authorizationInvalidationPort,
             RolePayloadCodec rolePayloadCodec,
             RoleGrantQueryFacade roleGrantQueryFacade
     ) {
         this.sysUserMapper = sysUserMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
         this.sysRoleMapper = sysRoleMapper;
-        this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
+        this.authorizationInvalidationPort = authorizationInvalidationPort;
         this.rolePayloadCodec = rolePayloadCodec;
         this.roleGrantQueryFacade = roleGrantQueryFacade;
     }
@@ -75,16 +75,6 @@ public class DatabaseUserRepository implements UserRepository {
     }
 
     @Override
-    public List<AuthenticationUser> findAll() {
-        return sysUserMapper.selectList(new LambdaQueryWrapper<SysUserEntity>()
-                        .eq(SysUserEntity::getDeleted, 0)
-                        .orderByAsc(SysUserEntity::getId))
-                .stream()
-                .map(user -> toAuthenticationUser(user, false))
-                .toList();
-    }
-
-    @Override
     public void incrementSessionVersion(Long userId) {
         SysUserEntity entity = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>()
                 .eq(SysUserEntity::getId, userId)
@@ -97,7 +87,7 @@ public class DatabaseUserRepository implements UserRepository {
         entity.setUpdatedBy(entity.getUsername());
         entity.setPasswordUpdatedAt(TimeSupport.now());
         sysUserMapper.updateById(entity);
-        permissionSnapshotInvalidationService.invalidateUser(entity.getId(), entity.getTenantId(), entity.getUsername());
+        authorizationInvalidationPort.invalidateUser(entity.getId(), entity.getTenantId(), entity.getUsername());
     }
 
     private AuthenticationUser toAuthenticationUser(SysUserEntity user, boolean includePasswordHash) {

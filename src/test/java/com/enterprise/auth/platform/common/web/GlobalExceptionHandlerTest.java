@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.common.context.RequestContext;
+import com.enterprise.auth.platform.common.exception.InvalidRequestException;
 import com.enterprise.auth.platform.common.web.RateLimitInterceptor.RateLimitExceededException;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -64,6 +66,53 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().details()).containsExactlyElementsOf(details);
+    }
+
+    @Test
+    void shouldPreferBoundRequestIdOverRawHeader() {
+        GlobalExceptionHandler handler = new GlobalExceptionHandler(eventPublisher, ipLocationResolver);
+        MockHttpServletRequest request = request();
+        RequestContext.setRequestId("normalized-request-id");
+        try {
+            ResponseEntity<ApiResponse<Void>> response = handler.handleUnexpected(
+                    new IllegalStateException("boom"), request
+            );
+
+            assertThat(response.getBody()).isNotNull();
+            assertThat(response.getBody().requestId()).isEqualTo("normalized-request-id");
+        } finally {
+            RequestContext.clear();
+        }
+    }
+
+    @Test
+    void shouldMapExplicitInvalidRequestToBadRequest() {
+        GlobalExceptionHandler handler = new GlobalExceptionHandler(eventPublisher, ipLocationResolver);
+
+        ResponseEntity<ApiResponse<Void>> response = handler.handleValidation(
+                new InvalidRequestException("invalid time zone"), request()
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().code()).isEqualTo("VALIDATION_ERROR");
+        assertThat(response.getBody().details()).containsExactly(
+                ApiResponse.ErrorDetail.of("request", "invalid time zone", "invalid_argument")
+        );
+    }
+
+    @Test
+    void shouldMapUnexpectedIllegalArgumentToInternalServerError() {
+        GlobalExceptionHandler handler = new GlobalExceptionHandler(eventPublisher, ipLocationResolver);
+
+        ResponseEntity<ApiResponse<Void>> response = handler.handleUnexpected(
+                new IllegalArgumentException("invalid internal state"), request()
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().code()).isEqualTo("INTERNAL_ERROR");
+        assertThat(response.getBody().message()).isEqualTo("服务器内部错误");
     }
 
     private MockHttpServletRequest request() {

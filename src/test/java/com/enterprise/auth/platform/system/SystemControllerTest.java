@@ -7,6 +7,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.modules.dept.infrastructure.entity.SysDeptEntity;
@@ -14,6 +16,13 @@ import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEn
 import com.enterprise.auth.platform.modules.dept.infrastructure.mapper.SysDeptMapper;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
+import com.enterprise.auth.platform.modules.system.interfaces.CategoryController;
+import com.enterprise.auth.platform.modules.system.interfaces.ConfigController;
+import com.enterprise.auth.platform.modules.system.interfaces.DictController;
+import com.enterprise.auth.platform.modules.system.interfaces.NoticeController;
+import com.enterprise.auth.platform.modules.system.interfaces.SystemFeatureController;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,6 +35,8 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 @org.junit.jupiter.api.Tag("integration")
 @SpringBootTest
@@ -63,8 +74,37 @@ class SystemControllerTest {
     @Autowired
     private CacheManager cacheManager;
 
+    @Autowired
+    private RequestMappingHandlerMapping requestMappingHandlerMapping;
+
     private Long scopeUserId;
     private Long hiddenDictId;
+
+    @Test
+    void splitControllersShouldKeepEverySystemRouteUnique() {
+        Map<String, Class<?>> actualRoutes = new LinkedHashMap<>();
+        Set<Class<?>> splitControllers = Set.of(
+                SystemFeatureController.class,
+                CategoryController.class,
+                DictController.class,
+                ConfigController.class,
+                NoticeController.class
+        );
+
+        requestMappingHandlerMapping.getHandlerMethods().forEach((mapping, handlerMethod) -> {
+            if (!splitControllers.contains(handlerMethod.getBeanType())) {
+                return;
+            }
+            for (RequestMethod method : mapping.getMethodsCondition().getMethods()) {
+                for (String path : mapping.getPatternValues()) {
+                    String route = method.name() + " " + path;
+                    assertNull(actualRoutes.put(route, handlerMethod.getBeanType()), () -> "重复路由: " + route);
+                }
+            }
+        });
+
+        assertEquals(expectedSplitRoutes(), actualRoutes);
+    }
 
     @BeforeEach
     void setUp() {
@@ -327,6 +367,47 @@ class SystemControllerTest {
                 DataScopeType.DEPT_AND_CHILDREN,
                 1
         );
+    }
+
+    private Map<String, Class<?>> expectedSplitRoutes() {
+        Map<String, Class<?>> routes = new LinkedHashMap<>();
+        routes.put("GET /api/system/features", SystemFeatureController.class);
+
+        routes.put("GET /api/system/categories", CategoryController.class);
+        routes.put("GET /api/system/categories/{targetType}", CategoryController.class);
+        routes.put("GET /api/system/categories/{targetType}/{code}/analysis", CategoryController.class);
+        routes.put("POST /api/system/categories/{targetType}", CategoryController.class);
+        routes.put("PUT /api/system/categories/{targetType}/{code}", CategoryController.class);
+        routes.put("DELETE /api/system/categories/{targetType}/{code}", CategoryController.class);
+
+        routes.put("GET /api/system/dicts", DictController.class);
+        routes.put("GET /api/system/dicts/{id}", DictController.class);
+        routes.put("POST /api/system/dicts", DictController.class);
+        routes.put("PUT /api/system/dicts/{id}", DictController.class);
+        routes.put("DELETE /api/system/dicts/{id}", DictController.class);
+        routes.put("GET /api/system/dicts/values", DictController.class);
+        routes.put("GET /api/system/dicts/{id}/values", DictController.class);
+        routes.put("POST /api/system/dicts/{id}/values", DictController.class);
+        routes.put("GET /api/system/dict-values/{valueId}", DictController.class);
+        routes.put("PUT /api/system/dict-values/{valueId}", DictController.class);
+        routes.put("DELETE /api/system/dict-values/{valueId}", DictController.class);
+        routes.put("DELETE /api/system/dicts/cache", DictController.class);
+
+        routes.put("GET /api/system/configs/page", ConfigController.class);
+        routes.put("GET /api/system/configs/{id}", ConfigController.class);
+        routes.put("POST /api/system/configs", ConfigController.class);
+        routes.put("PUT /api/system/configs/{id}", ConfigController.class);
+        routes.put("DELETE /api/system/configs/{id}", ConfigController.class);
+        routes.put("DELETE /api/system/configs", ConfigController.class);
+        routes.put("DELETE /api/system/configs/cache", ConfigController.class);
+
+        routes.put("GET /api/system/notices", NoticeController.class);
+        routes.put("GET /api/system/notices/{id}", NoticeController.class);
+        routes.put("GET /api/system/notices/{id}/published", NoticeController.class);
+        routes.put("POST /api/system/notices", NoticeController.class);
+        routes.put("PUT /api/system/notices/{id}", NoticeController.class);
+        routes.put("DELETE /api/system/notices/{id}", NoticeController.class);
+        return routes;
     }
 
     private Long visibleDictId() {

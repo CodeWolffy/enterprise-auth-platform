@@ -12,8 +12,6 @@ import com.enterprise.auth.platform.modules.workflow.domain.WorkflowTask;
 import com.enterprise.auth.platform.modules.workflow.domain.WorkflowTaskStatus;
 import com.enterprise.auth.platform.modules.workflow.domain.WorkflowTaskUrge;
 import com.enterprise.auth.platform.modules.workflow.domain.WorkflowStepDefinition;
-import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfTaskCandidateRoleEntity;
-import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfTaskCandidateUserEntity;
 import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfProcessDefinitionEntity;
 import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfProcessInstanceEntity;
 import com.enterprise.auth.platform.modules.workflow.infrastructure.entity.WfTaskEntity;
@@ -43,8 +41,7 @@ public class MybatisWorkflowRepository implements WorkflowRepository {
     private final WfProcessInstanceMapper instanceMapper;
     private final WfTaskMapper taskMapper;
     private final WfTaskUrgeMapper urgeMapper;
-    private final WfTaskCandidateUserMapper candidateUserMapper;
-    private final WfTaskCandidateRoleMapper candidateRoleMapper;
+    private final WorkflowCandidateLinkWriter candidateLinkWriter;
     private static final TypeReference<List<WorkflowStepDefinition>> STEP_LIST_TYPE = new TypeReference<>() { };
     private static final TypeReference<Set<Long>> LONG_SET_TYPE = new TypeReference<>() { };
     private static final TypeReference<Set<String>> STRING_SET_TYPE = new TypeReference<>() { };
@@ -65,8 +62,7 @@ public class MybatisWorkflowRepository implements WorkflowRepository {
         this.instanceMapper = instanceMapper;
         this.taskMapper = taskMapper;
         this.urgeMapper = urgeMapper;
-        this.candidateUserMapper = candidateUserMapper;
-        this.candidateRoleMapper = candidateRoleMapper;
+        this.candidateLinkWriter = new WorkflowCandidateLinkWriter(candidateUserMapper, candidateRoleMapper);
         this.objectMapper = objectMapper;
     }
 
@@ -187,44 +183,7 @@ public class MybatisWorkflowRepository implements WorkflowRepository {
         task.setCreatedAt(entity.getCreatedAt());
         task.setUpdatedAt(entity.getUpdatedAt());
         // expand-contract 双写：规范化候选关系，供 SQL 下推
-        writeCandidateLinks(task);
-    }
-
-    private void writeCandidateLinks(WorkflowTask task) {
-        if (task == null || task.getId() == null || !StringUtils.hasText(task.getTenantId())) {
-            return;
-        }
-        if (task.getCandidateUserIds() != null) {
-            for (Long userId : task.getCandidateUserIds()) {
-                if (userId == null) {
-                    continue;
-                }
-                WfTaskCandidateUserEntity link = new WfTaskCandidateUserEntity();
-                link.setTenantId(task.getTenantId());
-                link.setTaskId(task.getId());
-                link.setUserId(userId);
-                try {
-                    candidateUserMapper.insert(link);
-                } catch (RuntimeException ignored) {
-                    // 唯一键冲突忽略（回填/重试）
-                }
-            }
-        }
-        if (task.getCandidateGroupCodes() != null) {
-            for (String roleCode : task.getCandidateGroupCodes()) {
-                if (!StringUtils.hasText(roleCode)) {
-                    continue;
-                }
-                WfTaskCandidateRoleEntity link = new WfTaskCandidateRoleEntity();
-                link.setTenantId(task.getTenantId());
-                link.setTaskId(task.getId());
-                link.setRoleCode(roleCode.trim());
-                try {
-                    candidateRoleMapper.insert(link);
-                } catch (RuntimeException ignored) {
-                }
-            }
-        }
+        candidateLinkWriter.write(task);
     }
 
     @Override

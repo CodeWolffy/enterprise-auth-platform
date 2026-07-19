@@ -102,22 +102,28 @@ public class RoleManagementService {
 
     @Transactional
     public Set<Long> assignMenus(Long roleId, Set<Long> menuIds) {
-        String operator = SecuritySupport.currentOperator();
         SysRoleEntity entity = getRole(roleId);
         String tenantId = entity.getTenantId();
         Set<Long> assigned = menuGrantQueryPort.expandMenuIdsWithAncestors(tenantId, menuIds);
         sysRoleMenuMapper.delete(new LambdaQueryWrapper<SysRoleMenuEntity>()
                 .eq(SysRoleMenuEntity::getTenantId, tenantId)
                 .eq(SysRoleMenuEntity::getRoleId, roleId));
-        for (Long menuId : assigned) {
-            SysRoleMenuEntity relation = new SysRoleMenuEntity();
-            relation.setTenantId(tenantId);
-            relation.setRoleId(roleId);
-            relation.setMenuId(menuId);
-            sysRoleMenuMapper.insert(relation);
+        if (!assigned.isEmpty()) {
+            List<SysRoleMenuEntity> relations = assigned.stream()
+                    .map(menuId -> roleMenu(tenantId, roleId, menuId))
+                    .toList();
+            sysRoleMenuMapper.insert(relations);
         }
         evictPrincipalsByRole(tenantId, roleId);
         return assigned;
+    }
+
+    private SysRoleMenuEntity roleMenu(String tenantId, Long roleId, Long menuId) {
+        SysRoleMenuEntity relation = new SysRoleMenuEntity();
+        relation.setTenantId(tenantId);
+        relation.setRoleId(roleId);
+        relation.setMenuId(menuId);
+        return relation;
     }
 
     public Set<Long> listAssignedMenus(Long roleId) {

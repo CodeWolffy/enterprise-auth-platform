@@ -38,8 +38,6 @@ public class SaTokenUserContextInterceptor implements HandlerInterceptor {
             var principal = currentUserService.bindRequestContext(request);
             enforceClientIpBinding(request);
             long lastAccessAt = Instant.now().toEpochMilli();
-            // Sa-Token 原生 lastAccess 仍每次写，保证 active-timeout 语义
-            StpUtil.getTokenSession().set("lastAccessAt", lastAccessAt);
             String token = StpUtil.getTokenValue();
             boolean touched = sessionIndexService.touch(token, lastAccessAt);
             if (!touched) {

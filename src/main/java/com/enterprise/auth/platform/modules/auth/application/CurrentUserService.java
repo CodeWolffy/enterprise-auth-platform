@@ -13,6 +13,7 @@ import com.enterprise.auth.platform.modules.user.application.AuthenticationUser;
 import com.enterprise.auth.platform.modules.user.application.UserAuthenticationFacade;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -123,7 +124,7 @@ public class CurrentUserService {
     }
 
     private UserAccount mergeSessionAuthorities(UserAccount user, SaSession tokenSession) {
-        boolean sessionAuthoritiesTrusted = sessionAuthoritiesMatchActiveTenant(tokenSession);
+        boolean sessionAuthoritiesTrusted = sessionAuthoritiesMatchActiveTenant(user, tokenSession);
         Set<String> roles = sessionAuthoritiesTrusted ? mergeStringSet(user.roles(), tokenSession.get("roles")) : user.roles();
         Set<String> permissions = sessionAuthoritiesTrusted ? mergeStringSet(user.permissions(), tokenSession.get("permissions")) : user.permissions();
         return new UserAccount(
@@ -143,7 +144,7 @@ public class CurrentUserService {
         );
     }
 
-    private boolean sessionAuthoritiesMatchActiveTenant(SaSession tokenSession) {
+    private boolean sessionAuthoritiesMatchActiveTenant(UserAccount user, SaSession tokenSession) {
         String permissionsTenantId = sessionString(tokenSession, "permissionsTenantId");
         if (!StringUtils.hasText(permissionsTenantId)) {
             return false;
@@ -152,16 +153,30 @@ public class CurrentUserService {
         if (!permissionsTenantId.equals(activeTenantId)) {
             return false;
         }
-        // 版本字段缺失：兼容升级窗口，仍信任租户匹配的旧快照
         Object globalVersion = tokenSession.get("authzGlobalVersion");
         Object tenantVersion = tokenSession.get("authzTenantVersion");
         if (globalVersion == null && tenantVersion == null) {
-            return true;
+            migrateLegacyAuthoritySnapshot(user, tokenSession, activeTenantId);
+            return false;
         }
         long sessionGlobal = sessionLong(tokenSession, "authzGlobalVersion", -1L);
         long sessionTenant = sessionLong(tokenSession, "authzTenantVersion", -1L);
         AuthzVersionService.Versions currentVersions = authzVersionService.currentVersions(activeTenantId);
         return sessionGlobal == currentVersions.global() && sessionTenant == currentVersions.tenant();
+    }
+
+    /**
+     * 旧会话没有权限版本时，不能判断其中的权限是否仍然有效。
+     * 使用本次从用户权威数据源加载的权限覆盖旧快照，并记录当前版本；当前请求仍返回 false，
+     * 确保不会把迁移前的旧权限与权威权限做并集。
+     */
+    private void migrateLegacyAuthoritySnapshot(UserAccount user, SaSession tokenSession, String activeTenantId) {
+        AuthzVersionService.Versions currentVersions = authzVersionService.currentVersionsFresh(activeTenantId);
+        tokenSession.set("roles", List.copyOf(user.roles()));
+        tokenSession.set("permissions", List.copyOf(user.permissions()));
+        tokenSession.set("permissionsTenantId", activeTenantId);
+        tokenSession.set("authzGlobalVersion", currentVersions.global());
+        tokenSession.set("authzTenantVersion", currentVersions.tenant());
     }
 
     private Set<String> mergeStringSet(Set<String> base, Object sessionValue) {

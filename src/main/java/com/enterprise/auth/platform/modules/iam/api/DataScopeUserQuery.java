@@ -1,10 +1,10 @@
-package com.enterprise.auth.platform.modules.auth.application;
+package com.enterprise.auth.platform.modules.iam.api;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-/** 数据权限用用户查询端口，由 user 模块实现，auth 不直接依赖 user Mapper。 */
+/** IAM data-scope query port implemented by the user module. */
 public interface DataScopeUserQuery {
 
     Optional<ScopedUser> findActive(Long userId, String tenantId);

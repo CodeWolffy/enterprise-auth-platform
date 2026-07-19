@@ -16,6 +16,9 @@ spring:
       database: 0
 
 app:
+  outbox:
+    # 至少 32 个字符；生产环境应由 secret manager 注入 APP_OUTBOX_PAYLOAD_SECRET_KEY。
+    payload-secret-key: <your-local-outbox-payload-secret-key-at-least-32-characters>
   cors:
     allowed-origins:
       - http://127.0.0.1:5777

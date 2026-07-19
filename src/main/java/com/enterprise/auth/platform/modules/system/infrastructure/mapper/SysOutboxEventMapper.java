@@ -14,6 +14,18 @@ import org.apache.ibatis.annotations.Update;
 public interface SysOutboxEventMapper extends BaseMapper<SysOutboxEventEntity> {
 
     @InterceptorIgnore(tenantLine = "true")
+    @Update("""
+            UPDATE sys_outbox_event
+            SET status = 'PENDING',
+                next_retry_at = #{now},
+                last_error = 'processing timeout; recovered for retry',
+                updated_at = UTC_TIMESTAMP(3)
+            WHERE status = 'PROCESSING'
+              AND updated_at < #{cutoff}
+            """)
+    int recoverStaleProcessing(@Param("cutoff") Instant cutoff, @Param("now") Instant now);
+
+    @InterceptorIgnore(tenantLine = "true")
     @Select("""
             SELECT *
             FROM sys_outbox_event
@@ -40,6 +52,10 @@ public interface SysOutboxEventMapper extends BaseMapper<SysOutboxEventEntity> {
     @Update("""
             UPDATE sys_outbox_event
             SET status = 'DONE',
+                payload_json = CASE
+                    WHEN event_type = 'PASSWORD_RESET_MAIL' THEN '{"redacted":true}'
+                    ELSE payload_json
+                END,
                 last_error = NULL,
                 updated_at = UTC_TIMESTAMP(3)
             WHERE id = #{id}
@@ -50,6 +66,10 @@ public interface SysOutboxEventMapper extends BaseMapper<SysOutboxEventEntity> {
     @Update("""
             UPDATE sys_outbox_event
             SET status = #{status},
+                payload_json = CASE
+                    WHEN #{status} = 'DEAD' AND event_type = 'PASSWORD_RESET_MAIL' THEN '{"redacted":true}'
+                    ELSE payload_json
+                END,
                 next_retry_at = #{nextRetryAt},
                 last_error = #{lastError},
                 updated_at = UTC_TIMESTAMP(3)

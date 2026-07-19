@@ -80,9 +80,7 @@ public class TenantMenuService {
                     e.setMenuId(menuId);
                     return e;
                 }).toList();
-            for (SysTenantMenuEntity entity : entities) {
-                    sysTenantMenuMapper.insert(entity);
-                }
+                sysTenantMenuMapper.insert(entities);
             }
             sysTenantMenuMapper.deleteRoleMenusOutsideTenantMenus(tenantId);
             return null;
@@ -99,18 +97,23 @@ public class TenantMenuService {
         Set<Long> normalizedMenuIds = validateTenantMenuIds(tenantId, menuIds);
         runWithTenant(tenantId, () -> {
             Set<Long> existing = findTenantMenuIds(tenantId);
-            for (Long menuId : normalizedMenuIds) {
-                if (existing.contains(menuId)) {
-                    continue;
-                }
-                SysTenantMenuEntity relation = new SysTenantMenuEntity();
-                relation.setTenantId(tenantId);
-                relation.setMenuId(menuId);
-                sysTenantMenuMapper.insert(relation);
+            List<SysTenantMenuEntity> relations = normalizedMenuIds.stream()
+                    .filter(menuId -> !existing.contains(menuId))
+                    .map(menuId -> tenantMenu(tenantId, menuId))
+                    .toList();
+            if (!relations.isEmpty()) {
+                sysTenantMenuMapper.insert(relations);
             }
             return null;
         });
         permissionSnapshotInvalidationService.invalidateTenant(tenantId);
+    }
+
+    private SysTenantMenuEntity tenantMenu(String tenantId, Long menuId) {
+        SysTenantMenuEntity relation = new SysTenantMenuEntity();
+        relation.setTenantId(tenantId);
+        relation.setMenuId(menuId);
+        return relation;
     }
 
     @Transactional

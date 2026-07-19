@@ -46,6 +46,29 @@ class RateLimitInterceptorTest {
     }
 
     @Test
+    void shouldUseRightmostUntrustedHopFromForwardedChain() {
+        RateLimitProperties properties = properties(List.of("127.0.0.1/32", "10.0.0.0/8"));
+        ClientIpResolver resolver = new ClientIpResolver(properties);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRemoteAddr("127.0.0.1");
+        request.addHeader("X-Forwarded-For", "192.0.2.99, 198.51.100.24, 10.0.0.8");
+
+        assertThat(resolver.resolve(request)).isEqualTo("198.51.100.24");
+    }
+
+    @Test
+    void shouldIgnoreInvalidForwardedHop() {
+        RateLimitProperties properties = properties(List.of("127.0.0.1/32"));
+        ClientIpResolver resolver = new ClientIpResolver(properties);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRemoteAddr("127.0.0.1");
+        request.addHeader("X-Forwarded-For", "not-an-ip");
+        request.addHeader("X-Real-IP", "198.51.100.25");
+
+        assertThat(resolver.resolve(request)).isEqualTo("198.51.100.25");
+    }
+
+    @Test
     void shouldNotFailStartupWhenLettuceFactoryIsUnavailable() {
         RateLimitProperties properties = properties(List.of());
         assertThatCode(() -> new RateLimitInterceptor(

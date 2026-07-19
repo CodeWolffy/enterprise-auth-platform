@@ -2,26 +2,25 @@ package com.enterprise.auth.platform.common.web;
 
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.context.RequestContext;
+import com.enterprise.auth.platform.common.context.RequestContextCleaner;
 import com.enterprise.auth.platform.common.context.RequestLogContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.UUID;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
 public class TenantFilter extends OncePerRequestFilter {
 
-    private static final String REQUEST_ID_HEADER = "X-Request-Id";
-
     private final ClientIpResolver clientIpResolver;
+    private final RequestContextCleaner requestContextCleaner;
 
-    public TenantFilter(ClientIpResolver clientIpResolver) {
+    public TenantFilter(ClientIpResolver clientIpResolver, RequestContextCleaner requestContextCleaner) {
         this.clientIpResolver = clientIpResolver;
+        this.requestContextCleaner = requestContextCleaner;
     }
 
     @Override
@@ -30,20 +29,19 @@ public class TenantFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
-        String requestId = request.getHeader(REQUEST_ID_HEADER);
-        if (!StringUtils.hasText(requestId)) {
-            requestId = UUID.randomUUID().toString();
-        }
+        String requestId = RequestIdSupport.resolveIncoming(request.getHeader(RequestIdSupport.HEADER));
 
         String clientIp = clientIpResolver.resolve(request);
         RequestContext.setRequestId(requestId);
         RequestContext.setClientIp(clientIp);
         RequestContext.setStartTime(System.currentTimeMillis());
+        request.setAttribute(RequestIdSupport.HEADER, requestId);
         RequestLogContext.bindRequest(requestId, clientIp, request.getMethod(), request.getRequestURI());
-        response.setHeader(REQUEST_ID_HEADER, requestId);
+        response.setHeader(RequestIdSupport.HEADER, requestId);
         try {
             filterChain.doFilter(request, response);
         } finally {
+            requestContextCleaner.clear();
             TenantContext.clear();
             RequestContext.clear();
             RequestLogContext.clearRequest();

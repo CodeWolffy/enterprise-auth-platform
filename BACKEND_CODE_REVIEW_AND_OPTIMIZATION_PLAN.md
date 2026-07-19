@@ -7,6 +7,8 @@
 > 文档性质：静态代码审查与改造设计。除明确标为“已确认”的问题外，性能收益需通过本文的基准方案验证。  
 > 统计口径：Java 行数按文件物理行（含空行与注释）；application 分层 import 统计范围为 `modules/**/application/**`。
 
+> **2026-07-12 实施状态更新**：本文第 2 节的规模数字和部分“待实施”描述是首次审查快照，不再代表当前源码。当前 Maven 编译主源码 455 个 Java 文件、测试 66 个 Java 文件；真实 ArchUnit 门禁、会话索引 pipeline/touch 节流、权限版本、Outbox、文件生命周期等已落地。本轮又完成了：会话管理 ID 与 bearer token 解耦、旧权限快照 fail-open 收紧、受限会话分页仅物化目标页、认证请求自定义 Redis 写收敛、Outbox 短事务与超时回收、密码重置 Outbox AES-GCM 加密、仪表盘聚合查询、菜单关联批写、可信代理链解析、审计参数脱敏和请求 ID 统一；随后完成菜单树查询/祖先展开、工作流候选关系批写、本地会话 fallback 的职责抽离，并将 Redis 会话索引读写、脚本、元数据兼容和分页实现抽离至 `RedisSessionIndex`，再以 `UserSessionIndexPort`、`UserAuthorizationInvalidationPort`、`UserAccessControlPort`、`UserPasswordHashPort` 和 `iam.api.DataScopeUserQuery` 切断用户模块对 auth 具体会话、权限失效、当前用户、数据范围和密码实现的直接依赖；Outbox 认领遇到数据库死锁时安全跳过本轮并由下一次调度重试。以上改造保持公开 API、事务边界与批量行为不变。最新验证为完整集成测试 278 项、ArchUnit 11 项和 ModuleBoundary 8 项均通过，`mvn -DskipTests verify` 通过，SpotBugs 高优先级问题为 0。后续决策应以本段及当前源码为准，旧数字仅保留用于追溯首次审查。
+
 ## 1. 结论摘要
 
 当前后端具备可继续演进的基础：使用 Spring Boot 3.5、构造器注入、统一响应与异常处理、Bean Validation、Flyway、多租户拦截、权限注解、Redis 缓存、Micrometer 指标和一定规模的测试。代码也已经按业务模块组织，方向本身是合理的。
@@ -50,12 +52,12 @@
 
 体积最大的类包括：
 
-- `modules/menu/application/MenuService.java`：821 行；
+- `modules/menu/application/MenuService.java`：当前约 572 行；菜单树算法已抽离至 `MenuTreeResolver.java`；
 - `modules/workflow/infrastructure/MybatisWorkflowRepository.java`：512 行；
 - `modules/notification/application/NotificationScenarioPublisher.java`：510 行；
 - `modules/file/application/FileApplicationService.java`：474 行；
 - `modules/system/application/DictApplicationService.java`：471 行；
-- `modules/auth/application/SessionIndexService.java`：462 行。
+- `modules/auth/application/SessionIndexService.java`：176 行的公开门面；Redis 实现已抽离至 `RedisSessionIndex.java`（549 行），本地 fallback 位于 `LocalSessionIndex.java`。
 
 ### 2.2 已执行的验证
 

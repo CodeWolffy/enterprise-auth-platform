@@ -7,6 +7,7 @@ import com.enterprise.auth.platform.common.context.RequestContext;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.event.SecurityAccessDeniedEvent;
 import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.common.exception.InvalidRequestException;
 import com.enterprise.auth.platform.common.web.ApiResponse.ErrorDetail;
 import com.enterprise.auth.platform.common.web.RateLimitInterceptor.RateLimitExceededException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,7 +15,6 @@ import jakarta.validation.ConstraintViolationException;
 import java.security.Principal;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,7 +35,6 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     private static final String RATE_LIMITED_CODE = "RATE_LIMITED";
-    private static final String REQUEST_ID_HEADER = "X-Request-Id";
     private final ApplicationEventPublisher eventPublisher;
     private final IpLocationResolver ipLocationResolver;
 
@@ -79,7 +78,7 @@ public class GlobalExceptionHandler {
             BindException.class,
             ConstraintViolationException.class,
             MethodArgumentTypeMismatchException.class,
-            IllegalArgumentException.class
+            InvalidRequestException.class
     })
     public ResponseEntity<ApiResponse<Void>> handleValidation(Exception exception, HttpServletRequest request) {
         return fail(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", validationMessage(exception), validationDetails(exception), request);
@@ -147,8 +146,8 @@ public class GlobalExceptionHandler {
         if (exception instanceof MethodArgumentTypeMismatchException mismatchException) {
             return List.of(ErrorDetail.of(mismatchException.getName(), "参数格式无效", "type_mismatch"));
         }
-        if (exception instanceof IllegalArgumentException illegalArgumentException) {
-            return List.of(ErrorDetail.of("request", illegalArgumentException.getMessage(), "invalid_argument"));
+        if (exception instanceof InvalidRequestException invalidRequestException) {
+            return List.of(ErrorDetail.of("request", invalidRequestException.getMessage(), "invalid_argument"));
         }
         return List.of();
     }
@@ -172,18 +171,7 @@ public class GlobalExceptionHandler {
     }
 
     private String requestId(HttpServletRequest request) {
-        if (request == null) {
-            return UUID.randomUUID().toString();
-        }
-        String requestId = request.getHeader(REQUEST_ID_HEADER);
-        if (StringUtils.hasText(requestId)) {
-            return requestId;
-        }
-        Object attribute = request.getAttribute(REQUEST_ID_HEADER);
-        if (attribute != null && StringUtils.hasText(String.valueOf(attribute))) {
-            return String.valueOf(attribute);
-        }
-        return UUID.randomUUID().toString();
+        return RequestIdSupport.currentOrCreate(request);
     }
 
     private String requestPath(HttpServletRequest request) {

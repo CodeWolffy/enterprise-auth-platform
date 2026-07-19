@@ -26,7 +26,8 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest(properties = {
         "app.security.password-reset.username-max-requests=1",
         "app.security.password-reset.ip-max-requests=20",
-        "app.security.notification.channel=log"
+        "app.security.notification.channel=log",
+        "app.outbox.payload-secret-key=test-outbox-payload-secret-key-32-chars"
 })
 @AutoConfigureMockMvc
 class AuthPasswordResetTest {
@@ -97,7 +98,7 @@ class AuthPasswordResetTest {
         assertThat(storedTokenHash).hasSize(64).matches("[0-9a-f]{64}");
 
         var resetLink = org.mockito.ArgumentCaptor.forClass(String.class);
-        org.mockito.Mockito.verify(passwordResetNotificationService).sendPasswordResetLink(
+        org.mockito.Mockito.verify(passwordResetNotificationService, org.mockito.Mockito.timeout(5000)).sendPasswordResetLink(
                 org.mockito.ArgumentMatchers.eq(TENANT_ID),
                 org.mockito.ArgumentMatchers.eq(EMAIL),
                 org.mockito.ArgumentMatchers.eq(USERNAME),
@@ -105,6 +106,18 @@ class AuthPasswordResetTest {
         );
         assertThat(resetLink.getValue())
                 .startsWith("http://localhost:5777/#/reset-password?token=");
+        String storedOutboxPayload = jdbcTemplate.queryForObject(
+                """
+                SELECT payload_json
+                FROM sys_outbox_event
+                WHERE tenant_id = ? AND event_type = 'PASSWORD_RESET_MAIL'
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                String.class,
+                TENANT_ID
+        );
+        assertThat(storedOutboxPayload).doesNotContain(resetLink.getValue());
     }
 
     @Test
@@ -252,6 +265,10 @@ class AuthPasswordResetTest {
     }
 
     private void cleanup() {
+        jdbcTemplate.update(
+                "DELETE FROM sys_outbox_event WHERE tenant_id = ? AND event_type = 'PASSWORD_RESET_MAIL'",
+                TENANT_ID
+        );
         jdbcTemplate.update("DELETE FROM sys_password_reset_token WHERE tenant_id = ? AND username IN (?, ?)",
                 TENANT_ID, USERNAME, MISSING_USERNAME);
         jdbcTemplate.update("DELETE FROM sys_user WHERE tenant_id = ? AND username IN (?, ?)",

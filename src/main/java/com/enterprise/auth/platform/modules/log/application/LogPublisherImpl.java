@@ -14,6 +14,8 @@ import com.enterprise.auth.platform.modules.log.infrastructure.mapper.SysLoginLo
 import com.enterprise.auth.platform.modules.log.infrastructure.mapper.SysLogMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,6 +30,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 public class LogPublisherImpl implements LogPublisher {
 
     private static final String MASK = "******";
+    private static final int MAX_REQUEST_PARAMS_LENGTH = 4096;
     private static final List<String> SENSITIVE_KEYWORDS = List.of(
             "password", "passwd", "pwd", "token", "secret", "credential",
             "authorization", "authheader", "privatekey", "accesskey", "apikey",
@@ -68,6 +71,7 @@ public class LogPublisherImpl implements LogPublisher {
         if (!StringUtils.hasText(requestParams) && request != null) {
             requestParams = formatRequestParams(request);
         }
+        requestParams = sanitizeRequestParams(requestParams);
         Long requestTime = event.requestTime();
         if (requestTime == null) {
             Long startTime = RequestContext.getStartTime();
@@ -91,7 +95,11 @@ public class LogPublisherImpl implements LogPublisher {
         entity.setRequestTime(requestTime);
         entity.setStatus(StringUtils.hasText(event.status()) ? event.status() : "1");
         entity.setExMsg(event.exMsg());
-        entity.setPayloadJson(toJson(redact(enrichDetails(event.details(), event.operator(), tenantId, requestId, clientIp))));
+        Map<String, Object> details = new LinkedHashMap<>(event.details());
+        if (details.containsKey("requestParams")) {
+            details.put("requestParams", requestParams);
+        }
+        entity.setPayloadJson(toJson(redact(enrichDetails(details, event.operator(), tenantId, requestId, clientIp))));
         sysLogMapper.insert(entity);
     }
 
@@ -203,5 +211,35 @@ public class LogPublisherImpl implements LogPublisher {
         } catch (Exception ex) {
             return null;
         }
+    }
+
+    private String sanitizeRequestParams(String requestParams) {
+        if (!StringUtils.hasText(requestParams)) {
+            return null;
+        }
+        String[] pairs = requestParams.split("&", -1);
+        StringBuilder sanitized = new StringBuilder(Math.min(requestParams.length(), MAX_REQUEST_PARAMS_LENGTH));
+        for (String pair : pairs) {
+            if (sanitized.length() > 0) {
+                sanitized.append('&');
+            }
+            int separator = pair.indexOf('=');
+            String rawKey = separator >= 0 ? pair.substring(0, separator) : pair;
+            String decodedKey;
+            try {
+                decodedKey = URLDecoder.decode(rawKey, StandardCharsets.UTF_8);
+            } catch (IllegalArgumentException ex) {
+                decodedKey = rawKey;
+            }
+            if (isSensitiveKey(decodedKey)) {
+                sanitized.append(rawKey).append('=').append(MASK);
+            } else {
+                sanitized.append(pair);
+            }
+            if (sanitized.length() >= MAX_REQUEST_PARAMS_LENGTH) {
+                return sanitized.substring(0, MAX_REQUEST_PARAMS_LENGTH);
+            }
+        }
+        return sanitized.toString();
     }
 }

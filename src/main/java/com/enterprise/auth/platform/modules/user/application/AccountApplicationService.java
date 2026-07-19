@@ -7,10 +7,9 @@ import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.modules.log.application.LogPublisher;
-import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
-import com.enterprise.auth.platform.modules.auth.domain.PasswordHasher;
-import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
-import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
+import com.enterprise.auth.platform.modules.user.api.UserAccessControlPort;
+import com.enterprise.auth.platform.modules.user.api.UserPasswordHashPort;
+import com.enterprise.auth.platform.modules.user.api.UserAuthorizationInvalidationPort;
 import com.enterprise.auth.platform.modules.file.application.FileApplicationService;
 import com.enterprise.auth.platform.modules.file.application.FileMetadataView;
 import com.enterprise.auth.platform.common.notification.NotificationScenarioPort;
@@ -29,34 +28,34 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class AccountApplicationService {
 
-    private final CurrentUserService currentUserService;
+    private final UserAccessControlPort accessControlPort;
     private final SysUserMapper sysUserMapper;
-    private final PasswordHasher passwordHasher;
-    private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
+    private final UserPasswordHashPort passwordHashPort;
+    private final UserAuthorizationInvalidationPort authorizationInvalidationPort;
     private final FileApplicationService fileApplicationService;
     private final LogPublisher logPublisher;
     private final NotificationScenarioPort notificationScenarioPublisher;
 
     public AccountApplicationService(
-            CurrentUserService currentUserService,
+            UserAccessControlPort accessControlPort,
             SysUserMapper sysUserMapper,
-            PasswordHasher passwordHasher,
-            AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
+            UserPasswordHashPort passwordHashPort,
+            UserAuthorizationInvalidationPort authorizationInvalidationPort,
             FileApplicationService fileApplicationService,
             LogPublisher logPublisher,
             NotificationScenarioPort notificationScenarioPublisher
     ) {
-        this.currentUserService = currentUserService;
+        this.accessControlPort = accessControlPort;
         this.sysUserMapper = sysUserMapper;
-        this.passwordHasher = passwordHasher;
-        this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
+        this.passwordHashPort = passwordHashPort;
+        this.authorizationInvalidationPort = authorizationInvalidationPort;
         this.fileApplicationService = fileApplicationService;
         this.logPublisher = logPublisher;
         this.notificationScenarioPublisher = notificationScenarioPublisher;
     }
 
     public AccountProfileResponse profile() {
-        UserAccount current = currentUserService.requireCurrentUser();
+        UserAccessControlPort.UserIdentity current = accessControlPort.requireCurrentUser();
         return runWithAccountTenant(current, () -> {
             SysUserEntity user = loadCurrentUser(current);
             return toProfile(user);
@@ -65,7 +64,7 @@ public class AccountApplicationService {
 
     @Transactional
     public AccountProfileResponse updateProfile(AccountProfileUpdateRequest request) {
-        UserAccount current = currentUserService.requireCurrentUser();
+        UserAccessControlPort.UserIdentity current = accessControlPort.requireCurrentUser();
         return runWithAccountTenant(current, () -> {
             SysUserEntity user = loadCurrentUser(current);
             user.setDisplayName(normalizeProfileText(request.displayName(), 32));
@@ -73,40 +72,40 @@ public class AccountApplicationService {
             user.setEmail(normalizeProfileText(request.email(), 128));
             user.setUpdatedBy(user.getUsername());
             sysUserMapper.updateById(user);
-            permissionSnapshotInvalidationService.invalidateUser(user.getId(), user.getTenantId(), user.getUsername());
+            authorizationInvalidationPort.invalidateUser(user.getId(), user.getTenantId(), user.getUsername());
             return toProfile(user);
         });
     }
 
     @Transactional
     public AccountProfileResponse updateAvatar(MultipartFile file) {
-        UserAccount current = currentUserService.requireCurrentUser();
+        UserAccessControlPort.UserIdentity current = accessControlPort.requireCurrentUser();
         return runWithAccountTenant(current, () -> {
             SysUserEntity user = loadCurrentUser(current);
             FileMetadataView uploaded = fileApplicationService.uploadCurrentUserAvatar(file);
             user.setAvatarFileKey(uploaded.fileKey());
             user.setUpdatedBy(user.getUsername());
             sysUserMapper.updateById(user);
-            permissionSnapshotInvalidationService.invalidateUser(user.getId(), user.getTenantId(), user.getUsername());
+            authorizationInvalidationPort.invalidateUser(user.getId(), user.getTenantId(), user.getUsername());
             return toProfile(user);
         });
     }
 
     @Transactional
     public AccountProfileResponse changePassword(AccountPasswordChangeRequest request) {
-        UserAccount current = currentUserService.requireCurrentUser();
+        UserAccessControlPort.UserIdentity current = accessControlPort.requireCurrentUser();
         return runWithAccountTenant(current, () -> {
             SysUserEntity user = loadCurrentUser(current);
-            if (!passwordHasher.matches(request.oldPassword(), user.getPasswordHash())) {
+            if (!passwordHashPort.matches(request.oldPassword(), user.getPasswordHash())) {
                 throw new BusinessException("BAD_CREDENTIALS", "原密码错误");
             }
             PasswordValidator.validate(request.newPassword());
-            if (passwordHasher.matches(request.newPassword(), user.getPasswordHash())) {
+            if (passwordHashPort.matches(request.newPassword(), user.getPasswordHash())) {
                 throw new BusinessException("PASSWORD_REUSED", "新密码不能与当前密码相同");
             }
 
             int nextSessionVersion = (user.getSessionVersion() == null ? 1 : user.getSessionVersion()) + 1;
-            user.setPasswordHash(passwordHasher.hash(request.newPassword()));
+            user.setPasswordHash(passwordHashPort.hash(request.newPassword()));
             user.setSessionVersion(nextSessionVersion);
             user.setMustChangePassword(0);
             user.setPasswordUpdatedAt(TimeSupport.now());
@@ -116,7 +115,7 @@ public class AccountApplicationService {
             StpUtil.getTokenSession().set("sessionVersion", nextSessionVersion);
             StpUtil.getTokenSession().set("passwordChangeRequired", false);
             StpUtil.getTokenSession().delete("passwordChangeReason");
-            permissionSnapshotInvalidationService.invalidateUser(user.getId(), user.getTenantId(), user.getUsername());
+            authorizationInvalidationPort.invalidateUser(user.getId(), user.getTenantId(), user.getUsername());
             notificationScenarioPublisher.passwordChanged(user.getTenantId(), user.getId(), user.getUsername());
             return toProfile(user);
         });
@@ -154,7 +153,7 @@ public class AccountApplicationService {
         return trimmed;
     }
 
-    private SysUserEntity loadCurrentUser(UserAccount current) {
+    private SysUserEntity loadCurrentUser(UserAccessControlPort.UserIdentity current) {
         SysUserEntity user = sysUserMapper.selectOne(new LambdaQueryWrapper<SysUserEntity>()
                 .eq(SysUserEntity::getId, current.id())
                 .eq(SysUserEntity::getTenantId, current.tenantId())
@@ -166,7 +165,7 @@ public class AccountApplicationService {
         return user;
     }
 
-    private <T> T runWithAccountTenant(UserAccount current, Supplier<T> supplier) {
+    private <T> T runWithAccountTenant(UserAccessControlPort.UserIdentity current, Supplier<T> supplier) {
         String previousTenantId = TenantContext.getTenantId();
         try {
             TenantContext.setTenantId(current.tenantId());

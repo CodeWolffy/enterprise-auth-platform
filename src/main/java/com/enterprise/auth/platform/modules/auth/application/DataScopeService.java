@@ -2,6 +2,7 @@ package com.enterprise.auth.platform.modules.auth.application;
 
 import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
+import com.enterprise.auth.platform.modules.iam.api.DataScopeUserQuery;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.HashSet;

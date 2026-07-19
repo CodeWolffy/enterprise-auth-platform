@@ -2,16 +2,13 @@ package com.enterprise.auth.platform.modules.log.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.TimeSupport;
-import com.enterprise.auth.platform.modules.auth.application.DataScopeService;
-import com.enterprise.auth.platform.modules.auth.application.PlatformAdminSupport;
-import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.context.TimeZoneContext;
-import com.enterprise.auth.platform.modules.log.application.LogDailyTrendPoint;
-import com.enterprise.auth.platform.modules.log.application.LogRecentAuditEvent;
 import com.enterprise.auth.platform.modules.log.infrastructure.entity.SysLogEntity;
 import com.enterprise.auth.platform.modules.log.infrastructure.entity.SysLoginLogEntity;
 import com.enterprise.auth.platform.modules.log.infrastructure.mapper.SysLogMapper;
 import com.enterprise.auth.platform.modules.log.infrastructure.mapper.SysLoginLogMapper;
+import com.enterprise.auth.platform.modules.log.infrastructure.mapper.LogDailyAggregateRow;
+import com.enterprise.auth.platform.modules.log.infrastructure.mapper.LogTrendRange;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -20,7 +17,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -29,15 +28,10 @@ public class LogStatsFacade {
 
     private final SysLogMapper sysLogMapper;
     private final SysLoginLogMapper sysLoginLogMapper;
-    private final DataScopeService dataScopeService;
-    private final PlatformAdminSupport platformAdminSupport;
 
-    public LogStatsFacade(SysLogMapper sysLogMapper, SysLoginLogMapper sysLoginLogMapper,
-                          DataScopeService dataScopeService, PlatformAdminSupport platformAdminSupport) {
+    public LogStatsFacade(SysLogMapper sysLogMapper, SysLoginLogMapper sysLoginLogMapper) {
         this.sysLogMapper = sysLogMapper;
         this.sysLoginLogMapper = sysLoginLogMapper;
-        this.dataScopeService = dataScopeService;
-        this.platformAdminSupport = platformAdminSupport;
     }
 
     public long countOperationLogs(String tenantId, boolean platformScope, Optional<Set<String>> visibleUsernames, boolean recentOnly) {
@@ -90,16 +84,30 @@ public class LogStatsFacade {
         ZoneId zone = TimeZoneContext.getZone();
         LocalDate startDate = TimeSupport.today(zone).minusDays(6);
         DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE;
-        return java.util.stream.IntStream.range(0, 7)
-                .mapToObj(offset -> {
-                    LocalDate date = startDate.plusDays(offset);
-                    Instant from = TimeSupport.startOfDay(date, zone);
-                    Instant to = TimeSupport.startOfDay(date.plusDays(1), zone);
+        List<LogTrendRange> ranges = java.util.stream.IntStream.range(0, 7)
+                .mapToObj(offset -> startDate.plusDays(offset))
+                .map(date -> new LogTrendRange(
+                        formatter.format(date),
+                        TimeSupport.startOfDay(date, zone),
+                        TimeSupport.startOfDay(date.plusDays(1), zone)
+                ))
+                .toList();
+        Set<String> usernames = visibleUsernames.orElse(null);
+        Map<String, LogDailyAggregateRow> loginByDay = rowsByDay(
+                sysLoginLogMapper.selectDailyTrend(tenantId, platformScope, usernames, ranges)
+        );
+        Map<String, LogDailyAggregateRow> operationByDay = rowsByDay(
+                sysLogMapper.selectDailyTrend(tenantId, platformScope, usernames, ranges)
+        );
+        return ranges.stream()
+                .map(range -> {
+                    LogDailyAggregateRow login = loginByDay.get(range.dayKey());
+                    LogDailyAggregateRow operation = operationByDay.get(range.dayKey());
                     return new LogDailyTrendPoint(
-                            formatter.format(date),
-                            countLoginLogs(tenantId, platformScope, visibleUsernames, "SUCCESS", from, to),
-                            countOperationLogs(tenantId, platformScope, visibleUsernames, from, to),
-                            countLoginLogs(tenantId, platformScope, visibleUsernames, "FAILED", from, to)
+                            range.dayKey(),
+                            value(login == null ? null : login.getLoginCount()),
+                            value(operation == null ? null : operation.getOperationCount()),
+                            value(login == null ? null : login.getLoginFailedCount())
                     );
                 })
                 .toList();
@@ -170,5 +178,22 @@ public class LogStatsFacade {
         if (toExclusive != null) {
             wrapper.lt(SysLoginLogEntity::getCreatedAt, toExclusive);
         }
+    }
+
+    private Map<String, LogDailyAggregateRow> rowsByDay(List<LogDailyAggregateRow> rows) {
+        Map<String, LogDailyAggregateRow> byDay = new HashMap<>();
+        if (rows == null) {
+            return byDay;
+        }
+        for (LogDailyAggregateRow row : rows) {
+            if (row != null && StringUtils.hasText(row.getDayKey())) {
+                byDay.put(row.getDayKey(), row);
+            }
+        }
+        return byDay;
+    }
+
+    private long value(Long value) {
+        return value == null ? 0L : value;
     }
 }

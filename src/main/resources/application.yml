@@ -253,6 +253,9 @@ app:
 
   outbox:
     poll-interval-ms: 2000
+    # 密码重置链接等一次性凭据只允许以 AES-GCM 密文进入 outbox。
+    # 可独立配置；未配置时兼容复用现有 SMTP 密钥环境变量。
+    payload-secret-key: ${APP_OUTBOX_PAYLOAD_SECRET_KEY:${APP_MAIL_SECRET_KEY:}}
 
 logging:
   pattern:

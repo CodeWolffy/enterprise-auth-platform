@@ -2,6 +2,7 @@ package com.enterprise.auth.platform.common.web;
 
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.context.TimeZoneContext;
+import com.enterprise.auth.platform.common.exception.InvalidRequestException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.DateTimeException;
@@ -19,7 +20,7 @@ public class TimeZoneInterceptor implements HandlerInterceptor {
         try {
             TimeZoneContext.setZone(TimeSupport.zone(rawTimeZone));
         } catch (DateTimeException ex) {
-            throw new IllegalArgumentException("无效时区，请使用 IANA 时区名称，例如 Asia/Shanghai：" + rawTimeZone, ex);
+            throw new InvalidRequestException("无效时区，请使用 IANA 时区名称，例如 Asia/Shanghai：" + rawTimeZone, ex);
         }
         response.setHeader(HEADER_NAME, TimeZoneContext.getZone().getId());
         return true;

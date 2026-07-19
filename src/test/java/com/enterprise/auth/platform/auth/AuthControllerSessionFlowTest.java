@@ -230,13 +230,16 @@ class AuthControllerSessionFlowTest {
         Assertions.assertNotNull(tokenSession.get("permissions"));
         Assertions.assertNotNull(tokenSession.get("roles"));
 
-        mockMvc.perform(get("/api/auth/sessions")
+        MvcResult sessionsResult = mockMvc.perform(get("/api/auth/sessions")
                         .header("Authorization", authorization)
                         .header("X-Tenant-Id", "platform"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[?(@.sessionId=='" + token + "')]").exists())
-                .andExpect(jsonPath("$.data[?(@.sessionId=='" + token + "')].lastAccessAt").isNotEmpty())
-                .andExpect(jsonPath("$.data[0].tenantId").value("platform"));
+                .andExpect(jsonPath("$.data[0].lastAccessAt").isNotEmpty())
+                .andExpect(jsonPath("$.data[0].tenantId").value("platform"))
+                .andReturn();
+        JsonNode currentSession = currentSession(sessionsResult);
+        Assertions.assertNotEquals(token, currentSession.path("sessionId").asText(),
+                "online session API must not expose the bearer token");
 
         mockMvc.perform(post("/api/auth/logout")
                         .header("Authorization", authorization)
@@ -367,10 +370,13 @@ class AuthControllerSessionFlowTest {
         Assertions.assertNotNull(tokenSession.get("permissions"));
         Assertions.assertNotNull(tokenSession.get("roles"));
 
-        mockMvc.perform(get("/api/auth/sessions")
+        MvcResult sessionsResult = mockMvc.perform(get("/api/auth/sessions")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[?(@.sessionId=='" + token + "' && @.activeTenantId=='" + TENANT_A + "')]").exists());
+                .andReturn();
+        JsonNode currentSession = currentSession(sessionsResult);
+        Assertions.assertEquals(TENANT_A, currentSession.path("activeTenantId").asText());
+        Assertions.assertNotEquals(token, currentSession.path("sessionId").asText());
 
         JsonNode payload = latestLogPayload("TENANT_SWITCH", requestId);
         Assertions.assertEquals(ADMIN_TENANT, payload.path("operatorTenantId").asText());
@@ -586,7 +592,22 @@ class AuthControllerSessionFlowTest {
         String t2 = extractToken(r2);
         Assertions.assertNotEquals(t1, t2, "should produce distinct tokens");
 
+        MvcResult sessionsResult = mockMvc.perform(get("/api/auth/sessions")
+                        .header("Authorization", "Bearer " + t1)
+                        .header("X-Tenant-Id", ADMIN_TENANT))
+                .andExpect(status().isOk())
+                .andReturn();
+        String targetManagementId = nonCurrentSession(sessionsResult).path("sessionId").asText();
+        Assertions.assertFalse(targetManagementId.isBlank());
+        Assertions.assertNotEquals(t2, targetManagementId);
+
         mockMvc.perform(post("/api/auth/sessions/{sessionId}/offline", t2)
+                        .header("Authorization", "Bearer " + t1)
+                        .header("X-Tenant-Id", ADMIN_TENANT))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SESSION_NOT_FOUND"));
+
+        mockMvc.perform(post("/api/auth/sessions/{sessionId}/offline", targetManagementId)
                         .header("Authorization", "Bearer " + t1)
                         .header("X-Tenant-Id", ADMIN_TENANT))
                 .andExpect(status().isOk());
@@ -621,9 +642,9 @@ class AuthControllerSessionFlowTest {
                         .header("X-Tenant-Id", ADMIN_TENANT))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").isNumber())
-                .andExpect(jsonPath("$.data[?(@.sessionId=='" + token + "')].currentSession").value(true))
                 .andReturn();
-        JsonNode current = sessionByToken(response, token);
+        JsonNode current = currentSession(response);
+        Assertions.assertNotEquals(token, current.path("sessionId").asText());
         Assertions.assertTrue(current.path("active").asBoolean(), "current session should be active");
         Assertions.assertEquals(ADMIN_TENANT, current.path("tenantId").asText());
         Assertions.assertEquals(ADMIN_TENANT, current.path("activeTenantId").asText());
@@ -647,8 +668,10 @@ class AuthControllerSessionFlowTest {
         .andReturn();
     JsonNode sessions = pageRecords(response);
     Assertions.assertTrue(sessions.size() >= 2, "all scope should include visible active sessions");
-    JsonNode adminSession = sessionByTokenFromPage(response, adminToken);
-    JsonNode tenantSession = sessionByTokenFromPage(response, tenantToken);
+    JsonNode adminSession = currentSessionFromPage(response);
+    JsonNode tenantSession = sessionByUsernameFromPage(response, TENANT_USER);
+    Assertions.assertNotEquals(adminToken, adminSession.path("sessionId").asText());
+    Assertions.assertNotEquals(tenantToken, tenantSession.path("sessionId").asText());
     Assertions.assertEquals(ADMIN_TENANT, adminSession.path("tenantId").asText());
     Assertions.assertEquals(ADMIN_TENANT, adminSession.path("activeTenantId").asText());
     Assertions.assertEquals(TENANT_A, tenantSession.path("tenantId").asText());
@@ -714,8 +737,10 @@ class AuthControllerSessionFlowTest {
         JsonNode sessions = dataArray(response);
         Assertions.assertTrue(sessions.size() >= 2, "own scope should include both admin sessions");
         assertSortedByLastAccessDesc(sessions);
-        Assertions.assertNotNull(sessionByToken(response, t1));
-        Assertions.assertNotNull(sessionByToken(response, t2));
+        for (JsonNode session : sessions) {
+            Assertions.assertNotEquals(t1, session.path("sessionId").asText());
+            Assertions.assertNotEquals(t2, session.path("sessionId").asText());
+        }
     }
 
     private MvcResult loginAsAdmin() throws Exception {
@@ -757,22 +782,40 @@ class AuthControllerSessionFlowTest {
     return records;
   }
 
-  private JsonNode sessionByTokenFromPage(MvcResult result, String token) throws Exception {
+  private JsonNode sessionByUsernameFromPage(MvcResult result, String username) throws Exception {
     for (JsonNode session : pageRecords(result)) {
-      if (token.equals(session.path("sessionId").asText())) {
+      if (username.equals(session.path("username").asText())) {
         return session;
       }
     }
-    throw new AssertionError("session not found in page: " + token);
+    throw new AssertionError("session not found in page for username: " + username);
   }
 
-    private JsonNode sessionByToken(MvcResult result, String token) throws Exception {
+    private JsonNode currentSession(MvcResult result) throws Exception {
         for (JsonNode session : dataArray(result)) {
-            if (token.equals(session.path("sessionId").asText())) {
+            if (session.path("currentSession").asBoolean()) {
                 return session;
             }
         }
-        throw new AssertionError("session not found: " + token);
+        throw new AssertionError("current session not found");
+    }
+
+    private JsonNode nonCurrentSession(MvcResult result) throws Exception {
+        for (JsonNode session : dataArray(result)) {
+            if (!session.path("currentSession").asBoolean()) {
+                return session;
+            }
+        }
+        throw new AssertionError("non-current session not found");
+    }
+
+    private JsonNode currentSessionFromPage(MvcResult result) throws Exception {
+        for (JsonNode session : pageRecords(result)) {
+            if (session.path("currentSession").asBoolean()) {
+                return session;
+            }
+        }
+        throw new AssertionError("current session not found in page");
     }
 
     private JsonNode logPayload(String eventType) throws Exception {

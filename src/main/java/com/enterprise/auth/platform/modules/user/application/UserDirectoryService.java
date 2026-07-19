@@ -13,7 +13,7 @@ import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserRo
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserRoleMapper;
 import com.enterprise.auth.platform.modules.role.application.RoleGrantQueryFacade;
-import com.enterprise.auth.platform.modules.auth.application.DataScopeService;
+import com.enterprise.auth.platform.modules.user.api.UserAccessControlPort;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.modules.user.interfaces.UserSummary;
@@ -31,20 +31,20 @@ public class UserDirectoryService {
     private final SysUserMapper sysUserMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
     private final RoleQueryFacade roleQueryFacade;
-    private final DataScopeService dataScopeService;
+    private final UserAccessControlPort accessControlPort;
     private final RoleGrantQueryFacade roleGrantQueryFacade;
 
     public UserDirectoryService(
             SysUserMapper sysUserMapper,
             SysUserRoleMapper sysUserRoleMapper,
             RoleQueryFacade roleQueryFacade,
-            DataScopeService dataScopeService,
+            UserAccessControlPort accessControlPort,
             RoleGrantQueryFacade roleGrantQueryFacade
     ) {
         this.sysUserMapper = sysUserMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
         this.roleQueryFacade = roleQueryFacade;
-        this.dataScopeService = dataScopeService;
+        this.accessControlPort = accessControlPort;
         this.roleGrantQueryFacade = roleGrantQueryFacade;
     }
 
@@ -82,7 +82,7 @@ public class UserDirectoryService {
             return Optional.empty();
         }
         if (!globalScope) {
-            Optional<Set<Long>> visible = dataScopeService.visibleUserIds(tenantId);
+            Optional<Set<Long>> visible = accessControlPort.visibleUserIds(tenantId);
             if (visible.isPresent() && !visible.get().contains(user.getId())) {
                 return Optional.empty();
             }
@@ -170,7 +170,7 @@ public class UserDirectoryService {
             query.eq(SysUserEntity::getDeptId, deptId);
         }
         if (!globalScope) {
-            dataScopeService.visibleUserIds(tenantId).ifPresent(visibleUserIds -> {
+            accessControlPort.visibleUserIds(tenantId).ifPresent(visibleUserIds -> {
                 if (visibleUserIds.isEmpty()) {
                     query.apply("1 = 0");
                 } else {
@@ -259,6 +259,6 @@ public class UserDirectoryService {
     }
 
     private boolean isGlobalScope() {
-        return TenantContext.isGlobalScope() || dataScopeService.isPlatformSuperAdmin();
+        return TenantContext.isGlobalScope() || accessControlPort.isPlatformSuperAdmin();
     }
 }

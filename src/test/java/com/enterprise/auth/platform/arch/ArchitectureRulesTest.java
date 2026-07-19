@@ -93,6 +93,35 @@ class ArchitectureRulesTest {
     }
 
     @Test
+    void userModuleMustUseSessionIndexPort() {
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("..modules.user..")
+                .should().dependOnClassesThat().haveFullyQualifiedName(
+                        "com.enterprise.auth.platform.modules.auth.application.SessionIndexService")
+                .because("user 只依赖 UserSessionIndexPort，不依赖 auth 会话索引实现");
+        rule.check(classes);
+    }
+
+    @Test
+    void userModuleMustUseAuthorizationInvalidationPort() {
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("..modules.user..")
+                .should().dependOnClassesThat().haveFullyQualifiedName(
+                        "com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService")
+                .because("user 只依赖 UserAuthorizationInvalidationPort，不依赖 auth 快照失效实现");
+        rule.check(classes);
+    }
+
+    @Test
+    void userModuleMustNotDependOnAuthImplementation() {
+        ArchRule rule = noClasses()
+                .that().resideInAPackage("..modules.user..")
+                .should().dependOnClassesThat().resideInAPackage("..modules.auth..")
+                .because("user 通过 user.api 与 iam.api 契约访问认证、授权和密码能力");
+        rule.check(classes);
+    }
+
+    @Test
     void iamApiPackageExistsAsStableContractAnchor() {
         ArchRule rule = classes()
                 .that().resideInAPackage("..modules.iam.api..")

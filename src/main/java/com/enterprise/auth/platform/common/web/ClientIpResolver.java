@@ -2,6 +2,8 @@ package com.enterprise.auth.platform.common.web;
 
 import com.enterprise.auth.platform.infrastructure.config.RateLimitProperties;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -28,13 +30,13 @@ public class ClientIpResolver {
             return remoteAddr;
         }
 
-        String forwardedClientIp = firstForwardedIp(request.getHeader(X_FORWARDED_FOR));
+        String forwardedClientIp = resolveForwardedClientIp(request.getHeader(X_FORWARDED_FOR));
         if (StringUtils.hasText(forwardedClientIp)) {
             return forwardedClientIp;
         }
 
         String realIp = normalize(request.getHeader(X_REAL_IP));
-        if (StringUtils.hasText(realIp) && !UNKNOWN.equals(realIp)) {
+        if (StringUtils.hasText(realIp) && !UNKNOWN.equals(realIp) && isIpAddress(realIp)) {
             return realIp;
         }
 
@@ -48,11 +50,50 @@ public class ClientIpResolver {
         return trustedProxyMatchers.stream().anyMatch(matcher -> matcher.matches(remoteAddr));
     }
 
-    private String firstForwardedIp(String forwardedFor) {
+    private String resolveForwardedClientIp(String forwardedFor) {
         if (!StringUtils.hasText(forwardedFor)) {
             return null;
         }
-        return normalize(forwardedFor.split(",")[0]);
+        List<String> hops = new ArrayList<>();
+        Collections.addAll(hops, forwardedFor.split(","));
+        for (int index = hops.size() - 1; index >= 0; index--) {
+            String candidate = normalize(hops.get(index));
+            if (UNKNOWN.equals(candidate) || !isIpAddress(candidate)) {
+                continue;
+            }
+            if (!isTrustedProxy(candidate)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private boolean isIpAddress(String value) {
+        if (!StringUtils.hasText(value)) {
+            return false;
+        }
+        if (value.contains(":")) {
+            try {
+                return java.net.InetAddress.getByName(value).getAddress().length == 16;
+            } catch (java.net.UnknownHostException ex) {
+                return false;
+            }
+        }
+        String[] octets = value.split("\\.");
+        if (octets.length != 4) {
+            return false;
+        }
+        for (String octet : octets) {
+            try {
+                int part = Integer.parseInt(octet);
+                if (part < 0 || part > 255) {
+                    return false;
+                }
+            } catch (NumberFormatException ex) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private String normalize(String value) {
@@ -80,9 +121,12 @@ public class ClientIpResolver {
             try {
                 int prefix = Integer.parseInt(parts[1]);
                 if (parts[0].contains(":")) {
+                    if (prefix < 0 || prefix > 128) {
+                        return false;
+                    }
                     return ipv6Matches(parts[0], address, prefix);
                 }
-                if (address.contains(":")) {
+                if (address.contains(":") || prefix < 0 || prefix > 32) {
                     return false;
                 }
                 int mask = prefix == 0 ? 0 : -1 << (32 - prefix);
@@ -127,7 +171,11 @@ public class ClientIpResolver {
             }
             int value = 0;
             for (String octet : octets) {
-                value = (value << 8) | Integer.parseInt(octet);
+                int part = Integer.parseInt(octet);
+                if (part < 0 || part > 255) {
+                    throw new IllegalArgumentException("Invalid IPv4 address");
+                }
+                value = (value << 8) | part;
             }
             return value;
         }
