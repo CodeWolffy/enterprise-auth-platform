@@ -101,7 +101,7 @@ public class WorkflowDefinitionService {
         int normalizedSize = WorkflowSupport.normalizeSize(size);
         boolean globalScope = TenantContext.isGlobalScope();
         long total = repository.countDefinitions(tenantId, globalScope, status);
-        int offset = (normalizedPage - 1) * normalizedSize;
+        int offset = (int) Math.min(Integer.MAX_VALUE, PaginationSupport.offset(normalizedPage, normalizedSize));
         List<WorkflowDefinitionView> records = repository
                 .findDefinitions(tenantId, globalScope, status, offset, normalizedSize)
                 .stream().map(viewMapper::toDefinitionView).toList();

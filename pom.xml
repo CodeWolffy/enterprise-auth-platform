@@ -35,6 +35,11 @@
         <logstash-logback-encoder.version>8.1</logstash-logback-encoder.version>
         <jsr305.version>3.0.2</jsr305.version>
         <jacoco.version>0.8.11</jacoco.version>
+        <jacoco.check.skip>false</jacoco.check.skip>
+        <jacoco.data.file>${project.build.directory}/jacoco.exec</jacoco.data.file>
+        <jacoco.report.directory>${project.build.directory}/site/jacoco</jacoco.report.directory>
+        <surefire.groups></surefire.groups>
+        <surefire.excluded-groups></surefire.excluded-groups>
         <spotbugs.version>4.8.4.0</spotbugs.version>
         <spotbugs.fail-on-error>true</spotbugs.fail-on-error>
         <spotbugs.threshold>High</spotbugs.threshold>
@@ -259,7 +264,20 @@
             <id>unit-tests</id>
             <properties>
                 <!-- Fast local suite: tests tagged as integration require MySQL/Redis and are skipped. -->
-                <groups>!integration</groups>
+                <surefire.excluded-groups>integration</surefire.excluded-groups>
+                <jacoco.check.skip>true</jacoco.check.skip>
+                <jacoco.data.file>${project.build.directory}/jacoco-unit.exec</jacoco.data.file>
+                <jacoco.report.directory>${project.build.directory}/site/jacoco-unit</jacoco.report.directory>
+            </properties>
+        </profile>
+        <profile>
+            <id>integration-tests</id>
+            <properties>
+                <!-- Run only tests that explicitly require real MySQL/Redis or Testcontainers. -->
+                <surefire.groups>integration</surefire.groups>
+                <jacoco.check.skip>true</jacoco.check.skip>
+                <jacoco.data.file>${project.build.directory}/jacoco-integration.exec</jacoco.data.file>
+                <jacoco.report.directory>${project.build.directory}/site/jacoco-integration</jacoco.report.directory>
             </properties>
         </profile>
         <profile>
@@ -347,6 +365,8 @@
                 <version>3.1.2</version>
                 <configuration>
                     <argLine>@{argLine} -Djdk.net.URLClassPath.disableClassPathURLCheck=true</argLine>
+                    <groups>${surefire.groups}</groups>
+                    <excludedGroups>${surefire.excluded-groups}</excludedGroups>
                 </configuration>
             </plugin>
             <plugin>
@@ -356,6 +376,7 @@
                 <executions>
                     <execution>
                         <configuration>
+                            <destFile>${jacoco.data.file}</destFile>
                             <excludes>
                                 <exclude>net/sf/jsqlparser/**</exclude>
                             </excludes>
@@ -367,6 +388,10 @@
                     <execution>
                         <id>report</id>
                         <phase>test</phase>
+                        <configuration>
+                            <dataFile>${jacoco.data.file}</dataFile>
+                            <outputDirectory>${jacoco.report.directory}</outputDirectory>
+                        </configuration>
                         <goals>
                             <goal>report</goal>
                         </goals>
@@ -378,6 +403,8 @@
                             <goal>check</goal>
                         </goals>
                         <configuration>
+                            <dataFile>${jacoco.data.file}</dataFile>
+                            <skip>${jacoco.check.skip}</skip>
                             <rules>
                                 <rule>
                                     <element>BUNDLE</element>

@@ -15,7 +15,6 @@ import com.enterprise.auth.platform.modules.notification.infrastructure.entity.S
 import com.enterprise.auth.platform.modules.notification.infrastructure.mapper.SysUserNotificationMapper;
 import com.enterprise.auth.platform.modules.notification.infrastructure.projection.NoticeBroadcastProjection;
 import java.time.Instant;
-import java.util.Comparator;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,29 +42,14 @@ public class NotificationInboxService {
         int safePage = PaginationSupport.normalizePage(page);
         int safeSize = PaginationSupport.normalizeSize(size, 100);
         Instant now = TimeSupport.now();
-        LambdaQueryWrapper<SysUserNotificationEntity> countWrapper = visibleMineWrapper(tenantId, user.id(), read);
-        long directTotal = notificationMapper.selectCount(countWrapper);
-        long broadcastTotal = noticeReadStatusMapper.countVisibleBroadcasts(tenantId, user.id(), read, now);
-        long total = directTotal + broadcastTotal;
-        int offset = (safePage - 1) * safeSize;
-        int fetchSize = offset + safeSize;
-        List<NotificationView> directRecords = notificationMapper.selectList(visibleMineWrapper(tenantId, user.id(), read)
-                        .orderByAsc(SysUserNotificationEntity::getReadAt)
-                        .orderByDesc(SysUserNotificationEntity::getCreatedAt)
-                        .orderByDesc(SysUserNotificationEntity::getId)
-                        .last("limit " + fetchSize))
+        long total = notificationMapper.countVisibleNotifications(tenantId, user.id(), read, now);
+        int offset = (int) Math.min(
+                Integer.MAX_VALUE,
+                PaginationSupport.offset(safePage, safeSize));
+        List<NotificationView> records = notificationMapper
+                .listVisibleNotifications(tenantId, user.id(), read, now, offset, safeSize)
                 .stream()
-                .map(NotificationView::from)
-                .toList();
-        List<NotificationView> broadcastRecords = noticeReadStatusMapper
-                .listVisibleBroadcasts(tenantId, user.id(), read, now, fetchSize)
-                .stream()
-                .map(NotificationView::fromBroadcast)
-                .toList();
-        List<NotificationView> records = java.util.stream.Stream.concat(directRecords.stream(), broadcastRecords.stream())
-                .sorted(notificationOrder())
-                .skip(offset)
-                .limit(safeSize)
+                .map(NotificationView::fromInbox)
                 .toList();
         return PageResult.of(total, safePage, safeSize, records);
     }
@@ -179,14 +163,4 @@ public class NotificationInboxService {
                 .eq(SysUserNotificationEntity::getDeleted, 0);
     }
 
-    private Comparator<NotificationView> notificationOrder() {
-        return Comparator
-                .comparing(NotificationView::read)
-                .thenComparing(
-                        notification -> notification.createdAt() == null ? Instant.EPOCH : notification.createdAt(),
-                        Comparator.reverseOrder())
-                .thenComparing(
-                        notification -> notification.id() == null ? Long.MIN_VALUE : Math.abs(notification.id()),
-                        Comparator.reverseOrder());
-    }
 }

@@ -4,12 +4,7 @@ import { defineAsyncComponent, ref } from 'vue';
 import { Page } from '@vben/common-ui';
 import { Plus } from '@vben/icons';
 
-import {
-  ElButton,
-  ElDrawer,
-  ElMessage,
-  ElTag,
-} from 'element-plus';
+import { ElButton, ElDrawer, ElMessage, ElTag } from 'element-plus';
 
 import { delObj, getById, getPage } from '#/api/upms/notice';
 import RichTextViewer from '#/components/rich-text-viewer/index.vue';

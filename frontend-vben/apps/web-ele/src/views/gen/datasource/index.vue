@@ -1,27 +1,24 @@
 <script setup lang="ts">
-import type { VxeTableGridOptions } from '#/adapter/vxe-table';
 import type { DataSourceView } from '#/api/codegen';
+import type {
+  CrudGridPageResponse,
+  CrudGridQueryParams,
+} from '#/composables/useCrudGrid';
 
 import { ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
 import { Plus } from '@vben/icons';
 
-import {
-  ElButton,
-  ElDialog,
-  ElMessage,
-  ElMessageBox,
-  ElTag,
-} from 'element-plus';
+import { ElButton, ElDialog, ElMessage, ElTag } from 'element-plus';
 
-import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import {
   authorizeDataSource,
   deleteDataSource,
   getDataSources,
   testDataSource,
 } from '#/api/codegen';
+import { useCrudGrid } from '#/composables/useCrudGrid';
 import { PERMS } from '#/constants/permissions';
 
 import { useColumns, useGridFormSchema } from './data';
@@ -31,46 +28,52 @@ const dialogVisible = ref(false);
 const currentRow = ref<DataSourceView | null>(null);
 const formRef = ref<null | { resetForm?: () => void }>(null);
 
-const [Grid, gridApi] = useVbenVxeGrid({
+type DataSourceQuery = {
+  keyword?: string;
+};
+
+async function fetchDataSourcePage(
+  params: CrudGridQueryParams<DataSourceQuery>,
+): Promise<CrudGridPageResponse<DataSourceView>> {
+  // The data-source API is list-only; keep the existing client-side paging.
+  const rows = await getDataSources();
+  const keyword = String(params.keyword ?? '')
+    .trim()
+    .toLowerCase();
+  const filtered = keyword
+    ? rows.filter((row) =>
+        [row.name, row.dbName, row.host].some((value) =>
+          String(value ?? '')
+            .toLowerCase()
+            .includes(keyword),
+        ),
+      )
+    : rows;
+  const currentPage = Number(params.page ?? 1);
+  const pageSize = Number(params.size ?? 10);
+  const start = (currentPage - 1) * pageSize;
+  return {
+    records: filtered.slice(start, start + pageSize),
+    total: filtered.length,
+  };
+}
+
+const {
+  Grid,
+  gridApi,
+  onDelete: baseOnDelete,
+} = useCrudGrid<DataSourceView, DataSourceQuery, number>({
+  columns: useColumns(),
+  deleteApi: deleteDataSource,
+  deleteConfirmMessage: '确认删除该数据源？',
+  deleteSuccessMessage: '已删除',
+  fetchPage: fetchDataSourcePage,
   formOptions: {
     schema: useGridFormSchema(),
     submitOnChange: false,
   },
-  gridOptions: {
-    columns: useColumns(),
-    height: 'auto',
-    keepSource: true,
-    pagerConfig: { enabled: true, pageSize: 10 },
-    proxyConfig: {
-      ajax: {
-        query: async ({ page }, formValues) => {
-          const rows = await getDataSources();
-          const keyword = String(formValues.keyword ?? '')
-            .trim()
-            .toLowerCase();
-          const filtered = keyword
-            ? rows.filter((row) =>
-                [row.name, row.dbName, row.host].some((value) =>
-                  value?.toLowerCase().includes(keyword),
-                ),
-              )
-            : rows;
-          const start = (page.currentPage - 1) * page.pageSize;
-          return {
-            list: filtered.slice(start, start + page.pageSize),
-            total: filtered.length,
-          };
-        },
-      },
-    },
-    rowConfig: { keyField: 'id' },
-    toolbarConfig: {
-      refresh: true,
-      refreshOptions: { code: 'query' },
-      search: true,
-      zoom: false,
-    },
-  } as VxeTableGridOptions<DataSourceView>,
+  pageSize: 10,
+  rowKey: 'id',
 });
 
 function openCreate() {
@@ -83,17 +86,8 @@ function openEdit(row: DataSourceView) {
   dialogVisible.value = true;
 }
 
-async function onDelete(row: DataSourceView) {
-  try {
-    await ElMessageBox.confirm(`确认删除数据源「${row.name}」？`, '提示', {
-      type: 'warning',
-    });
-    await deleteDataSource(row.id);
-    ElMessage.success('已删除');
-    gridApi.query();
-  } catch {
-    // Cancelled confirmations require no further action.
-  }
+function onDelete(row: DataSourceView) {
+  return baseOnDelete(row, `确认删除数据源「${row.name}」？`);
 }
 
 async function onTest(row: DataSourceView) {

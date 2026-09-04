@@ -177,6 +177,8 @@ app:
       session-enabled: true
       captcha-enabled: true
       redisson-enabled: true
+      # 幂等保护依赖 Redisson；closed 在客户端不可用时拒绝受保护请求，open 仅建议用于明确的本地降级场景
+      idempotent-failure-mode: ${APP_IDEMPOTENCY_FAILURE_MODE:closed}
       key-prefix: "eap:auth:"
       namespace-version: "v2"
       session-touch-throttle: 30s

@@ -27,7 +27,11 @@ const configTypeMap: Record<
   system: { label: '系统参数', type: 'warning' },
 };
 
-const { Grid, onRefresh, onDelete: baseDelete } = useCrudGrid({
+const {
+  Grid,
+  onRefresh,
+  onDelete: baseDelete,
+} = useCrudGrid({
   formOptions: {
     schema: useGridFormSchema(),
   },

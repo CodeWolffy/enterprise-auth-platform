@@ -98,7 +98,7 @@ public class WorkflowInstanceService {
         int normalizedPage = PaginationSupport.normalizePage(page);
         int normalizedSize = WorkflowSupport.normalizeSize(size);
         long total = repository.countStartedInstances(tenantId, user.id(), status);
-        int offset = (normalizedPage - 1) * normalizedSize;
+        int offset = (int) Math.min(Integer.MAX_VALUE, PaginationSupport.offset(normalizedPage, normalizedSize));
         List<WorkflowInstanceView> records = repository
                 .findStartedInstances(tenantId, user.id(), status, offset, normalizedSize)
                 .stream().map(viewMapper::toInstanceView).toList();

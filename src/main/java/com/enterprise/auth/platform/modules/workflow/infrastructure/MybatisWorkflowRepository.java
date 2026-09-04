@@ -22,6 +22,7 @@ import com.enterprise.auth.platform.modules.workflow.infrastructure.mapper.WfTas
 import com.enterprise.auth.platform.modules.workflow.infrastructure.mapper.WfTaskCandidateUserMapper;
 import com.enterprise.auth.platform.modules.workflow.infrastructure.mapper.WfTaskMapper;
 import com.enterprise.auth.platform.modules.workflow.infrastructure.mapper.WfTaskUrgeMapper;
+import com.enterprise.auth.platform.modules.workflow.infrastructure.projection.WorkflowTaskUrgeCountProjection;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,6 +38,7 @@ import org.springframework.util.StringUtils;
 @Repository
 public class MybatisWorkflowRepository implements WorkflowRepository {
 
+    private static final int MAX_PAGE_SIZE = 100;
     private final WfProcessDefinitionMapper definitionMapper;
     private final WfProcessInstanceMapper instanceMapper;
     private final WfTaskMapper taskMapper;
@@ -121,10 +123,12 @@ public class MybatisWorkflowRepository implements WorkflowRepository {
     @Override
     public List<WorkflowDefinition> findDefinitions(
             String tenantId, boolean globalScope, String status, int offset, int limit) {
+        int safeOffset = Math.max(offset, 0);
+        int safeLimit = Math.min(Math.max(limit, 1), MAX_PAGE_SIZE);
         return definitionMapper.selectList(definitionQuery(tenantId, globalScope, status)
                         .orderByDesc(WfProcessDefinitionEntity::getUpdatedAt)
                         .orderByDesc(WfProcessDefinitionEntity::getId)
-                        .last("limit " + offset + "," + limit))
+                        .last("limit " + safeOffset + "," + safeLimit))
                 .stream().map(this::toDomain).toList();
     }
 
@@ -168,10 +172,12 @@ public class MybatisWorkflowRepository implements WorkflowRepository {
     @Override
     public List<WorkflowInstance> findStartedInstances(
             String tenantId, Long starterUserId, String status, int offset, int limit) {
+        int safeOffset = Math.max(offset, 0);
+        int safeLimit = Math.min(Math.max(limit, 1), MAX_PAGE_SIZE);
         return instanceMapper.selectList(instanceQuery(tenantId, starterUserId, status)
                         .orderByDesc(WfProcessInstanceEntity::getStartedAt)
                         .orderByDesc(WfProcessInstanceEntity::getId)
-                        .last("limit " + offset + "," + limit))
+                        .last("limit " + safeOffset + "," + safeLimit))
                 .stream().map(this::toDomain).toList();
     }
 
@@ -254,10 +260,24 @@ public class MybatisWorkflowRepository implements WorkflowRepository {
     }
 
     @Override
-    public List<WorkflowTask> findTodoCandidates(String tenantId, Long userId, Long taskId, int limit) {
-        // 候选关系表 SQL 下推，避免全量 PENDING 再内存过滤
-        int safeLimit = Math.min(Math.max(limit, 1), 500);
-        LambdaQueryWrapper<WfTaskEntity> query = new LambdaQueryWrapper<WfTaskEntity>()
+    public long countTodoCandidates(String tenantId, Long userId, Long taskId) {
+        return taskMapper.selectCount(todoQuery(tenantId, userId, taskId));
+    }
+
+    @Override
+    public List<WorkflowTask> findTodoCandidates(
+            String tenantId, Long userId, Long taskId, int offset, int limit) {
+        int safeOffset = Math.max(offset, 0);
+        int safeLimit = Math.min(Math.max(limit, 1), MAX_PAGE_SIZE);
+        return taskMapper.selectList(todoQuery(tenantId, userId, taskId)
+                        .orderByAsc(WfTaskEntity::getCreatedAt)
+                        .orderByAsc(WfTaskEntity::getId)
+                        .last("limit " + safeOffset + "," + safeLimit))
+                .stream().map(this::toDomain).toList();
+    }
+
+    private LambdaQueryWrapper<WfTaskEntity> todoQuery(String tenantId, Long userId, Long taskId) {
+        return new LambdaQueryWrapper<WfTaskEntity>()
                 .eq(WfTaskEntity::getTenantId, tenantId)
                 .eq(WfTaskEntity::getStatus, WorkflowTaskStatus.PENDING.name())
                 .eq(WfTaskEntity::getDeleted, 0)
@@ -274,12 +294,7 @@ public class MybatisWorkflowRepository implements WorkflowRepository {
                                           INNER JOIN sys_user_role ur ON ur.tenant_id = r.tenant_id AND ur.role_id = r.id AND ur.user_id = {0}
                                           WHERE cr.tenant_id = wf_task.tenant_id AND cr.task_id = wf_task.id
                                         )
-                                        """, userId))
-                )
-                .orderByAsc(WfTaskEntity::getCreatedAt)
-                .orderByAsc(WfTaskEntity::getId)
-                .last("limit " + safeLimit);
-        return taskMapper.selectList(query).stream().map(this::toDomain).toList();
+                                        """, userId)));
     }
 
     @Override
@@ -299,7 +314,7 @@ public class MybatisWorkflowRepository implements WorkflowRepository {
     @Override
     public List<WorkflowTask> findDoneTasks(String tenantId, Long userId, int offset, int limit) {
         int safeOffset = Math.max(offset, 0);
-        int safeLimit = Math.min(Math.max(limit, 1), 100);
+        int safeLimit = Math.min(Math.max(limit, 1), MAX_PAGE_SIZE);
         return taskMapper.selectList(new LambdaQueryWrapper<WfTaskEntity>()
                         .eq(WfTaskEntity::getTenantId, tenantId)
                         .ne(WfTaskEntity::getStatus, WorkflowTaskStatus.PENDING.name())
@@ -333,17 +348,15 @@ public class MybatisWorkflowRepository implements WorkflowRepository {
         if (taskIds == null || taskIds.isEmpty()) {
             return Map.of();
         }
-        List<WfTaskUrgeEntity> rows = urgeMapper.selectList(new LambdaQueryWrapper<WfTaskUrgeEntity>()
-                .select(WfTaskUrgeEntity::getTaskId)
-                .eq(WfTaskUrgeEntity::getTenantId, tenantId)
-                .in(WfTaskUrgeEntity::getTaskId, taskIds)
-                .eq(WfTaskUrgeEntity::getDeleted, 0));
+        List<WorkflowTaskUrgeCountProjection> rows = urgeMapper.countByTaskIds(tenantId, taskIds);
+        if (rows == null || rows.isEmpty()) {
+            return Map.of();
+        }
         Map<Long, Long> counts = new java.util.HashMap<>();
-        for (WfTaskUrgeEntity row : rows) {
-            if (row.getTaskId() == null) {
-                continue;
+        for (var row : rows) {
+            if (row.getTaskId() != null && row.getUrgeCount() != null) {
+                counts.put(row.getTaskId(), row.getUrgeCount());
             }
-            counts.merge(row.getTaskId(), 1L, Long::sum);
         }
         return counts;
     }
@@ -369,13 +382,15 @@ public class MybatisWorkflowRepository implements WorkflowRepository {
 
     @Override
     public List<WorkflowTaskUrge> findUrgesByInstance(String tenantId, Long instanceId, int offset, int limit) {
+        int safeOffset = Math.max(offset, 0);
+        int safeLimit = Math.min(Math.max(limit, 1), MAX_PAGE_SIZE);
         return urgeMapper.selectList(new LambdaQueryWrapper<WfTaskUrgeEntity>()
                         .eq(WfTaskUrgeEntity::getTenantId, tenantId)
                         .eq(WfTaskUrgeEntity::getInstanceId, instanceId)
                         .eq(WfTaskUrgeEntity::getDeleted, 0)
                         .orderByDesc(WfTaskUrgeEntity::getUrgedAt)
                         .orderByDesc(WfTaskUrgeEntity::getId)
-                        .last("limit " + offset + "," + limit))
+                        .last("limit " + safeOffset + "," + safeLimit))
                 .stream().map(this::toDomain).toList();
     }
 

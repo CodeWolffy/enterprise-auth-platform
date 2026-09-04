@@ -1,14 +1,17 @@
 <script lang="ts" setup>
-import type { VxeTableGridOptions } from '#/adapter/vxe-table';
+import type {
+  CrudGridPageResponse,
+  CrudGridQueryParams,
+} from '#/composables/useCrudGrid';
 
 import { defineAsyncComponent, ref } from 'vue';
 
 import { Plus } from '@vben/icons';
 
-import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus';
+import { ElButton, ElTag } from 'element-plus';
 
-import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { delObj, getList } from '#/api/upms/dict-value';
+import { useCrudGrid } from '#/composables/useCrudGrid';
 import { PERMS } from '#/constants/permissions';
 import { useDictStore } from '#/store/dict';
 import { invokeWhenComponentReady } from '#/utils/component-ready';
@@ -32,37 +35,60 @@ const Form = defineAsyncComponent(() => import('./form.vue'));
 const formRef = ref();
 const formMounted = ref(false);
 
-const [Grid, gridApi] = useVbenVxeGrid({
+interface DictValueRow {
+  dictId?: string;
+  dictType?: string;
+  dictLabel?: string;
+  dictValue?: string;
+  enabled?: boolean;
+  id: number | string;
+  remarks?: string;
+  showClass?: 'danger' | 'default' | 'info' | 'primary' | 'success' | 'warning';
+  sort?: number;
+  updatedAt?: null | string;
+}
+
+type DictValueQuery = Record<never, never>;
+
+async function fetchDictValuePage(
+  _params: CrudGridQueryParams<DictValueQuery>,
+): Promise<CrudGridPageResponse<DictValueRow>> {
+  // The dict-value endpoint is list-only; preserve the drawer's unpaged view.
+  const response = props.dictId ? await getList(props.dictId) : [];
+  const records = Array.isArray(response) ? (response as DictValueRow[]) : [];
+  return { records, total: records.length };
+}
+
+const {
+  Grid,
+  onDelete: baseOnDelete,
+  onRefresh,
+} = useCrudGrid<DictValueRow, DictValueQuery, number | string>({
+  columns: useColumns(),
+  deleteApi: async (id) => {
+    await delObj(String(id));
+    useDictStore().removeDict(props.dictType);
+  },
+  deleteConfirmMessage: '此操作将删除该字典键值，是否继续?',
+  fetchPage: fetchDictValuePage,
   gridOptions: {
-    columns: useColumns(),
-    height: 'auto',
-    keepSource: true,
-    pagerConfig: {
-      enabled: false,
-    },
-    proxyConfig: {
-      ajax: {
-        query: async () => {
-          return props.dictId ? await getList(props.dictId) : [];
-        },
-      },
-    },
-    rowConfig: {
-      keyField: 'id',
-    },
+    pagerConfig: { enabled: false },
     toolbarConfig: {
       refresh: true,
       refreshOptions: { code: 'query' },
+      search: false,
       zoom: false,
     },
-  } as VxeTableGridOptions,
+  },
+  rowKey: 'id',
 });
 
-function onRefresh() {
-  gridApi.query();
-}
+type DictValueFormRow = Partial<DictValueRow> & {
+  dictId?: string;
+  dictType?: string;
+};
 
-function openForm(row: any) {
+function openForm(row?: DictValueFormRow) {
   formMounted.value = true;
   void invokeWhenComponentReady(formRef, (form: any) => form.initForm(row));
 }
@@ -71,20 +97,8 @@ function onCreate() {
   openForm({ dictId: props.dictId, dictType: props.dictType });
 }
 
-async function onDelete(row: any) {
-  try {
-    await ElMessageBox.confirm('此操作将删除该字典键值，是否继续?', '提示', {
-      cancelButtonText: '取消',
-      confirmButtonText: '确认',
-      type: 'warning',
-    });
-    await delObj(row.id);
-    useDictStore().removeDict(props.dictType);
-    ElMessage.success('删除成功');
-    onRefresh();
-  } catch {
-    // Cancelled confirmations require no further action.
-  }
+function onDelete(row: DictValueRow) {
+  return baseOnDelete(row);
 }
 </script>
 
@@ -105,7 +119,7 @@ async function onDelete(row: any) {
       </template>
 
       <template #showClass="{ row }">
-        <ElTag :type="row.showClass === 'default' ? '' : row.showClass">
+        <ElTag :type="row.showClass === 'default' ? undefined : row.showClass">
           {{ row.showClass || 'default' }}
         </ElTag>
       </template>

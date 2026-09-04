@@ -32,7 +32,8 @@ public @interface Idempotent {
     String key() default "";
 
     /**
-     * 锁过期 / 保持时间，防止极端情况下节点宕机导致死锁。
+     * 锁过期 / 防重窗口时间，防止极端情况下节点宕机导致死锁。
+     * 执行业务方法期间由切面自动续租；{@code releaseOnSuccess=false} 时窗口从业务完成后开始计算。
      * 默认 5 秒。
      */
     long timeout() default 5;

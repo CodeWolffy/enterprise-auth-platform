@@ -23,7 +23,6 @@ import {
   ElTag,
 } from 'element-plus';
 
-import { useCrudGrid } from '#/composables/useCrudGrid';
 import { getList as getMenuList } from '#/api/upms/menu';
 import {
   delObj,
@@ -33,6 +32,7 @@ import {
   getTenantMenuList,
 } from '#/api/upms/tenant';
 import { getList as getPkgList } from '#/api/upms/tenant-package';
+import { useCrudGrid } from '#/composables/useCrudGrid';
 import { PERMS } from '#/constants/permissions';
 import { invokeWhenComponentReady } from '#/utils/component-ready';
 import { formatDateTime } from '#/utils/datetime';

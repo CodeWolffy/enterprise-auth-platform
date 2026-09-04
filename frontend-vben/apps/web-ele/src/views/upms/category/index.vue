@@ -1,5 +1,8 @@
 <script lang="ts" setup>
-import type { VxeTableGridOptions } from '#/adapter/vxe-table';
+import type {
+  CrudGridPageResponse,
+  CrudGridQueryParams,
+} from '#/composables/useCrudGrid';
 import type { CategoryAnalysis, CategoryOption } from '#/types/system';
 
 import { computed, defineAsyncComponent, nextTick, ref } from 'vue';
@@ -18,7 +21,6 @@ import {
   ElDrawer,
   ElEmpty,
   ElMessage,
-  ElMessageBox,
   ElTable,
   ElTableColumn,
   ElTag,
@@ -26,8 +28,8 @@ import {
   ElTimelineItem,
 } from 'element-plus';
 
-import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { delObj, getAnalysis, getOptions } from '#/api/upms/category';
+import { useCrudGrid } from '#/composables/useCrudGrid';
 import { PERMS } from '#/constants/permissions';
 import { invokeWhenComponentReady } from '#/utils/component-ready';
 import { formatDateTime } from '#/utils/datetime';
@@ -58,46 +60,49 @@ const ruleSummary = computed(() =>
     : `当前 ${targetTypeLabel.value}共 ${ruleCount.value} 条规则`,
 );
 
-const [Grid, gridApi] = useVbenVxeGrid({
+type CategoryQuery = {
+  keyword?: string;
+  targetType?: 'config' | 'dict';
+};
+
+async function fetchCategoryPage(
+  params: CrudGridQueryParams<CategoryQuery>,
+): Promise<CrudGridPageResponse<CategoryOption>> {
+  // The category API returns a complete list, so filtering stays client-side.
+  activeTab.value = params.targetType === 'config' ? 'config' : 'dict';
+  const response = await getOptions(activeTab.value);
+  const records = Array.isArray(response) ? (response as CategoryOption[]) : [];
+  const keyword = String(params.keyword ?? '')
+    .trim()
+    .toLowerCase();
+  const filtered = keyword
+    ? records.filter((item) =>
+        [item.code, item.name, ...item.matchers].some((text) =>
+          text.toLowerCase().includes(keyword),
+        ),
+      )
+    : records;
+  ruleCount.value = records.length;
+  matchedRuleCount.value = filtered.length;
+  hasKeyword.value = Boolean(keyword);
+  return { records: filtered, total: filtered.length };
+}
+
+const {
+  Grid,
+  onDelete: baseOnDelete,
+  onRefresh,
+} = useCrudGrid<CategoryOption, CategoryQuery, string>({
+  columns: useColumns(),
+  deleteApi: (code) => delObj(activeTab.value, String(code)),
+  deleteConfirmMessage: '此操作将删除该分类，是否继续?',
+  fetchPage: fetchCategoryPage,
   formOptions: {
     schema: useGridFormSchema(),
     submitOnChange: false,
   },
   gridOptions: {
-    columns: useColumns(),
-    height: 'auto',
-    keepSource: true,
-    pagerConfig: {
-      enabled: false,
-    },
-    proxyConfig: {
-      ajax: {
-        query: async (_params, formValues) => {
-          activeTab.value =
-            formValues.targetType === 'config' ? 'config' : 'dict';
-          const records = (await getOptions(
-            activeTab.value,
-          )) as CategoryOption[];
-          const keyword = String(formValues.keyword ?? '')
-            .trim()
-            .toLowerCase();
-          const filtered = keyword
-            ? records.filter((item) =>
-                [item.code, item.name, ...item.matchers].some((text) =>
-                  text.toLowerCase().includes(keyword),
-                ),
-              )
-            : records;
-          ruleCount.value = records.length;
-          matchedRuleCount.value = filtered.length;
-          hasKeyword.value = Boolean(keyword);
-          return filtered;
-        },
-      },
-    },
-    rowConfig: {
-      keyField: 'code',
-    },
+    pagerConfig: { enabled: false },
     toolbarConfig: {
       custom: true,
       refresh: true,
@@ -105,12 +110,9 @@ const [Grid, gridApi] = useVbenVxeGrid({
       search: true,
       zoom: false,
     },
-  } as VxeTableGridOptions<CategoryOption>,
+  },
+  rowKey: 'code',
 });
-
-function onRefresh() {
-  gridApi.query();
-}
 
 function openForm(row?: CategoryOption) {
   formMounted.value = true;
@@ -119,19 +121,8 @@ function openForm(row?: CategoryOption) {
   );
 }
 
-async function onDelete(row: CategoryOption) {
-  try {
-    await ElMessageBox.confirm('此操作将删除该分类，是否继续?', '提示', {
-      cancelButtonText: '取消',
-      confirmButtonText: '确认',
-      type: 'warning',
-    });
-    await delObj(activeTab.value, row.code);
-    ElMessage.success('删除成功');
-    onRefresh();
-  } catch {
-    // Cancelled confirmations require no further action.
-  }
+function onDelete(row: CategoryOption) {
+  return baseOnDelete(row);
 }
 
 async function openAnalysis(row: CategoryOption) {

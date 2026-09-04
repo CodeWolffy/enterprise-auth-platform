@@ -11,7 +11,7 @@ import java.util.Set;
 import org.springframework.util.StringUtils;
 
 /**
- * 工作流通用小工具：租户上下文归一、分页归一、内存分页、文本清洗与越界步骤兜底。
+ * 工作流通用小工具：租户上下文归一、分页归一、文本清洗与越界步骤兜底。
  * 无状态纯函数，不依赖 Spring 容器。通用部分委托 common 的 TenantContextSupport / PaginationSupport。
  */
 final class WorkflowSupport {
@@ -34,8 +34,9 @@ final class WorkflowSupport {
     static <T> PageResult<T> page(List<T> items, int page, int size) {
         int normalizedPage = PaginationSupport.normalizePage(page);
         int normalizedSize = normalizeSize(size);
-        int from = Math.min((normalizedPage - 1) * normalizedSize, items.size());
-        int to = Math.min(from + normalizedSize, items.size());
+        long offset = PaginationSupport.offset(normalizedPage, normalizedSize);
+        int from = (int) Math.min(offset, items.size());
+        int to = (int) Math.min((long) items.size(), offset + normalizedSize);
         return PageResult.of(items.size(), normalizedPage, normalizedSize, items.subList(from, to));
     }
 

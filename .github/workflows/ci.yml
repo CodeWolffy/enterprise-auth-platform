@@ -87,7 +87,7 @@ jobs:
           if-no-files-found: ignore
 
   frontend:
-    name: frontend-typecheck-build
+    name: frontend-quality-tests-and-build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -110,6 +110,12 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Unit tests
+        run: pnpm test:unit
 
       - name: Typecheck
         run: pnpm check:type

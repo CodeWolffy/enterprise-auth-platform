@@ -76,6 +76,11 @@ class WorkflowViewMapper {
     }
 
     WorkflowTaskView toTaskView(WorkflowTask task, UserAccount user, int urgeCount) {
+        return toTaskView(task, user, urgeCount, store.isActionable(task, user));
+    }
+
+    private WorkflowTaskView toTaskView(
+            WorkflowTask task, UserAccount user, int urgeCount, boolean actionable) {
         return new WorkflowTaskView(
                 task.getId(),
                 task.getTenantId(),
@@ -91,7 +96,7 @@ class WorkflowViewMapper {
                 task.getComment(),
                 task.getCreatedAt(),
                 task.getCompletedAt(),
-                task.getStatus() == WorkflowTaskStatus.PENDING && store.isActionable(task, user),
+                task.getStatus() == WorkflowTaskStatus.PENDING && actionable,
                 urgeCount
         );
     }
@@ -102,6 +107,18 @@ class WorkflowViewMapper {
                         task,
                         user,
                         Math.toIntExact(urgeCounts.getOrDefault(task.getId(), 0L))
+                ))
+                .toList();
+    }
+
+    List<WorkflowTaskView> toTodoTaskViews(
+            Collection<WorkflowTask> tasks, UserAccount user, Map<Long, Long> urgeCounts) {
+        return tasks.stream()
+                .map(task -> toTaskView(
+                        task,
+                        user,
+                        Math.toIntExact(urgeCounts.getOrDefault(task.getId(), 0L)),
+                        true
                 ))
                 .toList();
     }

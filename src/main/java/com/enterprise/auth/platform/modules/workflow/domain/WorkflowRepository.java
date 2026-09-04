@@ -50,7 +50,22 @@ public interface WorkflowRepository {
 
     List<WorkflowTask> findInstanceTasks(String tenantId, Long instanceId);
 
-    List<WorkflowTask> findTodoCandidates(String tenantId, Long userId, Long taskId, int limit);
+    /**
+     * 统计当前用户可处理的待办任务数，权限条件必须与分页查询保持一致。
+     */
+    long countTodoCandidates(String tenantId, Long userId, Long taskId);
+
+    /**
+     * 按数据库排序和分页查询当前用户可处理的待办任务。
+     */
+    List<WorkflowTask> findTodoCandidates(String tenantId, Long userId, Long taskId, int offset, int limit);
+
+    /**
+     * 兼容旧调用方：从第一页开始查询待办任务。
+     */
+    default List<WorkflowTask> findTodoCandidates(String tenantId, Long userId, Long taskId, int limit) {
+        return findTodoCandidates(tenantId, userId, taskId, 0, limit);
+    }
 
     List<WorkflowTask> findDoneTasks(String tenantId, Long userId);
 

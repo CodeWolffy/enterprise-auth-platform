@@ -105,7 +105,9 @@ public class WorkflowTaskUrgeService {
         int safePage = PaginationSupport.normalizePage(page);
         int safeSize = PaginationSupport.normalizeSize(size, 100);
         long total = repository.countUrgesByInstance(tenantId, instanceId);
-        int offset = (safePage - 1) * safeSize;
+        int offset = (int) Math.min(
+                Integer.MAX_VALUE,
+                PaginationSupport.offset(safePage, safeSize));
         List<WorkflowTaskUrgeView> records = repository
                 .findUrgesByInstance(tenantId, instanceId, offset, safeSize)
                 .stream()

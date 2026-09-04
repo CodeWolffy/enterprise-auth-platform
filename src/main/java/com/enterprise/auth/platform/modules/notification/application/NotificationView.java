@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.modules.notification.application;
 
 import com.enterprise.auth.platform.modules.notification.infrastructure.entity.SysUserNotificationEntity;
+import com.enterprise.auth.platform.modules.notification.infrastructure.projection.NotificationInboxProjection;
 import com.enterprise.auth.platform.modules.notification.infrastructure.projection.NoticeBroadcastProjection;
 import java.time.Instant;
 
@@ -62,6 +63,41 @@ public record NotificationView(
                 notice.getReadAt(),
                 null,
                 notice.getPublishTime() == null ? notice.getCreatedAt() : notice.getPublishTime()
+        );
+    }
+
+    static NotificationView fromInbox(NotificationInboxProjection projection) {
+        if (projection == null) {
+            return null;
+        }
+        if (projection.isBroadcast()) {
+            NoticeBroadcastProjection notice = new NoticeBroadcastProjection();
+            Long rawId = projection.getId();
+            notice.setId(rawId == null ? null : Math.abs(rawId));
+            notice.setNoticeTitle(projection.getNoticeTitle());
+            notice.setNoticeContent(projection.getNoticeContent());
+            notice.setPublishTime(projection.getPublishTime());
+            notice.setCreatedAt(projection.getCreatedAt());
+            notice.setReadAt(projection.getReadAt());
+            return fromBroadcast(notice);
+        }
+        return new NotificationView(
+                projection.getId(),
+                projection.getScenarioCode(),
+                projection.getSourceType(),
+                projection.getSourceId(),
+                projection.getBizType(),
+                projection.getBizId(),
+                projection.getTitle(),
+                projection.getContent(),
+                projection.getLevel(),
+                projection.getLink(),
+                projection.getActionPayloadJson(),
+                projection.getMetadataJson(),
+                projection.getReadAt() != null,
+                projection.getReadAt(),
+                projection.getExpiresAt(),
+                projection.getCreatedAt()
         );
     }
 

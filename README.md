@@ -4,6 +4,12 @@
 
 > 说明：仓库名与 Java 包名 `com.enterprise.auth.platform` 沿用了项目早期"认证平台"阶段的命名，当前定位以本 README 为准；包名改名成本较高，计划在后续大版本统一处理。
 
+## 当前迭代状态
+
+本轮目标是稳定化和性能收敛，不继续拆分模块或引入微服务。第一批已完成前端格式门禁、前端单元测试门禁、`useCrudGrid` 泛型化和测试补齐；第二批已完成普通 CRUD 列表迁移，并将工作流待办/已办和通知收件箱的分页、总数与催办统计下推到数据库。真实 Redis/Redisson 集成测试和端到端测试均为显式启用，未配置依赖服务时不会伪造通过。
+
+当前剩余事项以本文“后续方向”和 `frontend-vben/apps/web-ele/src/composables/CRUD_MIGRATION.md` 为准；历史审查文档中的快照数字仅用于追溯。
+
 ## 技术栈
 
 ### 后端
@@ -100,33 +106,41 @@ pnpm dev:ele
 
 - `application.yml`：基线配置，不含 DB/Redis 明文，必须通过环境变量注入
 - `application-dev.yml` / `application-staging.yml` / `application-prod.yml`：按环境覆盖（`DEV_*` / `STAGING_*` 前缀环境变量）
-- 常用环境变量：`DB_URL`、`DB_USERNAME`、`DB_PASSWORD`、`REDIS_HOST`、`REDIS_PORT`、`REDIS_PASSWORD`、`APP_CORS_ALLOWED_ORIGIN`、`APP_SECURITY_SESSION_IDLE_SECONDS`、`APP_SECURITY_MAX_LOGIN_COUNT`、`FLYWAY_ENABLED`、`MINIO_ACCESS_KEY`、`MINIO_SECRET_KEY`
+- 常用环境变量：`DB_URL`、`DB_USERNAME`、`DB_PASSWORD`、`REDIS_HOST`、`REDIS_PORT`、`REDIS_PASSWORD`、`APP_CORS_ALLOWED_ORIGIN`、`APP_SECURITY_SESSION_IDLE_SECONDS`、`APP_SECURITY_MAX_LOGIN_COUNT`、`APP_IDEMPOTENCY_FAILURE_MODE`、`FLYWAY_ENABLED`、`MINIO_ACCESS_KEY`、`MINIO_SECRET_KEY`
 
 ## 构建与测试
 
 ### 后端
 
 ```bash
-mvn "-Dmaven.repo.local=.m2repo" verify
+# 快速单元测试：排除标记为 integration 的测试，不执行全局覆盖率门禁
+mvn -Punit-tests test
+
+# 完整验证：需要可用的 MySQL 和 Redis，并执行全局覆盖率门禁
+mvn verify
 ```
 
-后端测试依赖可连接的 MySQL 与 Redis，可用 `TEST_*` 环境变量覆盖测试库连接（见 `src/test/resources/application.yml`）。
+后端集成测试依赖可连接的 MySQL 与 Redis，可用 `TEST_*` 环境变量覆盖测试库连接（见 `src/test/resources/application.yml`）。使用 Testcontainers 的真实 Redis/Redisson 集成测试标记为 `integration`，在没有 Docker 或外部服务时应显式跳过或快速失败，不访问未知公网服务。
 
 ### 前端
 
 ```bash
 cd frontend-vben
 pnpm check:type   # 类型检查
-pnpm build:ele    # 构建 web-ele
-pnpm lint         # 代码检查
+pnpm test:unit   # Vitest 单元测试
+pnpm build:ele   # 构建 web-ele
+pnpm lint        # 格式与代码检查
+pnpm --filter @vben/web-ele test:e2e  # 仅运行已配置的 Playwright smoke 用例
 ```
+
+端到端测试默认跳过依赖后端、登录状态或可变测试数据的用例。设置 `E2E_SMOKE=1`、`E2E_BACKEND=1` 和相应的 `E2E_*` 环境变量后，才会执行对应业务流程。
 
 ## CI
 
 `.github/workflows/ci.yml`：
 
-- `backend`：MySQL/Redis service 容器 + `mvn verify`（含 ArchUnit 模块边界测试与 JaCoCo 报告）
-- `frontend`：pnpm 安装 + `check:type` + `build:ele`
+- `backend`：MySQL/Redis service 容器 + `mvn verify`（含 ArchUnit 模块边界测试与 JaCoCo 报告）；`mvn -Punit-tests test` 用于不依赖外部服务的快速单元测试。
+- `frontend`：pnpm 安装 + `lint` + `test:unit` + `check:type` + `build:ele`。
 
 ## 认证与会话模型（摘要）
 
@@ -139,8 +153,11 @@ pnpm lint         # 代码检查
 
 ## 后续方向
 
-- 前端：剩余 11 组 CRUD 页面迁移到 `useCrudGrid` 范式（见 `CRUD_MIGRATION.md`）；在线用户权限码已同后端对齐为 `upms:session:kick`
-- 后端：幂等注解框架（@Idempotent + Redis）；codegen 两套类型映射（生成/导入链路）统一
-- 可观测性：链路追踪（Micrometer Tracing）、业务指标埋点（@Timed 等）按需接入
-- 运维：监控接入、配置中心、网关与分布式任务能力按需启用（`future-components` profile 预留）
-- 测试：已修复硬编码 id 与 `sys_audit_log` 遗留引用问题；集成测试（带 `@Tag("integration")`）需依赖外部或本地真实中间件环境，纯单元测试可直接通过 `mvn test -Punit-tests` 执行验证
+- 前端：普通分页页面已经统一到 `useCrudGrid`。剩余直接使用底层 `useVbenVxeGrid` 的页面是部门树、菜单树、租户目录双列表和代码生成双列表；工作流列表作为特殊交互单独评估。真实清单、迁移理由和验收条件见 `frontend-vben/apps/web-ele/src/composables/CRUD_MIGRATION.md`。
+- 前端质量：继续为已迁移页面补齐 `TRow`、`TQuery`、`TId` 类型参数，并在具备测试环境时执行登录、租户切换、授权、强退、工作流和代码生成端到端用例。
+- 后端列表：工作流待办/已办的权限条件、总数、排序、分页和当前页催办聚合已下推数据库；通知直接消息与广播公告已采用统一投影分页。后续用真实数据量执行 `EXPLAIN` 和性能基线，重点观察深分页与候选关系表索引。
+- 后端幂等：`@Idempotent` 已接入 Redis/Redisson，当前继续补真实 Redis 集成验证、慢请求锁租期验证，并明确 Redisson 不可用时的失败策略。
+- 用户语义：统一数据库全局用户名唯一约束、登录、密码重置和错误提示的产品语义。
+- 发布准备：补齐后端镜像、MySQL/Redis/MinIO 一体化 Compose、迁移验证、健康检查、版本标签、压测和告警后，再发布第一个非快照版本。
+- 运维：网关、配置中心、消息队列、分布式事务和任务调度继续作为 `future-components` 可选能力；正式启用前先完成版本矩阵和启动冒烟验证。
+- 测试：集成测试（带 `@Tag("integration")`）依赖真实中间件或 Testcontainers；`mvn -Punit-tests test` 只运行快速单元测试并跳过全局覆盖率门禁，完整 `mvn verify` 再执行集成测试和覆盖率门禁。

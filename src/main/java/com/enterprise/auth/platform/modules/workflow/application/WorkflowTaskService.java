@@ -26,8 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class WorkflowTaskService {
 
-    private static final int TODO_CANDIDATE_LIMIT = 500;
-
     private final WorkflowRepository repository;
     private final WorkflowStore store;
     private final WorkflowViewMapper viewMapper;
@@ -158,19 +156,21 @@ public class WorkflowTaskService {
     public PageResult<WorkflowTaskView> todoTasks(int page, int size, Long taskId) {
         UserAccount user = currentUserService.requireCurrentUser();
         String tenantId = WorkflowSupport.currentTenantId(user);
-        List<WorkflowTask> candidates = repository
-                .findTodoCandidates(tenantId, user.id(), taskId, TODO_CANDIDATE_LIMIT)
-                .stream()
-                .filter(task -> store.isActionable(task, user))
-                .toList();
-        // 先内存分页，再对当前页批量查催办，避免候选集 500 次 COUNT
-        PageResult<WorkflowTask> pageResult = WorkflowSupport.page(candidates, page, size);
+        int normalizedPage = PaginationSupport.normalizePage(page);
+        int normalizedSize = WorkflowSupport.normalizeSize(size);
+        long total = repository.countTodoCandidates(tenantId, user.id(), taskId);
+        int offset = (int) Math.min(
+                Integer.MAX_VALUE,
+                PaginationSupport.offset(normalizedPage, normalizedSize));
+        List<WorkflowTask> tasks = repository.findTodoCandidates(
+                tenantId, user.id(), taskId, offset, normalizedSize);
         Map<Long, Long> urgeCounts = repository.countUrgesByTaskIds(
                 tenantId,
-                pageResult.records().stream().map(WorkflowTask::getId).toList()
+                tasks.stream().map(WorkflowTask::getId).toList()
         );
-        List<WorkflowTaskView> views = viewMapper.toTaskViews(pageResult.records(), user, urgeCounts);
-        return PageResult.of(pageResult.total(), pageResult.page(), pageResult.size(), views);
+        // 权限条件已经在待办 SQL 中执行，避免候选集截断或二次内存过滤造成 total/records 不一致。
+        List<WorkflowTaskView> views = viewMapper.toTodoTaskViews(tasks, user, urgeCounts);
+        return PageResult.of(total, normalizedPage, normalizedSize, views);
     }
 
     public PageResult<WorkflowTaskView> doneTasks(int page, int size) {

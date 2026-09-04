@@ -28,3 +28,4 @@ app:
     cookie-secure: false
     redis:
       redisson-enabled: true
+      idempotent-failure-mode: closed

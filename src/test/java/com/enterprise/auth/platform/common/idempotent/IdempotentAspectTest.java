@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -98,12 +99,35 @@ class IdempotentAspectTest {
     }
 
     @Test
-    void shouldBypassGracefullyWhenRedissonClientUnavailable() throws Throwable {
+    void shouldFailClosedWhenRedissonClientUnavailableByDefault() throws Throwable {
         @SuppressWarnings("unchecked")
         ObjectProvider<RedissonClient> provider = Mockito.mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(null);
 
-        IdempotentAspect bypassAspect = new IdempotentAspect(provider);
+        IdempotentAspect failClosedAspect = new IdempotentAspect(provider);
+
+        ProceedingJoinPoint joinPoint = Mockito.mock(ProceedingJoinPoint.class);
+        Method method = SampleService.class.getMethod("processOrder", String.class);
+        MethodSignature signature = Mockito.mock(MethodSignature.class);
+
+        when(joinPoint.getSignature()).thenReturn(signature);
+        when(joinPoint.proceed()).thenReturn("SHOULD-NOT-RUN");
+
+        Idempotent annotation = method.getAnnotation(Idempotent.class);
+
+        assertThatThrownBy(() -> failClosedAspect.around(joinPoint, annotation))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("幂等保护暂不可用");
+        verify(joinPoint, never()).proceed();
+    }
+
+    @Test
+    void shouldBypassGracefullyWhenRedissonClientUnavailableInExplicitOpenMode() throws Throwable {
+        @SuppressWarnings("unchecked")
+        ObjectProvider<RedissonClient> provider = Mockito.mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(null);
+
+        IdempotentAspect bypassAspect = new IdempotentAspect(provider, "open");
 
         ProceedingJoinPoint joinPoint = Mockito.mock(ProceedingJoinPoint.class);
         Method method = SampleService.class.getMethod("processOrder", String.class);

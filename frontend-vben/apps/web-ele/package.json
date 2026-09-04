@@ -15,6 +15,7 @@
     "build:analyze": "pnpm vite build --mode analyze",
     "dev": "pnpm vite --mode development",
     "preview": "vite preview",
+    "test:e2e": "playwright test",
     "typecheck": "vue-tsc --noEmit --skipLibCheck"
   },
   "imports": {
@@ -47,6 +48,7 @@
   },
   "devDependencies": {
     "@vben/tailwind-config": "workspace:*",
+    "playwright": "catalog:",
     "unplugin-element-plus": "catalog:"
   }
 }

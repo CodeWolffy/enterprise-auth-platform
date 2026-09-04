@@ -4,12 +4,7 @@ import { defineAsyncComponent, ref } from 'vue';
 import { Page } from '@vben/common-ui';
 import { Plus } from '@vben/icons';
 
-import {
-  ElButton,
-  ElDrawer,
-  ElMessage,
-  ElTag,
-} from 'element-plus';
+import { ElButton, ElDrawer, ElMessage, ElTag } from 'element-plus';
 
 import { delObj, getPage, refresh } from '#/api/upms/dict';
 import { useCrudGrid } from '#/composables/useCrudGrid';
@@ -29,7 +24,11 @@ const dictId = ref('');
 const currentDict = ref<any>(null);
 const dictValueDrawer = ref(false);
 
-const { Grid, onRefresh, onDelete: baseDelete } = useCrudGrid({
+const {
+  Grid,
+  onRefresh,
+  onDelete: baseDelete,
+} = useCrudGrid({
   formOptions: {
     schema: useGridFormSchema(),
   },

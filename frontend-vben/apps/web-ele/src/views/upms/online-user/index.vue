@@ -1,67 +1,63 @@
 <script setup lang="ts">
-import type { VxeTableGridOptions } from '#/adapter/vxe-table';
+import type {
+  CrudGridPageResponse,
+  CrudGridQueryParams,
+} from '#/composables/useCrudGrid';
+import type { SessionPageResult, UserSessionView } from '#/types/auth-models';
 
 import { Page } from '@vben/common-ui';
 
-import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus';
+import { ElButton, ElTag } from 'element-plus';
 
-import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { delObj, getList } from '#/api/upms/online-user';
+import { useCrudGrid } from '#/composables/useCrudGrid';
 import { PERMS } from '#/constants/permissions';
 import { formatDateTime } from '#/utils/datetime';
 
 import { useColumns } from './data';
 
-const [Grid, gridApi] = useVbenVxeGrid({
+type SessionQuery = Record<never, never>;
+
+type SessionListResponse = SessionPageResult | UserSessionView[];
+
+async function fetchSessionPage(
+  params: CrudGridQueryParams<SessionQuery>,
+): Promise<CrudGridPageResponse<UserSessionView>> {
+  const response = (await getList(params)) as SessionListResponse;
+  if (Array.isArray(response)) {
+    return { records: response, total: response.length };
+  }
+  return {
+    records: response.records ?? [],
+    total: response.total ?? 0,
+  };
+}
+
+const { Grid, onDelete: baseOnDelete } = useCrudGrid<
+  UserSessionView,
+  SessionQuery,
+  string
+>({
+  columns: useColumns(),
+  defaultSortBy: '',
+  deleteApi: delObj,
+  deleteConfirmMessage: '此操作将强退该用户，是否继续?',
+  deleteSuccessMessage: '强退成功',
+  fetchPage: fetchSessionPage,
   gridOptions: {
-    columns: useColumns(),
-    height: 'auto',
-    keepSource: true,
-    pagerConfig: {
-      enabled: true,
-      pageSize: 20,
-    },
-    proxyConfig: {
-      ajax: {
-        query: async ({ page }) => {
-          const response: any = await getList({
-            page: page.currentPage,
-            size: page.pageSize,
-          });
-          if (Array.isArray(response)) {
-            return { list: response, total: response.length };
-          }
-          return {
-            list: response?.records ?? [],
-            total: response?.total ?? 0,
-          };
-        },
-      },
-    },
-    rowConfig: {
-      keyField: 'sessionId',
-    },
     toolbarConfig: {
       refresh: true,
       refreshOptions: { code: 'query' },
+      search: false,
       zoom: false,
     },
-  } as VxeTableGridOptions,
+  },
+  pageSize: 20,
+  rowKey: 'sessionId',
 });
 
-async function forceOffline(row: any) {
-  try {
-    await ElMessageBox.confirm('此操作将强退该用户，是否继续?', '提示', {
-      cancelButtonText: '取消',
-      confirmButtonText: '强退',
-      type: 'warning',
-    });
-    await delObj(row.sessionId);
-    ElMessage.success('强退成功');
-    gridApi.query();
-  } catch {
-    // Cancelled confirmations require no further action.
-  }
+function forceOffline(row: UserSessionView) {
+  return baseOnDelete(row);
 }
 </script>
 
