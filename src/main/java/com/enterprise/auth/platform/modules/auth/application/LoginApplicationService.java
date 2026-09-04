@@ -6,9 +6,9 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.modules.auth.api.AuthTenantQueryPort;
 import com.enterprise.auth.platform.modules.auth.infrastructure.SecurityProperties;
 import com.enterprise.auth.platform.modules.security.application.SecurityPolicyApplicationService;
-import com.enterprise.auth.platform.modules.tenant.application.TenantProfileFacade;
 import com.enterprise.auth.platform.modules.user.application.AuthenticationUser;
 import com.enterprise.auth.platform.modules.user.application.UserAuthenticationFacade;
 import com.enterprise.auth.platform.modules.auth.interfaces.LoginRequest;
@@ -19,7 +19,6 @@ import com.enterprise.auth.platform.modules.log.domain.event.LoginLogEvent;
 import com.enterprise.auth.platform.common.web.ClientIpResolver;
 import com.enterprise.auth.platform.common.web.IpLocationResolver;
 import jakarta.servlet.http.HttpServletRequest;
-import java.time.Instant;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -41,7 +40,7 @@ public class LoginApplicationService {
     private final ClientIpResolver clientIpResolver;
     private final IpLocationResolver ipLocationResolver;
     private final SecurityPolicyApplicationService securityPolicyApplicationService;
-    private final TenantProfileFacade tenantProfileFacade;
+    private final AuthTenantQueryPort tenantQuery;
 
     public LoginApplicationService(
             CaptchaService captchaService,
@@ -55,7 +54,7 @@ public class LoginApplicationService {
             ClientIpResolver clientIpResolver,
             IpLocationResolver ipLocationResolver,
             SecurityPolicyApplicationService securityPolicyApplicationService,
-            TenantProfileFacade tenantProfileFacade
+            AuthTenantQueryPort tenantQuery
     ) {
         this.captchaService = captchaService;
         this.passwordHasher = passwordHasher;
@@ -68,7 +67,7 @@ public class LoginApplicationService {
         this.clientIpResolver = clientIpResolver;
         this.ipLocationResolver = ipLocationResolver;
         this.securityPolicyApplicationService = securityPolicyApplicationService;
-            this.tenantProfileFacade = tenantProfileFacade;
+        this.tenantQuery = tenantQuery;
     }
 
     public TokenSessionResponse login(LoginRequest request, HttpServletRequest servletRequest) {
@@ -77,7 +76,7 @@ public class LoginApplicationService {
             throw new BusinessException("CAPTCHA_INVALID", "验证码未通过校验或已过期");
         }
         String tenantId = resolveLoginTenantId(request);
-        tenantProfileFacade.ensureTenantAccessible(tenantId);
+        tenantQuery.ensureTenantAccessible(tenantId);
         String clientIp = clientIpResolver.resolve(servletRequest);
         String userAgent = servletRequest.getHeader("User-Agent");
         String browser = parseBrowser(userAgent);

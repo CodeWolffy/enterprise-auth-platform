@@ -1,13 +1,13 @@
 package com.enterprise.auth.platform.modules.role.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.enterprise.auth.platform.modules.auth.application.DataScopeService;
 import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.common.web.PaginationSupport;
+import com.enterprise.auth.platform.modules.role.api.RoleAccessControlPort;
 import com.enterprise.auth.platform.modules.role.infrastructure.entity.SysRoleEntity;
 import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMapper;
 import java.util.List;
@@ -19,16 +19,16 @@ public class RoleCatalogFacade {
 
     private final SysRoleMapper sysRoleMapper;
     private final RolePayloadCodec rolePayloadCodec;
-    private final DataScopeService dataScopeService;
+    private final RoleAccessControlPort accessControl;
 
     public RoleCatalogFacade(
             SysRoleMapper sysRoleMapper,
             RolePayloadCodec rolePayloadCodec,
-            DataScopeService dataScopeService
+            RoleAccessControlPort accessControl
     ) {
         this.sysRoleMapper = sysRoleMapper;
         this.rolePayloadCodec = rolePayloadCodec;
-        this.dataScopeService = dataScopeService;
+        this.accessControl = accessControl;
     }
 
     public List<SysRoleEntity> listRoles(String tenantId) {
@@ -71,7 +71,7 @@ public class RoleCatalogFacade {
 
     public List<RoleView> roles() {
         String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
-        boolean globalScope = TenantContext.isGlobalScope() || dataScopeService.isPlatformSuperAdmin();
+        boolean globalScope = TenantContext.isGlobalScope() || accessControl.isPlatformSuperAdmin();
         List<RoleItem> items = globalScope && !TenantContext.isGlobalScope()
                 ? TenantContext.runWithGlobalScope(tenantId, () -> listRoleItems(tenantId))
                 : listRoleItems(tenantId);

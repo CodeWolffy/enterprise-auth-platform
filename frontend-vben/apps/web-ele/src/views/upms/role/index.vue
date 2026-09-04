@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import type { VxeTableGridOptions } from '#/adapter/vxe-table';
-
 import { defineAsyncComponent, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
@@ -8,8 +6,8 @@ import { Plus } from '@vben/icons';
 
 import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus';
 
-import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { delObj, getPage, queryRoleImpact } from '#/api/upms/sys-role';
+import { useCrudGrid } from '#/composables/useCrudGrid';
 import { PERMS } from '#/constants/permissions';
 import { invokeWhenComponentReady } from '#/utils/component-ready';
 
@@ -31,49 +29,13 @@ const roleMenuRef = ref();
 const formMounted = ref(false);
 const menuMounted = ref(false);
 
-const [Grid, gridApi] = useVbenVxeGrid({
+const { Grid, onRefresh } = useCrudGrid({
   formOptions: {
     schema: useGridFormSchema(),
-    submitOnChange: false,
   },
-  gridOptions: {
-    columns: useColumns(),
-    height: 'auto',
-    keepSource: true,
-    pagerConfig: {
-      enabled: true,
-      pageSize: 10,
-    },
-    proxyConfig: {
-      ajax: {
-        query: async ({ page }, formValues) => {
-          const response: any = await getPage({
-            ...formValues,
-            page: page.currentPage,
-            size: page.pageSize,
-          });
-          return {
-            list: response?.records ?? [],
-            total: response?.total ?? 0,
-          };
-        },
-      },
-    },
-    rowConfig: {
-      keyField: 'id',
-    },
-    toolbarConfig: {
-      refresh: true,
-      refreshOptions: { code: 'query' },
-      search: true,
-      zoom: false,
-    },
-  } as VxeTableGridOptions,
+  columns: useColumns(),
+  fetchPage: getPage,
 });
-
-function onRefresh() {
-  gridApi.query();
-}
 
 function openForm(row?: any) {
   formMounted.value = true;

@@ -7,12 +7,11 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.common.web.PaginationSupport;
-import com.enterprise.auth.platform.modules.role.application.RoleQueryFacade;
+import com.enterprise.auth.platform.modules.iam.api.IamRoleQueryPort;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserRoleEntity;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserRoleMapper;
-import com.enterprise.auth.platform.modules.role.application.RoleGrantQueryFacade;
 import com.enterprise.auth.platform.modules.user.api.UserAccessControlPort;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
@@ -30,22 +29,19 @@ public class UserDirectoryService {
 
     private final SysUserMapper sysUserMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
-    private final RoleQueryFacade roleQueryFacade;
+    private final IamRoleQueryPort roleQueryPort;
     private final UserAccessControlPort accessControlPort;
-    private final RoleGrantQueryFacade roleGrantQueryFacade;
 
     public UserDirectoryService(
             SysUserMapper sysUserMapper,
             SysUserRoleMapper sysUserRoleMapper,
-            RoleQueryFacade roleQueryFacade,
-            UserAccessControlPort accessControlPort,
-            RoleGrantQueryFacade roleGrantQueryFacade
+            IamRoleQueryPort roleQueryPort,
+            UserAccessControlPort accessControlPort
     ) {
         this.sysUserMapper = sysUserMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
-        this.roleQueryFacade = roleQueryFacade;
+        this.roleQueryPort = roleQueryPort;
         this.accessControlPort = accessControlPort;
-        this.roleGrantQueryFacade = roleGrantQueryFacade;
     }
 
     public List<UserSummary> listUsers() {
@@ -225,7 +221,7 @@ public class UserDirectoryService {
                 .distinct()
                 .collect(Collectors.toMap(
                         java.util.function.Function.identity(),
-                        roleQueryFacade::loadRoleCodeMap
+                        roleQueryPort::loadRoleCodeMap
                 ));
 
         return userRoles.stream().collect(Collectors.groupingBy(
@@ -253,7 +249,7 @@ public class UserDirectoryService {
                     String effectiveTenantId = globalScope ? userTenantMap.getOrDefault(entry.getKey(), tenantId) : tenantId;
                     Set<String> key = entry.getValue() == null ? Set.of() : new java.util.TreeSet<>(entry.getValue());
                     return cache.computeIfAbsent(effectiveTenantId, ignored -> new java.util.HashMap<>())
-                            .computeIfAbsent(key, item -> roleGrantQueryFacade.resolveGrantKeys(effectiveTenantId, item, false));
+                            .computeIfAbsent(key, item -> roleQueryPort.resolveGrantKeys(effectiveTenantId, item, false));
                 }
         ));
     }

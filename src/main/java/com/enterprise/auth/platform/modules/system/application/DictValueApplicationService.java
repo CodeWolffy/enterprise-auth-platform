@@ -2,10 +2,10 @@ package com.enterprise.auth.platform.modules.system.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.TimeSupport;
-import com.enterprise.auth.platform.modules.auth.application.DataScopeService;
 import com.enterprise.auth.platform.common.cache.CacheNames;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.modules.system.api.SystemAccessControlPort;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysDictEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysDictValueEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysDictMapper;
@@ -28,16 +28,16 @@ public class DictValueApplicationService {
 
     private final SysDictValueMapper sysDictValueMapper;
     private final SysDictMapper sysDictMapper;
-    private final DataScopeService dataScopeService;
+    private final SystemAccessControlPort accessControl;
 
     public DictValueApplicationService(
             SysDictValueMapper sysDictValueMapper,
             SysDictMapper sysDictMapper,
-            DataScopeService dataScopeService
+            SystemAccessControlPort accessControl
     ) {
         this.sysDictValueMapper = sysDictValueMapper;
         this.sysDictMapper = sysDictMapper;
-        this.dataScopeService = dataScopeService;
+        this.accessControl = accessControl;
     }
 
     @Cacheable(value = CacheNames.SYSTEM_DICTS, key = "'value:' + #dictType")
@@ -128,7 +128,7 @@ public class DictValueApplicationService {
         if (entity == null) {
             throw new BusinessException("字典项不存在");
         }
-        if (!dataScopeService.canAccessCreatedBy(entity.getTenantId(), entity.getCreatedBy())) {
+        if (!accessControl.canAccessCreatedBy(entity.getTenantId(), entity.getCreatedBy())) {
             throw new BusinessException("无权访问该字典项");
         }
         return entity;

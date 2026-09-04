@@ -3,7 +3,8 @@ package com.enterprise.auth.platform.modules.role.interfaces;
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.common.web.PageResult;
-import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
+import com.enterprise.auth.platform.common.audit.SysLog;
+import com.enterprise.auth.platform.common.idempotent.Idempotent;
 import com.enterprise.auth.platform.modules.role.application.RoleGrantQueryFacade;
 import com.enterprise.auth.platform.modules.role.application.RoleCatalogFacade;
 import com.enterprise.auth.platform.modules.role.application.RoleView;
@@ -68,6 +69,7 @@ public class RoleController {
     @Operation(summary = "新增角色")
     @PostMapping
     @SaCheckPermission(PermissionCodes.SYSROLE_ADD)
+    @Idempotent(prefix = "role:create", key = "#request.roleCode", timeout = 5)
     public ApiResponse<RoleView> create(@Valid @RequestBody CreateRoleRequest request) {
         return ApiResponse.ok(roleManagementService.create(request));
     }

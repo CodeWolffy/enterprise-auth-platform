@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import type { VxeTableGridOptions } from '#/adapter/vxe-table';
-
 import { defineAsyncComponent, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
@@ -10,13 +8,12 @@ import {
   ElButton,
   ElDrawer,
   ElMessage,
-  ElMessageBox,
   ElTag,
 } from 'element-plus';
 
-import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { delObj, getById, getPage } from '#/api/upms/notice';
 import RichTextViewer from '#/components/rich-text-viewer/index.vue';
+import { useCrudGrid } from '#/composables/useCrudGrid';
 import { PERMS } from '#/constants/permissions';
 import { invokeWhenComponentReady } from '#/utils/component-ready';
 import { formatDateTime } from '#/utils/datetime';
@@ -30,51 +27,15 @@ const formMounted = ref(false);
 const detailDrawer = ref(false);
 const detailData = ref<any>(null);
 
-const [Grid, gridApi] = useVbenVxeGrid({
+const { Grid, onRefresh, onDelete } = useCrudGrid({
   formOptions: {
     schema: useGridFormSchema(),
-    submitOnChange: false,
   },
-  gridOptions: {
-    columns: useColumns(),
-    height: 'auto',
-    keepSource: true,
-    pagerConfig: {
-      enabled: true,
-      pageSize: 10,
-    },
-    proxyConfig: {
-      ajax: {
-        query: async ({ page }, formValues) => {
-          const response: any = await getPage({
-            ...formValues,
-            page: page.currentPage,
-            size: page.pageSize,
-            sortBy: 'createdAt',
-            sortDirection: 'desc',
-          });
-          return {
-            list: response?.records ?? [],
-            total: response?.total ?? 0,
-          };
-        },
-      },
-    },
-    rowConfig: {
-      keyField: 'id',
-    },
-    toolbarConfig: {
-      refresh: true,
-      refreshOptions: { code: 'query' },
-      search: true,
-      zoom: false,
-    },
-  } as VxeTableGridOptions,
+  columns: useColumns(),
+  fetchPage: getPage,
+  deleteApi: delObj,
+  deleteConfirmMessage: '此操作将删除该公告，是否继续?',
 });
-
-function onRefresh() {
-  gridApi.query();
-}
 
 function openForm(row?: any) {
   formMounted.value = true;
@@ -87,21 +48,6 @@ async function viewDetail(row: any) {
     detailDrawer.value = true;
   } catch (error: any) {
     ElMessage.error(error?.message || '加载详情失败');
-  }
-}
-
-async function onDelete(row: any) {
-  try {
-    await ElMessageBox.confirm('此操作将删除该公告，是否继续?', '提示', {
-      cancelButtonText: '取消',
-      confirmButtonText: '确认',
-      type: 'warning',
-    });
-    await delObj(row.id);
-    ElMessage.success('删除成功');
-    onRefresh();
-  } catch {
-    // Cancelled confirmations require no further action.
   }
 }
 

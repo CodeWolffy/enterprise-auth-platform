@@ -3,12 +3,11 @@ package com.enterprise.auth.platform.modules.system.application;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.enterprise.auth.platform.common.TimeSupport;
-import com.enterprise.auth.platform.modules.auth.application.DataScopeService;
-import com.enterprise.auth.platform.modules.auth.application.SecuritySupport;
 import com.enterprise.auth.platform.common.cache.CacheNames;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.modules.system.api.SystemAccessControlPort;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysCategoryRuleEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysConfigEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysCategoryRuleMapper;
@@ -43,16 +42,16 @@ public class ConfigApplicationService {
 
     private final SysConfigMapper sysConfigMapper;
     private final SysCategoryRuleMapper sysCategoryRuleMapper;
-    private final DataScopeService dataScopeService;
+    private final SystemAccessControlPort accessControl;
 
     public ConfigApplicationService(
             SysConfigMapper sysConfigMapper,
             SysCategoryRuleMapper sysCategoryRuleMapper,
-            DataScopeService dataScopeService
+            SystemAccessControlPort accessControl
     ) {
         this.sysConfigMapper = sysConfigMapper;
         this.sysCategoryRuleMapper = sysCategoryRuleMapper;
-        this.dataScopeService = dataScopeService;
+        this.accessControl = accessControl;
     }
 
     public Optional<String> getConfigValue(String tenantId, String configKey) {
@@ -76,7 +75,7 @@ public class ConfigApplicationService {
     ) {
         String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         boolean globalScope = TenantContext.isGlobalScope();
-        Optional<Set<String>> visibleCreators = globalScope ? Optional.empty() : dataScopeService.visibleUsernames(tenantId);
+        Optional<Set<String>> visibleCreators = globalScope ? Optional.empty() : accessControl.visibleUsernames(tenantId);
         return pageQuery(
                 buildConfigQuery(tenantId, globalScope, category, keyword, visibleCreators),
                 buildConfigQuery(tenantId, globalScope, category, keyword, visibleCreators),
@@ -241,7 +240,7 @@ public class ConfigApplicationService {
         if (entity == null) {
             throw new BusinessException("参数不存在");
         }
-        if (!dataScopeService.canAccessCreatedBy(tenantId, entity.getCreatedBy())) {
+        if (!accessControl.canAccessCreatedBy(tenantId, entity.getCreatedBy())) {
             throw new BusinessException("无权访问该参数");
         }
         return entity;
@@ -330,9 +329,7 @@ public class ConfigApplicationService {
     }
 
     private String currentScopeCacheKey() {
-        return dataScopeService.currentUser()
-                .map(user -> user.username() + "|" + user.dataScopeType() + "|" + user.customDeptIds().stream().sorted().toList())
-                .orElse("anonymous");
+        return accessControl.currentScopeCacheKey();
     }
 
     private SFunction<SysConfigEntity, ?> resolveConfigSort(String sortBy) {

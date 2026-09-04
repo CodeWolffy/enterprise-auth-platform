@@ -2,12 +2,11 @@ package com.enterprise.auth.platform.modules.file.application;
 
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
-import com.enterprise.auth.platform.modules.auth.application.PlatformAdminSupport;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.web.PageResult;
-import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
-import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
+import com.enterprise.auth.platform.modules.file.api.FileAccessControlPort;
+import com.enterprise.auth.platform.modules.file.api.FileAccessControlPort.FileActor;
 import com.enterprise.auth.platform.modules.file.domain.FileLifecycleStatus;
 import com.enterprise.auth.platform.modules.file.domain.FileVisibility;
 import com.enterprise.auth.platform.modules.file.infrastructure.entity.SysStorageFileEntity;
@@ -36,21 +35,18 @@ public class FileApplicationService {
     private final FileStorageProperties properties;
     private final ObjectStorageService objectStorageService;
     private final SysStorageFileMapper storageFileMapper;
-    private final CurrentUserService currentUserService;
-    private final PlatformAdminSupport platformAdminSupport;
+    private final FileAccessControlPort accessControlPort;
 
     public FileApplicationService(
             FileStorageProperties properties,
             ObjectStorageService objectStorageService,
             SysStorageFileMapper storageFileMapper,
-            CurrentUserService currentUserService,
-            PlatformAdminSupport platformAdminSupport
+            FileAccessControlPort accessControlPort
     ) {
         this.properties = properties;
         this.objectStorageService = objectStorageService;
         this.storageFileMapper = storageFileMapper;
-        this.currentUserService = currentUserService;
-        this.platformAdminSupport = platformAdminSupport;
+        this.accessControlPort = accessControlPort;
     }
 
     public FileMetadataView upload(MultipartFile file, FileVisibility visibility) {
@@ -62,7 +58,7 @@ public class FileApplicationService {
     }
 
     public PageResult<FileMetadataView> page(FileQuery query) {
-        UserAccount user = currentUserService.requireCurrentUser();
+        FileActor user = accessControlPort.requireCurrentUser();
         FileQuery normalized = query == null ? new FileQuery(null, null, null, null, 1, 20) : query;
         FileReadScope scope = readableScope(user);
         String keyword = trimmedOrNull(normalized.keyword());
@@ -101,7 +97,7 @@ public class FileApplicationService {
     }
 
     public long countVisibleFiles() {
-        UserAccount user = currentUserService.requireCurrentUser();
+        FileActor user = accessControlPort.requireCurrentUser();
         FileReadScope scope = readableScope(user);
         return storageFileMapper.countReadableFiles(
                 scope.tenantId(),
@@ -116,14 +112,14 @@ public class FileApplicationService {
     }
 
     public FileMetadataView metadata(String fileKey) {
-        UserAccount user = currentUserService.requireCurrentUser();
+        FileActor user = accessControlPort.requireCurrentUser();
         SysStorageFileEntity entity = loadByFileKey(fileKey);
         assertReadable(entity, user);
         return toView(entity);
     }
 
     public FileDownloadResult download(String fileKey) {
-        UserAccount user = currentUserService.requireCurrentUser();
+        FileActor user = accessControlPort.requireCurrentUser();
         SysStorageFileEntity entity = loadByFileKey(fileKey);
         assertReadable(entity, user);
         return toDownload(entity);
@@ -138,7 +134,7 @@ public class FileApplicationService {
     }
 
     public void delete(String fileKey) {
-        UserAccount user = currentUserService.requireCurrentUser();
+        FileActor user = accessControlPort.requireCurrentUser();
         SysStorageFileEntity entity = loadByFileKey(fileKey);
         assertDeletable(entity, user);
         storageFileMapper.updateLifecycle(entity.getId(), FileLifecycleStatus.DELETE_PENDING.name(), entity.getEtag());
@@ -173,7 +169,7 @@ public class FileApplicationService {
             boolean imageOnly,
             String auditType
     ) {
-        UserAccount user = currentUserService.requireCurrentUser();
+        FileActor user = accessControlPort.requireCurrentUser();
         ValidatedUpload validatedUpload = validateUpload(file, imageOnly);
         FileVisibility resolvedVisibility = visibility == null ? FileVisibility.OWNER : visibility;
         assertVisibilityWritable(user, resolvedVisibility, requirePublicWritePermission);
@@ -334,7 +330,7 @@ public class FileApplicationService {
                 || "application/pdf".equals(contentType);
     }
 
-    private void assertVisibilityWritable(UserAccount user, FileVisibility visibility, boolean requirePublicWritePermission) {
+    private void assertVisibilityWritable(FileActor user, FileVisibility visibility, boolean requirePublicWritePermission) {
         if (visibility == FileVisibility.PRIVATE && requirePublicWritePermission) {
             throw new BusinessException("VALIDATION_ERROR", "通用文件上传不支持私有可见性，请通过具体业务授权链路创建私有文件");
         }
@@ -343,14 +339,14 @@ public class FileApplicationService {
         }
     }
 
-    private FileReadScope readableScope(UserAccount user) {
+    private FileReadScope readableScope(FileActor user) {
         String activeTenantId = TenantContextSupport.currentTenantIdOrPlatform(user.tenantId());
         boolean platformScope = canAccessAllTenants(user);
         boolean restrictReadable = !platformScope && !hasFileRead(user);
         return new FileReadScope(activeTenantId, platformScope, restrictReadable, user.id());
     }
 
-    private void assertReadable(SysStorageFileEntity entity, UserAccount user) {
+    private void assertReadable(SysStorageFileEntity entity, FileActor user) {
         FileVisibility visibility = FileVisibility.from(entity.getVisibility());
         String activeTenantId = TenantContextSupport.currentTenantIdOrPlatform(user.tenantId());
         switch (visibility) {
@@ -380,7 +376,7 @@ public class FileApplicationService {
         }
     }
 
-    private void assertDeletable(SysStorageFileEntity entity, UserAccount user) {
+    private void assertDeletable(SysStorageFileEntity entity, FileActor user) {
         boolean owner = entity.getOwnerUserId() != null && entity.getOwnerUserId().equals(user.id());
         boolean sameTenantAdmin = entity.getTenantId().equals(TenantContextSupport.currentTenantIdOrPlatform(user.tenantId()))
                 && hasFileWrite(user);
@@ -390,8 +386,8 @@ public class FileApplicationService {
         }
     }
 
-    private boolean canAccessAllTenants(UserAccount user) {
-        return platformAdminSupport.isPlatformSuperAdmin(user)
+    private boolean canAccessAllTenants(FileActor user) {
+        return user.platformSuperAdmin()
                 && TenantContextSupport.PLATFORM_TENANT_ID.equals(
                         TenantContextSupport.currentTenantIdOrPlatform(user.tenantId()));
     }
@@ -437,12 +433,12 @@ public class FileApplicationService {
         }
     }
 
-    private boolean hasFileRead(UserAccount user) {
+    private boolean hasFileRead(FileActor user) {
         return user.permissions().contains(PermissionCodes.FILE_PAGE)
                 || user.permissions().contains(PermissionCodes.FILE_GET);
     }
 
-    private boolean hasFileWrite(UserAccount user) {
+    private boolean hasFileWrite(FileActor user) {
         return user.permissions().contains(PermissionCodes.FILE_ADD);
     }
 

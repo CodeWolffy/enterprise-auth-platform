@@ -1,9 +1,9 @@
 package com.enterprise.auth.platform.modules.dept.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.enterprise.auth.platform.modules.auth.application.DataScopeDeptQuery;
 import com.enterprise.auth.platform.modules.dept.infrastructure.entity.SysDeptEntity;
 import com.enterprise.auth.platform.modules.dept.infrastructure.mapper.SysDeptMapper;
+import com.enterprise.auth.platform.modules.iam.api.DataScopeDeptQuery;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;

@@ -2,13 +2,12 @@ package com.enterprise.auth.platform.modules.system.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
-import com.enterprise.auth.platform.modules.auth.application.DataScopeService;
-import com.enterprise.auth.platform.modules.auth.application.SecuritySupport;
 import com.enterprise.auth.platform.common.cache.CacheNames;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.TimeSupport;
+import com.enterprise.auth.platform.modules.system.api.SystemAccessControlPort;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysCategoryRuleEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysDictEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysDictValueEntity;
@@ -43,20 +42,20 @@ public class DictApplicationService {
     private final SysDictMapper sysDictMapper;
     private final SysDictValueMapper sysDictValueMapper;
     private final SysCategoryRuleMapper sysCategoryRuleMapper;
-    private final DataScopeService dataScopeService;
+    private final SystemAccessControlPort accessControl;
     private final LogPublisher logPublisher;
 
     public DictApplicationService(
             SysDictMapper sysDictMapper,
             SysDictValueMapper sysDictValueMapper,
             SysCategoryRuleMapper sysCategoryRuleMapper,
-            DataScopeService dataScopeService,
+            SystemAccessControlPort accessControl,
             LogPublisher logPublisher
     ) {
         this.sysDictMapper = sysDictMapper;
         this.sysDictValueMapper = sysDictValueMapper;
         this.sysCategoryRuleMapper = sysCategoryRuleMapper;
-        this.dataScopeService = dataScopeService;
+        this.accessControl = accessControl;
         this.logPublisher = logPublisher;
     }
 
@@ -72,7 +71,7 @@ public class DictApplicationService {
     ) {
         String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         boolean globalScope = TenantContext.isGlobalScope();
-        Optional<Set<String>> visibleCreators = globalScope ? Optional.empty() : dataScopeService.visibleUsernames(tenantId);
+        Optional<Set<String>> visibleCreators = globalScope ? Optional.empty() : accessControl.visibleUsernames(tenantId);
         String normalizedDictType = blankToNull(dictType);
         String normalizedCategory = blankToNull(category);
         String normalizedKeyword = blankToNull(keyword);
@@ -92,7 +91,7 @@ public class DictApplicationService {
     @CacheEvict(value = {CacheNames.SYSTEM_DICTS, CacheNames.SYSTEM_CATEGORIES_ALL, CacheNames.SYSTEM_CATEGORIES_TARGET}, allEntries = true)
     public SystemViewModels.DictView createDict(DictCrudRequest request) {
         String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
-        String operator = SecuritySupport.currentOperator();
+        String operator = accessControl.currentOperator();
         String dictType = normalizeCode(request.dictType(), "字典类型不能为空", DICT_TYPE_MAX_LENGTH, "字典类型长度不能超过64个字符");
         ensureDictTypeUnique(tenantId, dictType, null);
 
@@ -118,7 +117,7 @@ public class DictApplicationService {
         if (!oldType.equals(dictType)) {
             syncValueTypes(tenantId, id, dictType);
         }
-        logPublisher.publish("DICT_UPDATED", SecuritySupport.currentOperator(), tenantId,
+        logPublisher.publish("DICT_UPDATED", accessControl.currentOperator(), tenantId,
                 Map.of("dictId", id, "dictType", entity.getDictType()));
         return toDictView(entity);
     }
@@ -142,7 +141,7 @@ public class DictApplicationService {
         releaseDeletedDictIdentity(entity);
         sysDictMapper.updateById(entity);
         sysDictMapper.deleteById(entity.getId());
-        logPublisher.publish("DICT_DELETED", SecuritySupport.currentOperator(), tenantId,
+        logPublisher.publish("DICT_DELETED", accessControl.currentOperator(), tenantId,
                 Map.of("dictId", id, "dictType", entity.getDictType()));
     }
 
@@ -229,7 +228,7 @@ public class DictApplicationService {
         if (entity == null) {
             throw new BusinessException("字典项不存在");
         }
-        if (!dataScopeService.canAccessCreatedBy(tenantId, entity.getCreatedBy())) {
+        if (!accessControl.canAccessCreatedBy(tenantId, entity.getCreatedBy())) {
             throw new BusinessException("无权访问该字典项");
         }
         return entity;
@@ -347,9 +346,7 @@ public class DictApplicationService {
     }
 
     private String currentScopeCacheKey() {
-        return dataScopeService.currentUser()
-                .map(user -> user.username() + "|" + user.dataScopeType() + "|" + user.customDeptIds().stream().sorted().toList())
-                .orElse("anonymous");
+        return accessControl.currentScopeCacheKey();
     }
 
     private SFunction<SysDictEntity, ?> resolveDictSort(String sortBy) {

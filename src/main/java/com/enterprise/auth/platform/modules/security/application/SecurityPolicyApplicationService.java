@@ -1,42 +1,39 @@
 package com.enterprise.auth.platform.modules.security.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.enterprise.auth.platform.modules.auth.application.SecuritySupport;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
-import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.common.security.EffectiveSecurityPolicy;
+import com.enterprise.auth.platform.modules.iam.api.IamSecurityPolicyQueryPort;
+import com.enterprise.auth.platform.modules.security.api.SecurityAccessControlPort;
 import com.enterprise.auth.platform.modules.security.infrastructure.entity.SysPlatformSecurityPolicyEntity;
 import com.enterprise.auth.platform.modules.security.infrastructure.entity.SysTenantSecurityPolicyEntity;
 import com.enterprise.auth.platform.modules.security.infrastructure.mapper.SysPlatformSecurityPolicyMapper;
 import com.enterprise.auth.platform.modules.security.infrastructure.mapper.SysTenantSecurityPolicyMapper;
 import com.enterprise.auth.platform.modules.security.interfaces.SecurityPolicyRequest;
-import com.enterprise.auth.platform.modules.tenant.application.TenantAccessPolicy;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 @Service
-public class SecurityPolicyApplicationService {
+public class SecurityPolicyApplicationService implements IamSecurityPolicyQueryPort {
 
     private final SysPlatformSecurityPolicyMapper platformPolicyMapper;
     private final SysTenantSecurityPolicyMapper tenantPolicyMapper;
-    private final LogPublisher logPublisher;
-    private final TenantAccessPolicy tenantAccessPolicy;
+    private final SecurityAccessControlPort accessControl;
 
     public SecurityPolicyApplicationService(
             SysPlatformSecurityPolicyMapper platformPolicyMapper,
             SysTenantSecurityPolicyMapper tenantPolicyMapper,
-            LogPublisher logPublisher,
-            TenantAccessPolicy tenantAccessPolicy
+            SecurityAccessControlPort accessControl
     ) {
         this.platformPolicyMapper = platformPolicyMapper;
         this.tenantPolicyMapper = tenantPolicyMapper;
-        this.logPublisher = logPublisher;
-        this.tenantAccessPolicy = tenantAccessPolicy;
+        this.accessControl = accessControl;
     }
 
+    @Override
     public EffectiveSecurityPolicy effectivePolicy(String tenantId) {
         SysPlatformSecurityPolicyEntity platform = ensurePlatformPolicy();
         SysTenantSecurityPolicyEntity tenant = StringUtils.hasText(tenantId) ? tenantPolicy(tenantId) : null;
@@ -52,13 +49,13 @@ public class SecurityPolicyApplicationService {
     }
 
     public SecurityPolicyView platformPolicyView() {
-        tenantAccessPolicy.requirePlatformSuperAdmin();
+        requirePlatformSuperAdmin();
         return SecurityPolicyView.from(merge(ensurePlatformPolicy(), null));
     }
 
     @Transactional
     public SecurityPolicyView updatePlatformPolicy(SecurityPolicyRequest request) {
-        tenantAccessPolicy.requirePlatformSuperAdmin();
+        requirePlatformSuperAdmin();
         validateRequest(request, false);
         SysPlatformSecurityPolicyEntity entity = ensurePlatformPolicy();
         applyPlatform(entity, request);
@@ -200,6 +197,12 @@ public class SecurityPolicyApplicationService {
 
     private String resolveTenantId() {
         return TenantContextSupport.currentTenantIdOrPlatform();
+    }
+
+    private void requirePlatformSuperAdmin() {
+        if (!accessControl.isPlatformSuperAdmin()) {
+            throw new BusinessException("ACCESS_DENIED", "需要平台超级管理员权限");
+        }
     }
 
     private int value(Integer candidate, int fallback) {

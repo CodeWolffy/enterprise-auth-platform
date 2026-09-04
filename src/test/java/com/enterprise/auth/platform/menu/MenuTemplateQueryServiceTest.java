@@ -13,7 +13,7 @@ import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.modules.menu.application.MenuTemplateQueryService;
 import com.enterprise.auth.platform.modules.menu.infrastructure.entity.SysMenuEntity;
 import com.enterprise.auth.platform.modules.menu.infrastructure.mapper.SysMenuMapper;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
+import com.enterprise.auth.platform.common.context.TenantProperties;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

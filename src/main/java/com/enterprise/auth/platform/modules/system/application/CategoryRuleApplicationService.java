@@ -2,12 +2,11 @@ package com.enterprise.auth.platform.modules.system.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.TimeSupport;
-import com.enterprise.auth.platform.modules.auth.application.DataScopeService;
-import com.enterprise.auth.platform.modules.auth.application.SecuritySupport;
 import com.enterprise.auth.platform.common.cache.CacheNames;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.context.TimeZoneContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.modules.system.api.SystemAccessControlPort;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysCategoryRuleEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysConfigEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysDictEntity;
@@ -34,18 +33,18 @@ public class CategoryRuleApplicationService {
     private final SysCategoryRuleMapper sysCategoryRuleMapper;
     private final SysDictMapper sysDictMapper;
     private final SysConfigMapper sysConfigMapper;
-    private final DataScopeService dataScopeService;
+    private final SystemAccessControlPort accessControl;
 
     public CategoryRuleApplicationService(
             SysCategoryRuleMapper sysCategoryRuleMapper,
             SysDictMapper sysDictMapper,
             SysConfigMapper sysConfigMapper,
-            DataScopeService dataScopeService
+            SystemAccessControlPort accessControl
     ) {
         this.sysCategoryRuleMapper = sysCategoryRuleMapper;
         this.sysDictMapper = sysDictMapper;
         this.sysConfigMapper = sysConfigMapper;
-        this.dataScopeService = dataScopeService;
+        this.accessControl = accessControl;
     }
 
     @Cacheable(value = CacheNames.SYSTEM_CATEGORIES_ALL,
@@ -242,7 +241,7 @@ public class CategoryRuleApplicationService {
         if (entity == null) {
             throw new BusinessException("分类配置不存在");
         }
-        if (!dataScopeService.canAccessCreatedBy(tenantId, entity.getCreatedBy())) {
+        if (!accessControl.canAccessCreatedBy(tenantId, entity.getCreatedBy())) {
             throw new BusinessException("无权访问该分类配置");
         }
         return entity;

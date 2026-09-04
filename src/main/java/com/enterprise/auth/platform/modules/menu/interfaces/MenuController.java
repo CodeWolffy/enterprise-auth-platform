@@ -1,12 +1,12 @@
 package com.enterprise.auth.platform.modules.menu.interfaces;
 
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
-import com.enterprise.auth.platform.modules.auth.application.DataScopeService;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.web.ApiResponse;
-import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
+import com.enterprise.auth.platform.common.audit.SysLog;
 import com.enterprise.auth.platform.modules.menu.application.MenuService;
 import com.enterprise.auth.platform.modules.menu.application.MenuTreeUtil;
+import com.enterprise.auth.platform.modules.menu.api.MenuAccessControlPort;
 import com.enterprise.auth.platform.modules.menu.domain.MenuTreeNode;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,13 +30,13 @@ public class MenuController {
     private final MenuService menuService;
     private final ObjectMapper objectMapper;
     private final Validator validator;
-    private final DataScopeService dataScopeService;
+    private final MenuAccessControlPort accessControl;
 
-    public MenuController(MenuService menuService, ObjectMapper objectMapper, Validator validator, DataScopeService dataScopeService) {
+    public MenuController(MenuService menuService, ObjectMapper objectMapper, Validator validator, MenuAccessControlPort accessControl) {
         this.menuService = menuService;
         this.objectMapper = objectMapper;
         this.validator = validator;
-        this.dataScopeService = dataScopeService;
+        this.accessControl = accessControl;
     }
 
     @Operation(summary = "查询菜单树")
@@ -50,7 +50,7 @@ public class MenuController {
     @GetMapping("/grantable-tree")
     @SaCheckPermission(PermissionCodes.SYSROLE_GET)
     public ApiResponse<List<MenuTreeNode>> grantableTree(@RequestParam(required = false) String tenantId) {
-        String effectiveTenantId = dataScopeService.isPlatformSuperAdmin() && org.springframework.util.StringUtils.hasText(tenantId)
+        String effectiveTenantId = accessControl.isPlatformSuperAdmin() && org.springframework.util.StringUtils.hasText(tenantId)
                 ? tenantId.trim()
                 : TenantContext.getTenantId();
         return ApiResponse.ok(MenuTreeUtil.buildTree(menuService.grantableTree(effectiveTenantId)));

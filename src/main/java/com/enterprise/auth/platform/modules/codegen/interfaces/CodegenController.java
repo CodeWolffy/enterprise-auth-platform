@@ -12,7 +12,7 @@ import com.enterprise.auth.platform.modules.codegen.application.CodegenMetadataS
 import com.enterprise.auth.platform.modules.codegen.application.CodegenPreviewResult;
 import com.enterprise.auth.platform.modules.codegen.application.CodegenTableDetailView;
 import com.enterprise.auth.platform.modules.codegen.application.CodegenTableView;
-import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
+import com.enterprise.auth.platform.common.audit.SysLog;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;

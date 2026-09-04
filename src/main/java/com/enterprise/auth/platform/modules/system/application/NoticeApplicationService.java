@@ -4,12 +4,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.HtmlSanitizer;
-import com.enterprise.auth.platform.modules.auth.application.DataScopeService;
-import com.enterprise.auth.platform.modules.auth.application.SecuritySupport;
 import com.enterprise.auth.platform.common.cache.CacheNames;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.modules.system.api.SystemAccessControlPort;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysNoticeEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysNoticeMapper;
 import com.enterprise.auth.platform.common.web.PageResult;
@@ -34,16 +33,16 @@ public class NoticeApplicationService {
     private static final String SORT_DESC = "desc";
 
     private final SysNoticeMapper sysNoticeMapper;
-    private final DataScopeService dataScopeService;
+    private final SystemAccessControlPort accessControl;
     private final NotificationScenarioPort notificationScenarioPublisher;
 
     public NoticeApplicationService(
             SysNoticeMapper sysNoticeMapper,
-            DataScopeService dataScopeService,
+            SystemAccessControlPort accessControl,
             NotificationScenarioPort notificationScenarioPublisher
     ) {
         this.sysNoticeMapper = sysNoticeMapper;
-        this.dataScopeService = dataScopeService;
+        this.accessControl = accessControl;
         this.notificationScenarioPublisher = notificationScenarioPublisher;
     }
 
@@ -59,7 +58,7 @@ public class NoticeApplicationService {
     ) {
         String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
         boolean globalScope = TenantContext.isGlobalScope();
-        Optional<Set<String>> visibleCreators = globalScope ? Optional.empty() : dataScopeService.visibleUsernames(tenantId);
+        Optional<Set<String>> visibleCreators = globalScope ? Optional.empty() : accessControl.visibleUsernames(tenantId);
         return pageQuery(
                 buildNoticeQuery(tenantId, globalScope, published, workflowStatus, keyword, visibleCreators),
                 buildNoticeQuery(tenantId, globalScope, published, workflowStatus, keyword, visibleCreators),
@@ -76,7 +75,7 @@ public class NoticeApplicationService {
     @CacheEvict(value = CacheNames.SYSTEM_NOTICES, allEntries = true)
     public SystemViewModels.NoticeView createNotice(NoticeCrudRequest request) {
         String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
-        String operator = SecuritySupport.currentOperator();
+        String operator = accessControl.currentOperator();
         SysNoticeEntity entity = new SysNoticeEntity();
         entity.setTenantId(tenantId);
         entity.setNoticeTitle(request.noticeTitle());
@@ -99,7 +98,7 @@ public class NoticeApplicationService {
         entity.setPublished(Boolean.TRUE.equals(request.published()) ? 1 : 0);
         entity.setPublishTime(request.publishTime());
         sysNoticeMapper.updateById(entity);
-        publishNoticeNotificationIfActive(entity, SecuritySupport.currentOperator(), wasActivePublished);
+        publishNoticeNotificationIfActive(entity, accessControl.currentOperator(), wasActivePublished);
         return toNoticeView(entity);
     }
 
@@ -219,16 +218,14 @@ public class NoticeApplicationService {
         if (entity == null) {
             throw new BusinessException("公告不存在");
         }
-        if (!dataScopeService.canAccessCreatedBy(tenantId, entity.getCreatedBy())) {
+        if (!accessControl.canAccessCreatedBy(tenantId, entity.getCreatedBy())) {
             throw new BusinessException("无权访问该公告");
         }
         return entity;
     }
 
     private String currentScopeCacheKey() {
-        return dataScopeService.currentUser()
-                .map(user -> user.username() + "|" + user.dataScopeType() + "|" + user.customDeptIds().stream().sorted().toList())
-                .orElse("anonymous");
+        return accessControl.currentScopeCacheKey();
     }
 
     private void publishNoticeNotificationIfActive(SysNoticeEntity entity, String operator, boolean alreadyActivePublished) {

@@ -1,16 +1,14 @@
 <script lang="ts" setup>
-import type { VxeTableGridOptions } from '#/adapter/vxe-table';
-
 import { ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
 import { Plus } from '@vben/icons';
 
-import { ElButton, ElMessage, ElMessageBox, ElTag } from 'element-plus';
+import { ElButton, ElMessage, ElTag } from 'element-plus';
 
-import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { requestClient } from '#/api/request';
 import { delObj, getPage, upload } from '#/api/upms/file';
+import { useCrudGrid } from '#/composables/useCrudGrid';
 import { PERMS } from '#/constants/permissions';
 import { formatDateTime } from '#/utils/datetime';
 
@@ -19,44 +17,15 @@ import { useColumns, useGridFormSchema } from './data';
 const uploadRef = ref<HTMLInputElement>();
 const defaultUploadVisibility = 'OWNER';
 
-const [Grid, gridApi] = useVbenVxeGrid({
+const { Grid, gridApi, onRefresh, onDelete } = useCrudGrid({
   formOptions: {
     schema: useGridFormSchema(),
-    submitOnChange: false,
   },
-  gridOptions: {
-    columns: useColumns(),
-    height: 'auto',
-    keepSource: true,
-    pagerConfig: {
-      enabled: true,
-      pageSize: 10,
-    },
-    proxyConfig: {
-      ajax: {
-        query: async ({ page }, formValues) => {
-          const response: any = await getPage({
-            ...formValues,
-            page: page.currentPage,
-            size: page.pageSize,
-          });
-          return {
-            list: response?.records ?? [],
-            total: response?.total ?? 0,
-          };
-        },
-      },
-    },
-    rowConfig: {
-      keyField: 'fileKey',
-    },
-    toolbarConfig: {
-      refresh: true,
-      refreshOptions: { code: 'query' },
-      search: true,
-      zoom: false,
-    },
-  } as VxeTableGridOptions,
+  columns: useColumns(),
+  fetchPage: getPage,
+  deleteApi: delObj,
+  rowKey: 'fileKey',
+  deleteConfirmMessage: '此操作将删除该文件，是否继续?',
 });
 
 async function handleUpload(event: Event) {
@@ -67,7 +36,7 @@ async function handleUpload(event: Event) {
   try {
     await upload(file, defaultUploadVisibility);
     ElMessage.success('上传成功');
-    gridApi.query();
+    onRefresh();
   } finally {
     gridApi.setLoading(false);
     input.value = '';
@@ -99,21 +68,6 @@ async function copyUrl(url: string) {
     ElMessage.success('公开链接已复制');
   } catch {
     ElMessage.error('复制失败');
-  }
-}
-
-async function onDelete(row: any) {
-  try {
-    await ElMessageBox.confirm('此操作将删除该文件，是否继续?', '提示', {
-      cancelButtonText: '取消',
-      confirmButtonText: '确认',
-      type: 'warning',
-    });
-    await delObj(row.fileKey);
-    ElMessage.success('删除成功');
-    gridApi.query();
-  } catch {
-    // Cancelled confirmations require no further action.
   }
 }
 </script>

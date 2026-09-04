@@ -1,6 +1,4 @@
 <script lang="ts" setup>
-import type { VxeTableGridOptions } from '#/adapter/vxe-table';
-
 import { computed, defineAsyncComponent, reactive, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
@@ -16,8 +14,6 @@ import {
   ElForm,
   ElFormItem,
   ElInput,
-  ElMessage,
-  ElMessageBox,
   ElOption,
   ElRow,
   ElSelect,
@@ -27,7 +23,7 @@ import {
   ElTag,
 } from 'element-plus';
 
-import { useVbenVxeGrid } from '#/adapter/vxe-table';
+import { useCrudGrid } from '#/composables/useCrudGrid';
 import { getList as getMenuList } from '#/api/upms/menu';
 import {
   delObj,
@@ -193,52 +189,33 @@ const resetHistoryQuery = () => {
 
 const formatHistoryTime = (value?: null | string) => formatDateTime(value);
 
-const [Grid, gridApi] = useVbenVxeGrid({
+async function fetchTenantPage(params: any) {
+  const response: any = await getPage(params);
+  const records = response?.records ?? [];
+  statData.total = response?.total ?? 0;
+  statData.enabled = records.filter(
+    (tenant: any) => String(tenant.tenantStatus) === '1',
+  ).length;
+  statData.platform = records.filter((tenant: any) =>
+    isPlatformTenant(tenant),
+  ).length;
+  return response;
+}
+
+const {
+  Grid,
+  onRefresh: initPage,
+  onDelete,
+} = useCrudGrid({
+  columns: useColumns,
+  fetchPage: fetchTenantPage,
+  deleteApi: delObj,
+  rowKey: 'tenantId',
+  deleteConfirmMessage: '确定要删除该租户吗？此操作不可恢复。',
   formOptions: {
     schema: useGridFormSchema(),
-    submitOnChange: false,
   },
-  gridOptions: {
-    columns: useColumns(),
-    height: 'auto',
-    keepSource: true,
-    pagerConfig: {
-      enabled: true,
-      pageSize: 10,
-    },
-    proxyConfig: {
-      ajax: {
-        query: async ({ page }, formValues) => {
-          const response: any = await getPage({
-            ...formValues,
-            page: page.currentPage,
-            size: page.pageSize,
-          });
-          const records = response?.records ?? [];
-          statData.total = response?.total ?? 0;
-          statData.enabled = records.filter(
-            (tenant: any) => String(tenant.tenantStatus) === '1',
-          ).length;
-          statData.platform = records.filter((tenant: any) =>
-            isPlatformTenant(tenant),
-          ).length;
-          return { list: records, total: statData.total };
-        },
-      },
-    },
-    rowConfig: {
-      keyField: 'tenantId',
-    },
-    toolbarConfig: {
-      refresh: true,
-      refreshOptions: { code: 'query' },
-      search: true,
-      zoom: false,
-    },
-  } as VxeTableGridOptions,
 });
-
-const initPage = () => gridApi.query();
 
 /** 新增按钮 */
 const openForm = (row?: any) => {
@@ -253,22 +230,10 @@ const edit = (row: any) => openForm(row);
 
 /** 删除租户 */
 const del = (row: any) => {
-  ElMessageBox.confirm(
+  onDelete(
+    row,
     `确定要删除租户「${row.name || row.tenantId}」吗？此操作不可恢复。`,
-    '删除确认',
-    {
-      cancelButtonText: '取消',
-      confirmButtonText: '确认删除',
-      type: 'warning',
-    },
-  ).then(() => {
-    delObj(row.tenantId)
-      .then(() => {
-        ElMessage.success('删除成功');
-        initPage();
-      })
-      .catch(() => {});
-  });
+  );
 };
 
 const upMenu = (id: string) => {

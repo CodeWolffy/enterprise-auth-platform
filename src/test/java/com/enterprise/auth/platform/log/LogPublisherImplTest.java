@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import com.enterprise.auth.platform.common.context.CurrentOperatorSupplier;
 import com.enterprise.auth.platform.common.web.ClientIpResolver;
 import com.enterprise.auth.platform.common.web.IpLocationResolver;
 import com.enterprise.auth.platform.modules.log.application.LogPublisherImpl;
@@ -27,7 +28,8 @@ class LogPublisherImplTest {
                 mock(SysLoginLogMapper.class),
                 new ObjectMapper(),
                 mock(ClientIpResolver.class),
-                mock(IpLocationResolver.class)
+                mock(IpLocationResolver.class),
+                CurrentOperatorSupplier.system()
         );
         String query = "page=1&token=raw-token&password=p%40ss&keyword=user";
         LogEvent event = new LogEvent(

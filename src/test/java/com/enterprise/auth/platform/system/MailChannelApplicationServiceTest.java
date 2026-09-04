@@ -17,7 +17,7 @@ import com.enterprise.auth.platform.modules.system.application.TransactionalMail
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysMailChannelEntity;
 import com.enterprise.auth.platform.modules.system.infrastructure.mapper.SysMailChannelMapper;
 import com.enterprise.auth.platform.modules.system.interfaces.MailChannelRequest;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
+import com.enterprise.auth.platform.common.context.TenantProperties;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;

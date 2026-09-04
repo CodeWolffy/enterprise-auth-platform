@@ -3,25 +3,22 @@ package com.enterprise.auth.platform.modules.role.application;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.plugins.IgnoreStrategy;
 import com.baomidou.mybatisplus.core.plugins.InterceptorIgnoreHelper;
-import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.authz.DataScopeType;
-import com.enterprise.auth.platform.modules.dept.application.DeptQueryFacade;
+import com.enterprise.auth.platform.modules.iam.api.IamDeptQueryPort;
 import com.enterprise.auth.platform.modules.role.infrastructure.entity.SysRoleEntity;
 import com.enterprise.auth.platform.modules.role.infrastructure.entity.SysRoleMenuEntity;
-import com.enterprise.auth.platform.modules.user.application.UserQueryFacade;
+import com.enterprise.auth.platform.modules.role.api.RoleAccessControlPort;
+import com.enterprise.auth.platform.modules.role.api.RoleAuthorizationInvalidationPort;
+import com.enterprise.auth.platform.modules.role.api.RoleTenantReferencePort;
+import com.enterprise.auth.platform.modules.iam.api.IamRoleUserReferencePort;
 import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMapper;
 import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMenuMapper;
 import com.enterprise.auth.platform.modules.role.interfaces.CreateRoleRequest;
 import com.enterprise.auth.platform.modules.role.application.RolePayloadCodec;
-import com.enterprise.auth.platform.modules.menu.application.MenuGrantQueryPort;
-import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
-import com.enterprise.auth.platform.modules.tenant.application.TenantProfileFacade;
-import com.enterprise.auth.platform.modules.auth.application.DataScopeService;
-import com.enterprise.auth.platform.modules.auth.application.SecuritySupport;
+import com.enterprise.auth.platform.modules.menu.api.MenuGrantQueryPort;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,46 +29,42 @@ public class RoleManagementService {
 
     private final SysRoleMapper sysRoleMapper;
     private final SysRoleMenuMapper sysRoleMenuMapper;
-    private final UserQueryFacade userQueryFacade;
-    private final DeptQueryFacade deptQueryFacade;
+    private final IamRoleUserReferencePort userReferences;
+    private final IamDeptQueryPort deptQueryPort;
     private final RoleCatalogFacade roleCatalogFacade;
-    private final LogPublisher logPublisher;
-    private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
+    private final RoleAuthorizationInvalidationPort authorizationInvalidation;
     private final RolePayloadCodec rolePayloadCodec;
     private final MenuGrantQueryPort menuGrantQueryPort;
-    private final DataScopeService dataScopeService;
-    private final TenantProfileFacade tenantProfileFacade;
+    private final RoleAccessControlPort accessControl;
+    private final RoleTenantReferencePort tenantReferences;
 
     public RoleManagementService(
             SysRoleMapper sysRoleMapper,
             SysRoleMenuMapper sysRoleMenuMapper,
-            UserQueryFacade userQueryFacade,
-            DeptQueryFacade deptQueryFacade,
+            IamRoleUserReferencePort userReferences,
+            IamDeptQueryPort deptQueryPort,
             RoleCatalogFacade roleCatalogFacade,
-            LogPublisher logPublisher,
-            AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
+            RoleAuthorizationInvalidationPort authorizationInvalidation,
             RolePayloadCodec rolePayloadCodec,
             MenuGrantQueryPort menuGrantQueryPort,
-            DataScopeService dataScopeService,
-            TenantProfileFacade tenantProfileFacade
+            RoleAccessControlPort accessControl,
+            RoleTenantReferencePort tenantReferences
     ) {
         this.sysRoleMapper = sysRoleMapper;
         this.sysRoleMenuMapper = sysRoleMenuMapper;
-        this.userQueryFacade = userQueryFacade;
-        this.deptQueryFacade = deptQueryFacade;
+        this.userReferences = userReferences;
+        this.deptQueryPort = deptQueryPort;
         this.roleCatalogFacade = roleCatalogFacade;
-        this.logPublisher = logPublisher;
-        this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
+        this.authorizationInvalidation = authorizationInvalidation;
         this.rolePayloadCodec = rolePayloadCodec;
         this.menuGrantQueryPort = menuGrantQueryPort;
-        this.dataScopeService = dataScopeService;
-        this.tenantProfileFacade = tenantProfileFacade;
+        this.accessControl = accessControl;
+        this.tenantReferences = tenantReferences;
     }
 
     @Transactional
     public RoleView create(CreateRoleRequest request) {
         String tenantId = resolveTargetTenantId(request.tenantId());
-        String operator = SecuritySupport.currentOperator();
         if (existsRoleCode(tenantId, request.roleCode())) {
             throw new BusinessException("角色编码已存在");
         }
@@ -135,7 +128,7 @@ public class RoleManagementService {
     public RoleImpactView impact(Long roleId) {
         SysRoleEntity entity = getRole(roleId);
         String tenantId = entity.getTenantId();
-        List<Long> assignedUserIds = userQueryFacade.listUserIdsByRole(tenantId, roleId);
+        List<Long> assignedUserIds = userReferences.listUserIdsByRole(tenantId, roleId);
         Set<Long> assignedMenuIds = listRoleMenuIds(tenantId, roleId);
         boolean deleteBlocked = !assignedUserIds.isEmpty();
         List<String> warnings = new java.util.ArrayList<>();
@@ -162,10 +155,9 @@ public class RoleManagementService {
 
     @Transactional
     public void delete(Long roleId) {
-        String operator = SecuritySupport.currentOperator();
         SysRoleEntity entity = getRole(roleId);
         String tenantId = entity.getTenantId();
-        long assignedUsers = userQueryFacade.countUsersByRole(tenantId, roleId);
+        long assignedUsers = userReferences.countUsersByRole(tenantId, roleId);
         if (assignedUsers > 0) {
             throw new BusinessException("角色已分配给用户，暂不允许删除");
         }
@@ -222,7 +214,7 @@ public class RoleManagementService {
         if (normalizedDeptIds.isEmpty()) {
             throw new BusinessException("自定义数据范围至少选择一个部门");
         }
-        long validCount = deptQueryFacade.countByIds(tenantId, normalizedDeptIds);
+        long validCount = deptQueryPort.countByIds(tenantId, normalizedDeptIds);
         if (validCount != normalizedDeptIds.size()) {
             throw new BusinessException("存在无效的自定义部门");
         }
@@ -230,16 +222,16 @@ public class RoleManagementService {
     }
 
     private void evictPrincipalsByRole(String tenantId, Long roleId) {
-        List<Long> userIds = userQueryFacade.listUserIdsByRole(tenantId, roleId);
+        List<Long> userIds = userReferences.listUserIdsByRole(tenantId, roleId);
         if (userIds.isEmpty()) {
             return;
         }
-        var users = userQueryFacade.findByIds(userIds);
+        var users = userReferences.findByIds(userIds);
         if (users.isEmpty()) {
             return;
         }
         for (var user : users) {
-            permissionSnapshotInvalidationService.invalidateUser(user.getId(), user.getTenantId(), user.getUsername());
+            authorizationInvalidation.invalidateUser(user.id(), user.tenantId(), user.username());
         }
     }
 
@@ -252,7 +244,7 @@ public class RoleManagementService {
 
     private SysRoleEntity getRole(Long roleId) {
         SysRoleEntity entity;
-        if (dataScopeService.isPlatformSuperAdmin()) {
+        if (accessControl.isPlatformSuperAdmin()) {
             entity = InterceptorIgnoreHelper.execute(
                     IgnoreStrategy.builder().tenantLine(true).build(),
                     () -> sysRoleMapper.selectOne(new LambdaQueryWrapper<SysRoleEntity>()
@@ -287,12 +279,13 @@ public class RoleManagementService {
 
     private String resolveTargetTenantId(String requestedTenantId) {
         String currentTenantId = TenantContextSupport.currentTenantIdOrPlatform();
-        if (!dataScopeService.isPlatformSuperAdmin()) {
+        if (!accessControl.isPlatformSuperAdmin()) {
             return currentTenantId;
         }
         String targetTenantId = StringUtils.hasText(requestedTenantId) ? requestedTenantId.trim() : currentTenantId;
-        tenantProfileFacade.findByTenantId(targetTenantId)
-                .orElseThrow(() -> new BusinessException("TENANT_NOT_FOUND", "租户不存在"));
+        if (!tenantReferences.tenantExists(targetTenantId)) {
+            throw new BusinessException("TENANT_NOT_FOUND", "租户不存在");
+        }
         return targetTenantId;
     }
 }

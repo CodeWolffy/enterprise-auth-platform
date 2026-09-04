@@ -1,13 +1,11 @@
 <script setup lang="ts">
-import type { VxeTableGridOptions } from '#/adapter/vxe-table';
-
 import { ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
 
 import { ElButton, ElDialog, ElTag } from 'element-plus';
 
-import { useVbenVxeGrid } from '#/adapter/vxe-table';
+import { useCrudGrid } from '#/composables/useCrudGrid';
 import { getPage } from '#/api/upms/sys-log';
 import { formatDateTime } from '#/utils/datetime';
 import { operationStatusMeta } from '#/utils/log-status';
@@ -18,45 +16,17 @@ import LogDetail from './detail.vue';
 const detailVisible = ref(false);
 const detailRow = ref<any>(null);
 
-const [Grid] = useVbenVxeGrid({
+const { Grid } = useCrudGrid({
+  columns: useColumns,
+  defaultSortBy: '',
+  fetchPage: (params) =>
+    getPage({
+      ...params,
+      desc: 'created_at',
+    }),
   formOptions: {
     schema: useGridFormSchema(),
-    submitOnChange: false,
   },
-  gridOptions: {
-    columns: useColumns(),
-    height: 'auto',
-    keepSource: true,
-    pagerConfig: {
-      enabled: true,
-      pageSize: 10,
-    },
-    proxyConfig: {
-      ajax: {
-        query: async ({ page }, formValues) => {
-          const response: any = await getPage({
-            ...formValues,
-            page: page.currentPage,
-            size: page.pageSize,
-            desc: 'created_at',
-          });
-          return {
-            list: response?.records ?? [],
-            total: response?.total ?? 0,
-          };
-        },
-      },
-    },
-    rowConfig: {
-      keyField: 'id',
-    },
-    toolbarConfig: {
-      refresh: true,
-      refreshOptions: { code: 'query' },
-      search: true,
-      zoom: false,
-    },
-  } as VxeTableGridOptions,
 });
 
 function openDetail(row: any) {

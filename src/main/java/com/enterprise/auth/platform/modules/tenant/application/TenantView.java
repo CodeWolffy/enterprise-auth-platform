@@ -20,5 +20,6 @@ public record TenantView(
         @Schema(description = "官网地址") String website,
         @Schema(description = "联系地址") String address,
         @Schema(description = "运营备注") String lifecycleNote
-) {
+)
+{
 }

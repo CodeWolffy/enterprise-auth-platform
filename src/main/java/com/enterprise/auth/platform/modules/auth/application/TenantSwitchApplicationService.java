@@ -8,14 +8,14 @@ import com.enterprise.auth.platform.modules.auth.domain.AuthContextHolder;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
+import com.enterprise.auth.platform.modules.auth.api.AuthTenantQueryPort;
+import com.enterprise.auth.platform.modules.auth.api.AuthTenantQueryPort.TenantSummary;
 import com.enterprise.auth.platform.modules.auth.application.PermissionSnapshotApplicationService;
 import com.enterprise.auth.platform.modules.auth.application.SessionIndexService;
 import com.enterprise.auth.platform.modules.auth.domain.SessionPrincipal;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
 import com.enterprise.auth.platform.modules.auth.interfaces.PermissionSnapshotResponse;
 import com.enterprise.auth.platform.modules.log.application.LogPublisher;
-import com.enterprise.auth.platform.modules.tenant.application.TenantProfileFacade;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.entity.SysTenantEntity;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -29,20 +29,20 @@ public class TenantSwitchApplicationService {
     private final LogPublisher logPublisher;
     private final PermissionSnapshotApplicationService permissionSnapshotApplicationService;
     private final SessionIndexService sessionIndexService;
-    private final TenantProfileFacade tenantProfileFacade;
+    private final AuthTenantQueryPort tenantQuery;
 
     public TenantSwitchApplicationService(
             PlatformAdminSupport platformAdminSupport,
             LogPublisher logPublisher,
             PermissionSnapshotApplicationService permissionSnapshotApplicationService,
             SessionIndexService sessionIndexService,
-            TenantProfileFacade tenantProfileFacade
+            AuthTenantQueryPort tenantQuery
     ) {
         this.platformAdminSupport = platformAdminSupport;
         this.logPublisher = logPublisher;
         this.permissionSnapshotApplicationService = permissionSnapshotApplicationService;
         this.sessionIndexService = sessionIndexService;
-        this.tenantProfileFacade = tenantProfileFacade;
+        this.tenantQuery = tenantQuery;
     }
 
     public PermissionSnapshotResponse switchTenant(UserAccount currentUser, String targetTenantId) {
@@ -53,12 +53,7 @@ public class TenantSwitchApplicationService {
         if (!platformAdminSupport.canSwitchTenant(currentUser, normalizedTargetTenantId)) {
             throw new BusinessException("ACCESS_DENIED", "无权切换到目标租户");
         }
-        SysTenantEntity tenant = tenantProfileFacade.findByTenantId(normalizedTargetTenantId)
-                .orElse(null);
-        if (tenant == null) {
-            throw new BusinessException("TENANT_NOT_FOUND", "租户不存在");
-        }
-        tenantProfileFacade.ensureTenantAccessible(tenant);
+        tenantQuery.ensureTenantAccessible(normalizedTargetTenantId);
 
         SaSession tokenSession = StpUtil.getTokenSession();
         String fromTenantId = sessionString(tokenSession, "activeTenantId", null);
@@ -115,9 +110,9 @@ public class TenantSwitchApplicationService {
         Instant now = TimeSupport.now();
 
         if (!platformAdminSupport.isPlatformSuperAdmin(currentUser)) {
-            return tenantProfileFacade.findByTenantId(originTenantId)
+            return tenantQuery.findByTenantId(originTenantId)
                     .map(tenant -> List.of(toSwitchableTenantView(
-                            toTenantRecord(tenant),
+                            tenant,
                             activeTenantId,
                             originTenantId,
                             now
@@ -126,9 +121,9 @@ public class TenantSwitchApplicationService {
         }
 
         String platformTenantId = platformAdminSupport.platformTenantId();
-        List<TenantProfileFacade.TenantRecord> tenants = TenantContext.runWithGlobalScope(
+        List<TenantSummary> tenants = TenantContext.runWithGlobalScope(
                 platformTenantId,
-                tenantProfileFacade::listTenantRecords
+                tenantQuery::listTenantRecords
         );
         return tenants.stream()
                 .map(tenant -> toSwitchableTenantView(tenant, activeTenantId, originTenantId, now))
@@ -141,7 +136,7 @@ public class TenantSwitchApplicationService {
     }
 
     private SwitchableTenantView toSwitchableTenantView(
-            TenantProfileFacade.TenantRecord tenant,
+            TenantSummary tenant,
             String activeTenantId,
             String originTenantId,
             Instant now
@@ -159,26 +154,7 @@ public class TenantSwitchApplicationService {
         );
     }
 
-    private TenantProfileFacade.TenantRecord toTenantRecord(SysTenantEntity tenant) {
-        return new TenantProfileFacade.TenantRecord(
-                tenant.getTenantId(),
-                tenant.getTenantName(),
-                tenant.getPlatformLevel(),
-                tenant.getTenantStatus(),
-                tenant.getAuthBeginAt(),
-                tenant.getExpireAt(),
-                tenant.getLogoUrl(),
-                tenant.getContactName(),
-                tenant.getContactPhone(),
-                tenant.getContactEmail(),
-                tenant.getWebsite(),
-                tenant.getAddress(),
-                tenant.getLifecycleNote(),
-                tenant.getPackageCode()
-        );
-    }
-
-    private String disabledReason(TenantProfileFacade.TenantRecord tenant, Instant now) {
+    private String disabledReason(TenantSummary tenant, Instant now) {
         if (tenant.tenantStatus() == null || tenant.tenantStatus() != 1) {
             return "租户已停用";
         }

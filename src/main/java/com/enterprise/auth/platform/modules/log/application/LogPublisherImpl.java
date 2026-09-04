@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.modules.log.application;
 
 import com.enterprise.auth.platform.common.TimeSupport;
-import com.enterprise.auth.platform.modules.auth.domain.AuthContextHolder;
+import com.enterprise.auth.platform.common.context.CurrentOperatorSupplier;
 import com.enterprise.auth.platform.common.context.RequestContext;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.web.ClientIpResolver;
@@ -42,15 +42,18 @@ public class LogPublisherImpl implements LogPublisher {
     private final ObjectMapper objectMapper;
     private final ClientIpResolver clientIpResolver;
     private final IpLocationResolver ipLocationResolver;
+    private final CurrentOperatorSupplier currentOperatorSupplier;
 
     public LogPublisherImpl(SysLogMapper sysLogMapper, SysLoginLogMapper sysLoginLogMapper,
                             ObjectMapper objectMapper, ClientIpResolver clientIpResolver,
-                            IpLocationResolver ipLocationResolver) {
+                            IpLocationResolver ipLocationResolver,
+                            CurrentOperatorSupplier currentOperatorSupplier) {
         this.sysLogMapper = sysLogMapper;
         this.sysLoginLogMapper = sysLoginLogMapper;
         this.objectMapper = objectMapper;
         this.clientIpResolver = clientIpResolver;
         this.ipLocationResolver = ipLocationResolver;
+        this.currentOperatorSupplier = currentOperatorSupplier;
     }
 
     @Override
@@ -142,8 +145,7 @@ public class LogPublisherImpl implements LogPublisher {
         String activeTenantId = StringUtils.hasText(TenantContext.getTenantId())
                 ? TenantContext.getTenantId()
                 : tenantId;
-        String operatorTenantId = AuthContextHolder.currentSession()
-                .map(session -> session.operatorTenantId())
+        String operatorTenantId = currentOperatorSupplier.operatorTenantId()
                 .filter(StringUtils::hasText)
                 .orElse(activeTenantId);
         putIfAbsent(enriched, "requestId", requestId);

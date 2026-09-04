@@ -1,8 +1,8 @@
-package com.enterprise.auth.platform.modules.auth.application;
+package com.enterprise.auth.platform.modules.iam.api;
 
 import java.util.List;
 
-/** 数据权限用部门查询端口，由 dept 模块实现。 */
+/** IAM data-scope department query implemented by the department module. */
 public interface DataScopeDeptQuery {
 
     List<ScopedDept> listActive(String tenantId);

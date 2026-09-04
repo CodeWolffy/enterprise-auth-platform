@@ -26,15 +26,15 @@ class VueViewRenderer {
                 import { Page, useVbenModal } from '@vben/common-ui';
                 import { Plus } from '@vben/icons';
 
-                import { ElButton, ElMessage, ElMessageBox } from 'element-plus';
+                import { ElButton } from 'element-plus';
 
-                import { useVbenVxeGrid } from '#/adapter/vxe-table';
                 import { delete__CLASS__, query__CLASS__Page } from '#/api/__KEBAB__';
+                import { useCrudGrid } from '#/composables/useCrudGrid';
 
                 import Form from './form.vue';
 
                 const searchSchema: VbenFormSchema[] = __SEARCH_SCHEMA__;
-                const columns: VxeTableGridOptions<__CLASS__View>['columns'] = [
+                const columns: VxeTableGridOptions['columns'] = [
                 __GRID_COLUMNS__  {
                     align: 'center',
                     field: 'operation',
@@ -58,44 +58,17 @@ class VueViewRenderer {
                   fullscreenButton: false,
                 });
 
-                const [Grid, gridApi] = useVbenVxeGrid({
+                const { Grid, onRefresh, onDelete } = useCrudGrid({
                   formOptions: {
                     schema: searchSchema,
-                    submitOnChange: false,
                   },
-                  gridOptions: {
-                    columns,
-                    height: 'auto',
-                    keepSource: true,
-                    pagerConfig: { enabled: true, pageSize: 20 },
-                    proxyConfig: {
-                      ajax: {
-                        query: async ({ page }, formValues) => {
-                          const result = await query__CLASS__Page({
-                            ...formValues,
-                            page: page.currentPage,
-                            size: page.pageSize,
-                          } as __CLASS__QueryParams);
-                          return {
-                            list: result.records ?? [],
-                            total: result.total ?? 0,
-                          };
-                        },
-                      },
-                    },
-                    rowConfig: { keyField: '__PRIMARY_KEY__' },
-                    toolbarConfig: {
-                      refresh: true,
-                      refreshOptions: { code: 'query' },
-                      search: true,
-                      zoom: false,
-                    },
-                  } as VxeTableGridOptions<__CLASS__View>,
+                  columns,
+                  fetchPage: (params) => query__CLASS__Page(params as __CLASS__QueryParams),
+                  deleteApi: delete__CLASS__,
+                  rowKey: '__PRIMARY_KEY__',
+                  pageSize: 20,
+                  deleteConfirmMessage: '删除后不可恢复，是否继续？',
                 });
-
-                function onRefresh() {
-                  gridApi.query();
-                }
 
                 function openForm(row?: __CLASS__View) {
                   formModalApi.setData(row ?? {}).open();
@@ -104,21 +77,6 @@ class VueViewRenderer {
                 function openDetail(row: __CLASS__View) {
                   detailItem.value = row;
                   detailModalApi.open();
-                }
-
-                async function remove(row: __CLASS__View) {
-                  try {
-                    await ElMessageBox.confirm(
-                      '删除后不可恢复，是否继续？',
-                      '删除确认',
-                      { type: 'warning' },
-                    );
-                  } catch {
-                    return;
-                  }
-                  await delete__CLASS__(row.__PRIMARY_KEY__);
-                  ElMessage.success('已删除');
-                  onRefresh();
                 }
                 </script>
 
@@ -163,7 +121,7 @@ class VueViewRenderer {
                           v-access:code="'__MODULE__:del'"
                           link
                           type="danger"
-                          @click="remove(row)"
+                          @click="onDelete(row)"
                         >
                           删除
                         </ElButton>

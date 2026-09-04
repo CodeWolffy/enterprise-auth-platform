@@ -1,6 +1,6 @@
 package com.enterprise.auth.platform.modules.role.application;
 
-import com.enterprise.auth.platform.modules.menu.application.RoleMenuReferencePort;
+import com.enterprise.auth.platform.modules.menu.api.RoleMenuReferencePort;
 import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMenuMapper;
 import org.springframework.stereotype.Service;
 

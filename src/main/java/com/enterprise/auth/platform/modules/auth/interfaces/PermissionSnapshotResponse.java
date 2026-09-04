@@ -1,6 +1,7 @@
 package com.enterprise.auth.platform.modules.auth.interfaces;
 
 import com.enterprise.auth.platform.common.authz.DataScopeType;
+import com.enterprise.auth.platform.modules.menu.api.MenuNode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import java.util.Set;

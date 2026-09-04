@@ -4,28 +4,26 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.plugins.IgnoreStrategy;
 import com.baomidou.mybatisplus.core.plugins.InterceptorIgnoreHelper;
-import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.modules.user.api.UserSessionIndexPort;
-import com.enterprise.auth.platform.modules.dept.application.DeptQueryFacade;
-import com.enterprise.auth.platform.modules.role.application.RoleCatalogFacade;
-import com.enterprise.auth.platform.modules.role.application.RoleView;
+import com.enterprise.auth.platform.modules.iam.api.IamDeptQueryPort;
+import com.enterprise.auth.platform.modules.iam.api.IamRoleQueryPort;
+import com.enterprise.auth.platform.modules.iam.api.IamSecurityPolicyQueryPort;
 import com.enterprise.auth.platform.common.exception.BusinessException;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.PasswordValidator;
-import com.enterprise.auth.platform.modules.role.application.RoleQueryFacade;
-import com.enterprise.auth.platform.modules.tenant.application.TenantProfileFacade;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserRoleEntity;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserRoleMapper;
 import com.enterprise.auth.platform.modules.user.api.UserAuthorizationInvalidationPort;
-import com.enterprise.auth.platform.modules.security.application.SecurityPolicyApplicationService;
+import com.enterprise.auth.platform.modules.user.api.UserTenantReferencePort;
 import com.enterprise.auth.platform.modules.user.api.UserAccessControlPort;
 import com.enterprise.auth.platform.modules.user.api.UserPasswordHashPort;
 import com.enterprise.auth.platform.common.notification.NotificationScenarioPort;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.modules.user.interfaces.CreateUserRequest;
+import com.enterprise.auth.platform.modules.user.interfaces.AssignedRoleView;
 import com.enterprise.auth.platform.modules.user.interfaces.UserSummary;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -43,49 +41,43 @@ public class UserManagementService {
 
     private final SysUserMapper sysUserMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
-    private final RoleQueryFacade roleQueryFacade;
-    private final DeptQueryFacade deptQueryFacade;
+    private final IamRoleQueryPort roleQueryPort;
+    private final IamDeptQueryPort deptQueryPort;
     private final UserPasswordHashPort passwordHashPort;
     private final UserDirectoryService userDirectoryService;
-    private final RoleCatalogFacade roleCatalogFacade;
-    private final LogPublisher logPublisher;
     private final UserAccessControlPort accessControlPort;
     private final UserAuthorizationInvalidationPort authorizationInvalidationPort;
     private final UserSessionIndexPort sessionIndexPort;
-    private final SecurityPolicyApplicationService securityPolicyApplicationService;
+    private final IamSecurityPolicyQueryPort securityPolicyQueryPort;
     private final NotificationScenarioPort notificationScenarioPublisher;
-    private final TenantProfileFacade tenantProfileFacade;
+    private final UserTenantReferencePort tenantReferences;
 
     public UserManagementService(
             SysUserMapper sysUserMapper,
             SysUserRoleMapper sysUserRoleMapper,
-            RoleQueryFacade roleQueryFacade,
-            DeptQueryFacade deptQueryFacade,
+            IamRoleQueryPort roleQueryPort,
+            IamDeptQueryPort deptQueryPort,
             UserPasswordHashPort passwordHashPort,
             UserDirectoryService userDirectoryService,
-            RoleCatalogFacade roleCatalogFacade,
-            LogPublisher logPublisher,
             UserAccessControlPort accessControlPort,
             UserAuthorizationInvalidationPort authorizationInvalidationPort,
             UserSessionIndexPort sessionIndexPort,
-            SecurityPolicyApplicationService securityPolicyApplicationService,
+            IamSecurityPolicyQueryPort securityPolicyQueryPort,
             NotificationScenarioPort notificationScenarioPublisher,
-            TenantProfileFacade tenantProfileFacade
+            UserTenantReferencePort tenantReferences
     ) {
         this.sysUserMapper = sysUserMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
-        this.roleQueryFacade = roleQueryFacade;
-        this.deptQueryFacade = deptQueryFacade;
+        this.roleQueryPort = roleQueryPort;
+        this.deptQueryPort = deptQueryPort;
         this.passwordHashPort = passwordHashPort;
         this.userDirectoryService = userDirectoryService;
-        this.roleCatalogFacade = roleCatalogFacade;
-        this.logPublisher = logPublisher;
         this.accessControlPort = accessControlPort;
         this.authorizationInvalidationPort = authorizationInvalidationPort;
         this.sessionIndexPort = sessionIndexPort;
-        this.securityPolicyApplicationService = securityPolicyApplicationService;
+        this.securityPolicyQueryPort = securityPolicyQueryPort;
         this.notificationScenarioPublisher = notificationScenarioPublisher;
-        this.tenantProfileFacade = tenantProfileFacade;
+        this.tenantReferences = tenantReferences;
     }
 
     @Transactional
@@ -178,7 +170,7 @@ public class UserManagementService {
         return loadSummary(userId, tenantId);
     }
 
-    public List<RoleView> listAssignedRoles(Long userId) {
+    public List<AssignedRoleView> listAssignedRoles(Long userId) {
         SysUserEntity entity = getUser(userId);
         String tenantId = entity.getTenantId();
         List<Long> roleIds = sysUserRoleMapper.selectList(new LambdaQueryWrapper<SysUserRoleEntity>()
@@ -191,8 +183,16 @@ public class UserManagementService {
             return List.of();
         }
         Set<Long> assignedRoleIds = roleIds.stream().collect(Collectors.toCollection(LinkedHashSet::new));
-        return roleCatalogFacade.tenantRoles(tenantId).stream()
-                .filter(role -> assignedRoleIds.contains(role.id()))
+        return roleQueryPort.listRolesByIds(tenantId, assignedRoleIds).stream()
+                .map(role -> new AssignedRoleView(
+                        role.id(),
+                        role.tenantId(),
+                        role.code(),
+                        role.name(),
+                        role.description(),
+                        role.dataScopeType(),
+                        role.customDeptIds()
+                ))
                 .toList();
     }
 
@@ -286,18 +286,16 @@ public class UserManagementService {
             return;
         }
 
-        var roles = roleQueryFacade.listAll(tenantId).stream()
-                .filter(r -> normalizedRoleCodes.contains(r.getRoleCode()))
-                .toList();
+        var roles = roleQueryPort.loadRoleIdMap(tenantId, normalizedRoleCodes);
         if (roles.size() != normalizedRoleCodes.size()) {
             throw new BusinessException("存在无效的角色编码");
         }
 
-        for (var role : roles) {
+        for (Long roleId : roles.values()) {
             SysUserRoleEntity link = new SysUserRoleEntity();
             link.setTenantId(tenantId);
             link.setUserId(userId);
-            link.setRoleId(role.getId());
+            link.setRoleId(roleId);
             sysUserRoleMapper.insert(link);
         }
     }
@@ -344,7 +342,7 @@ public class UserManagementService {
             return;
         }
         if (!accessControlPort.canAccessDept(tenantId, deptId)
-                || deptQueryFacade.countByIds(tenantId, List.of(deptId)) != 1) {
+                || deptQueryPort.countByIds(tenantId, List.of(deptId)) != 1) {
             throw new BusinessException("无权使用该部门");
         }
     }
@@ -358,7 +356,7 @@ public class UserManagementService {
     }
 
     private void validatePassword(String password, String tenantId) {
-        PasswordValidator.validate(password, securityPolicyApplicationService.effectivePolicy(tenantId));
+        PasswordValidator.validate(password, securityPolicyQueryPort.effectivePolicy(tenantId));
     }
 
     private UserSummary loadSummary(Long userId, String tenantId) {
@@ -391,8 +389,9 @@ public class UserManagementService {
             return currentTenantId;
         }
         String targetTenantId = StringUtils.hasText(requestedTenantId) ? requestedTenantId.trim() : currentTenantId;
-        tenantProfileFacade.findByTenantId(targetTenantId)
-                .orElseThrow(() -> new BusinessException("TENANT_NOT_FOUND", "租户不存在"));
+        if (!tenantReferences.tenantExists(targetTenantId)) {
+            throw new BusinessException("TENANT_NOT_FOUND", "租户不存在");
+        }
         return targetTenantId;
     }
 }

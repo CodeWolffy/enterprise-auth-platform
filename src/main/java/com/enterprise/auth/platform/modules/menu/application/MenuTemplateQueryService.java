@@ -5,7 +5,7 @@ import com.enterprise.auth.platform.common.cache.CacheNames;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.modules.menu.infrastructure.entity.SysMenuEntity;
 import com.enterprise.auth.platform.modules.menu.infrastructure.mapper.SysMenuMapper;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
+import com.enterprise.auth.platform.common.context.TenantProperties;
 import java.util.List;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;

@@ -1,7 +1,7 @@
 package com.enterprise.auth.platform.modules.role.application;
 
-import com.enterprise.auth.platform.modules.auth.interfaces.MenuNode;
-import com.enterprise.auth.platform.modules.menu.application.MenuGrantQueryPort;
+import com.enterprise.auth.platform.modules.menu.api.MenuGrantQueryPort;
+import com.enterprise.auth.platform.modules.menu.api.MenuNode;
 import java.util.List;
 import java.util.Set;
 import org.springframework.stereotype.Service;

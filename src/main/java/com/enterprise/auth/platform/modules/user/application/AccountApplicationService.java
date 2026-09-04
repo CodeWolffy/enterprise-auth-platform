@@ -6,12 +6,10 @@ import com.enterprise.auth.platform.common.PasswordValidator;
 import com.enterprise.auth.platform.common.TimeSupport;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.exception.BusinessException;
-import com.enterprise.auth.platform.modules.log.application.LogPublisher;
 import com.enterprise.auth.platform.modules.user.api.UserAccessControlPort;
 import com.enterprise.auth.platform.modules.user.api.UserPasswordHashPort;
 import com.enterprise.auth.platform.modules.user.api.UserAuthorizationInvalidationPort;
-import com.enterprise.auth.platform.modules.file.application.FileApplicationService;
-import com.enterprise.auth.platform.modules.file.application.FileMetadataView;
+import com.enterprise.auth.platform.modules.user.api.UserAvatarFilePort;
 import com.enterprise.auth.platform.common.notification.NotificationScenarioPort;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
@@ -32,8 +30,7 @@ public class AccountApplicationService {
     private final SysUserMapper sysUserMapper;
     private final UserPasswordHashPort passwordHashPort;
     private final UserAuthorizationInvalidationPort authorizationInvalidationPort;
-    private final FileApplicationService fileApplicationService;
-    private final LogPublisher logPublisher;
+    private final UserAvatarFilePort avatarFilePort;
     private final NotificationScenarioPort notificationScenarioPublisher;
 
     public AccountApplicationService(
@@ -41,16 +38,14 @@ public class AccountApplicationService {
             SysUserMapper sysUserMapper,
             UserPasswordHashPort passwordHashPort,
             UserAuthorizationInvalidationPort authorizationInvalidationPort,
-            FileApplicationService fileApplicationService,
-            LogPublisher logPublisher,
+            UserAvatarFilePort avatarFilePort,
             NotificationScenarioPort notificationScenarioPublisher
     ) {
         this.accessControlPort = accessControlPort;
         this.sysUserMapper = sysUserMapper;
         this.passwordHashPort = passwordHashPort;
         this.authorizationInvalidationPort = authorizationInvalidationPort;
-        this.fileApplicationService = fileApplicationService;
-        this.logPublisher = logPublisher;
+        this.avatarFilePort = avatarFilePort;
         this.notificationScenarioPublisher = notificationScenarioPublisher;
     }
 
@@ -82,7 +77,7 @@ public class AccountApplicationService {
         UserAccessControlPort.UserIdentity current = accessControlPort.requireCurrentUser();
         return runWithAccountTenant(current, () -> {
             SysUserEntity user = loadCurrentUser(current);
-            FileMetadataView uploaded = fileApplicationService.uploadCurrentUserAvatar(file);
+            UserAvatarFilePort.UploadedAvatar uploaded = avatarFilePort.uploadCurrentUserAvatar(file);
             user.setAvatarFileKey(uploaded.fileKey());
             user.setUpdatedBy(user.getUsername());
             sysUserMapper.updateById(user);
@@ -131,7 +126,7 @@ public class AccountApplicationService {
                 user.getMobile(),
                 user.getEmail(),
                 avatarFileKey,
-                fileApplicationService.publicUrl(avatarFileKey),
+                avatarFilePort.publicUrl(avatarFileKey),
                 user.getEnabled() == null || user.getEnabled() == 1,
                 user.getMustChangePassword() != null && user.getMustChangePassword() == 1,
                 user.getPasswordUpdatedAt(),

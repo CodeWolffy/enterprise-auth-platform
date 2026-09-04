@@ -3,7 +3,7 @@ package com.enterprise.auth.platform.modules.system.interfaces;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.web.ApiResponse;
-import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
+import com.enterprise.auth.platform.common.audit.SysLog;
 import com.enterprise.auth.platform.modules.system.application.CategoryRuleApplicationService;
 import com.enterprise.auth.platform.modules.system.application.SystemViewModels;
 import io.swagger.v3.oas.annotations.Operation;

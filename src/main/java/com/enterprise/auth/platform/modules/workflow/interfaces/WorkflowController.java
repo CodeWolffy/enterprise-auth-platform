@@ -12,7 +12,8 @@ import com.enterprise.auth.platform.modules.workflow.application.WorkflowStartRe
 import com.enterprise.auth.platform.modules.workflow.application.WorkflowTaskUrgeResult;
 import com.enterprise.auth.platform.modules.workflow.application.WorkflowTaskUrgeView;
 import com.enterprise.auth.platform.modules.workflow.application.WorkflowTaskView;
-import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
+import com.enterprise.auth.platform.common.audit.SysLog;
+import com.enterprise.auth.platform.common.idempotent.Idempotent;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -87,6 +88,7 @@ public class WorkflowController {
     @Operation(summary = "发起流程实例")
     @PostMapping("/instances")
     @SaCheckPermission(PermissionCodes.WORKFLOW_INSTANCE_ADD)
+    @Idempotent(prefix = "wf:start", key = "#request.definitionKey + ':' + #request.businessKey", timeout = 5)
     public ApiResponse<WorkflowStartResult> startInstance(@Valid @RequestBody WorkflowStartRequest request) {
         return ApiResponse.ok(workflowApplicationService.startInstance(request.toCommand()));
     }
@@ -154,6 +156,7 @@ public class WorkflowController {
     @Operation(summary = "审批通过任务")
     @PutMapping("/tasks/{taskId}/approve")
     @SaCheckPermission(PermissionCodes.WORKFLOW_TODO_EDIT)
+    @Idempotent(prefix = "wf:task", key = "#taskId", timeout = 5)
     public ApiResponse<WorkflowActionResult> approveTask(
             @Parameter(description = "任务 ID") @PathVariable Long taskId,
             @Valid @RequestBody(required = false) WorkflowTaskActionRequest request
@@ -166,6 +169,7 @@ public class WorkflowController {
     @Operation(summary = "驳回任务")
     @PutMapping("/tasks/{taskId}/reject")
     @SaCheckPermission(PermissionCodes.WORKFLOW_TODO_EDIT)
+    @Idempotent(prefix = "wf:task", key = "#taskId", timeout = 5)
     public ApiResponse<WorkflowActionResult> rejectTask(
             @Parameter(description = "任务 ID") @PathVariable Long taskId,
             @Valid @RequestBody(required = false) WorkflowTaskActionRequest request

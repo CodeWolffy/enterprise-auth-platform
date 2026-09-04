@@ -2,7 +2,8 @@ package com.enterprise.auth.platform.modules.tenant.interfaces;
 
 import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.modules.auth.application.SecuritySupport;
-import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
+import com.enterprise.auth.platform.common.audit.SysLog;
+import com.enterprise.auth.platform.common.idempotent.Idempotent;
 import com.enterprise.auth.platform.modules.tenant.application.TenantChangeLogApplicationService;
 import com.enterprise.auth.platform.modules.tenant.application.TenantDirectoryApplicationService;
 import com.enterprise.auth.platform.modules.tenant.application.TenantLifecycleApplicationService;
@@ -11,7 +12,7 @@ import com.enterprise.auth.platform.modules.tenant.application.TenantView;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.common.context.TenantContext;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
+import com.enterprise.auth.platform.common.context.TenantProperties;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -129,6 +130,7 @@ public class TenantController {
     @Operation(summary = "创建租户")
     @PostMapping
     @SaCheckPermission(PermissionCodes.SYSTENANT_ADD)
+    @Idempotent(prefix = "tenant:create", key = "#request.tenantId", timeout = 5)
     public ApiResponse<TenantView> create(@Valid @RequestBody CreateTenantRequest request) {
         return ApiResponse.ok(platformScope(() -> tenantLifecycleApplicationService.create(request)));
     }

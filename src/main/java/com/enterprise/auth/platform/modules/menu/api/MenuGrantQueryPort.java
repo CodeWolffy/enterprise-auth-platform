@@ -1,12 +1,9 @@
-package com.enterprise.auth.platform.modules.menu.application;
+package com.enterprise.auth.platform.modules.menu.api;
 
-import com.enterprise.auth.platform.modules.auth.interfaces.MenuNode;
 import java.util.List;
 import java.util.Set;
 
-/**
- * 菜单授权查询端口：role 模块只依赖此接口，避免 role↔menu 实现环。
- */
+/** Menu-owned contract for resolving grants and grantable menu identifiers. */
 public interface MenuGrantQueryPort {
 
     Set<String> resolveGrantKeys(String activeTenantId, Set<Long> grantedMenuIds, boolean superAdmin);

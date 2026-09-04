@@ -1,6 +1,6 @@
 package com.enterprise.auth.platform.modules.role.application;
 
-import com.enterprise.auth.platform.modules.menu.application.MenuDeletedEvent;
+import com.enterprise.auth.platform.modules.menu.api.MenuDeletedEvent;
 import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMenuMapper;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;

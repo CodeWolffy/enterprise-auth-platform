@@ -1,12 +1,12 @@
 package com.enterprise.auth.platform.modules.menu.application;
 
 import com.enterprise.auth.platform.common.exception.BusinessException;
-import com.enterprise.auth.platform.modules.auth.interfaces.MenuNode;
+import com.enterprise.auth.platform.modules.menu.api.MenuNode;
+import com.enterprise.auth.platform.modules.menu.api.MenuTenantGrantPort;
 import com.enterprise.auth.platform.modules.menu.domain.MenuTreeNode;
 import com.enterprise.auth.platform.modules.menu.domain.MenuType;
 import com.enterprise.auth.platform.modules.menu.infrastructure.entity.SysMenuEntity;
-import com.enterprise.auth.platform.modules.tenant.application.TenantMenuService;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
+import com.enterprise.auth.platform.common.context.TenantProperties;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -30,11 +30,11 @@ final class MenuTreeResolver {
 
     private static final String PLATFORM_TENANT = "platform";
 
-    private final TenantMenuService tenantMenuService;
+    private final MenuTenantGrantPort tenantGrants;
     private final TenantProperties tenantProperties;
 
-    MenuTreeResolver(TenantMenuService tenantMenuService, TenantProperties tenantProperties) {
-        this.tenantMenuService = tenantMenuService;
+    MenuTreeResolver(MenuTenantGrantPort tenantGrants, TenantProperties tenantProperties) {
+        this.tenantGrants = tenantGrants;
         this.tenantProperties = tenantProperties;
     }
 
@@ -187,7 +187,7 @@ final class MenuTreeResolver {
                     .filter(Objects::nonNull)
                     .collect(Collectors.toCollection(LinkedHashSet::new));
         }
-        return tenantMenuService.findTenantMenuIds(activeTenantId);
+        return tenantGrants.findTenantMenuIds(activeTenantId);
     }
 
     private Set<Long> expandWithAncestors(Collection<Long> menuIds, Map<Long, SysMenuEntity> menuById) {

@@ -5,7 +5,7 @@ import com.enterprise.auth.platform.common.web.PageResult;
 import com.enterprise.auth.platform.modules.notification.application.NotificationInboxService;
 import com.enterprise.auth.platform.modules.notification.application.NotificationStreamTicketService;
 import com.enterprise.auth.platform.modules.notification.application.NotificationView;
-import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
+import com.enterprise.auth.platform.common.audit.SysLog;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;

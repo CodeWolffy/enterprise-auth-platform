@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import type { VxeTableGridOptions } from '#/adapter/vxe-table';
-
 import { computed, defineAsyncComponent, reactive, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
@@ -14,13 +12,12 @@ import {
   ElDescriptionsItem,
   ElDrawer,
   ElMessage,
-  ElMessageBox,
   ElRow,
   ElStatistic,
   ElTag,
 } from 'element-plus';
 
-import { useVbenVxeGrid } from '#/adapter/vxe-table';
+import { useCrudGrid } from '#/composables/useCrudGrid';
 import { delObj, getAssignedRoles, getPage } from '#/api/upms/user';
 import { PERMS } from '#/constants/permissions';
 import { useAuthStore } from '#/store/auth';
@@ -61,63 +58,40 @@ const DATA_SCOPE_LABELS: Record<string, string> = {
 
 const statData = computed(() => pageStats);
 
-const [Grid, gridApi] = useVbenVxeGrid({
+async function fetchUserPage(params: any) {
+  const response: any = await getPage(params);
+  const records = response?.records ?? [];
+  const enabled = records.filter((user: any) => user.enabled).length;
+  pageStats.total = response?.total ?? 0;
+  pageStats.enabled = enabled;
+  pageStats.disabled = records.length - enabled;
+  pageStats.avgRoles =
+    records.length === 0
+      ? 0
+      : Number(
+          (
+            records.reduce(
+              (sum: number, user: any) => sum + (user.roles?.length ?? 0),
+              0,
+            ) / records.length
+          ).toFixed(1),
+        );
+  return response;
+}
+
+const {
+  Grid,
+  onRefresh,
+  onDelete: baseOnDelete,
+} = useCrudGrid({
+  columns: useColumns,
+  fetchPage: fetchUserPage,
+  deleteApi: delObj,
+  deleteConfirmMessage: '此操作将删除该用户，是否继续?',
   formOptions: {
     schema: useGridFormSchema(),
-    submitOnChange: false,
   },
-  gridOptions: {
-    columns: useColumns(),
-    height: 'auto',
-    keepSource: true,
-    pagerConfig: {
-      enabled: true,
-      pageSize: 10,
-    },
-    proxyConfig: {
-      ajax: {
-        query: async ({ page }, formValues) => {
-          const response: any = await getPage({
-            ...formValues,
-            page: page.currentPage,
-            size: page.pageSize,
-          });
-          const records = response?.records ?? [];
-          const enabled = records.filter((user: any) => user.enabled).length;
-          pageStats.total = response?.total ?? 0;
-          pageStats.enabled = enabled;
-          pageStats.disabled = records.length - enabled;
-          pageStats.avgRoles =
-            records.length === 0
-              ? 0
-              : Number(
-                  (
-                    records.reduce(
-                      (sum: number, user: any) =>
-                        sum + (user.roles?.length ?? 0),
-                      0,
-                    ) / records.length
-                  ).toFixed(1),
-                );
-          return { list: records, total: pageStats.total };
-        },
-      },
-    },
-    rowConfig: {
-      keyField: 'id',
-    },
-    toolbarConfig: {
-      refresh: true,
-      refreshOptions: { code: 'query' },
-      search: true,
-      zoom: false,
-    },
-  } as VxeTableGridOptions,
 });
-
-function onRefresh() {
-  gridApi.query();
-}
 
 function openForm(row?: any) {
   formMounted.value = true;
@@ -155,18 +129,7 @@ async function onDelete(row: any) {
     ElMessage.warning('不能删除当前登录用户');
     return;
   }
-  try {
-    await ElMessageBox.confirm('此操作将删除该用户，是否继续?', '提示', {
-      cancelButtonText: '取消',
-      confirmButtonText: '确认',
-      type: 'warning',
-    });
-    await delObj(row.id);
-    ElMessage.success('删除成功');
-    onRefresh();
-  } catch {
-    // Cancelled confirmations require no further action.
-  }
+  await baseOnDelete(row);
 }
 </script>
 

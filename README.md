@@ -139,8 +139,8 @@ pnpm lint         # 代码检查
 
 ## 后续方向
 
-- 前端：剩余 11 组 CRUD 页面迁移到 `useCrudGrid` 范式（见 `CRUD_MIGRATION.md`）；统一在线用户权限码（前端 `upms:onlineuser:forced` 与后端登记的 `upms:session:kick` 不一致）
-- 后端：幂等注解框架（@Idempotent + Redis）；修复 `CodegenResourceRegistrationService` 直接引用 tenant Mapper 的边界违规（ArchUnit 已知失败项）；codegen 两套类型映射（生成/导入链路）统一
+- 前端：剩余 11 组 CRUD 页面迁移到 `useCrudGrid` 范式（见 `CRUD_MIGRATION.md`）；在线用户权限码已同后端对齐为 `upms:session:kick`
+- 后端：幂等注解框架（@Idempotent + Redis）；codegen 两套类型映射（生成/导入链路）统一
 - 可观测性：链路追踪（Micrometer Tracing）、业务指标埋点（@Timed 等）按需接入
 - 运维：监控接入、配置中心、网关与分布式任务能力按需启用（`future-components` profile 预留）
-- 测试：修复预存的测试失败——本地库种子数据缺失（Dept/Role/User ManagementServiceTest、ResourceAuthorizationControllerTest 硬编码 id）与 `sys_audit_log` 遗留引用（AuthControllerSessionFlowTest，审计模块已重构为 log 模块）
+- 测试：已修复硬编码 id 与 `sys_audit_log` 遗留引用问题；集成测试（带 `@Tag("integration")`）需依赖外部或本地真实中间件环境，纯单元测试可直接通过 `mvn test -Punit-tests` 执行验证

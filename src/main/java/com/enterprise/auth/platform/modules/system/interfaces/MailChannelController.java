@@ -5,7 +5,7 @@ import com.enterprise.auth.platform.common.authz.PermissionCodes;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.web.ApiResponse;
 import com.enterprise.auth.platform.common.web.RateLimit;
-import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
+import com.enterprise.auth.platform.common.audit.SysLog;
 import com.enterprise.auth.platform.modules.system.application.MailChannelApplicationService;
 import com.enterprise.auth.platform.modules.system.application.MailChannelPreset;
 import io.swagger.v3.oas.annotations.Operation;

@@ -20,7 +20,7 @@ import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.modules.auth.application.CurrentUserService;
 import com.enterprise.auth.platform.modules.auth.interfaces.RegisterRequest;
 import com.enterprise.auth.platform.modules.auth.domain.UserAccount;
-import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
+import com.enterprise.auth.platform.common.audit.SysLog;
 import com.enterprise.auth.platform.modules.user.interfaces.UserSummary;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

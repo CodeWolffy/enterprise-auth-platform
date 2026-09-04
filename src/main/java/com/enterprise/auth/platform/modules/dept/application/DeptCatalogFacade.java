@@ -1,9 +1,9 @@
 package com.enterprise.auth.platform.modules.dept.application;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.enterprise.auth.platform.modules.auth.application.DataScopeService;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
+import com.enterprise.auth.platform.modules.dept.api.DeptAccessControlPort;
 import com.enterprise.auth.platform.modules.dept.infrastructure.entity.SysDeptEntity;
 import com.enterprise.auth.platform.modules.dept.infrastructure.mapper.SysDeptMapper;
 import java.util.List;
@@ -13,11 +13,11 @@ import org.springframework.stereotype.Service;
 public class DeptCatalogFacade {
 
     private final SysDeptMapper sysDeptMapper;
-    private final DataScopeService dataScopeService;
+    private final DeptAccessControlPort accessControl;
 
-    public DeptCatalogFacade(SysDeptMapper sysDeptMapper, DataScopeService dataScopeService) {
+    public DeptCatalogFacade(SysDeptMapper sysDeptMapper, DeptAccessControlPort accessControl) {
         this.sysDeptMapper = sysDeptMapper;
-        this.dataScopeService = dataScopeService;
+        this.accessControl = accessControl;
     }
 
     public List<SysDeptEntity> listDepartments(String tenantId) {
@@ -62,12 +62,12 @@ public class DeptCatalogFacade {
 
     public List<DepartmentView> departments() {
         String tenantId = TenantContextSupport.currentTenantIdOrPlatform();
-        boolean globalScope = TenantContext.isGlobalScope() || dataScopeService.isPlatformSuperAdmin();
+        boolean globalScope = TenantContext.isGlobalScope() || accessControl.isPlatformSuperAdmin();
         List<DeptItem> items = globalScope && !TenantContext.isGlobalScope()
                 ? TenantContext.runWithGlobalScope(tenantId, () -> listDeptItems(tenantId))
                 : listDeptItems(tenantId);
         if (!globalScope) {
-            java.util.Set<Long> visibleDeptIds = dataScopeService.visibleDeptIds(tenantId).orElse(null);
+            java.util.Set<Long> visibleDeptIds = accessControl.visibleDeptIds(tenantId).orElse(null);
             if (visibleDeptIds != null) {
                 items = items.stream()
                         .filter(item -> item.id() != null && visibleDeptIds.contains(item.id()))

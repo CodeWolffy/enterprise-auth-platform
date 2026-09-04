@@ -9,16 +9,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.enterprise.auth.platform.common.context.TenantContext;
-import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
 import com.enterprise.auth.platform.modules.menu.application.MenuService;
 import com.enterprise.auth.platform.modules.menu.application.MenuTemplateQueryService;
-import com.enterprise.auth.platform.modules.menu.application.RoleMenuReferencePort;
+import com.enterprise.auth.platform.modules.menu.api.RoleMenuReferencePort;
+import com.enterprise.auth.platform.modules.menu.api.MenuAuthorizationInvalidationPort;
+import com.enterprise.auth.platform.modules.menu.api.MenuTenantGrantPort;
 import com.enterprise.auth.platform.modules.menu.domain.MenuTreeNode;
 import com.enterprise.auth.platform.modules.menu.domain.MenuType;
 import com.enterprise.auth.platform.modules.menu.infrastructure.entity.SysMenuEntity;
 import com.enterprise.auth.platform.modules.menu.infrastructure.mapper.SysMenuMapper;
-import com.enterprise.auth.platform.modules.tenant.application.TenantMenuService;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
+import com.enterprise.auth.platform.common.context.TenantProperties;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -36,14 +36,13 @@ class MenuServiceOptimizationTest {
     void batchCreateActionsShouldReuseSingleTemplateSnapshot() {
         SysMenuMapper mapper = mock(SysMenuMapper.class);
         MenuTemplateQueryService templateQueryService = mock(MenuTemplateQueryService.class);
-        AuthPermissionSnapshotInvalidationService invalidationService =
-                mock(AuthPermissionSnapshotInvalidationService.class);
+        MenuAuthorizationInvalidationPort invalidation = mock(MenuAuthorizationInvalidationPort.class);
         MenuService menuService = new MenuService(
                 mapper,
                 mock(RoleMenuReferencePort.class),
                 mock(ApplicationEventPublisher.class),
-                mock(TenantMenuService.class),
-                invalidationService,
+                mock(MenuTenantGrantPort.class),
+                invalidation,
                 new TenantProperties("X-Tenant-Id", "platform", true, List.of()),
                 templateQueryService
         );
@@ -64,7 +63,7 @@ class MenuServiceOptimizationTest {
         verify(mapper, times(2)).insert(inserted.capture());
         assertThat(inserted.getAllValues()).extracting(SysMenuEntity::getPermission)
                 .containsExactly("upms:user:edit", "upms:user:del");
-        verify(invalidationService).invalidateAll();
+        verify(invalidation).invalidateAll();
     }
 
     private static SysMenuEntity menu(

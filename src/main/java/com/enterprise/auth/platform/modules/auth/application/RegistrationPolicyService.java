@@ -5,7 +5,7 @@ import com.enterprise.auth.platform.common.cache.CacheNames;
 import com.enterprise.auth.platform.modules.system.infrastructure.entity.SysConfigEntity;
 import com.enterprise.auth.platform.modules.system.application.ConfigApplicationService;
 import com.enterprise.auth.platform.common.context.TenantContext;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
+import com.enterprise.auth.platform.common.context.TenantProperties;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;

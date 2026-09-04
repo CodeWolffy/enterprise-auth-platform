@@ -5,15 +5,18 @@ import com.enterprise.auth.platform.common.cache.CacheNames;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.context.TenantContextSupport;
 import com.enterprise.auth.platform.common.exception.BusinessException;
-import com.enterprise.auth.platform.modules.auth.application.AuthPermissionSnapshotInvalidationService;
-import com.enterprise.auth.platform.modules.auth.interfaces.MenuNode;
+import com.enterprise.auth.platform.modules.menu.api.MenuAuthorizationInvalidationPort;
+import com.enterprise.auth.platform.modules.menu.api.MenuDeletedEvent;
+import com.enterprise.auth.platform.modules.menu.api.MenuGrantQueryPort;
+import com.enterprise.auth.platform.modules.menu.api.MenuNode;
+import com.enterprise.auth.platform.modules.menu.api.RoleMenuReferencePort;
+import com.enterprise.auth.platform.modules.menu.api.MenuTenantGrantPort;
 import com.enterprise.auth.platform.modules.menu.domain.MenuTreeNode;
 import com.enterprise.auth.platform.modules.menu.domain.MenuType;
 import com.enterprise.auth.platform.modules.menu.infrastructure.entity.SysMenuEntity;
 import com.enterprise.auth.platform.modules.menu.infrastructure.mapper.SysMenuMapper;
 import com.enterprise.auth.platform.modules.menu.interfaces.CreateMenuRequest;
-import com.enterprise.auth.platform.modules.tenant.application.TenantMenuService;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
+import com.enterprise.auth.platform.common.context.TenantProperties;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -44,7 +47,7 @@ public class MenuService implements MenuGrantQueryPort {
     private final SysMenuMapper sysMenuMapper;
     private final RoleMenuReferencePort roleMenuReferencePort;
     private final ApplicationEventPublisher eventPublisher;
-    private final AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService;
+    private final MenuAuthorizationInvalidationPort authorizationInvalidation;
     private final TenantProperties tenantProperties;
     private final MenuTemplateQueryService menuTemplateQueryService;
     private final MenuTreeResolver menuTreeResolver;
@@ -53,18 +56,18 @@ public class MenuService implements MenuGrantQueryPort {
             SysMenuMapper sysMenuMapper,
             RoleMenuReferencePort roleMenuReferencePort,
             ApplicationEventPublisher eventPublisher,
-            TenantMenuService tenantMenuService,
-            AuthPermissionSnapshotInvalidationService permissionSnapshotInvalidationService,
+            MenuTenantGrantPort tenantGrants,
+            MenuAuthorizationInvalidationPort authorizationInvalidation,
             TenantProperties tenantProperties,
             MenuTemplateQueryService menuTemplateQueryService
     ) {
         this.sysMenuMapper = sysMenuMapper;
         this.roleMenuReferencePort = roleMenuReferencePort;
         this.eventPublisher = eventPublisher;
-        this.permissionSnapshotInvalidationService = permissionSnapshotInvalidationService;
+        this.authorizationInvalidation = authorizationInvalidation;
         this.tenantProperties = tenantProperties;
         this.menuTemplateQueryService = menuTemplateQueryService;
-        this.menuTreeResolver = new MenuTreeResolver(tenantMenuService, tenantProperties);
+        this.menuTreeResolver = new MenuTreeResolver(tenantGrants, tenantProperties);
     }
 
     public List<MenuTreeNode> templateTree() {
@@ -479,7 +482,7 @@ public class MenuService implements MenuGrantQueryPort {
     }
 
     private void evictPrincipalSnapshots() {
-        permissionSnapshotInvalidationService.invalidateAll();
+        authorizationInvalidation.invalidateAll();
     }
 
     private String platformTenantId() {

@@ -1,11 +1,11 @@
 package com.enterprise.auth.platform.modules.log.application;
 
-import com.enterprise.auth.platform.modules.auth.application.SecuritySupport;
+import com.enterprise.auth.platform.common.context.CurrentOperatorSupplier;
 import com.enterprise.auth.platform.common.context.RequestContext;
 import com.enterprise.auth.platform.common.context.TenantContext;
 import com.enterprise.auth.platform.common.web.IpLocationResolver;
 import com.enterprise.auth.platform.modules.log.domain.event.LogEvent;
-import com.enterprise.auth.platform.modules.log.infrastructure.annotation.SysLog;
+import com.enterprise.auth.platform.common.audit.SysLog;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -24,10 +24,16 @@ public class LogAopAspect {
 
     private final ApplicationEventPublisher eventPublisher;
     private final IpLocationResolver ipLocationResolver;
+    private final CurrentOperatorSupplier currentOperatorSupplier;
 
-    public LogAopAspect(ApplicationEventPublisher eventPublisher, IpLocationResolver ipLocationResolver) {
+    public LogAopAspect(
+            ApplicationEventPublisher eventPublisher,
+            IpLocationResolver ipLocationResolver,
+            CurrentOperatorSupplier currentOperatorSupplier
+    ) {
         this.eventPublisher = eventPublisher;
         this.ipLocationResolver = ipLocationResolver;
+        this.currentOperatorSupplier = currentOperatorSupplier;
     }
 
     @Around("@annotation(sysLog)")
@@ -36,7 +42,7 @@ public class LogAopAspect {
         HttpServletRequest request = attributes != null ? attributes.getRequest() : null;
 
         String eventType = sysLog.value();
-        String operator = SecuritySupport.currentOperator();
+        String operator = currentOperatorSupplier.currentOperator();
         String tenantId = TenantContext.getTenantId();
         String requestId = RequestContext.getRequestId();
         String clientIp = request != null ? RequestContext.getClientIp() : null;

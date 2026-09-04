@@ -4,11 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.enterprise.auth.platform.modules.auth.interfaces.MenuNode;
+import com.enterprise.auth.platform.modules.menu.api.MenuNode;
+import com.enterprise.auth.platform.modules.menu.api.MenuTenantGrantPort;
 import com.enterprise.auth.platform.modules.menu.domain.MenuType;
 import com.enterprise.auth.platform.modules.menu.infrastructure.entity.SysMenuEntity;
-import com.enterprise.auth.platform.modules.tenant.application.TenantMenuService;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
+import com.enterprise.auth.platform.common.context.TenantProperties;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -17,16 +17,16 @@ class MenuTreeResolverTest {
 
     @Test
     void shouldExpandAncestorsAndKeepTenantScopedButtonGrant() {
-        TenantMenuService tenantMenuService = mock(TenantMenuService.class);
+        MenuTenantGrantPort tenantGrants = mock(MenuTenantGrantPort.class);
         MenuTreeResolver resolver = new MenuTreeResolver(
-                tenantMenuService,
+                tenantGrants,
                 new TenantProperties("X-Tenant-Id", "platform", true, List.of())
         );
         SysMenuEntity root = menu(1L, null, MenuType.MENU, null, "root", 1);
         SysMenuEntity customer = menu(2L, 1L, MenuType.MENU, null, "customer", 2);
         SysMenuEntity read = menu(3L, 2L, MenuType.BUTTON, "crm:customer:read", null, 1);
         List<SysMenuEntity> template = List.of(root, customer, read);
-        when(tenantMenuService.findTenantMenuIds("tenant-a")).thenReturn(Set.of(1L, 2L, 3L));
+        when(tenantGrants.findTenantMenuIds("tenant-a")).thenReturn(Set.of(1L, 2L, 3L));
 
         assertThat(resolver.resolveGrantKeys(template, "tenant-a", Set.of(3L), false))
                 .containsExactly("crm:customer:read");

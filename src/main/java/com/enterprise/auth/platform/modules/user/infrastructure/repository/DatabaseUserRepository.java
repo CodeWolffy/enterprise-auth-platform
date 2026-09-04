@@ -2,25 +2,17 @@ package com.enterprise.auth.platform.modules.user.infrastructure.repository;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.enterprise.auth.platform.common.cache.CacheNames;
-import com.enterprise.auth.platform.common.authz.DataScopeType;
 import com.enterprise.auth.platform.common.TimeSupport;
-import com.enterprise.auth.platform.modules.role.infrastructure.entity.SysRoleEntity;
+import com.enterprise.auth.platform.modules.iam.api.IamRoleQueryPort;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserEntity;
 import com.enterprise.auth.platform.modules.user.infrastructure.entity.SysUserRoleEntity;
-import com.enterprise.auth.platform.modules.role.infrastructure.mapper.SysRoleMapper;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserMapper;
 import com.enterprise.auth.platform.modules.user.infrastructure.mapper.SysUserRoleMapper;
-import com.enterprise.auth.platform.modules.role.application.RolePayloadCodec;
-import com.enterprise.auth.platform.modules.role.application.RoleGrantQueryFacade;
 import com.enterprise.auth.platform.modules.user.api.UserAuthorizationInvalidationPort;
 import com.enterprise.auth.platform.modules.user.application.AuthenticationUser;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
@@ -29,29 +21,21 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class DatabaseUserRepository implements UserRepository {
 
-    private static final Logger log = LoggerFactory.getLogger(DatabaseUserRepository.class);
-
     private final SysUserMapper sysUserMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
-    private final SysRoleMapper sysRoleMapper;
     private final UserAuthorizationInvalidationPort authorizationInvalidationPort;
-    private final RolePayloadCodec rolePayloadCodec;
-    private final RoleGrantQueryFacade roleGrantQueryFacade;
+    private final IamRoleQueryPort roleQueryPort;
 
     public DatabaseUserRepository(
             SysUserMapper sysUserMapper,
             SysUserRoleMapper sysUserRoleMapper,
-            SysRoleMapper sysRoleMapper,
             UserAuthorizationInvalidationPort authorizationInvalidationPort,
-            RolePayloadCodec rolePayloadCodec,
-            RoleGrantQueryFacade roleGrantQueryFacade
+            IamRoleQueryPort roleQueryPort
     ) {
         this.sysUserMapper = sysUserMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
-        this.sysRoleMapper = sysRoleMapper;
         this.authorizationInvalidationPort = authorizationInvalidationPort;
-        this.rolePayloadCodec = rolePayloadCodec;
-        this.roleGrantQueryFacade = roleGrantQueryFacade;
+        this.roleQueryPort = roleQueryPort;
     }
 
     @Override
@@ -91,18 +75,15 @@ public class DatabaseUserRepository implements UserRepository {
     }
 
     private AuthenticationUser toAuthenticationUser(SysUserEntity user, boolean includePasswordHash) {
-        List<SysRoleEntity> roles = loadRoles(user.getTenantId(), user.getId());
-        Set<String> roleCodes = roles.stream()
-                .map(SysRoleEntity::getRoleCode)
-                .collect(Collectors.toSet());
-        RoleData roleData = loadRoleData(user.getTenantId(), roleCodes, roles);
+        Set<Long> roleIds = loadRoleIds(user.getTenantId(), user.getId());
+        IamRoleQueryPort.RoleAuthorization roleData = roleQueryPort.resolveAuthorization(user.getTenantId(), roleIds);
         return new AuthenticationUser(
                 user.getId(),
                 user.getTenantId(),
                 user.getUsername(),
                 includePasswordHash ? user.getPasswordHash() : null,
                 user.getEnabled() != null && user.getEnabled() == 1,
-                roleCodes,
+                roleData.roleCodes(),
                 roleData.permissionCodes(),
                 roleData.customDeptIds(),
                 roleData.dataScopeType(),
@@ -113,60 +94,12 @@ public class DatabaseUserRepository implements UserRepository {
         );
     }
 
-    private List<SysRoleEntity> loadRoles(String tenantId, Long userId) {
-        List<SysUserRoleEntity> links = sysUserRoleMapper.selectList(new LambdaQueryWrapper<SysUserRoleEntity>()
+    private Set<Long> loadRoleIds(String tenantId, Long userId) {
+        return sysUserRoleMapper.selectList(new LambdaQueryWrapper<SysUserRoleEntity>()
                 .eq(SysUserRoleEntity::getTenantId, tenantId)
-                .eq(SysUserRoleEntity::getUserId, userId));
-        if (links.isEmpty()) {
-            return List.of();
-        }
-        List<Long> roleIds = links.stream().map(SysUserRoleEntity::getRoleId).distinct().toList();
-        return sysRoleMapper.selectList(new LambdaQueryWrapper<SysRoleEntity>()
-                .eq(SysRoleEntity::getTenantId, tenantId)
-                .eq(SysRoleEntity::getDeleted, 0)
-                .in(SysRoleEntity::getId, roleIds));
-    }
-
-    private RoleData loadRoleData(String tenantId, Set<String> roleCodes, List<SysRoleEntity> roles) {
-        if (roleCodes.isEmpty()) {
-            return new RoleData(new HashSet<>(), DataScopeType.SELF, new HashSet<>());
-        }
-        DataScopeType dataScopeType = roles.stream()
-                .map(SysRoleEntity::getDataScopeType)
-                .map(this::parseScope)
-                .max(java.util.Comparator.comparingInt(this::scopeWeight))
-                .orElse(DataScopeType.SELF);
-        Set<Long> customDeptIds = roles.stream()
-                .filter(role -> parseScope(role.getDataScopeType()) == DataScopeType.CUSTOM)
-                .flatMap(role -> rolePayloadCodec.readDeptIds(role.getDataScopeValueJson()).stream())
+                .eq(SysUserRoleEntity::getUserId, userId))
+                .stream()
+                .map(SysUserRoleEntity::getRoleId)
                 .collect(Collectors.toSet());
-        boolean superAdmin = "platform".equals(tenantId) && roleCodes.contains("ADMIN");
-        Set<String> permissionCodes = roleGrantQueryFacade.resolveGrantKeys(tenantId, roleCodes, superAdmin);
-        return new RoleData(permissionCodes, dataScopeType, customDeptIds);
-    }
-
-    private DataScopeType parseScope(String value) {
-        if (!org.springframework.util.StringUtils.hasText(value)) {
-            return DataScopeType.SELF;
-        }
-        try {
-            return DataScopeType.valueOf(value);
-        } catch (IllegalArgumentException ex) {
-            log.debug("未知的用户数据范围类型，回退为 SELF。value={}", value);
-            return DataScopeType.SELF;
-        }
-    }
-
-    private int scopeWeight(DataScopeType scopeType) {
-        return switch (scopeType) {
-            case SELF -> 1;
-            case DEPT -> 2;
-            case DEPT_AND_CHILDREN -> 3;
-            case CUSTOM -> 4;
-            case ALL -> 5;
-        };
-    }
-
-    private record RoleData(Set<String> permissionCodes, DataScopeType dataScopeType, Set<Long> customDeptIds) {
     }
 }

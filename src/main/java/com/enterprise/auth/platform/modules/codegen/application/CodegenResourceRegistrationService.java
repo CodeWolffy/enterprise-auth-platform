@@ -8,7 +8,7 @@ import com.enterprise.auth.platform.modules.menu.application.MenuTemplateMutatio
 import com.enterprise.auth.platform.modules.menu.application.MenuTemplateMutationFacade.MenuTemplateNode;
 import com.enterprise.auth.platform.modules.role.application.RoleMenuMutationFacade;
 import com.enterprise.auth.platform.modules.tenant.application.TenantMenuService;
-import com.enterprise.auth.platform.modules.tenant.infrastructure.TenantProperties;
+import com.enterprise.auth.platform.common.context.TenantProperties;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
